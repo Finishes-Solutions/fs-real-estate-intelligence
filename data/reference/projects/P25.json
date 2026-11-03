@@ -1,0 +1,601 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P25",
+  "name": "Hawthorn Cottages",
+  "location": "Dublin (Malahide Road), Ireland",
+  "family": "hawthorn",
+  "partition": "dev",
+  "forms": [
+    "podium",
+    "tower-on-podium",
+    "mid-rise-corridor-elevator"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+      "sha256": "02765bfac7764f5b0db44d61f95b5f3805573fbd13f415af191afe112d69ad77",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "HTC-06-00-DR-DA-AR-A002",
+          "title": "Site layout plan",
+          "revision": "rev 5 (LRD Stage 3)",
+          "date": "2026-07-30"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P25_Hawthorn/016_PROPOSED_SITE_PLAN_LEVEL_00_pdf_1051_KB.pdf",
+      "sha256": "b7e07d73bfd517a1ffd6ce41f27c4e854cee0e79c969f32f94ce9511cac92ff0",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "HTC-06-00-DR-DA-AR-A100",
+          "title": "Site plans - level 00",
+          "revision": "rev 10",
+          "date": "2026-08-21"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P25_Hawthorn/014_PROPOSED_SECTIONS_pdf_674_KB.pdf",
+      "sha256": "99cd9a1b371300de99f585c8351eab469d669206cfcb3959728d78d20e0ad47a",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "HTC-06-XX-DR-DA-AR-A300",
+          "title": "Proposed sections",
+          "revision": "rev 6",
+          "date": "2026-07-30"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P25_Hawthorn/009_PROPOSED_FLOOR_PLANS_LEVEL_02_04_pdf_549_KB.pdf",
+      "sha256": "a2347ff8f7809dd451bbf6c39a02e9ec096eb0b04e87ba67e62a4df153db9d97",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": null,
+          "title": "Floor plans level 02-04",
+          "revision": null,
+          "date": null
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ha": {
+      "v": 0.42,
+      "units": "ha",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "area_ac": {
+      "v": 1.04,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "0.42 ha x 2.471"
+    },
+    "units": {
+      "v": 126,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_du_ac": {
+      "v": 121,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "126/1.04"
+    },
+    "gia_m2": {
+      "v": 10529,
+      "units": "m2",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "footprint_L01_m2": {
+      "v": 1393.7,
+      "units": "m2",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "footprint_L00_m2": {
+      "v": 2636,
+      "units": "m2",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/016_PROPOSED_SITE_PLAN_LEVEL_00_pdf_1051_KB.pdf",
+        "page": 1,
+        "sheet": "A100"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "incl. car parking spaces"
+    },
+    "communal_open_space_m2": {
+      "v": 1164,
+      "units": "m2",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "podium 914 + roof terrace 250"
+    },
+    "public_open_space_m2": {
+      "v": 1097,
+      "units": "m2",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "ground 922 + podium 175"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "A",
+      "label": "Building A (tallest)",
+      "count": 1,
+      "floors": {
+        "v": 11,
+        "units": "residential storeys over podium",
+        "src": {
+          "file": "01_Original_Collection/plans/P25_Hawthorn/014_PROPOSED_SECTIONS_pdf_674_KB.pdf",
+          "page": 1,
+          "sheet": "A300"
+        },
+        "method": "printed-dimension",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "L01-L11; roof L12 +58.600"
+      },
+      "shape": "irregular bar",
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": 802,
+          "units": "m2",
+          "src": {
+            "file": "01_Original_Collection/plans/P25_Hawthorn/016_PROPOSED_SITE_PLAN_LEVEL_00_pdf_1051_KB.pdf",
+            "page": 1,
+            "sheet": "A100"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "L01 GIA; L02-04 797; L05-07 565; L08 565; L09-11 344"
+        }
+      },
+      "units_per_building": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "double-loaded core layout seen on plans; not verified"
+      },
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "podium L00 below",
+      "gsf": {
+        "v": null,
+        "units": "m2",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "B",
+      "label": "Building B",
+      "count": 1,
+      "floors": {
+        "v": 7,
+        "units": "residential storeys over podium",
+        "src": {
+          "file": "01_Original_Collection/plans/P25_Hawthorn/014_PROPOSED_SECTIONS_pdf_674_KB.pdf",
+          "page": 1,
+          "sheet": "A300"
+        },
+        "method": "printed-dimension",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "top +46.600"
+      },
+      "shape": "irregular bar",
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": 483,
+          "units": "m2",
+          "src": {
+            "file": "01_Original_Collection/plans/P25_Hawthorn/016_PROPOSED_SITE_PLAN_LEVEL_00_pdf_1051_KB.pdf",
+            "page": 1,
+            "sheet": "A100"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "L01 GIA; L02-07 509"
+        }
+      },
+      "units_per_building": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "podium L00 below",
+      "gsf": {
+        "v": null,
+        "units": "m2",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "floor_to_floor": {
+    "podium_mm": {
+      "v": 4000,
+      "units": "mm",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/014_PROPOSED_SECTIONS_pdf_674_KB.pdf",
+        "page": 1,
+        "sheet": "A300"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "typical_mm": {
+      "v": 3000,
+      "units": "mm",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/014_PROPOSED_SECTIONS_pdf_674_KB.pdf",
+        "page": 1,
+        "sheet": "A300"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    }
+  },
+  "unit_types": [
+    {
+      "name": "1 Bed 2 Person",
+      "beds": 1,
+      "baths": null,
+      "sf": "approx 45-50 m2",
+      "count": {
+        "v": 79,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P25_Hawthorn/009_PROPOSED_FLOOR_PLANS_LEVEL_02_04_pdf_549_KB.pdf",
+          "page": 1,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "text-only",
+        "note": "summed across level schedules"
+      }
+    },
+    {
+      "name": "2 Bed 4 Person",
+      "beds": 2,
+      "baths": null,
+      "sf": "approx 73-81 m2",
+      "count": {
+        "v": 47,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P25_Hawthorn/009_PROPOSED_FLOOR_PLANS_LEVEL_02_04_pdf_549_KB.pdf",
+          "page": 1,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "text-only"
+      }
+    }
+  ],
+  "parking": {
+    "provided": {
+      "v": 75,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "car share 2 + resident 69 + disabled 4"
+    },
+    "stall_mm": {
+      "v": "2400 x 4800",
+      "units": "mm",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "aisle_mm": {
+      "v": 6000,
+      "units": "mm",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/016_PROPOSED_SITE_PLAN_LEVEL_00_pdf_1051_KB.pdf",
+        "page": 1,
+        "sheet": "A100"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "motorbike": {
+      "v": 4,
+      "units": "spaces",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "cycle": {
+      "v": 237,
+      "units": "spaces",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "173 resident + 64 visitor"
+    },
+    "ratio_per_unit": {
+      "v": 0.6,
+      "units": "stalls/unit",
+      "src": {
+        "file": "01_Original_Collection/plans/P25_Hawthorn/015_PROPOSED_SITE_LAYOUT_PLAN_pdf_474_KB.pdf",
+        "page": 1,
+        "sheet": "A002"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "75/126"
+    },
+    "type": "podium (ground level under podium deck)"
+  },
+  "amenities": [
+    "podium communal garden",
+    "roof terrace",
+    "bike stores",
+    "public realm"
+  ],
+  "access": [
+    "Malahide Road (east) main entrance + car park entry"
+  ],
+  "project_rules": [
+    {
+      "rule": "building separation A-B (printed)",
+      "value": 16000,
+      "units": "mm",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "GIA by level sum",
+      "values": "507+1285+3x1306+3x1074+565+3x344 = 10,529",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "unit schedules sum",
+      "values": "10+51+14+14+14+8+5+10 = 126",
+      "result": "consistent",
+      "note": "text-extracted from level schedules"
+    }
+  ],
+  "open_questions": [
+    "building footprints in ft (not scaled)",
+    "lift/stair counts",
+    "revision dates printed as 2026 on sheets (as found)"
+  ],
+  "manifest_name": "Hawthorn"
+}

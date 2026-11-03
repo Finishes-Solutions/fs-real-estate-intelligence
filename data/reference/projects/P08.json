@@ -1,0 +1,488 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P08",
+  "name": "130-unit Ennis apartment concept",
+  "location": "Ennis, TX",
+  "family": "ennis-concept",
+  "partition": "dev",
+  "forms": [
+    "garden-breezeway"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+      "sha256": "8dd8a8cd009e903629b8902f5b521ddf187dcbfeb7bed99b7f0c628d464b9dd7",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "concept site plan",
+          "title": "Concept site plan (Ikemire Architects)",
+          "revision": null,
+          "date": "2024-01-16"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ac": {
+      "v": 5.95,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "units": {
+      "v": 130,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_du_ac": {
+      "v": 22,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "coverage_pct": {
+      "v": 28.5,
+      "units": "%",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "buildings": {
+      "v": 6,
+      "units": "buildings",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "(4) 3-story + (2) 2-story"
+    },
+    "inner_label_ac": {
+      "v": 4.473,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "low",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "unexplained acreage label inside site"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "3S",
+      "label": "3-story breezeway building",
+      "count": {
+        "v": 4,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 147.6,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+            "page": 1,
+            "sheet": "concept site plan"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed",
+          "note": "graphic scale 0-160 ft = 131.9 pt (1.213 ft/pt); printed 1\"=80' does not match (sheet reduced); stall pitch check 9.06 ft; +/-3 ft"
+        },
+        "d_ft": {
+          "v": 66.4,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+            "page": 1,
+            "sheet": "concept site plan"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed",
+          "note": "includes projections"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 24,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 8,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "4 per side, double-loaded on 2 open breezeways"
+      },
+      "unit_mix": {},
+      "corridor": "breezeway (open stairs)",
+      "stairs": {
+        "v": 2,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "2S",
+      "label": "2-story breezeway building",
+      "count": {
+        "v": 2,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 2,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 17,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "derived",
+        "confidence": "low",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "one bldg 16, one 18 (2 single-story end units); total 34"
+      },
+      "units_per_floor": {
+        "v": 8,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "derived",
+        "confidence": "low",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {},
+      "corridor": "breezeway",
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "1BR",
+      "beds": 1,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 86,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "2BR",
+      "beds": 2,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 44,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+          "page": 1,
+          "sheet": "concept site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    }
+  ],
+  "parking": {
+    "required": {
+      "v": 217,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "provided": {
+      "v": 232,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "ratio_per_unit": {
+      "v": 1.78,
+      "units": "stalls/unit",
+      "src": {
+        "file": "01_Original_Collection/plans/P08_130_unit_Ennis_apartment_concept/001_130_unit_Ennis_apartment_concept.pdf",
+        "page": 1,
+        "sheet": "concept site plan"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "232/130"
+    },
+    "type": "surface"
+  },
+  "amenities": [
+    "clubhouse",
+    "pool",
+    "storage cubbies"
+  ],
+  "access": [
+    "2 drives on Physician's Blvd",
+    "exit toward S.H. 34"
+  ],
+  "project_rules": [
+    {
+      "rule": "building setback",
+      "value": 10,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "unit mix",
+      "values": "86+44=130",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "density",
+      "values": "130/5.95=21.8 vs printed 22",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "units by building",
+      "values": "4x24 + 16 + 18 = 130",
+      "result": "consistent",
+      "note": "2-story split estimated from plan"
+    }
+  ],
+  "open_questions": [
+    "meaning of 4.473 ac label",
+    "unit sizes",
+    "adjacent 2.1 ac 'future retail' is outside project"
+  ],
+  "manifest_name": "130-unit Ennis apartment concept"
+}

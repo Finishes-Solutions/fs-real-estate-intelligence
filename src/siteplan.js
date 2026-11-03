@@ -29,6 +29,8 @@ import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort, aiPi
 import * as CU from './lib/customtypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
+import * as LV from './lib/layoutcheck.mjs';
+import * as LB from './lib/layoutbrief.mjs';
 import * as STG from './lib/planstages.mjs';
 import * as PARC from './lib/siteparcels.mjs';
 import * as RF from './lib/sitefiles.mjs';
@@ -2979,8 +2981,28 @@ export function initSitePlan(ctx) {
       (byStory.length ? '<table class="sp-mixt"><tr><th>Home</th><th>Living sf</th><th>Homes</th></tr>' + byStory.map(([n, c]) => '<tr><td>' + (n === 'tiny' ? 'Tiny home' : n + '-story') + '</td><td>' + f0(n === 'tiny' ? tinySf : SP.HOME_TYPES[n].sf) + '</td><td>' + c + '</td></tr>').join('') + '</table>' : '') +
       (cs ? customBlock(cs) : '') + walkLine(pl) +
       (issues.length ? '<ul class="sp-issues">' + issues.map(i => '<li class="' + i.level + '">' + esc(i.text) + '</li>').join('') + '</ul>' : m.gfa ? '<div class="rnote sp-ok">Fits the setbacks' + (m.spaces >= m.required ? ' and parks' : '') + (gOn ? ', within the planning checks' : '') + '.</div>' : '') +
-      (gOn ? guardNums(pl) : '');
+      (gOn ? guardNums(pl) : '') + verifyBlock(pl);
     el.querySelector('#spSaveType')?.addEventListener('click', saveTypeToLib); if (gOn) wireGuard();
+    el.querySelector('#spVerify')?.addEventListener('toggle', ev => { verifyOpen = ev.target.open; if (verifyOpen) ev.target.querySelector('.sp-vbody').innerHTML = verifyHTML(PL()); });
+  }
+  // The independent check (lib/layoutcheck.mjs): the plan as drawn measured against what was asked and the stated rules,
+  // each check pass / fail / unknown with the rule it rests on. Worked out only while it's open (big plans take a moment).
+  let verifyOpen = false;
+  function verifyBlock(pl) {
+    if (!pl.elements.some(e => e.kind === 'building')) return '';
+    return '<details class="sp-verify" id="spVerify"' + (verifyOpen ? ' open' : '') + '><summary>Independent check' + infoBtn('Measured from the drawing itself, not from the layout engine’s own numbers: inside the property line, setbacks, nothing on excluded land, no overlaps at the same level, a way in from a street edge, every drive and parking row connected, parking required against provided, the program as asked, units against each building. Unknown means the evidence isn’t there, never a pass. Drainage, turning movements, fire route distance, grading and utilities are not checked.') + '</summary><div class="sp-vbody">' + (verifyOpen ? verifyHTML(pl) : '') + '</div></details>';
+  }
+  function verifyHTML(pl) {
+    let r; try {
+      const brief = LB.canonicalBrief(LB.briefFromProgram(pl.program, pl, { text: '' })), fm = SP.fillMode(pl.params);
+      for (const u of brief.program.uses) if (u.quantity.mode !== 'maximize') u.quantity.mode = fm === 'hold' ? 'exact' : 'min'; // what Leftover land says the size means
+      r = LV.validateLayout(pl, brief);
+    } catch (e) { return '<div class="rnote">The check couldn’t run on this plan: ' + esc(e.message) + '</div>'; }
+    const icon = { pass: '✓', fail: '✕', unknown: '?', 'n/a': '–' }, val = v => v == null ? '' : Array.isArray(v) ? v.join('–') : typeof v === 'object' ? Object.entries(v).map(([k, x]) => k + ' ' + x).join(', ') : typeof v === 'number' ? f0(v) : String(v);
+    const head = { pass: 'Passes every check it can measure', fail: 'Fails ' + r.failed.length + ' check' + (r.failed.length > 1 ? 's' : ''), incomplete: 'No failures, but ' + r.unresolved.length + ' check' + (r.unresolved.length > 1 ? 's' : '') + ' can’t be settled from what’s known' }[r.status];
+    return '<div class="sp-vhead ' + r.status + '">' + esc(head) + (r.restsOnAssumptions.length ? ' · ' + r.restsOnAssumptions.length + ' rest on planning assumptions' : '') + '</div><ul class="sp-vlist">' +
+      r.checks.map(c => '<li class="' + c.status.replace('/', '') + '"><b>' + icon[c.status] + '</b> ' + esc(c.title) + (c.measured != null || c.required != null ? ' <small>' + esc((c.measured != null ? val(c.measured) + (c.units ? ' ' + c.units : '') : '') + (c.required != null ? ' · required ' + val(c.required) : '')) + '</small>' : '') +
+        '<small class="sp-vrule">' + esc((c.basis === 'assumption' ? 'Assumption: ' : c.basis === 'verified' ? 'Rule: ' : '') + (c.rule || '')) + (c.note ? ' ' + esc(c.note) : '') + '</small>' + (c.features?.length && c.status === 'fail' ? '<small class="sp-vfeat">' + esc(c.features.slice(0, 6).join('; ')) + (c.features.length > 6 ? ' …' : '') + '</small>' : '') + '</li>').join('') + '</ul>';
   }
   // the basis of a plan's leasable area in a few words: one use's own, or 'by use'
   const leasableWhy = a => { const k = Object.keys(a.uses).filter(u => u !== 'amenity' && a.uses[u].gsf > 0); return k.length === 1 ? a.uses[k[0]].basis || '' : 'by use, as the Pro forma counts it'; };

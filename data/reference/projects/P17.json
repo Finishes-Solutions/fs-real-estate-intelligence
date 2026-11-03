@@ -1,0 +1,440 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P17",
+  "name": "Pointe Grand Columbia Phase 2",
+  "location": "Columbia, SC",
+  "family": "pointe-grand-columbia",
+  "partition": "dev",
+  "forms": [
+    "garden-breezeway",
+    "garage-detached"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+      "sha256": "7453b643461aaae78fc5bd59c207d1234320809025b04d3fb0009a28a38ce20d",
+      "pages_used": [
+        1,
+        6,
+        7,
+        17,
+        23
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": null,
+          "title": "Planning Commission staff report",
+          "revision": null,
+          "date": "2022-11-10"
+        },
+        {
+          "page": 17,
+          "sheet": "A0",
+          "title": "36 unit apartment building (raster)",
+          "revision": null,
+          "date": "2020-04-24"
+        },
+        {
+          "page": 23,
+          "sheet": "Site / Parking Plan",
+          "title": "Site / parking plan site notes (raster)",
+          "revision": null,
+          "date": null
+        }
+      ]
+    }
+  ],
+  "site": {
+    "tract_ac": {
+      "v": 26.58,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "units_phase2": {
+      "v": 36,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "units_phase1_2": {
+      "v": 258,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_ph2_du_ac": {
+      "v": 1.35,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_ph1_2_du_ac": {
+      "v": 9.7,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "max_height_ft": {
+      "v": 45,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "coverage_sf": {
+      "v": 28931.15,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "apartments 14,331.15 + garages 14,600; 2.48%"
+    },
+    "zoning": {
+      "v": "Employment Campus (from C1)",
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "APT36",
+      "label": "36-unit 3-story garden building",
+      "count": {
+        "v": 1,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 23,
+          "sheet": "Site / Parking Plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 23,
+          "sheet": "Site / Parking Plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 252.58,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+            "page": 17,
+            "sheet": "A0"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "252'-7\" = 84'-6\" + 83'-7\" + 84'-6\""
+        },
+        "d_ft": {
+          "v": 48.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+            "page": 17,
+            "sheet": "A0"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "body; patios/stairs add ~9'-9\""
+        },
+        "area_sf": {
+          "v": 14331,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+            "page": 23,
+            "sheet": "Site / Parking Plan"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "apartment building coverage"
+        }
+      },
+      "units_per_building": {
+        "v": 36,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 7,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "units_per_floor": {
+        "v": 12,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 17,
+          "sheet": "A0"
+        },
+        "method": "derived",
+        "confidence": "high",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {
+        "2BR": 36
+      },
+      "corridor": "breezeway (open stairs)",
+      "stairs": {
+        "v": 3,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 17,
+          "sheet": "A0"
+        },
+        "method": "printed-dimension",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "counted on plan"
+      },
+      "elevators": {
+        "v": 0,
+        "units": "elevators",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 17,
+          "sheet": "A0"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "none shown"
+      },
+      "parking": "surface + 10 detached garages",
+      "gsf": {
+        "v": 41397,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 17,
+          "sheet": "A0"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "13,799 sf/floor x 3"
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "2BR",
+      "beds": 2,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 36,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+          "page": 6,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      }
+    }
+  ],
+  "parking": {
+    "required": {
+      "v": 63,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "1.75/unit"
+    },
+    "provided": {
+      "v": 59,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "47 std + 2 accessible + 10 garages; 1.63/unit"
+    },
+    "garages": {
+      "v": 10,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "bike_required": {
+      "v": 11,
+      "units": "spaces",
+      "src": {
+        "file": "01_Original_Collection/plans/P17_Pointe_Grand_Columbia_Phase_2/001_Pointe_Grand_Columbia_Phase_2.pdf",
+        "page": 23,
+        "sheet": "Site / Parking Plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "type": "surface + detached garages"
+  },
+  "amenities": [
+    "phase 1 clubhouse, fitness, pool (shared)"
+  ],
+  "access": [
+    "Research Drive (via phase 1)"
+  ],
+  "project_rules": [
+    {
+      "rule": "max building height",
+      "value": 45,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "parking ratio required",
+      "value": 1.75,
+      "units": "stalls/unit",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "parking",
+      "values": "47+2+10=59 vs 63 required",
+      "result": "discrepancy",
+      "note": "plan notes a reduction (note 3); provided < required"
+    },
+    {
+      "check": "density",
+      "values": "36/26.58=1.354; 258/26.58=9.71",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "coverage vs impervious",
+      "values": "garages coverage 14,600 vs garage impervious 7,000",
+      "result": "discrepancy",
+      "note": "printed values disagree"
+    },
+    {
+      "check": "footprint vs floor area",
+      "values": "coverage 14,331 vs 13,799 sf/floor",
+      "result": "consistent",
+      "note": "coverage includes stairs/patios"
+    },
+    {
+      "check": "tract acreage",
+      "values": "site notes 26.58 vs staff report \u00b128.58",
+      "result": "discrepancy",
+      "note": "staff report likely typo"
+    }
+  ],
+  "open_questions": [
+    "unit sf (not legible on raster)"
+  ],
+  "manifest_name": "Pointe Grand Columbia Phase 2"
+}

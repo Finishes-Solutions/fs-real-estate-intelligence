@@ -1,0 +1,614 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P35",
+  "name": "Sierra Vista WB-30 Senior Apartments (Westbrook)",
+  "location": "Roseville, CA",
+  "family": "sierra-vista-westbrook",
+  "partition": "holdout",
+  "forms": [
+    "mid-rise-corridor-elevator"
+  ],
+  "overlays": [
+    "senior",
+    "affordable"
+  ],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+      "sha256": "7ce425dfc178eaf84661c90acaa969606bec6fb9ce617865d1306a76cbd3cf08",
+      "pages_used": [
+        1,
+        3,
+        11,
+        12
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "Sheet 1 of 4",
+          "title": "Preliminary site plan (Morton & Pitalo)",
+          "revision": null,
+          "date": "2023-08-19"
+        },
+        {
+          "page": 12,
+          "sheet": "A1-01",
+          "title": "Conceptual composite plans (KTGY)",
+          "revision": "conceptual design",
+          "date": "2022-11-04"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ac": {
+      "v": 8.06,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "units": {
+      "v": 355,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "permitted_units": {
+      "v": 237,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_bonus_pct": {
+      "v": 49.8,
+      "units": "%",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_du_ac": {
+      "v": 43.4,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "zoning": {
+      "v": "HDR / R3",
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "building_floor_area_sf": {
+      "v": 95450,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "lot_coverage_pct": {
+      "v": 27.2,
+      "units": "%",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "max_height_ft": {
+      "v": 50,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "64-plex; clubhouse 50 ft"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "64PLEX",
+      "label": "KTGY 64-plex senior building",
+      "count": {
+        "v": 5,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 1,
+          "sheet": "Sheet 1 of 4"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 4,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 1,
+          "sheet": "Sheet 1 of 4"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "site plan labels '4 Stories 64 UNITS'"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 241,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+            "page": 12,
+            "sheet": "A1-01"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed",
+          "note": "graphic scale 0-4-8-16 ft (9.0 pt/ft); +/-3 ft"
+        },
+        "d_ft": {
+          "v": 83,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+            "page": 12,
+            "sheet": "A1-01"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed",
+          "note": "incl. bays"
+        },
+        "area_sf": {
+          "v": 17100,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+            "page": 1,
+            "sheet": "Sheet 1 of 4"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "'building floor area' per 64-plex; lot coverage math implies footprint"
+        }
+      },
+      "units_per_building": {
+        "v": 64,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 1,
+          "sheet": "Sheet 1 of 4"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 16,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 1,
+          "sheet": "Sheet 1 of 4"
+        },
+        "method": "derived",
+        "confidence": "high",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "64/4"
+      },
+      "unit_mix": {
+        "1BR/1BA (707 sf)": "?",
+        "2BR/2BA (943 sf)": "?"
+      },
+      "corridor": "double-loaded interior corridor (Hall 1 / Hall 2) with central lobby",
+      "stairs": {
+        "v": 2,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 12,
+          "sheet": "A1-01"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "elevators": {
+        "v": 2,
+        "units": "elevators",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 12,
+          "sheet": "A1-01"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "only footprint printed"
+      }
+    },
+    {
+      "type_id": "CLUB35",
+      "label": "Clubhouse building with 35 units",
+      "count": {
+        "v": 1,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 3,
+          "sheet": "Sheet 3 of 4"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 4,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 3,
+          "sheet": "Sheet 3 of 4"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": 9950,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+            "page": 1,
+            "sheet": "Sheet 1 of 4"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": {
+        "v": 35,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+          "page": 3,
+          "sheet": "Sheet 3 of 4"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "1BR/1BA",
+      "beds": 1,
+      "baths": 1,
+      "sf": 707,
+      "count": {
+        "v": null,
+        "units": "units",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "count not printed"
+      }
+    },
+    {
+      "name": "2BR/2BA",
+      "beds": 2,
+      "baths": 2,
+      "sf": 943,
+      "count": {
+        "v": null,
+        "units": "units",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "parking": {
+    "required": {
+      "v": 391,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "1/unit + 10% guest"
+    },
+    "provided": {
+      "v": 404,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "6 compact, 6 motorcycle, 28 accessible"
+    },
+    "ratio_per_unit": {
+      "v": 1.14,
+      "units": "stalls/unit",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed"
+    },
+    "type": "surface",
+    "stall_d_ft": {
+      "v": 16,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "standard 16' w/ 2' overhang; compact 14'"
+    },
+    "stall_w_ft": {
+      "v": 9,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 1,
+        "sheet": "Sheet 1 of 4"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "drive_aisle_ft": {
+      "v": 27,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P35_Sierra_Vista_WB_30_Senior_Apartments/001_Sierra_Vista_WB_30_Senior_Apartments.pdf",
+        "page": 3,
+        "sheet": "Sheet 3 of 4"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "east boundary section: 16' parking + 27' aisle + 16' parking in 70' easement"
+    }
+  },
+  "amenities": [
+    "clubhouse (9,950 sf)"
+  ],
+  "access": [
+    "Santucci Blvd",
+    "Pleasant Grove Blvd"
+  ],
+  "project_rules": [
+    {
+      "rule": "max height 64-plex",
+      "value": 50,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "parking: 1/unit + 10% guest (senior)",
+      "value": 1.1,
+      "units": "stalls/unit",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "min walk adjacent to parking stalls",
+      "value": 6,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "shared access & drainage easement with WB-31",
+      "value": 70,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "units vs buildings",
+      "values": "5x64 + 35 = 355 vs 355",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "floor area",
+      "values": "5x17,100 + 9,950 = 95,450 vs 95,450",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "density",
+      "values": "355/8.06 = 44.04 vs printed 43.4",
+      "result": "discrepancy",
+      "note": ""
+    },
+    {
+      "check": "lot coverage",
+      "values": "95,450/(8.06 ac x 43,560) = 27.2% vs printed 27.2%",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "stall numbering",
+      "values": "site plan stalls numbered 1..404 consecutively vs 404 provided",
+      "result": "consistent",
+      "note": "text-layer check"
+    }
+  ],
+  "open_questions": [
+    "unit mix counts per building",
+    "scaled footprint 241x83 (20,000 sf) exceeds printed 17,100 sf; outline has notches/bays - use printed area"
+  ],
+  "manifest_name": "Sierra Vista WB-30 Senior Apartments"
+}

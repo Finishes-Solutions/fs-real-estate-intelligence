@@ -156,3 +156,18 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - The map's facades show only when the map is **tilted**: from straight above, the plan's colour by use and the selection highlight matter more than roofs. The picture-taking map for renderings always has them. Phase 2 buildings stay plain, faint massing.
 - A retail or office building faces the side with the most parking stalls (it faced the service drive on the test retail site).
 
+
+## Deterministic layout runs and the independent validator (2026-11-03, branch matthew/site-engine-update-110326)
+
+- **Wrap the engine, don't rewrite it.** The heuristic engine already draws most forms; the gaps were reproducibility, quantity meaning and independent checking. A run layer (brief → deterministic run → validator → ranked record) fixes those without touching its layout logic.
+- **Determinism by a seeded generator and a virtual clock** (lib/enginectx.mjs), not by removing the time budgets: the engine's budgets become evaluation budgets (25 virtual ms a clock read). The app's live behaviour is unchanged outside a run.
+- **A number with no qualifier is exact.** The earlier "fill the site" default stays for the live Build flow (its Leftover land setting); briefs say what they mean.
+- **The validator shares only the shape decoder and the drawn stall marks with the engine**, so it judges the drawing the user sees; it never reads the engine's scores, checks or metrics.
+- **Unknown is a status of its own.** A check without a rule (building separation without a stated distance) or without evidence (garage stall estimates, units estimated from floor area) is unknown, never pass; drainage, turning, fire route and grading are always unknown.
+- **Drive aprons may cross an allowed street edge** by up to 40 ft (they meet the street in the right-of-way); any other overshoot fails containment.
+- **Exact counts are met by trimming whole modules or homes**; when whole modules can't reach the count it stays short or over and the program check fails. Parking short of required takes modules off; no parking tolerance.
+- **Templates only from dev-partition evidence.** Holdout families (Sierra Vista, Lake Shore, Anderson, and the hash-assigned rest) stay for evaluation. Garden module = one breezeway stack (75 × 60 ft, 4 units a floor) from the 24-unit bar on three projects; mid-rise bay 50 × 65 ft from Creekview (one family); 5-floor mid-rise is an extrapolation, labelled an estimate.
+- **A bar up to 5% short of whole modules counts them at its drawn length.** The engine's generator draws 143 ft garden bars; the reviewed 24-unit bars span 146–154 ft. Never stretched.
+- **No form is marked "validated" yet**: the benchmark is synthetic; courtyard and anchored center were downgraded to partial after the benchmark drawings showed corner overlaps and a single-box center.
+- **Proven infeasible only from a bound**: the footprint at the most floors a form allows exceeds the land inside the setbacks. Anything else that finds nothing is "no feasible layout found".
+- **Two failing tests were left failing** (test/layoutasks.mjs townhome commons; test/streetnet.mjs street bend 30 vs 60 ft): both fail identically on the base commit 50c0f1b. The layoutasks pads failure was fixed (pads only for shop, restaurant, office, medical and other uses).
