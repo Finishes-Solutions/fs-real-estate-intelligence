@@ -3,6 +3,12 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-03
+
+### 12:00 PM CT: Monthly businesses-and-places refresh fixed; terrain back on the detailed elevation image (this push)
+- **The Nov 3 refresh of businesses and places failed before loading anything.** The database tool it uses released a new version that no longer accepts one piece of the query's wording. The query now uses the new wording, and the job is locked to that tool version so a future release can't break it the same way. The places already on the map were not touched by the failed run; they are from the last successful load and update on the next run.
+- **Topography and terrain use the full-detail USGS elevation image again.** A merge on Nov 2 dropped the part that reads that image, so terrain quietly fell back to the older, coarser elevation sampling. It is back.
+
 ## 2026-11-02
 
 ### 5:39 PM CT: Main catches up with the experimental branch and three side branches (db044da, b535cb1, 1b76dbd, 03167ac, this push)
