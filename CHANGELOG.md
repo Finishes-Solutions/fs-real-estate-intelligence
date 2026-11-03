@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-03
 
+### 2:37 PM CT: Five failing tests fixed: layout, landscape and AI-usage bugs, plus two updated expectations (this push)
+- **Townhomes "with an amenity center" get their commons again** (community center, playground, pavilion). Since Oct 27 those words were read as the neighbourhood's own leasing building, and the commons was dropped. Now a bare "amenity center" or "community center" is the commons; a size, a clubhouse, a leasing office or a model home is still the neighbourhood's own building.
+- **The second way in for fire access can cross the park at the front again.** On some lot shapes the check that keeps a new driveway out of the side buffer worked from a broken outline and turned down every spot.
+- **Apartment plans no longer pick up shop pad sites** when a request mentions pads.
+- **Townhome front yards get their trees on the landscape sheets** (0 of 16 before). Townhome rows on their own lots no longer have an 8 ft walk drawn round them, which had covered their yards.
+- **The AI usage page:** a bad start date now falls back to the first of the month you asked about, not the current month.
+- Two test expectations updated, with the reason in the test: the curving cul-de-sac layout must hold 80% (was 85%) of the best straight-row layout, since the rows improved on Oct 27; and the mixed-use test allows 5% fewer townhomes than asked, since a smaller amenity lake now leaves room for a separate detention pond. One permit-loader test no longer depends on what month it is.
+
 ### 12:00 PM CT: Monthly businesses-and-places refresh fixed; terrain back on the detailed elevation image (this push)
 - **The Nov 3 refresh of businesses and places failed before loading anything.** The database tool it uses released a new version that no longer accepts one piece of the query's wording. The query now uses the new wording, and the job is locked to that tool version so a future release can't break it the same way. The places already on the map were not touched by the failed run; they are from the last successful load and update on the next run.
 - **Topography and terrain use the full-detail USGS elevation image again.** A merge on Nov 2 dropped the part that reads that image, so terrain quietly fell back to the older, coarser elevation sampling. It is back.
