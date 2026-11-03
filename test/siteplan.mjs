@@ -400,8 +400,13 @@ for (const v of [0, 1, 2]) {
 
 // ---- /api/projects ----
 { const store = []; let table = true;
+  const files = new Map(); // the project-media bucket
   globalThis.fetch = async (url, opts = {}) => {
-    const u = new URL(String(url)), m = opts.method || 'GET'; if (!table) return new Response('{"code":"PGRST205","message":"Could not find the table public.site_projects"}', { status: 404 });
+    const u = new URL(String(url)), m = opts.method || 'GET';
+    if (u.pathname.startsWith('/storage/v1/object/list/')) { const pre = JSON.parse(opts.body).prefix; return Response.json([...files.keys()].filter(k => k.startsWith(pre)).map(k => ({ name: k.slice(pre.length) }))); }
+    if (u.pathname.startsWith('/storage/v1/object/project-media/')) { const k = decodeURIComponent(u.pathname.slice('/storage/v1/object/project-media/'.length)); if (m === 'POST') { files.set(k, opts.body); return new Response('{}'); } return files.has(k) ? new Response(files.get(k)) : new Response('not found', { status: 404 }); }
+    if (u.pathname === '/storage/v1/object/project-media' && m === 'DELETE') { for (const k of JSON.parse(opts.body).prefixes) files.delete(k); return new Response('[]'); }
+    if (!table) return new Response('{"code":"PGRST205","message":"Could not find the table public.site_projects"}', { status: 404 });
     if (m === 'GET') { const ids = u.searchParams.get('id'); return Response.json(ids ? store.filter(r => ids.slice(4, -1).split(',').map(x => x.replace(/"/g, '')).includes(r.id)) : store.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at))); }
     for (const r of JSON.parse(opts.body)) { const i = store.findIndex(x => x.id === r.id); if (i >= 0) store[i] = r; else store.push(r); }
     return new Response(null, { status: 201 });
@@ -409,13 +414,25 @@ for (const v of [0, 1, 2]) {
   process.env.SUPABASE_SECRET_KEY = 'sb_secret_test';
   const { default: handler } = await import('../api/projects.js');
   const mock = () => { const r = { code: 200, headers: {}, status(c) { r.code = c; return r; }, json(o) { r.body = o; return r; }, setHeader(k, v) { r.headers[k] = v; } }; return r; };
-  const call = async (method, body, headers = {}) => { const res = mock(); await handler({ method, body, headers: { 'x-forwarded-for': '8.8.8.8', ...headers } }, res); return res; };
+  const call = async (method, body, headers = {}, query = {}) => { const res = mock(); await handler({ method, body, query, headers: { 'x-forwarded-for': '8.8.8.8', ...headers } }, res); return res; };
   const doc = { id: 'p-katy1', name: 'Katy pad', updated: '2026-10-12T10:00:00Z', parcels: [], plans: [{ id: 'a', name: 'Option A', ring: [[0, 0], [1, 0], [0, 1]], elements: [] }] };
   let res = await call('POST', { name: 'Matthew', projects: [doc, { id: '../x', name: 'bad' }] }); assert.equal(res.code, 200); assert.equal(res.body.saved, 1, 'bad id dropped');
   res = await call('POST', { projects: [{ ...doc, name: 'stale copy', updated: '2026-10-11T10:00:00Z' }] }); assert.equal(res.body.skipped, 1, 'an older copy doesn’t overwrite');
   res = await call('GET'); assert.deepEqual(res.body.projects.map(p => p.name), ['Katy pad']); assert.equal(store[0].updated_by, 'Matthew');
   res = await call('POST', { deletes: ['p-katy1'] }); res = await call('GET'); assert.deepEqual(res.body, { projects: [], deleted: ['p-katy1'] }, 'deleted: a tombstone for other devices');
-  res = await call('POST', { projects: [{ ...doc, plans: [{ big: 'x'.repeat(600000) }] }] }); assert.equal(res.body.saved, 0, 'oversized project refused');
+  // a big project (several built options: megabytes) is kept whole: the row holds a summary, the bucket the project
+  const bigDoc = { id: 'p-big01', name: 'Big tract', updated: '2026-10-13T10:00:00Z', status: 'active', parcels: [{ label: '19730 FM 362', county: 'Waller', ring: [[0, 0]] }], plans: Array.from({ length: 8 }, (_, i) => ({ id: 'o' + i, name: 'Option ' + i, elements: Array.from({ length: 1500 }, (_, j) => ({ id: 'e' + j, kind: 'parking', x: j * 1.234567, y: i + j * 0.5, ring: [[j, i], [j + 1, i], [j, i + 1]] })) })) };
+  assert.ok(JSON.stringify(bigDoc).length > 600000, 'bigger than a row holds');
+  res = await call('POST', { name: 'Matthew', projects: [bigDoc] }); assert.deepEqual(res.body.savedIds, ['p-big01'], 'saved, and said so by id');
+  const row = store.find(r => r.id === 'p-big01'); assert.ok(row.doc.big && !row.doc.plans && JSON.stringify(row.doc).length < 5000, 'the row: a small summary'); assert.equal(row.doc.parcels[0].county, 'Waller');
+  assert.equal(row.size, undefined, 'no stray columns');
+  res = await call('GET', null, {}, { index: '1' }); assert.deepEqual(res.body.index.map(e => e.id).sort(), ['p-big01', 'p-katy1']);
+  res = await call('GET', null, {}, { ids: 'p-big01,p-katy1' }); assert.deepEqual(res.body.projects.find(p => p.id === 'p-big01'), { ...bigDoc, updated: '2026-10-13T10:00:00.000Z' }, 'comes back whole'); assert.deepEqual(res.body.more, []);
+  res = await call('POST', { projects: [{ ...bigDoc, updated: '2026-10-14T10:00:00Z' }] }); res = await call('POST', { projects: [{ ...bigDoc, updated: '2026-10-15T10:00:00Z' }] });
+  assert.equal([...files.keys()].filter(k => k.startsWith('p-big01/')).length, 2, 'older versions tidied, the newest two kept');
+  res = await call('POST', { projects: [{ ...bigDoc, updated: '2026-10-01T10:00:00Z' }] }); assert.deepEqual(res.body.newerIds, ['p-big01'], 'an older copy: the team has newer');
+  res = await call('POST', { projects: [{ ...doc, id: 'p-huge1', plans: [{ big: 'x'.repeat(4100000) }] }] }); assert.deepEqual(res.body.tooBig, ['p-huge1'], 'over 4 MB: refused, and named');
+  res = await call('POST', { deletes: ['p-big01'] }); assert.equal([...files.keys()].filter(k => k.startsWith('p-big01/')).length, 0, 'deleted: its files go too');
   process.env.FIELD_ACCESS_CODE = 'gate'; res = await call('GET'); assert.equal(res.code, 401); res = await call('GET', null, { 'x-field-code': 'gate' }); assert.equal(res.code, 200); delete process.env.FIELD_ACCESS_CODE;
   table = false; res = await call('GET'); assert.equal(res.code, 503); assert.equal(res.body.local, true, 'no table yet: the browser keeps projects on the device'); }
 

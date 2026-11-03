@@ -32,6 +32,7 @@ import * as BR from './lib/planbrief.mjs';
 import * as STG from './lib/planstages.mjs';
 import * as PARC from './lib/siteparcels.mjs';
 import * as RF from './lib/sitefiles.mjs';
+import { projectStore, browserIdb, mergeLoaded } from './lib/projectstore.mjs';
 import { siteFiles } from './sitefiles.js';
 import { workspace } from './workspace.js';
 import { teamLibrary } from './teamlib.js';
@@ -74,6 +75,8 @@ export const ADD_ICON = Object.fromEntries(Object.entries({
 }).map(([k, d]) => [k, '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>']));
 export const addAccent = k => k === 'pad' ? USE_COL.restaurant : k === 'roundabout' || k === 'loop' ? COL.drive : COL[k] || COL.building;
 const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+// localStorage, or (where the browser refuses it outright) a stand-in whose writes fail as blocked
+const safeLS = () => { try { const ls = localStorage; ls.getItem('x'); return ls; } catch (e) { const no = () => { throw Object.assign(new Error('storage blocked'), { name: 'SecurityError' }); }; return { getItem: () => null, setItem: no, removeItem: no }; } };
 const PS_PICK = { model: () => pickedClaude(get(PLANSET_MODEL_KEY)), effort: () => pickedEffort(get(PLANSET_EFFORT_KEY)) }; // Settings › AI model › Plan sets
 // Ultra's mark (the effort levels under Build): a four-point spark and a small one beside it
 const SPARK = '<svg class="sp-spark" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 1.5c.45 3.35 1.95 4.85 5.3 5.3-3.35.45-4.85 1.95-5.3 5.3-.45-3.35-1.95-4.85-5.3-5.3C5.05 6.35 6.55 4.85 7 1.5z"/><path fill="currentColor" opacity=".7" d="M13 10.3c.17 1.25.73 1.8 1.97 1.97-1.24.17-1.8.72-1.97 1.97-.17-1.25-.73-1.8-1.97-1.97 1.24-.17 1.8-.72 1.97-1.97z"/></svg>';
@@ -83,19 +86,26 @@ const clone = o => JSON.parse(JSON.stringify(o));
 
 export function initSitePlan(ctx) {
   const { map, esc, fmtN } = ctx, card = ctx.card, root = document.getElementById('view-projects');
-  let db = load(), ed = null, shared = null, syncT = 0, syncing = false, raf = 0;
+  const store = projectStore(KEY, safeLS(), browserIdb()), boot = store.load();
+  let db = boot.db, loaded = !boot.later, ed = null, shared = null, syncT = 0, syncing = false, raf = 0;
   const f0 = v => (Math.round(v) || 0).toLocaleString('en-US'), pct = v => (v * 100).toFixed(v < 0.1 ? 1 : 0) + '%';
   // the numbers and checks of a plan, under the Waller guardrails when they're on for it (lib/guardrails.mjs); exactly
   // lib/siteplan.mjs's for every other plan
   const GM = x => G.metrics(x), GC = x => G.check(x), GON = x => !!x && G.isOn(x);
 
   // ---------- storage and team sync ----------
-  function load() { try { const d = JSON.parse(localStorage.getItem(KEY) || '{}'); return { projects: d.projects || [], dirty: d.dirty || [], gone: d.gone || [] }; } catch (e) { return { projects: [], dirty: [], gone: [] }; } }
-  let persistT = 0; // written a moment after the last change, not on every one (a big plan is megabytes)
-  function persistNow() { clearTimeout(persistT); persistT = 0; try { localStorage.setItem(KEY, JSON.stringify(db)); saved(); return; } catch (e) { /* full: try lighter */ }
+  // the list lives in localStorage until it outgrows it, then in IndexedDB (lib/projectstore.mjs: Safari's localStorage
+  // holds about half what Chrome's does). From IndexedDB it arrives a moment after start: nothing is written or synced
+  // until it has, and what happened meanwhile is merged in.
+  const ready = boot.later ? boot.later.then(d => { db = mergeLoaded(d, db); loaded = true; badge(); if (ctx.view === 'projects') render(); if (persistT) persistNow(); sync(); }) : Promise.resolve();
+  let persistT = 0, saidFail = 0; // written a moment after the last change, not on every one (a big plan is megabytes)
+  function persistNow() { clearTimeout(persistT); persistT = 0; if (!loaded) { persistT = -1; return; } // (written once the stored list is in)
     // the browser's store is full: the saved layouts of options that aren't open keep their numbers only (each is laid out again when clicked)
-    if (RUN.lightenRuns(db.projects, ed?.plid)) try { localStorage.setItem(KEY, JSON.stringify(db)); saved(); return; } catch (e) { /* still full */ }
-    ctx.toast('This browser won’t let the page save projects.'); }
+    let r; try { r = store.save(db, () => RUN.lightenRuns(db.projects, ed?.plid)); } catch (e) { return failed(e); }
+    if (r === 'local') saved(); else r.then(saved, failed);
+  }
+  function failed(e) { if (Date.now() - saidFail < 60000) return; saidFail = Date.now(); // (once a minute, not on every change)
+    ctx.toast(e?.why === 'blocked' ? 'This browser is blocking site storage, so projects can’t be saved on this device. In Safari, turn off Block All Cookies (Settings › Privacy) and leave Private Browsing.' : 'This device is out of room for projects, so the latest changes weren’t saved here.' + (shared === true ? ' They still go to the team.' : '')); }
   function persist() { clearTimeout(persistT); persistT = setTimeout(persistNow, 600); }
   // the plan header's save status (paintSave): saved here; synced with the team once the server has it; or a failed sync
   const saved = () => { if (saveSt.kind !== 'synced' || db.dirty.includes(ed?.pid)) { saveSt.kind = saveSt.kind === 'failed' ? 'failed' : 'local'; } saveSt.at = Date.now(); paintSave(); };
@@ -106,27 +116,50 @@ export function initSitePlan(ctx) {
     persist(); badge(); if (ctx.view === 'projects') render();
     clearTimeout(syncT); syncT = setTimeout(sync, 1500);
   }
+  // the team's copy is the real one (api/projects.js): changes go up in batches the server can take, and only projects
+  // the server confirms by id count as saved; then the index says what changed elsewhere and only those come down
+  let tooBig = new Set();
   async function sync() {
-    if (syncing || !navigator.onLine) return; syncing = true;
+    if (syncing || !loaded || !navigator.onLine) return; syncing = true;
     const h = { 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY) };
+    const notUp = r => { shared = r.status === 503 || r.status === 401 ? false : shared; syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); };
     try {
       if (db.dirty.length || db.gone.length) {
-        const sent = db.projects.filter(p => db.dirty.includes(p.id)).map(p => [p.id, p.updated]), gone = db.gone.slice();
-        const r = await fetch('api/projects', { method: 'POST', headers: h, body: JSON.stringify({ projects: db.projects.filter(p => db.dirty.includes(p.id)).map(p => RUN.syncCopy(p)), deletes: gone, name: get(NAME_KEY) }) });
-        if (!r.ok) { shared = r.status === 503 || r.status === 401 ? false : shared; syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); return; } // not set up: this device only
-        db.dirty = db.dirty.filter(id => !sent.some(([i, u]) => i === id && db.projects.find(p => p.id === id)?.updated === u)); db.gone = db.gone.filter(id => !gone.includes(id));
+        const copies = db.projects.filter(p => db.dirty.includes(p.id)).map(p => { const c = RUN.syncCopy(p); return { id: p.id, u: p.updated, c, n: JSON.stringify(c).length }; });
+        const batches = []; let cur = [], size = 0;
+        for (const x of copies) { if (cur.length && (size + x.n > 3.2e6 || cur.length >= 20)) { batches.push(cur); cur = []; size = 0; } cur.push(x); size += x.n; }
+        if (cur.length || db.gone.length) batches.push(cur);
+        let gone = db.gone.slice();
+        for (const B of batches) {
+          const r = await fetch('api/projects', { method: 'POST', headers: h, body: JSON.stringify({ projects: B.map(x => x.c), deletes: gone, name: get(NAME_KEY) }) });
+          if (!r.ok) { notUp(r); return; } // not set up: this device only
+          const d = await r.json().catch(() => ({})), done = new Set([...(d.savedIds || B.map(x => x.id)), ...(d.newerIds || [])]); // (newer: the team's copy wins, and comes down below)
+          for (const id of d.tooBig || []) tooBig.add(id);
+          db.dirty = db.dirty.filter(id => !B.some(x => x.id === id && done.has(id) && db.projects.find(p => p.id === id)?.updated === x.u));
+          db.gone = db.gone.filter(id => !gone.includes(id)); gone = [];
+        }
       }
-      const r = await fetch('api/projects', { headers: h }); if (!r.ok) { shared = r.status === 503 || r.status === 401 ? false : shared; syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); return; }
-      const d = await r.json(); shared = true; let changed = false; syncSaid(true);
-      for (const id of d.deleted || []) { const i = db.projects.findIndex(p => p.id === id); if (i >= 0 && !db.dirty.includes(id) && ed?.pid !== id) { db.projects.splice(i, 1); changed = true; } }
-      for (const p of d.projects || []) {
-        const i = db.projects.findIndex(x => x.id === p.id); if (ed?.pid === p.id || db.dirty.includes(p.id)) continue;
-        if (i < 0) { db.projects.push(p); changed = true; } else if (t(p.updated) > t(db.projects[i].updated)) { db.projects[i] = p; changed = true; }
+      const r = await fetch('api/projects?index=1', { headers: h }); if (!r.ok) { notUp(r); return; }
+      const d = await r.json(); shared = true; let changed = false;
+      const ix = d.index || [], skip = id => ed?.pid === id || db.dirty.includes(id);
+      for (const e of ix) if (e.deleted) { const i = db.projects.findIndex(p => p.id === e.id); if (i >= 0 && !skip(e.id)) { db.projects.splice(i, 1); changed = true; } }
+      let want = ix.filter(e => !e.deleted && !skip(e.id)).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
+      for (let k = 0; want.length && k < 40; k++) {
+        const ask = want.slice(0, 20), q = await fetch('api/projects?ids=' + ask.map(encodeURIComponent).join(','), { headers: h }); if (!q.ok) { notUp(q); return; }
+        const got = await q.json(), more = got.more || [];
+        for (const p of got.projects || []) { if (skip(p.id)) continue; const i = db.projects.findIndex(x => x.id === p.id);
+          if (i < 0) { db.projects.push(p); changed = true; } else if (t(p.updated) > t(db.projects[i].updated)) { db.projects[i] = p; changed = true; } }
+        want = more.concat(want.slice(ask.length)); if (!got.projects?.length && more.length) break; // (one project bigger than an answer: never)
       }
+      syncSaid(tooBig.size && tooBig.has(ed?.pid) ? false : true);
+      if (tooBig.size) { const names = db.projects.filter(p => tooBig.has(p.id)).map(p => p.name); tooBig = new Set(); if (names.length) ctx.toast(names.join(', ') + ' is too big for the team’s copy, so it is kept on this device only. Delete some options or renderings to make it smaller.'); }
       if (changed) { persist(); badge(); if (ctx.view === 'projects') render(); }
     } catch (e) { syncSaid(false); /* offline: try again on the next change or when back online */ }
     finally { syncing = false; if (ctx.view === 'projects') render(); }
   }
+  // what the rest of the team changed: every 30 seconds while the page is in front, and as soon as it comes back to it
+  setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
   window.addEventListener('online', sync);
   setTimeout(sync, 4000);
   function badge() { ctx.setBadge?.('projects', db.projects.length); } // a muted count beside the Projects sub-tab
@@ -1805,7 +1838,7 @@ export function initSitePlan(ctx) {
   function paintSave() {
     const el = ed && card.querySelector('#spSave'); if (!el) return;
     const k = saveSt.kind === 'failed' ? 'failed' : saveSt.kind === 'synced' ? 'synced' : saveSt.at ? 'local' : '';
-    const say = k === 'failed' ? 'Sync failed: saved on this device only. Retry' : k === 'synced' ? 'Synced with team ' + T.ago(Date.now() - saveSt.at) : k === 'local' ? 'Saved on this device' : '';
+    const say = k === 'failed' ? 'Not saved to the team’s cloud yet (kept on this device). Retry' : k === 'synced' ? 'Synced with team ' + T.ago(Date.now() - saveSt.at) : k === 'local' ? (shared === false ? 'Saved on this device only: the team’s cloud copy isn’t set up on this site' : 'Saved on this device; sending to the team…') : '';
     if (el.dataset.k !== k) { el.dataset.k = k; const ic = k ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + SV[k] + '</svg>' : '';
       el.innerHTML = k === 'failed' ? '<button type="button" class="sp-sv bad" data-retry>' + ic + '</button>' : k ? '<span class="sp-sv ' + k + '" role="img">' + ic + '</span>' : '';
       const r = el.querySelector('[data-retry]'); if (r) r.onclick = () => { saveSt.kind = 'local'; paintSave(); sync(); }; }
@@ -4339,7 +4372,7 @@ export function initSitePlan(ctx) {
   // (800 x 450), shown as they come. Clicking one picks that view; its corner button shows it large.
   const mprev = new Map();
   const mpKey = (pl, sur, Tg) => pl.id + '|' + planSig(pl) + '|' + sur + '|' + (Tg?.id || '');
-  const mpViews = Tg => RD.PREVIEW_VIEWS.concat(Tg ? ['hero'] : []);
+  const mpViews = () => RD.PREVIEW_VIEWS;
   function mpGrid(pl, sur, Tg, cur) {
     const st = mprev.get(mpKey(pl, sur, Tg)); if (!st) return '';
     return mpViews(Tg).map(v => { const u = st.shots[v], lab = RD.renderLabel(v, Tg), on = v === cur;
@@ -4375,12 +4408,10 @@ export function initSitePlan(ctx) {
   const rWhen = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
   // the building a close-up would frame now: the one selected on the plan when it is a building, else the one nearest the street
   const heroFor = pl => RD.heroTarget(pl, ed?.sel);
-  // the View choices: the four site views, then the close-up named after its building (and saying so when it's the selected one)
+  // the View choices: every whole-site view (the building close-up was retired Nov 3)
   function viewOptions(pl, sel) {
-    const T = heroFor(pl), picked = !!T && T.id === ed?.sel, v = ed.rview || 'corner';
-    return sel(RD.VIEWS.filter(x => !x.hero), v) + RD.VIEWS.filter(x => x.hero).map(x => '<option value="' + x.id + '"' + (x.id === v && T ? ' selected' : '') + (T ? '' : ' disabled') +
-      ' title="' + esc(!T ? 'There is no building on this plan to frame' : picked ? 'A close-up of ' + RD.buildingName(T) + ', the building selected on the plan' : 'A close-up of ' + RD.buildingName(T) + ', the building nearest the street. Select a building on the plan first to frame that one instead.') + '">' +
-      esc(RD.renderLabel(x.id, T) + (picked ? ' (selected)' : '')) + '</option>').join('');
+    const v = RD.byId(RD.OFFERED_VIEWS, ed.rview, null) ? ed.rview : 'corner';
+    return sel(RD.OFFERED_VIEWS, v);
   }
   function renderHtml(p, pl) {
     const R = ed.rendering, pr = rPrefs(), list = (pl.renders || []).slice().reverse(), sig = planSig(pl), off = aiOff(), sel = (list2, v) => list2.map(x => '<option value="' + x.id + '"' + (x.id === v ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
@@ -4712,7 +4743,7 @@ export function initSitePlan(ctx) {
     const ready = p.plans.filter(laidOut); if (!ready.length) return '';
     const f = rsForm.get(p.id) || {}, pl = ready.find(x => x.id === f.plid) || ready[ready.length - 1], pr = rPrefs(), off = aiOff(), busy = !!ed?.rendering, T = RD.heroTarget(pl), v = f.view || 'corner', bg = bgRender.get(p.id);
     const opt = (list, cur) => list.map(x => '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.label) + '</option>').join('');
-    const views = RD.VIEWS.filter(x => !x.hero).map(x => ({ id: x.id, label: x.label, tip: x.tip })).concat(T ? RD.VIEWS.filter(x => x.hero).map(x => ({ id: x.id, label: RD.renderLabel(x.id, T) })) : []).concat([{ id: 'all', label: 'All site views (four pictures)' }]);
+    const views = RD.OFFERED_VIEWS.map(x => ({ id: x.id, label: x.label, tip: x.tip })).concat([{ id: 'all', label: 'All site views (four pictures)' }]);
     return '<section class="pj-box ps-form" aria-labelledby="rsH"><h3 class="pj-h3" id="rsH">Make renderings</h3>' +
       '<div class="ps-row2 rs-grid"><div class="ps-row"><label for="rsOpt">Option</label><select id="rsOpt">' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
         '<div class="ps-row"><label for="rsView">View</label><select id="rsView">' + opt(views, views.some(x => x.id === v) ? v : 'corner') + '</select></div>' +
@@ -5193,7 +5224,7 @@ export function initSitePlan(ctx) {
     save(); ctx.setView('projects'); show(null); ctx.scheduleHash?.();
     return r;
   }
-  ctx.sitePlan = { start, open, close, get editing() { return !!ed; }, show: (id, tab) => { if (db.projects.some(x => x.id === id)) show(id, tab); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
+  ctx.sitePlan = { ready, get loaded() { return loaded; }, start, open, close, get editing() { return !!ed; }, show: (id, tab) => { if (db.projects.some(x => x.id === id)) show(id, tab); }, has: (pid, plid) => !!db.projects.find(x => x.id === pid)?.plans.some(x => x.id === plid),
     // what the address keeps (reload, reopening the installed app): the open plan, else the project on the Projects page
     get where() { return ed && !ed.draftPlan ? { plan: ed.pid + '.' + ed.plid } : cur && ctx.view === 'projects' ? { project: cur, tab: PJ.tabOf(ptab.get(cur)) } : {}; }, forAssistant, get projects() { return db.projects; }, sync, projectsFor, // sync: Settings runs it after a new team passcode
     counts: () => ({ ...PJ.projectCounts(db.projects), team: teamMode() }), deleteAll,
