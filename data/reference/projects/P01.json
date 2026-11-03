@@ -1,0 +1,1388 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P01",
+  "name": "Artisan Village",
+  "location": "Fort Worth, TX",
+  "family": "fw-artisan-village",
+  "partition": "dev",
+  "forms": [
+    "garden-breezeway",
+    "garage-detached"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+      "sha256": "759afd9d19cc66545314ce431ebc2f081b8f3907ef4d31df59cadeb317a251a1",
+      "pages_used": [
+        1,
+        2
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "MFD-19-002 site plan",
+          "title": "Site plan (Monterra by Hillwood Lot 3R Block 2)",
+          "revision": "approved",
+          "date": "2019-10-15"
+        },
+        {
+          "page": 2,
+          "sheet": "A1-02",
+          "title": "Addressing plan (375 apartments)",
+          "revision": "rev 2019-10-16",
+          "date": "2019-05-01"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ac": {
+      "v": 18.589,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "area_sf": {
+      "v": 809739,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "units": {
+      "v": 375,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_du_ac": {
+      "v": 20,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "printed 'units per acre actual'; 375/18.589 = 20.17"
+    },
+    "zoning": {
+      "v": "PD 710",
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "max_units_pd": {
+      "v": 1026,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only",
+      "note": "max in PD boundary, not this lot"
+    },
+    "building_coverage_sf": {
+      "v": 213010,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "first-floor impervious, 26.3%"
+    },
+    "paving_sf": {
+      "v": 268072,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "33.1%"
+    },
+    "open_space_sf": {
+      "v": 254688,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "31.4% (20% required)"
+    },
+    "max_height_ft": {
+      "v": 45,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "slab to top plate; actual 30'-5\""
+    },
+    "total_gsf": {
+      "v": 522871,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "buildings": {
+      "v": 17,
+      "units": "buildings",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "16 residential + leasing/clubhouse"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "A",
+      "label": "Type A, L-shape 3-story",
+      "count": {
+        "v": 2,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "heights 30'-4 7/8\""
+      },
+      "shape": "L",
+      "footprint": {
+        "w_ft": {
+          "v": 222.38,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "long leg; other leg 200.79"
+        },
+        "d_ft": {
+          "v": 88.67,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null,
+          "note": "dims include breezeways/balconies; see reconciliation"
+        }
+      },
+      "units_per_building": {
+        "v": 50,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 16.7,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "derived",
+        "confidence": "high",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "50/3, uneven"
+      },
+      "unit_mix": {
+        "1BR": 25,
+        "2BR": 25
+      },
+      "corridor": "breezeway (open stairs)",
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface + detached garages",
+      "gsf": {
+        "v": 70694,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "type_id": "B",
+      "label": "Type B bar 3-story",
+      "count": {
+        "v": 5,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 187.54,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 79.08,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 30,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 10,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "derived",
+        "confidence": "high",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {
+        "1BR": 24,
+        "2BR": 6
+      },
+      "corridor": "breezeway (open stairs)",
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": 36580,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "type_id": "C",
+      "label": "Type C bar 3-story",
+      "count": {
+        "v": 2,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 186.04,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 85.25,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 28,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "unit_mix": {
+        "1BR": 20,
+        "2BR": 8
+      },
+      "corridor": "breezeway (open stairs)",
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": 38316,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "type_id": "D",
+      "label": "Type D 2-story",
+      "count": {
+        "v": 4,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 2,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "height 19'-9\""
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 173.13,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 54.92,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 6,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "unit_mix": {
+        "2BR": 4,
+        "3BR": 2
+      },
+      "corridor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "not determinable from site plan"
+      },
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "12,718 sf for 6 units suggests garages in building; unconfirmed"
+      },
+      "gsf": {
+        "v": 12718,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "type_id": "E",
+      "label": "Type E 2-story",
+      "count": {
+        "v": 2,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 2,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 173.13,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 54.92,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 6,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "unit_mix": {
+        "2BR": 6
+      },
+      "corridor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "gsf": {
+        "v": 12284,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "type_id": "F",
+      "label": "Type F 3-story",
+      "count": {
+        "v": 1,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 186.04,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 85.25,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 33,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 11,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "derived",
+        "confidence": "high",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {
+        "1BR": 24,
+        "2BR": 9
+      },
+      "corridor": "breezeway (open stairs)",
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": 38316,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "type_id": "LEASING",
+      "label": "Leasing / clubhouse",
+      "count": {
+        "v": 1,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 155.79,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 64.92,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+            "page": 1,
+            "sheet": "MFD-19-002 site plan"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 0,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": null,
+      "stairs": null,
+      "elevators": null,
+      "parking": null,
+      "gsf": {
+        "v": 8195,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "1BR",
+      "beds": 1,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 234,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "2BR",
+      "beds": 2,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 133,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "3BR",
+      "beds": 3,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 8,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+          "page": 1,
+          "sheet": "MFD-19-002 site plan"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    }
+  ],
+  "parking": {
+    "provided": {
+      "v": 626,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "required": {
+      "v": 557,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "surface_regular": {
+      "v": 421,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "garage": {
+      "v": 188,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "ada": {
+      "v": 17,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "13 standard + 4 garage"
+    },
+    "ratio_per_unit": {
+      "v": 1.67,
+      "units": "stalls/unit",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "626/375"
+    },
+    "stall_w_ft": {
+      "v": 9,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "stall_d_ft": {
+      "v": 18,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "drive_aisle_ft": {
+      "v": 24,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P01_Artisan_Village/001_Artisan_Village.pdf",
+        "page": 1,
+        "sheet": "MFD-19-002 site plan"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "type": "surface + detached garages + carports"
+  },
+  "amenities": [
+    "pool (3,732 sf)",
+    "leasing/clubhouse (8,195 sf indoor rec)",
+    "dog parks",
+    "carports"
+  ],
+  "access": [
+    "Monterra Blvd",
+    "N Riverside Dr",
+    "private drives (Tenon Dr, Batten Cir, Crafters Loop, Artera Dr)"
+  ],
+  "project_rules": [
+    {
+      "rule": "building setback north/west",
+      "value": 10,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "max building setback Monterra Blvd",
+      "value": 20,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "min building setback N Riverside Dr",
+      "value": 60,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "emergency access easement width",
+      "value": 26,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "max height slab to top plate",
+      "value": 45,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "min open space",
+      "value": 20,
+      "units": "% of site",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "unit mix sum vs total",
+      "values": "234+133+8=375 vs 375",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "units by building type",
+      "values": "2x50+5x30+2x28+4x6+2x6+1x33=375",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "GSF by type x count vs total",
+      "values": "sum=522,871 vs 522,871",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "parking components",
+      "values": "421+188+17=626",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "printed bar dims vs GSF/floor",
+      "values": "B: 187.54x79.08=14,831 sf vs 36,580/3=12,193 sf",
+      "result": "discrepancy",
+      "note": "printed outline dims likely include breezeways/balconies; do not use w x d as gross floor area"
+    },
+    {
+      "check": "address plan count",
+      "values": "A1-02 title 375 apartments; address labels 374 noted in review",
+      "result": "discrepancy",
+      "note": "minor; unverified"
+    }
+  ],
+  "open_questions": [
+    "Type D/E function (garages below units?)",
+    "stair counts per building",
+    "unit sizes not on site plan"
+  ],
+  "manifest_name": "Artisan Village"
+}

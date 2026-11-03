@@ -35,7 +35,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm install --no-save --no-audit --no-fund @duckdb/node-api
+      - run: npm install --no-save --no-audit --no-fund @duckdb/node-api@2.0.0-r.1 # pinned: 2.0 dropped the old "x -> y" lambda syntax and broke the Nov 3 run
       - name: Load places
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}

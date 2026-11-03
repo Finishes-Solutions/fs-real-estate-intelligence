@@ -1,0 +1,638 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P37",
+  "name": "Terracina at Fiddyment",
+  "location": "Roseville, CA",
+  "family": "roseville-usa-properties-bassenian",
+  "partition": "dev",
+  "forms": [
+    "garden-breezeway",
+    "carport"
+  ],
+  "overlays": [
+    "affordable"
+  ],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+      "sha256": "47aeeeec9b5a0624ae38b76b0c16a180386b9f2b07a3c2ae3879076f1cfc92b5",
+      "pages_used": [
+        3,
+        9
+      ],
+      "sheets": [
+        {
+          "page": 3,
+          "sheet": "C2",
+          "title": "Preliminary site plan",
+          "revision": "2nd submittal 2024-02-09",
+          "date": "2024-04-01"
+        },
+        {
+          "page": 9,
+          "sheet": "A.2",
+          "title": "Residential bldg plan floors 2-3",
+          "revision": null,
+          "date": null
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_gross_ac": {
+      "v": 10.882,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "area_net_ac": {
+      "v": 9.848,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "units": {
+      "v": 265,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_du_ac": {
+      "v": 26.9,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "net"
+    },
+    "zoning": {
+      "v": "R3 / HDR, West Roseville SP",
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "max_height_ft": {
+      "v": 45,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "max_lot_coverage_pct": {
+      "v": 50,
+      "units": "%",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "common_open_space_sf": {
+      "v": 14509,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "required 10,600"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "A24",
+      "label": "Type A 24-plex, 3-story",
+      "count": {
+        "v": 11,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "bldgs 2-12"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 154,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+            "page": 3,
+            "sheet": "C2"
+          },
+          "method": "scaled-measurement",
+          "confidence": "low",
+          "status": "measured",
+          "review": "visually-reviewed",
+          "note": "graphic scale 1\"=30' (0-60 ft = 144 pt); bldg 10; +/-5 ft"
+        },
+        "d_ft": {
+          "v": 54,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+            "page": 3,
+            "sheet": "C2"
+          },
+          "method": "scaled-measurement",
+          "confidence": "low",
+          "status": "measured",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 24,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 8,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 9,
+          "sheet": "A.2"
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "unit_mix": {
+        "1BR": 6,
+        "2BR": 12,
+        "3BR": 6
+      },
+      "corridor": "breezeway (2 open stair halls)",
+      "stairs": {
+        "v": 2,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "seen on site plan building outline"
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface + carports",
+      "gsf": {
+        "v": 22979,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "type_id": "CLUB",
+      "label": "Clubhouse 2-story with manager unit",
+      "count": 1,
+      "floors": {
+        "v": 2,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 1,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": {
+        "2BR": 1
+      },
+      "corridor": null,
+      "stairs": null,
+      "elevators": null,
+      "parking": null,
+      "gsf": {
+        "v": 6981,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "5,542 club + 1,529 manager unit"
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "1BR",
+      "beds": 1,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 66,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "2BR",
+      "beds": 2,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 133,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "3BR",
+      "beds": 3,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 66,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+          "page": 3,
+          "sheet": "C2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    }
+  ],
+  "parking": {
+    "required": {
+      "v": 365,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "density bonus 65915(p)(1): 1/1BR, 1.5/2-3BR"
+    },
+    "provided": {
+      "v": 436,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "carport": {
+      "v": 120,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "0.45/unit"
+    },
+    "uncovered": {
+      "v": 316,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "accessible": {
+      "v": 23,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "stall_d_ft": {
+      "v": 18,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-dimension",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "drive_aisle_ft": {
+      "v": 26,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P37_Terracina_at_Fiddyment/001_Terracina_at_Fiddyment.pdf",
+        "page": 3,
+        "sheet": "C2"
+      },
+      "method": "printed-dimension",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "type": "surface + carports"
+  },
+  "amenities": [
+    "pool",
+    "clubhouse",
+    "laundry buildings",
+    "common open spaces COS 1-5"
+  ],
+  "access": [
+    "Harvey Way driveways (35' and 43')",
+    "Fiddyment Rd frontage (no driveway noted)"
+  ],
+  "project_rules": [
+    {
+      "rule": "building setback front",
+      "value": 20,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "building setback side street",
+      "value": 20,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "building setback side interior",
+      "value": 5,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "building setback rear",
+      "value": 20,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "landscape setback Harvey Way",
+      "value": 20,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "landscape setback Fiddyment Rd",
+      "value": 36,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "common open space",
+      "value": 40,
+      "units": "sf/unit",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "max lot coverage",
+      "value": 50,
+      "units": "%",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "units by building",
+      "values": "11 x 24 + 1 manager = 265",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "mix",
+      "values": "11x6=66; 11x12+1=133; 11x6=66",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "parking required",
+      "values": "66 + 200 + 99 = 365",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "parking provided",
+      "values": "120 + 316 = 436",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "density",
+      "values": "265/9.848 = 26.9",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "footprint vs gross",
+      "values": "154x54=8,316 sf vs 22,979/3=7,660 sf/floor",
+      "result": "consistent",
+      "note": "outline includes open stair halls"
+    }
+  ],
+  "open_questions": [
+    "unit sizes"
+  ],
+  "manifest_name": "Terracina at Fiddyment"
+}

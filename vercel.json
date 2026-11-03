@@ -9,6 +9,9 @@
       "maxDuration": 60,
       "includeFiles": "data/{filings,changes,market,area}.json"
     },
+    "api/layoutrun.js": {
+      "maxDuration": 60
+    },
     "api/feed.js": {
       "maxDuration": 10,
       "includeFiles": "data/{filings,changes}.json"

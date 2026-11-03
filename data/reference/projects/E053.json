@@ -1,0 +1,737 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "E053",
+  "name": "Portland Road Townhomes",
+  "location": "Salem, OR",
+  "family": "portland-road-salem",
+  "partition": "dev",
+  "forms": [
+    "townhome",
+    "tuck-under",
+    "retail-pad",
+    "mixed-use"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+      "sha256": "71f061ce3b779aa2ee21377a6438d272e9ae2d4cd7b457b384d0658b26f04bed",
+      "pages_used": [
+        7
+      ],
+      "sheets": [
+        {
+          "page": 7,
+          "sheet": "C100",
+          "title": "Preliminary site plan - overall (AKS)",
+          "revision": null,
+          "date": "2025-05-16"
+        }
+      ]
+    },
+    {
+      "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+      "sha256": "43214d712bf3802db95bfce9c80dc267fcbe4208678df1b049bd7ea0d7d8e7c9",
+      "pages_used": [
+        1,
+        3,
+        4
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": null,
+          "title": "Project information",
+          "revision": "land use review",
+          "date": "2025-05-02"
+        },
+        {
+          "page": 3,
+          "sheet": "A2",
+          "title": "Floor plan commercial retail",
+          "revision": "land use review",
+          "date": "2025-05-02"
+        },
+        {
+          "page": 4,
+          "sheet": "A3",
+          "title": "Floor plans building A.1",
+          "revision": "land use review",
+          "date": "2025-05-02"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "units": {
+      "v": 74,
+      "units": "units",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only",
+      "note": "scope reads '74 TOWNHOME BUILDINGS'; manifest '74-unit'; site plan shows 19 townhome buildings"
+    },
+    "buildings": {
+      "v": 20,
+      "units": "buildings",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+        "page": 7,
+        "sheet": "C100"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "19 townhome buildings + 1 retail"
+    },
+    "zoning": {
+      "v": "MU-III",
+      "units": null,
+      "src": {
+        "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "area_ac": {
+      "v": null,
+      "units": "ac",
+      "src": null,
+      "method": null,
+      "confidence": null,
+      "status": "unknown",
+      "review": null,
+      "note": "not found on reviewed pages"
+    },
+    "common_open_space_sf": {
+      "v": 13229,
+      "units": "sf",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+        "page": 7,
+        "sheet": "C100"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "7,676 (playground) + 5,553"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "A.1",
+      "label": "Townhome row A.1 (4 units, 2-story, tuck-in garage)",
+      "count": {
+        "v": 6,
+        "units": "bldg",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+          "page": 7,
+          "sheet": "C100"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "bldgs 10-15"
+      },
+      "floors": {
+        "v": 2,
+        "units": "floors",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+          "page": 4,
+          "sheet": "A3"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "row",
+      "footprint": {
+        "w_ft": {
+          "v": 80.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 4,
+            "sheet": "A3"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "face of finish; 4 x 19'-11\""
+        },
+        "d_ft": {
+          "v": 42.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 4,
+            "sheet": "A3"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": 3360,
+          "units": "sf",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 4,
+            "sheet": "A3"
+          },
+          "method": "derived",
+          "confidence": "high",
+          "status": "derived",
+          "review": "visually-reviewed",
+          "note": "80x42"
+        }
+      },
+      "units_per_building": {
+        "v": 4,
+        "units": "units",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+          "page": 4,
+          "sheet": "A3"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": {
+        "3BR": 4
+      },
+      "corridor": "exterior entry",
+      "stairs": null,
+      "elevators": 0,
+      "parking": "1-car garage per unit (11'x22') at ground floor",
+      "gsf": {
+        "v": 6720,
+        "units": "sf",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+          "page": 4,
+          "sheet": "A3"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "3,360 x 2 floors"
+      }
+    },
+    {
+      "type_id": "A.2",
+      "label": "Townhome row A.2",
+      "count": {
+        "v": 2,
+        "units": "bldg",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+          "page": 7,
+          "sheet": "C100"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "shape": "row",
+      "footprint": {
+        "w_ft": {
+          "v": 80.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 7,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "d_ft": {
+          "v": 42.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 7,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": null,
+        "units": "units",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": "exterior entry",
+      "stairs": null,
+      "elevators": 0,
+      "parking": "garage",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "B",
+      "label": "Townhome row B",
+      "count": {
+        "v": 9,
+        "units": "bldg",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+          "page": 7,
+          "sheet": "C100"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "shape": "row",
+      "footprint": {
+        "w_ft": {
+          "v": 83.83,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 10,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "d_ft": {
+          "v": 46.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 10,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "low",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": null,
+        "units": "units",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "units_per_floor": null,
+      "unit_mix": {
+        "2BR": "?",
+        "3BR": "?"
+      },
+      "corridor": "exterior entry",
+      "stairs": null,
+      "elevators": 0,
+      "parking": "garage",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "C",
+      "label": "Townhome row C",
+      "count": {
+        "v": 2,
+        "units": "bldg",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+          "page": 7,
+          "sheet": "C100"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "shape": "row",
+      "footprint": {
+        "w_ft": {
+          "v": 75.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 13,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "d_ft": {
+          "v": 42.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 13,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "low",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": null,
+        "units": "units",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": "exterior entry",
+      "stairs": null,
+      "elevators": 0,
+      "parking": "garage",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "RETAIL",
+      "label": "Stand-alone commercial retail (3 suites)",
+      "count": {
+        "v": 1,
+        "units": "bldg",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+          "page": 7,
+          "sheet": "C100"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 1,
+        "units": "floors",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+          "page": 3,
+          "sheet": "A2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "rect",
+      "footprint": {
+        "w_ft": {
+          "v": 60.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 3,
+            "sheet": "A2"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 76.0,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 3,
+            "sheet": "A2"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": 4560,
+          "units": "sf",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+            "page": 3,
+            "sheet": "A2"
+          },
+          "method": "derived",
+          "confidence": "high",
+          "status": "derived",
+          "review": "visually-reviewed",
+          "note": "60x76; scope says ~4,500 sf"
+        }
+      },
+      "units_per_building": 0,
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": null,
+      "stairs": null,
+      "elevators": 0,
+      "parking": "surface",
+      "gsf": {
+        "v": 4560,
+        "units": "sf",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+          "page": 3,
+          "sheet": "A2"
+        },
+        "method": "derived",
+        "confidence": "high",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "1 story"
+      },
+      "height_ft": {
+        "v": 20,
+        "units": "ft",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+          "page": 3,
+          "sheet": "A2"
+        },
+        "method": "printed-dimension",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "top of parapet"
+      },
+      "suites": {
+        "v": 3,
+        "units": "suites",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/001_Ex_B_Preliminary_Floor_Plans_and_Elevations.pdf",
+          "page": 3,
+          "sheet": "A2"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "note": "drive-thru elevation shown"
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "A.1 townhome 3BR",
+      "beds": 3,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": 24,
+        "units": "units",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+          "page": 7,
+          "sheet": "C100"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "6 bldgs x 4"
+      }
+    }
+  ],
+  "parking": {
+    "type": "attached garages + surface (retail)",
+    "provided": {
+      "v": null,
+      "units": "stalls",
+      "src": null,
+      "method": null,
+      "confidence": null,
+      "status": "unknown",
+      "review": null
+    },
+    "stall_d_ft": {
+      "v": 18,
+      "units": "ft",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E053_Portland_Road_Apartments/002_Ex_A_Preliminary_Land_Use_Plans.pdf",
+        "page": 7,
+        "sheet": "C100"
+      },
+      "method": "printed-dimension",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "driveway aprons 18-20'"
+    }
+  },
+  "amenities": [
+    "common open space with playground (7,676 sf)",
+    "gazebo/common open space (5,553 sf)",
+    "mailbox",
+    "trash enclosure"
+  ],
+  "access": [
+    "Portland Road NE (Pacific Hwy 99E): main drive + exit-only",
+    "sliding gates on internal drives"
+  ],
+  "project_rules": [
+    {
+      "rule": "drive aisle width (internal)",
+      "value": 22,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "perimeter setback (north/east)",
+      "value": 10,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "setback Portland Rd frontage (bldgs)",
+      "value": 20,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "fence height in Portland Rd setback",
+      "value": 4,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "units by type",
+      "values": "A.1 6x4=24; A.2 2x4=8 (assumed same 80' row); B 9 and C 2 bldgs must hold 42 units",
+      "result": "unknown",
+      "note": "9x4 + 2x3 = 42 would close to 74 but B/C unit counts were not read; do not rely"
+    },
+    {
+      "check": "retail area",
+      "values": "60x76 = 4,560 vs '~4,500 sf'",
+      "result": "consistent",
+      "note": ""
+    }
+  ],
+  "open_questions": [
+    "site area",
+    "unit counts for types A.2/B/C",
+    "parking count"
+  ],
+  "manifest_name": "Portland Road Apartments"
+}

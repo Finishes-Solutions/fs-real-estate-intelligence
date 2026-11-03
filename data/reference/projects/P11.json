@@ -1,0 +1,409 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P11",
+  "name": "Creekview C-43 Family Affordable Apartments",
+  "location": "Roseville, CA",
+  "family": "roseville-usa-properties-bassenian",
+  "partition": "dev",
+  "forms": [
+    "mid-rise-corridor-elevator"
+  ],
+  "overlays": [
+    "affordable"
+  ],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+      "sha256": "3afc433bc3e2e7022c40579527fcd35d5c3d7f79d6d9db437a11aa85e9336554",
+      "pages_used": [
+        2,
+        7
+      ],
+      "sheets": [
+        {
+          "page": 2,
+          "sheet": null,
+          "title": "Project data / area summary",
+          "revision": null,
+          "date": null
+        },
+        {
+          "page": 7,
+          "sheet": "A1.1",
+          "title": "Conceptual site plan",
+          "revision": null,
+          "date": "2022-06-13"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ac": {
+      "v": 3.88,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 7,
+        "sheet": "A1.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "units": {
+      "v": 116,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 7,
+        "sheet": "A1.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "density_du_ac": {
+      "v": 29.9,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 7,
+        "sheet": "A1.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "gfa_sf": {
+      "v": 120481,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 2,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "far": {
+      "v": 0.71,
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 2,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "lot_coverage_sf": {
+      "v": 33112,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 2,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "1",
+      "label": "Building 1 4-story",
+      "count": 1,
+      "floors": {
+        "v": 4,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+          "page": 2,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "shape": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": 33112,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+            "page": 2,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "text-only"
+        }
+      },
+      "units_per_building": {
+        "v": 116,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+          "page": 2,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "units_per_floor": null,
+      "unit_mix": {
+        "1BR": 40,
+        "2BR": 47,
+        "3BR": 29
+      },
+      "corridor": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": 120481,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+          "page": 2,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only",
+        "note": "floors 33,112/31,633/31,633/24,103; res 92,306 + rec 3,494 + circ 23,175 + POS 1,506"
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "1BR/1BA",
+      "beds": 1,
+      "baths": 1,
+      "sf": "570-582 gross",
+      "count": {
+        "v": 40,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+          "page": 7,
+          "sheet": "A1.1"
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      }
+    },
+    {
+      "name": "2BR/1BA",
+      "beds": 2,
+      "baths": 1,
+      "sf": null,
+      "count": {
+        "v": 20,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+          "page": 7,
+          "sheet": "A1.1"
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      }
+    },
+    {
+      "name": "2BR/2BA",
+      "beds": 2,
+      "baths": 2,
+      "sf": "945 gross (2E)",
+      "count": {
+        "v": 27,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+          "page": 7,
+          "sheet": "A1.1"
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      }
+    },
+    {
+      "name": "3BR/2BA",
+      "beds": 3,
+      "baths": 2,
+      "sf": "1,029-1,030 gross",
+      "count": {
+        "v": 29,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+          "page": 7,
+          "sheet": "A1.1"
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      }
+    }
+  ],
+  "parking": {
+    "required": {
+      "v": 154,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 7,
+        "sheet": "A1.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "provided": {
+      "v": 201,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 7,
+        "sheet": "A1.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only",
+      "note": "148 std 9x18 + 53 compact 9x16"
+    },
+    "accessible": {
+      "v": 8,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P11_Creekview_C_43/001_Creekview_C_43.pdf",
+        "page": 7,
+        "sheet": "A1.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "type": "surface"
+  },
+  "amenities": [
+    "recreation center 3,494 sf",
+    "common open space 6,839 sf"
+  ],
+  "access": [
+    "resident-only gated access"
+  ],
+  "project_rules": [
+    {
+      "rule": "private outdoor open space",
+      "value": 40,
+      "units": "sf/unit",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "unit mix",
+      "values": "40+20+27+29=116",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "GFA",
+      "values": "92,306+1,506+3,494+23,175=120,481",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "floors",
+      "values": "33,112+2x31,633+24,103=120,481",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "parking",
+      "values": "148+53=201",
+      "result": "consistent",
+      "note": ""
+    }
+  ],
+  "open_questions": [
+    "not visually reviewed (text-only); footprint dims"
+  ],
+  "manifest_name": "Creekview C-43"
+}

@@ -38,7 +38,7 @@ export async function readOverture(d, box, { release, file } = {}) {
   if (!file) await d.run("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2'; SET s3_access_key_id=''; SET s3_secret_access_key='';");
   // a local file from the dev query already has these column names
   const cols = file ? 'id, name, cat, hier, conf, web, phone, brand, addr, city, zip, status, srcs, lon, lat'
-    : "id, names.primary AS name, taxonomy.primary AS cat, taxonomy.hierarchy AS hier, confidence AS conf, websites[1] AS web, phones[1] AS phone, brand.names.primary AS brand, addresses[1].freeform AS addr, addresses[1].locality AS city, addresses[1].postcode AS zip, operating_status AS status, list_transform(sources, s -> s.dataset) AS srcs, bbox.xmin AS lon, bbox.ymin AS lat";
+    : "id, names.primary AS name, taxonomy.primary AS cat, taxonomy.hierarchy AS hier, confidence AS conf, websites[1] AS web, phones[1] AS phone, brand.names.primary AS brand, addresses[1].freeform AS addr, addresses[1].locality AS city, addresses[1].postcode AS zip, operating_status AS status, list_transform(sources, lambda s: s.dataset) AS srcs, bbox.xmin AS lon, bbox.ymin AS lat";
   const where = file ? 'lon BETWEEN ' + box[0] + ' AND ' + box[2] + ' AND lat BETWEEN ' + box[1] + ' AND ' + box[3]
     : 'bbox.xmin BETWEEN ' + box[0] + ' AND ' + box[2] + ' AND bbox.ymin BETWEEN ' + box[1] + ' AND ' + box[3];
   return d.rows('SELECT ' + cols + ' FROM read_parquet(' + src + ') WHERE ' + where);

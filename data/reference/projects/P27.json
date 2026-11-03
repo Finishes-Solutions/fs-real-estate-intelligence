@@ -1,0 +1,903 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P27",
+  "name": "The Rise (Vallco Town Center)",
+  "location": "Cupertino, CA",
+  "family": "rise-vallco",
+  "partition": "dev",
+  "forms": [
+    "tower-on-podium",
+    "podium",
+    "townhome",
+    "mixed-use"
+  ],
+  "overlays": [
+    "affordable"
+  ],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+      "sha256": "390a02f8a1e03d90954e70bc29b8b3f360f4feb3384c05991970f3143812bb63",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "P-0101",
+          "title": "Project information and data table",
+          "revision": "REV-6 SB-35 modification application",
+          "date": "2023-12-04"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+      "sha256": "f0415c174eca364c7c80b3f236da4e2ebd6503ba86eae981889299581b4f8322",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "P-0102",
+          "title": "Drawing list & residential program tables",
+          "revision": "REV-6",
+          "date": "2023-12-04"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+      "sha256": "7340fc3a1d0854be7f425814ea28f0dfdfb47d39be78026efbccc631f128a05d",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "P-0800.06",
+          "title": "Building plan - typical tower",
+          "revision": "REV-6",
+          "date": "2023-12-04"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ac": {
+      "v": 50.822,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "area_sf": {
+      "v": 2213821,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "units": {
+      "v": 2669,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0102"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "base_density_units": {
+      "v": 1779,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0102"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_bonus_units": {
+      "v": 890,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0102"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "residential_gsf": {
+      "v": 4382226,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "retail_gsf": {
+      "v": 226386,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "office_gsf": {
+      "v": 1954613,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "lot_coverage_pct": {
+      "v": 54,
+      "units": "%",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "blocks": {
+      "v": 15,
+      "units": "blocks",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "density_du_ac": {
+      "v": 52.5,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0102"
+      },
+      "method": "derived",
+      "confidence": "medium",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "2669/50.822 gross"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "POINT_TOWER",
+      "label": "Typical residential point tower",
+      "count": {
+        "v": null,
+        "units": "bldg",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "floors": {
+        "v": null,
+        "units": "floors",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "tower storeys not on reviewed sheets"
+      },
+      "shape": "rect",
+      "footprint": {
+        "w_ft": {
+          "v": 78,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+            "page": 1,
+            "sheet": "P-0800.06"
+          },
+          "method": "scaled-measurement",
+          "confidence": "low",
+          "status": "estimated",
+          "review": "visually-reviewed",
+          "note": "printed 1/64\"=1'-0\" not calibrated against a printed dimension; +/-10%"
+        },
+        "d_ft": {
+          "v": 134,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+            "page": 1,
+            "sheet": "P-0800.06"
+          },
+          "method": "scaled-measurement",
+          "confidence": "low",
+          "status": "estimated",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "units_per_floor": {
+        "v": 7,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0800.06"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "unit labels counted"
+      },
+      "unit_mix": {
+        "1BR": 2,
+        "2BR": 4,
+        "3BR": 1
+      },
+      "corridor": "double-loaded corridor",
+      "stairs": {
+        "v": 2,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0800.06"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "elevators": {
+        "v": 2,
+        "units": "elevators",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0800.06"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "parking": "podium/below-grade",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "BAR_TOWER",
+      "label": "Typical residential bar tower (Street D)",
+      "count": {
+        "v": null,
+        "units": "bldg",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "floors": {
+        "v": null,
+        "units": "floors",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 264,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+            "page": 1,
+            "sheet": "P-0800.06"
+          },
+          "method": "scaled-measurement",
+          "confidence": "low",
+          "status": "estimated",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 83,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+            "page": 1,
+            "sheet": "P-0800.06"
+          },
+          "method": "scaled-measurement",
+          "confidence": "low",
+          "status": "estimated",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "units_per_floor": {
+        "v": 10,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0800.06"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {
+        "1BR": 1,
+        "2BR": 3,
+        "2BR+": 3,
+        "3BR": 2,
+        "2BR+ (corner)": 1
+      },
+      "corridor": "double-loaded corridor",
+      "stairs": {
+        "v": 2,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0800.06"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "elevators": {
+        "v": 2,
+        "units": "elevators",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/016_P_0800_06_BUILDING_PLAN_TYPICAL_TOWER_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0800.06"
+        },
+        "method": "printed-schedule",
+        "confidence": "low",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "2 cabs + possible service"
+      },
+      "parking": "podium",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "TH",
+      "label": "Block 6 townhomes",
+      "count": {
+        "v": 47,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "floors": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "shape": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": null,
+      "units_per_floor": null,
+      "unit_mix": {
+        "3BR": 32,
+        "4BR": 15
+      },
+      "corridor": "exterior entry",
+      "stairs": null,
+      "elevators": null,
+      "parking": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "Affordable studio",
+      "beds": 0,
+      "baths": null,
+      "sf": 425,
+      "count": {
+        "v": 353,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Affordable 1BR",
+      "beds": 1,
+      "baths": null,
+      "sf": 571,
+      "count": {
+        "v": 435,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Affordable 2BR",
+      "beds": 2,
+      "baths": null,
+      "sf": 842,
+      "count": {
+        "v": 66,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Affordable 3BR",
+      "beds": 3,
+      "baths": null,
+      "sf": 1113,
+      "count": {
+        "v": 36,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Market studio",
+      "beds": 0,
+      "baths": null,
+      "sf": 602,
+      "count": {
+        "v": 134,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Market 1BR",
+      "beds": 1,
+      "baths": null,
+      "sf": 748,
+      "count": {
+        "v": 834,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Market 2BR",
+      "beds": 2,
+      "baths": null,
+      "sf": 1450,
+      "count": {
+        "v": 664,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Market 3BR",
+      "beds": 3,
+      "baths": null,
+      "sf": 1797,
+      "count": {
+        "v": 90,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Market 4BR",
+      "beds": 4,
+      "baths": null,
+      "sf": 2900,
+      "count": {
+        "v": 10,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Market townhome",
+      "beds": null,
+      "baths": null,
+      "sf": 2720,
+      "count": {
+        "v": 47,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P27_Cupertino/003_P_0102_DRAWING_LIST_RESIDENTIAL_PROGRAM_TABLES_pdf.pdf",
+          "page": 1,
+          "sheet": "P-0102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    }
+  ],
+  "parking": {
+    "provided": {
+      "v": 9570,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "residential": {
+      "v": 2623,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "office": {
+      "v": 6050,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "retail": {
+      "v": 798,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "street": {
+      "v": 99,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "required": {
+      "v": "not applicable per SB-35",
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "residential_ratio": {
+      "v": 0.98,
+      "units": "stalls/unit",
+      "src": {
+        "file": "01_Original_Collection/plans/P27_Cupertino/002_P_0101_PROJECT_INFORMATION_AND_DATA_TABLE_pdf.pdf",
+        "page": 1,
+        "sheet": "P-0101"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "2623/2669"
+    },
+    "type": "podium + below-grade structured"
+  },
+  "amenities": [
+    "two town squares",
+    "community parks",
+    "amenity levels"
+  ],
+  "access": [
+    "N Wolfe Rd",
+    "Stevens Creek Blvd",
+    "Vallco Pkwy",
+    "Perimeter Rd"
+  ],
+  "project_rules": [
+    {
+      "rule": "building plane: 1:1 slope from curb of arterial (Wolfe, Stevens Creek)",
+      "value": "1:1",
+      "units": "slope",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "affordable + market",
+      "values": "890 + 1,779 = 2,669",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "block distribution sum",
+      "values": "204+268+73+182+297+47+89+254+204+284+309+458 = 2,669",
+      "result": "consistent",
+      "note": "text layer; my first visual read of tiny totals misread 204 as 284 (sum 2,819) and was corrected by text extraction"
+    },
+    {
+      "check": "affordable blocks",
+      "values": "B5 297 + B10 284 + B11 309 = 890",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "parking components",
+      "values": "2623+6050+798+99 = 9,570",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "site areas",
+      "values": "west 30.20 + east 17.62 = 47.82 vs 50.822 gross",
+      "result": "discrepancy",
+      "note": "remaining area unexplained in reviewed sheets"
+    }
+  ],
+  "open_questions": [
+    "tower heights/storeys",
+    "calibrated tower footprints"
+  ],
+  "manifest_name": "The Rise / Vallco \u2014 selected drawings"
+}

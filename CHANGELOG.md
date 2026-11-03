@@ -12,6 +12,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **A link to a plan or project now opens on a computer that hasn't loaded the team's projects yet** (it used to land on the plain map).
 - Without the team's cloud set up on the site, all three still run in the browser as before.
 
+### 4:44 PM CT: Repeatable, independently checked layouts built from reviewed plan sets (c8e7998, dd4dddb, merged into main: this push)
+- **The same request gives the same layouts.** A layout run now has a saved description (the site, what to build and what each number means, the rules and where they come from, a seed) and replays it exactly: same buildings, ids, numbers and ranking on any machine, with no AI call. Tested with 20 repeats.
+- **A number means what you said.** Exactly, at least, at most, between, or as many as fit. "Exactly 120 garden apartments" gives 120 (it came out short before), "28,000 sf of retail" gives 28,000 sf (it gave 34,400), "a 40,000 sf anchor, 80,000 sf total" is 80,000 sf (it was read as 120,000).
+- **An independent check of every layout**, separate from the engine's own numbers: pass, fail or unknown for the property line, setbacks, easements, overlaps (by level), access, connected drives and parking, parking needed vs drawn, the size asked for, and units by building. In the site plan's Numbers, and for agents. Unknown never counts as a pass; drainage, turning and grading are always "not checked".
+- **Garden apartments follow real buildings:** 15 projects from the reference plan library were read (site plans, building and unit schedules) and their buildings turned into templates with their sources. Garden buildings are whole 24-unit breezeway buildings (two stairs, four homes a floor at each); units come from that schedule.
+- **Changes as edits:** lock pieces, move the pool to the middle, keep an entrance and lay out the rest, change a count, compare garden apartments with townhomes, raise a flex office share. A change that breaks a rule or moves a lock isn't made, and says why; changes can be replayed and undone.
+- **Unsupported building types are said, not swapped:** a wrap building is reported unsupported rather than drawn as garden apartments. Which types are supported, partly supported or not is listed.
+- **Fixes:** flex loading aprons meet their end drives (a 2 ft gap left them disconnected); pad sites only on uses that have them.
+
+### 4:24 PM CT: Expand site-layout report with multifamily details (e6bf0c9)
+- Expanded the technical report to explain apartment layout strategies, unit/parking sizing, amenities, detention, and candidate validation.
+
 ### 4:08 PM CT: Projects saved to the team's cloud reliably, Safari saving fixed, massing framing (bc1406e, dc9f046)
 - **Big projects now reach the team's cloud.** Before, a project over about half a megabyte (several built options is enough) was quietly left out of the team's copy and stayed only on the computer that made it, while the save mark still said it was synced. Now it is kept whole, and only projects the server confirms count as saved. A single project over about 4 MB is named in a message instead of being dropped silently.
 - **Teammates' changes show up within 30 seconds**, and as soon as you come back to the tab; only the projects that changed are downloaded, so a long project list keeps loading.
@@ -19,6 +31,18 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Safari no longer says "This browser won't let the page save projects."** Safari gives a website about half the browser storage Chrome does; projects that outgrow it now go to the browser's larger store. If Safari blocks storage outright (Block All Cookies, some Private windows) the message says so and how to fix it, and appears once a minute at most instead of on every change.
 - **Massing for renderings is always taken on flat ground.** With 3D Terrain on, the site was lifted toward the camera, so the massing came out zoomed in with the site cut off (worst on hilly sites).
 - **Building close-up is gone** from the Render views, the project page and the agents' renderings tool. Close-ups made before still show with their names.
+
+### 2:37 PM CT: Five failing tests fixed: layout, landscape and AI-usage bugs, plus two updated expectations (this push)
+- **Townhomes "with an amenity center" get their commons again** (community center, playground, pavilion). Since Oct 27 those words were read as the neighbourhood's own leasing building, and the commons was dropped. Now a bare "amenity center" or "community center" is the commons; a size, a clubhouse, a leasing office or a model home is still the neighbourhood's own building.
+- **The second way in for fire access can cross the park at the front again.** On some lot shapes the check that keeps a new driveway out of the side buffer worked from a broken outline and turned down every spot.
+- **Apartment plans no longer pick up shop pad sites** when a request mentions pads.
+- **Townhome front yards get their trees on the landscape sheets** (0 of 16 before). Townhome rows on their own lots no longer have an 8 ft walk drawn round them, which had covered their yards.
+- **The AI usage page:** a bad start date now falls back to the first of the month you asked about, not the current month.
+- Two test expectations updated, with the reason in the test: the curving cul-de-sac layout must hold 80% (was 85%) of the best straight-row layout, since the rows improved on Oct 27; and the mixed-use test allows 5% fewer townhomes than asked, since a smaller amenity lake now leaves room for a separate detention pond. One permit-loader test no longer depends on what month it is.
+
+### 12:00 PM CT: Monthly businesses-and-places refresh fixed; terrain back on the detailed elevation image (this push)
+- **The Nov 3 refresh of businesses and places failed before loading anything.** The database tool it uses released a new version that no longer accepts one piece of the query's wording. The query now uses the new wording, and the job is locked to that tool version so a future release can't break it the same way. The places already on the map were not touched by the failed run; they are from the last successful load and update on the next run.
+- **Topography and terrain use the full-detail USGS elevation image again.** A merge on Nov 2 dropped the part that reads that image, so terrain quietly fell back to the older, coarser elevation sampling. It is back.
 
 ## 2026-11-02
 
@@ -59,6 +83,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **The renderings test** imports the massing picture from where it lives now (it had failed since the picture moved).
 - **ChatGPT's `search` and `fetch`** are there (projects by words, or an address, parcel number or coordinates to a property) because ChatGPT connectors expect them.
 - **For the admin:** set `MCP_OAUTH_SECRET` (16+ random characters) and `MCP_SIGNIN_CODE` on the deployment to turn this on; both are set on production and preview.
+
+### 1:24 PM CT: Technical report on data sources and site layout (7789478)
+- Added a technical guide to the app's data sources and how the site layout engine builds and evaluates plan options.
 
 ### 1:05 PM CT: 3D view of road loops and easements; Montreve Option B fixed (affab09)
 - **The 3D view no longer paves over blocks of land inside a road loop.** Where a site's roads run in a loop, the 3D picture drew the whole block of lots inside it as asphalt. Paving now keeps its holes, as the map already did. Both Montreve options showed this.

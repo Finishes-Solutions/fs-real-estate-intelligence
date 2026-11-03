@@ -1,0 +1,1254 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P20",
+  "name": "Magnolia Village PDD Phase 2",
+  "location": "Salina, KS",
+  "family": "magnolia-village",
+  "partition": "dev",
+  "forms": [
+    "garden-exterior-entry",
+    "duplex",
+    "cottage-detached",
+    "tuck-under"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+      "sha256": "1960293dc6d0e8cb141d95afaea69777fc6e4d0bd7b971a2f8e497942aee0221",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "C009",
+          "title": "Final Development Plan",
+          "revision": null,
+          "date": "2025-12-02"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+      "sha256": "7cde157da6b0a44ff80960220f65ebe365945737772bf59db88cc78c380f5d26",
+      "pages_used": [
+        3,
+        4,
+        8
+      ],
+      "sheets": [
+        {
+          "page": 3,
+          "sheet": null,
+          "title": "Code narrative",
+          "revision": "permit set",
+          "date": "2025-03-28"
+        },
+        {
+          "page": 4,
+          "sheet": "G-102",
+          "title": "Code floor plans bldg A, B, C",
+          "revision": "permit set",
+          "date": "2025-03-28"
+        },
+        {
+          "page": 8,
+          "sheet": "S-100",
+          "title": "Slab plan 1A",
+          "revision": "permit",
+          "date": "2025-03-28"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P20_Magnolia_Village/010_Plans_SS_1BR_DUPLEX.pdf",
+      "sha256": "1d30b1f4b69357364e1cab874bfa75f89beec32e7fb45e98fae33f0c2d6af21f",
+      "pages_used": [
+        3
+      ],
+      "sheets": [
+        {
+          "page": 3,
+          "sheet": "A1",
+          "title": "Single story duplex floor plan",
+          "revision": "permit set",
+          "date": "2024-12-13"
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P20_Magnolia_Village/011_Plans_SS_2BR.pdf",
+      "sha256": "922b15ed92a718478be33d8e12c0281ab73fbd9c4194475a1304ba1c40bef763",
+      "pages_used": [
+        3
+      ],
+      "sheets": [
+        {
+          "page": 3,
+          "sheet": "A1",
+          "title": "Single story 2BR floor plan",
+          "revision": "permit set",
+          "date": null
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P20_Magnolia_Village/014_Plans_DS_2BR.pdf",
+      "sha256": "3fb6b9623ff9e6b27956be80a5f87bfebdb14001b9da0d66a7f688d47cefcd87",
+      "pages_used": [
+        3
+      ],
+      "sheets": [
+        {
+          "page": 3,
+          "sheet": "A1",
+          "title": "Double story 2BR plans",
+          "revision": "permit set",
+          "date": null
+        }
+      ]
+    },
+    {
+      "file": "01_Original_Collection/plans/P20_Magnolia_Village/016_Plans_MM_Unit_1.pdf",
+      "sha256": "476a85d6266db2be4a1ba0c82262532fa585c5d3bce2f16916153a0d53723587",
+      "pages_used": [
+        1
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": null,
+          "title": "MicroMansion unit 1",
+          "revision": null,
+          "date": null
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ac": {
+      "v": 29.22,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "units": {
+      "v": 250,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "total_footprint_sf": {
+      "v": 190368,
+      "units": "sf",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "lot1_ac": {
+      "v": 1.388,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "lot2_ac": {
+      "v": 22.23,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "lot3_ac": {
+      "v": 4.814,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "lot2_coverage_pct": {
+      "v": 16,
+      "units": "%",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "lot3_coverage_pct": {
+      "v": 15,
+      "units": "%",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_du_ac": {
+      "v": 8.6,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "250/29.22 gross"
+    },
+    "zoning": {
+      "v": "PDD (from Agriculture)",
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "APT",
+      "label": "3-story apartment (Bldg A, B, C)",
+      "count": {
+        "v": 3,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+          "page": 3,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+          "page": 3,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "shape": "bar with end wings",
+      "footprint": {
+        "w_ft": {
+          "v": 199.92,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+            "page": 8,
+            "sheet": "S-100"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "199'-11\" EOS"
+        },
+        "d_ft": {
+          "v": 59.67,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+            "page": 8,
+            "sheet": "S-100"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "59'-8\" body; 64'-10\" at end wing"
+        },
+        "area_sf": {
+          "v": 10822,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "interior per floor; +2,083 exterior (stairs/balconies)"
+        }
+      },
+      "units_per_building": {
+        "v": "32-33",
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+          "page": 4,
+          "sheet": "G-102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "A 32 (L1 has clubhouse), B 33, C 33"
+      },
+      "units_per_floor": {
+        "v": 11,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+          "page": 4,
+          "sheet": "G-102"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {
+        "1BR": "2/floor (650 sf)",
+        "2BR": "6/floor (865 sf)",
+        "3BR": "3/floor (1,183-1,272 sf)"
+      },
+      "corridor": "exterior entry: back-to-back units, exterior exit stairs + exit balconies",
+      "stairs": {
+        "v": 4,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+          "page": 4,
+          "sheet": "G-102"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "two exterior exit stairs per half building"
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "none found in review"
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": 38715,
+        "units": "sf",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/006_Plans_Apartments_Part_1.pdf",
+          "page": 3,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only",
+        "note": "10,822+2,083 per floor x 3"
+      }
+    },
+    {
+      "type_id": "DUPLEX",
+      "label": "Single-story 1BR duplex",
+      "count": {
+        "v": 13,
+        "units": "bldg",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 1,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/010_Plans_SS_1BR_DUPLEX.pdf",
+          "page": 3,
+          "sheet": "A1"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "rect",
+      "footprint": {
+        "w_ft": {
+          "v": 46.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/010_Plans_SS_1BR_DUPLEX.pdf",
+            "page": 3,
+            "sheet": "A1"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 44.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/010_Plans_SS_1BR_DUPLEX.pdf",
+            "page": 3,
+            "sheet": "A1"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": 1876,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": {
+        "v": 2,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": {
+        "1BR": 2
+      },
+      "corridor": "exterior entry (porch)",
+      "stairs": 0,
+      "elevators": 0,
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "SS2",
+      "label": "Single-story detached 2BR",
+      "count": {
+        "v": 21,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 1,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/011_Plans_SS_2BR.pdf",
+          "page": 3,
+          "sheet": "A1"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "L/rect",
+      "footprint": {
+        "w_ft": {
+          "v": 36.67,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/011_Plans_SS_2BR.pdf",
+            "page": 3,
+            "sheet": "A1"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 44.67,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/011_Plans_SS_2BR.pdf",
+            "page": 3,
+            "sheet": "A1"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "44'-8\" incl porch; body 39'-4\""
+        },
+        "area_sf": {
+          "v": 1331,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": 1,
+      "units_per_floor": null,
+      "unit_mix": {
+        "2BR": 1
+      },
+      "corridor": "exterior entry",
+      "stairs": 0,
+      "elevators": 0,
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "DS2",
+      "label": "Two-story detached 2BR (narrow)",
+      "count": {
+        "v": 30,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": 2,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/014_Plans_DS_2BR.pdf",
+          "page": 3,
+          "sheet": "A1"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "shape": "rect",
+      "footprint": {
+        "w_ft": {
+          "v": 17.33,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/014_Plans_DS_2BR.pdf",
+            "page": 3,
+            "sheet": "A1"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 45.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/014_Plans_DS_2BR.pdf",
+            "page": 3,
+            "sheet": "A1"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": 830,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": 1,
+      "units_per_floor": null,
+      "unit_mix": {
+        "2BR": 1
+      },
+      "corridor": "exterior entry",
+      "stairs": 1,
+      "elevators": 0,
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "SS3",
+      "label": "Single-story detached 3BR",
+      "count": {
+        "v": 9,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": 1,
+      "shape": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": 1646,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": 1,
+      "units_per_floor": null,
+      "unit_mix": {
+        "3BR": 1
+      },
+      "corridor": "exterior entry",
+      "stairs": 0,
+      "elevators": 0,
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "DS3",
+      "label": "Two-story detached 3BR",
+      "count": {
+        "v": 31,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": 2,
+      "shape": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": 1193,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": 1,
+      "units_per_floor": null,
+      "unit_mix": {
+        "3BR": 1
+      },
+      "corridor": "exterior entry",
+      "stairs": 1,
+      "elevators": 0,
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "GAR",
+      "label": "Unit over 3-car garage",
+      "count": {
+        "v": 9,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": 2,
+      "shape": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "footprint": {
+        "w_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "d_ft": {
+          "v": null,
+          "units": "ft",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        },
+        "area_sf": {
+          "v": 902,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": 1,
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": "exterior entry",
+      "stairs": null,
+      "elevators": 0,
+      "parking": "tuck-under (3-car garage below unit)",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "MM",
+      "label": "MicroMansion 'The Bert'",
+      "count": {
+        "v": 26,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "floors": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "shape": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "footprint": {
+        "w_ft": {
+          "v": 26.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/016_Plans_MM_Unit_1.pdf",
+            "page": 1,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "low",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "d_ft": {
+          "v": 20.5,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/016_Plans_MM_Unit_1.pdf",
+            "page": 1,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "low",
+          "status": "extracted",
+          "review": "text-only"
+        },
+        "area_sf": {
+          "v": 798,
+          "units": "sf",
+          "src": {
+            "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+            "page": 1,
+            "sheet": "C009"
+          },
+          "method": "printed-schedule",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        }
+      },
+      "units_per_building": 1,
+      "units_per_floor": null,
+      "unit_mix": {},
+      "corridor": "exterior entry",
+      "stairs": null,
+      "elevators": 0,
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "Apt 1BR",
+      "beds": 1,
+      "baths": null,
+      "sf": 650,
+      "count": {
+        "v": 17,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Apt 2BR",
+      "beds": 2,
+      "baths": null,
+      "sf": 865,
+      "count": {
+        "v": 54,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    },
+    {
+      "name": "Apt 3BR",
+      "beds": 3,
+      "baths": null,
+      "sf": "1,183-1,272",
+      "count": {
+        "v": 27,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+          "page": 1,
+          "sheet": "C009"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      }
+    }
+  ],
+  "parking": {
+    "horizontal_required": {
+      "v": 238,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "2/unit first 20 + 1.5/unit x 132"
+    },
+    "horizontal_provided": {
+      "v": 238,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "27 garage + 204 surface + 7 ADA"
+    },
+    "apartment_required": {
+      "v": 157,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "2x20 + 1.5x78"
+    },
+    "apartment_provided": {
+      "v": 159,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "153 + 6 ADA"
+    },
+    "provided": {
+      "v": 397,
+      "units": "stalls",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "ratio_per_unit": {
+      "v": 1.59,
+      "units": "stalls/unit",
+      "src": {
+        "file": "01_Original_Collection/plans/P20_Magnolia_Village/001_Final_PDD_Site_Development_Plan.pdf",
+        "page": 1,
+        "sheet": "C009"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "397/250"
+    },
+    "type": "surface + individual garages"
+  },
+  "amenities": [
+    "mail building (152 boxes)",
+    "phase 1 clubhouse",
+    "walking trails",
+    "apartment clubhouse room (583 sf)"
+  ],
+  "access": [
+    "Magnolia Road (north gate)",
+    "Virginia Drive (+ future extension)",
+    "gates at fencing/sidewalk crossings"
+  ],
+  "project_rules": [
+    {
+      "rule": "front setback abutting street",
+      "value": 0,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "separation between buildings",
+      "value": 10,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "rear setback",
+      "value": 25,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "parking: 2/unit first 20 units, then 1.5/unit",
+      "value": "2 / 1.5",
+      "units": "stalls/unit",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "unit legend sum",
+      "values": "26+9+30+31+26+21+9+98=250",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "footprint legend sum",
+      "values": "157,902 horizontal + 3x10,822 = 190,368 vs printed 190,368",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "lot 3 footprint",
+      "values": "3 x 10,822 = 32,466 vs printed 32,466",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "lot 2 footprint",
+      "values": "157,902 vs printed 158,552",
+      "result": "discrepancy",
+      "note": "650 sf difference"
+    },
+    {
+      "check": "lot areas vs site",
+      "values": "1.388+22.230+4.814=28.432 vs 29.22 ac",
+      "result": "discrepancy",
+      "note": "0.79 ac unexplained (likely ROW)"
+    },
+    {
+      "check": "apartment units",
+      "values": "A 32 + B 33 + C 33 = 98; mix 17/54/27",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "parking",
+      "values": "238 + 159 = 397",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "plumbing count",
+      "values": "code narrative uses 180 D.U. vs 98 units",
+      "result": "discrepancy",
+      "note": "stale value in narrative"
+    }
+  ],
+  "open_questions": [
+    "dimensions of SS3, DS3, garage and MM types only partly text-extracted"
+  ],
+  "manifest_name": "Magnolia Village"
+}
