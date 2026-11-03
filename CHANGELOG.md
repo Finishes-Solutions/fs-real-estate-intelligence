@@ -3,8 +3,6 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
-## 2026-10-30
-
 ## 2026-11-03
 
 ### 4:24 PM CT: Expand site-layout report with multifamily details (e6bf0c9)
