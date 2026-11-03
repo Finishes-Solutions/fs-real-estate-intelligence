@@ -242,7 +242,7 @@ const edited = (els, what, o = {}) => { // every drive and home reached, lots cl
   const R = reachedAll(els); assert.deepEqual(R.D.filter(d => !R.seen.has(d.id)).map(d => d.name || d.note), [], what + ': every drive reached from a way in'); assert.deepEqual(offStreet(els, R), [], what + ': every home on a reached street');
   assert.deepEqual(lotIssues(els), [], what + ': lots clear'); assert.deepEqual(S.check({ ...base, elements: els }).filter(i => i.level === 'bad').map(i => i.text), [], what + ': no bad check'); assert.deepEqual(N.clashes(els), [], what + ': no street runs into another');
   const extra = N.netRules({ ...base, elements: els }).filter(i => !(o.allow || []).includes(i.kind) && !(o.allowText && o.allowText.test(i.text))); assert.deepEqual(extra.map(i => i.text), [], what + ': within the street rules'); };
-const chains = N.chainsOf(base), court = chains.filter(c => c.role === 'court' && !c.cyc && c.ends.every(e => e?.kind === 'bulb') && c.tees).sort((a, b) => b.L - a.L)[0];
+const chains = N.chainsOf(base), court = chains.filter(c => c.role === 'court' && !c.cyc && c.ends.every(e => e?.kind === 'bulb') && c.tees && c.L <= 2000).sort((a, b) => b.L - a.L)[0]; // (a court of ordinary length: since Oct 27 Waller's network can have a winding 5,500 ft street that bows less, with the reason)
 assert.ok(chains.length > 10 && chains.some(c => c.role === 'collector' && c.cyc) && chains.some(c => c.role === 'boulevard'), 'the streets as named things: a loop road, a boulevard in');
 assert.ok(court, 'a cul-de-sac street with streets meeting it along it');
 { // a dead end made a cul-de-sac: its bulb gone first (a street that ends in nothing)
