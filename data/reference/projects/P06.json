@@ -1,0 +1,458 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P06",
+  "name": "Landing at 2EightySeven",
+  "location": "Fort Worth (Haslet area), TX",
+  "family": "fw-landing-287",
+  "partition": "dev",
+  "forms": [
+    "garden-breezeway",
+    "garage-detached"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+      "sha256": "9a6897037026c9a6bcd83c66a8f2eb84da201ac2836482ae04107b1b7a16f053",
+      "pages_used": [
+        2,
+        3
+      ],
+      "sheets": [
+        {
+          "page": 3,
+          "sheet": "A0.5",
+          "title": "Site layout & unit identification plan (MFD-20-010)",
+          "revision": "approved 2021-01-04",
+          "date": "2020-10-14"
+        },
+        {
+          "page": 2,
+          "sheet": "L0.1",
+          "title": "Phase II as-developed landscape / urban forestry plan",
+          "revision": null,
+          "date": "2020-12-04"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_gross_ac": {
+      "v": 26.3939,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 2,
+        "sheet": "L0.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "area_net_ac": {
+      "v": 25.7062,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 2,
+        "sheet": "L0.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "lot_label_ac": {
+      "v": 26.393,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 2,
+        "sheet": "L0.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only",
+      "note": "'LOT 1, BLOCK 18 \u00b126.393 ACRES'"
+    },
+    "open_space_ac": {
+      "v": 8.997,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 2,
+        "sheet": "L0.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "parking_area_ac": {
+      "v": 8.35,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 2,
+        "sheet": "L0.1"
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "units": {
+      "v": 432,
+      "units": "units",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 3,
+        "sheet": "A0.5"
+      },
+      "method": "derived",
+      "confidence": "medium",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "18 numbered buildings x 24 unit ids (8/floor x 3); matches manifest '432-unit'"
+    },
+    "density_du_ac": {
+      "v": 16.8,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 3,
+        "sheet": "A0.5"
+      },
+      "method": "derived",
+      "confidence": "medium",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "432/25.7062 net"
+    },
+    "buildings": {
+      "v": 18,
+      "units": "buildings",
+      "src": {
+        "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+        "page": 3,
+        "sheet": "A0.5"
+      },
+      "method": "text-search",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "residential, numbered"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "A",
+      "label": "Type A (bldg 10 measured), H-shape",
+      "count": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+          "page": 3,
+          "sheet": "A0.5"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed",
+        "note": "unit ids 1xx-3xx"
+      },
+      "shape": "H",
+      "footprint": {
+        "w_ft": {
+          "v": 146,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+            "page": 3,
+            "sheet": "A0.5"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed",
+          "note": "printed 1\"=60' (0.833 ft/pt) checked vs 9 ft stall pitch; +/-3 ft"
+        },
+        "d_ft": {
+          "v": 95,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+            "page": 3,
+            "sheet": "A0.5"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 24,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+          "page": 3,
+          "sheet": "A0.5"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 8,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+          "page": 3,
+          "sheet": "A0.5"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {},
+      "corridor": "breezeway (2 open stair slots + cross breezeway)",
+      "stairs": {
+        "v": 2,
+        "units": "stairs",
+        "src": {
+          "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+          "page": 3,
+          "sheet": "A0.5"
+        },
+        "method": "derived",
+        "confidence": "low",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "B1",
+      "label": "Type B1 (bldg 14 measured)",
+      "count": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "floors": {
+        "v": 3,
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+          "page": 3,
+          "sheet": "A0.5"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "shape": "bar",
+      "footprint": {
+        "w_ft": {
+          "v": 147,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+            "page": 3,
+            "sheet": "A0.5"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 85,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+            "page": 3,
+            "sheet": "A0.5"
+          },
+          "method": "scaled-measurement",
+          "confidence": "medium",
+          "status": "measured",
+          "review": "visually-reviewed"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 24,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+          "page": 3,
+          "sheet": "A0.5"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": {
+        "v": 8,
+        "units": "units/floor",
+        "src": {
+          "file": "01_Original_Collection/plans/P06_Landing_at_2EightySeven/001_Landing_at_2EightySeven.pdf",
+          "page": 3,
+          "sheet": "A0.5"
+        },
+        "method": "derived",
+        "confidence": "medium",
+        "status": "derived",
+        "review": "visually-reviewed"
+      },
+      "unit_mix": {},
+      "corridor": "breezeway",
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "surface",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "unit_types": [],
+  "parking": {
+    "type": "surface + detached 4- and 5-bay garages",
+    "provided": {
+      "v": null,
+      "units": "stalls",
+      "src": null,
+      "method": null,
+      "confidence": null,
+      "status": "unknown",
+      "review": null,
+      "note": "no parking table on reviewed sheets"
+    },
+    "required": {
+      "v": null,
+      "units": "stalls",
+      "src": null,
+      "method": null,
+      "confidence": null,
+      "status": "unknown",
+      "review": null
+    }
+  },
+  "amenities": [
+    "clubhouse",
+    "pool amenity area",
+    "dog park"
+  ],
+  "access": [
+    "resident-only entry/exit",
+    "US 287/81 frontage",
+    "roundabout internal circle"
+  ],
+  "project_rules": [
+    {
+      "rule": "open space minimum (zoning D)",
+      "value": 35,
+      "units": "% of site",
+      "note": "printed on landscape sheet; project-specific"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "unit count",
+      "values": "18 bldg x 24 = 432 vs manifest 432",
+      "result": "consistent",
+      "note": "unit schedule not printed; derived from addressing ids"
+    },
+    {
+      "check": "lot area labels",
+      "values": "26.3939 gross vs 26.393 lot label vs 25.7062 net",
+      "result": "consistent",
+      "note": "net excludes ROW"
+    }
+  ],
+  "open_questions": [
+    "parking counts",
+    "unit mix and sizes",
+    "building type counts (A/B1/B2)"
+  ],
+  "manifest_name": "Landing at 2EightySeven"
+}

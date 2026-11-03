@@ -1,0 +1,198 @@
+// The deterministic layout contract: the brief (lib/layoutbrief.mjs), the independent validator (lib/layoutcheck.mjs)
+// checked on hand-built layouts whose answers are known, building templates (lib/bldgtemplates.mjs), and runs
+// (lib/layoutrun.mjs) repeated 20 times on representative briefs to prove identical geometry, quantities and ranking.
+// No network, no AI.  node test/layoutrun.mjs [--quick]
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import * as CX from '../lib/enginectx.mjs';
+import { sha256, hashOf } from '../lib/sha256.mjs';
+import * as B from '../lib/layoutbrief.mjs';
+import * as V from '../lib/layoutcheck.mjs';
+import * as RUN from '../lib/layoutrun.mjs';
+import * as T from '../lib/bldgtemplates.mjs';
+import * as SP from '../lib/siteplan.mjs';
+
+const QUICK = process.argv.includes('--quick');
+let n = 0; const ok = (name, f) => { f(); n++; console.log('ok', n, name); };
+
+// ---------- primitives ----------
+ok('sha256 matches node:crypto', () => { for (const s of ['', 'abc', 'x'.repeat(119), 'é漢字🙂'.repeat(9)]) assert.equal(sha256(s), crypto.createHash('sha256').update(s).digest('hex')); });
+ok('canonical JSON ignores key order', () => assert.equal(hashOf({ a: 1, b: [1, { d: 2, c: 3 }] }), hashOf({ b: [1, { c: 3, d: 2 }], a: 1 })));
+ok('enginectx: seeded, restored, synchronous only', () => {
+  const a = CX.deterministic({ seed: 7 }, () => [CX.rand(), CX.rand(), CX.now(), CX.rid()]), b = CX.deterministic({ seed: 7 }, () => [CX.rand(), CX.rand(), CX.now(), CX.rid()]);
+  assert.deepEqual(a.value, b.value); assert.notDeepEqual(a.value, CX.deterministic({ seed: 8 }, () => [CX.rand(), CX.rand(), CX.now(), CX.rid()]).value);
+  assert.equal(a.stats.reads, 1); assert.equal(CX.isDeterministic(), false);
+  assert.throws(() => CX.deterministic({ seed: 1 }, async () => 1), /synchronous/);
+  assert.equal(CX.isDeterministic(), false);
+});
+
+// ---------- the brief ----------
+ok('quantities keep their meaning', () => {
+  assert.deepEqual(B.quantityFromWords('exactly 240 garden apartments'), { mode: 'exact', value: 240, unit: 'units' });
+  assert.deepEqual(B.quantityFromWords('at least 150 apartments'), { mode: 'min', value: 150, unit: 'units' });
+  assert.deepEqual(B.quantityFromWords('up to 300 apartments'), { mode: 'max', value: 300, unit: 'units' });
+  assert.deepEqual(B.quantityFromWords('200 to 240 apartments'), { mode: 'range', min: 200, max: 240, unit: 'units' });
+  assert.deepEqual(B.quantityFromWords('28,000 sf of retail', 'sf'), { mode: 'exact', value: 28000, unit: 'sf' });
+  assert.equal(B.quantityFromWords('apartments'), null);
+  const plan = { origin: [-96, 30], ring: [[0, 0], [600, 0], [600, 400], [0, 400]], front: 0, streets: [] };
+  assert.equal(B.briefFromRequest('townhomes, as many as fit', plan).program.uses[0].quantity.mode, 'maximize');
+  assert.equal(B.briefFromRequest('at least 150 apartments', plan).program.uses[0].quantity.mode, 'min');
+  assert.equal(B.briefFromRequest('200 garden apartments', plan).program.uses[0].quantity.mode, 'exact');
+  assert.deepEqual(B.briefFromRequest('senior affordable apartments, 120 units', plan).program.overlays, ['affordable', 'senior']);
+});
+ok('brief validation reports what is wrong or missing', () => {
+  assert.equal(B.validateBrief(null).ok, false);
+  const plan = { ring: [[0, 0], [100, 0], [100, 100], [0, 100]], front: 0 };
+  const b = B.briefFromRequest('100 apartments', plan);
+  assert.equal(B.validateBrief(b).ok, true);
+  assert.ok(B.validateBrief({ ...b, site: { ...b.site, ring: [[0, 0], [100, 100], [100, 0], [0, 100]] } }).errors.some(e => /crosses itself/.test(e.msg)));
+  assert.ok(B.validateBrief({ ...b, site: { ...b.site, ring: [] } }).missing.includes('site boundary'));
+  assert.ok(B.validateBrief({ ...b, program: { ...b.program, uses: [{ ...b.program.uses[0], quantity: { mode: 'range', min: 9, max: 3, unit: 'units' } }] } }).errors.some(e => /range/.test(e.msg)));
+  assert.ok(B.validateBrief({ ...b, program: { ...b.program, uses: [{ ...b.program.uses[0], mix: [{ pct: 60 }, { pct: 30 }] }] } }).errors.some(e => /add to 90/.test(e.msg)));
+  assert.ok(B.validateBrief({ ...b, site: { ...b.site, parts: [[], []] } }).errors.some(e => /several separate parts/.test(e.msg)));
+});
+ok('canonical brief: metres to feet, clockwise rings turned, same meaning -> same hash', () => {
+  const ft = B.briefFromRequest('100 apartments', { ring: [[0, 0], [328.08399, 0], [328.08399, 164.041995], [0, 164.041995]], front: 0 });
+  const m = JSON.parse(JSON.stringify(ft)); m.site.units = 'm'; m.site.ring = [[0, 0], [100, 0], [100, 50], [0, 50]];
+  assert.equal(B.inputHash(ft), B.inputHash(m));
+  const cw = JSON.parse(JSON.stringify(ft)); cw.site.ring = ft.site.ring.slice().reverse(); cw.site.front = 2; // edge 0 (bottom) of the CCW ring is edge 2 of the reversed ring
+  const c = B.canonicalBrief(cw); assert.ok(SP.signedArea(c.site.ring) > 0); assert.deepEqual([c.site.ring[c.site.front], c.site.ring[(c.site.front + 1) % 4]].map(p => p[1]), [0, 0]);
+  assert.notEqual(B.inputHash(ft), B.inputHash({ ...ft, solver: { ...ft.solver, seed: 'other' } }));
+  assert.equal(B.inputHash(ft), B.inputHash({ ...ft, request: { text: 'reworded', parser: 'ai' } })); // wording isn't geometry
+});
+
+// ---------- the validator on layouts with known answers ----------
+// a 400 x 300 ft site, street along the bottom (edge 0); setbacks front 25, side 10, rear 20, paving 10
+const SITE = [[0, 0], [400, 0], [400, 300], [0, 300]];
+const briefFor = (extra = {}) => B.canonicalBrief({ ...B.briefFromProgram({ use: 'retail', gfa: 6000 }, { ring: SITE, front: 0, streets: [] }), ...extra });
+const good = () => [
+  { id: 'entry', kind: 'drive', x: 200, y: 30, w: 24, d: 60, rot: 0, entry: true }, // from the street (y 0) to the aisle
+  { id: 'aisle', kind: 'drive', x: 200, y: 72, w: 240, d: 24, rot: 0 },
+  { id: 'row', kind: 'parking', x: 200, y: 93, w: 234, d: 18, rot: 0, row: -1, lock: true }, // 26 stalls, against the aisle (a row as the engine draws it)
+  { id: 'shop', kind: 'building', use: 'retail', x: 200, y: 162, w: 100, d: 60, rot: 0, floors: 1 }
+];
+const lay = (els, extra = {}) => ({ ring: SITE, front: 0, streets: [], program: { use: 'retail' }, elements: els, ...extra });
+const st = (r, id) => r.checks.find(c => c.id === id)?.status;
+ok('a clean layout passes what it can measure, and says what it cannot', () => {
+  const r = V.validateLayout(lay(good()), briefFor());
+  for (const id of ['geometry.valid', 'site.containment', 'site.setbacks.buildings', 'overlap.level-aware', 'access.entrance', 'access.connectivity', 'access.buildings', 'parking.count', 'parking.geometry', 'program.u1']) assert.equal(st(r, id), 'pass', id + ' ' + JSON.stringify(r.checks.find(c => c.id === id)));
+  assert.equal(r.quantities.parking.surface, 26); assert.equal(r.quantities.parking.required, 24); // 6,000 sf at 4 a 1,000
+  assert.equal(r.quantities.totals.gfa, 6000);
+  for (const id of ['eng.detention', 'eng.turning', 'eng.fire-route']) assert.equal(st(r, id), 'unknown'); // never passed
+  assert.equal(r.status, 'pass'); assert.ok(r.restsOnAssumptions.includes('parking.count'));
+});
+ok('a building past the property line fails containment (concave site: inside the box, outside the L)', () => {
+  const L = [[0, 0], [400, 0], [400, 150], [200, 150], [200, 300], [0, 300]];
+  const els = good().filter(e => e.id !== 'shop').concat({ id: 'notch', kind: 'building', use: 'retail', x: 300, y: 225, w: 80, d: 60, rot: 0 });
+  const r = V.validateLayout(lay(els, { ring: L }), B.canonicalBrief({ ...briefFor(), site: { ...briefFor().site, ring: L } }));
+  assert.equal(st(r, 'site.containment'), 'fail'); assert.deepEqual(r.checks.find(c => c.id === 'site.containment').features, ['notch']); assert.equal(r.status, 'fail');
+});
+ok('setbacks measured edge by edge', () => {
+  const els = good(); els[3] = { ...els[3], x: 55, y: 200 }; // 5 ft from the west line (side setback 10)
+  const r = V.validateLayout(lay(els), briefFor()); assert.equal(st(r, 'site.setbacks.buildings'), 'fail'); assert.equal(r.checks.find(c => c.id === 'site.setbacks.buildings').measured, -5);
+});
+ok('overlaps are level-aware', () => {
+  const two = good().concat({ id: 'shop2', kind: 'building', use: 'retail', x: 230, y: 162, w: 100, d: 60, rot: 0 });
+  assert.equal(st(V.validateLayout(lay(two), briefFor()), 'overlap.level-aware'), 'fail');
+  const stacked = good().concat({ id: 'flats', kind: 'building', use: 'multifamily', x: 200, y: 162, w: 100, d: 60, rot: 0, z0: 20, z1: 50, units: 12 });
+  assert.equal(st(V.validateLayout(lay(stacked), briefFor()), 'overlap.level-aware'), 'pass'); // apartments over the shop
+  const onParking = good().concat({ id: 'tuck', kind: 'building', use: 'multifamily', x: 200, y: 93, w: 60, d: 18, rot: 0, over: 10, floors: 2, units: 2 });
+  assert.equal(st(V.validateLayout(lay(onParking), briefFor()), 'overlap.level-aware'), 'pass'); // raised over the stalls
+  assert.equal(st(V.validateLayout(lay(good().concat({ ...onParking.at(-1), over: 0 })), briefFor()), 'overlap.level-aware'), 'fail');
+});
+ok('parking that does not reach the way in is disconnected', () => {
+  const els = good().concat({ id: 'island', kind: 'parking', x: 200, y: 260, w: 90, d: 18, rot: 0, row: 1, lock: true });
+  const r = V.validateLayout(lay(els), briefFor()); assert.equal(st(r, 'access.connectivity'), 'fail'); assert.deepEqual(r.checks.find(c => c.id === 'access.connectivity').features, ['island']);
+});
+ok('an entrance across an edge the brief does not allow fails access', () => {
+  const b = briefFor(); b.site.access = { edges: [1], entrances: [] }; // only the east edge allowed
+  assert.equal(st(V.validateLayout(lay(good()), b), 'access.entrance'), 'fail');
+  const side = good().concat({ id: 'west', kind: 'drive', x: 15, y: 72, w: 30, d: 24, rot: 0 }); // a drive out to the west (neighbour's) line
+  assert.equal(st(V.validateLayout(lay(side), briefFor()), 'access.entrance'), 'fail');
+});
+ok('exclusions are kept clear', () => {
+  const b = briefFor(); b.site.exclusions = [{ id: 'easement', kind: 'easement', ring: [[150, 150], [400, 150], [400, 170], [150, 170]], source: 'test' }];
+  const r = V.validateLayout(lay(good()), b); assert.equal(st(r, 'site.exclusions'), 'fail'); assert.match(r.checks.find(c => c.id === 'site.exclusions').features[0], /^shop on easement/);
+});
+ok('parking required and provided reported separately; a shortfall fails with no tolerance', () => {
+  const b = briefFor(); b.rules.values.parkingPer1000 = { v: 5, cls: 'verified', source: 'Test ordinance §1' };
+  const r = V.validateLayout(lay(good()), b), c = r.checks.find(x => x.id === 'parking.count');
+  assert.equal(c.status, 'fail'); assert.equal(c.required, 30); assert.equal(c.measured, 26); assert.equal(c.basis, 'verified');
+});
+ok('missing evidence is never a pass', () => {
+  const b = briefFor(); delete b.rules.values.buildingSeparation;
+  assert.equal(st(V.validateLayout(lay(good()), b), 'separation.buildings'), 'unknown');
+  const bm = briefFor(); bm.program.uses[0] = { ...bm.program.uses[0], use: 'mystery', quantity: { mode: 'maximize', unit: 'sf' } };
+  const r = V.validateLayout(lay(good().map(e => e.id === 'shop' ? { ...e, use: 'mystery' } : e), { program: { use: 'mystery' } }), bm);
+  assert.equal(st(r, 'parking.count'), 'unknown'); assert.equal(r.status, 'incomplete');
+  const mf = B.canonicalBrief(B.briefFromProgram({ use: 'multifamily', units: 12 }, { ring: SITE, front: 0 }));
+  const est = V.validateLayout(lay(good().map(e => e.id === 'shop' ? { ...e, use: 'multifamily', floors: 3 } : e), { program: { use: 'multifamily' } }), mf);
+  assert.equal(st(est, 'program.buildings'), 'unknown'); // units estimated from floor area, not a schedule
+});
+ok('a use asked for but not on the plan is 0, not unknown', () => {
+  const r = V.validateLayout(lay(good().filter(e => e.kind !== 'building')), briefFor()); assert.equal(st(r, 'program.u1'), 'fail'); assert.equal(r.checks.find(c => c.id === 'program.u1').measured, 0);
+});
+ok('quantity meanings: exact, min, max, range, maximize', () => {
+  const mk = q => { const b = B.canonicalBrief(B.briefFromProgram({ use: 'multifamily', units: 10 }, { ring: SITE, front: 0 })); b.program.uses[0].quantity = q; return b; };
+  const els = good().map(e => e.id === 'shop' ? { ...e, use: 'multifamily', floors: 3, units: 24 } : e), L0 = lay(els, { program: { use: 'multifamily' } });
+  const s = q => st(V.validateLayout(L0, mk(q)), 'program.u1');
+  assert.equal(s({ mode: 'exact', value: 24, unit: 'units' }), 'pass'); assert.equal(s({ mode: 'exact', value: 20, unit: 'units' }), 'fail');
+  assert.equal(s({ mode: 'min', value: 20, unit: 'units' }), 'pass'); assert.equal(s({ mode: 'max', value: 20, unit: 'units' }), 'fail');
+  assert.equal(s({ mode: 'range', min: 20, max: 30, unit: 'units' }), 'pass'); assert.equal(s({ mode: 'range', min: 25, max: 30, unit: 'units' }), 'fail');
+  assert.equal(s({ mode: 'maximize', unit: 'units' }), 'pass');
+});
+ok('a locked piece that moved fails', () => {
+  const b = briefFor(); b.locked = { shop: { shape: SP.shapeOf(good()[3]) } };
+  assert.equal(st(V.validateLayout(lay(good()), b), 'locks'), 'pass');
+  assert.equal(st(V.validateLayout(lay(good().map(e => e.id === 'shop' ? { ...e, x: 201 } : e)), b), 'locks'), 'fail');
+  assert.equal(st(V.validateLayout(lay(good().filter(e => e.id !== 'shop')), b), 'locks'), 'fail');
+});
+ok('turned 33°, a layout checks the same', () => {
+  const a = 33 * Math.PI / 180, R = ([x, y]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+  const els = good().map(e => { const [x, y] = R([e.x, e.y]); return { ...e, x, y, rot: (e.rot || 0) + 33 }; }), ring = SITE.map(R);
+  const b = briefFor(); b.site.ring = ring;
+  const r0 = V.validateLayout(lay(good()), briefFor()), r1 = V.validateLayout(lay(els, { ring }), b);
+  assert.deepEqual(r1.checks.map(c => [c.id, c.status]), r0.checks.map(c => [c.id, c.status]));
+  assert.equal(r1.quantities.parking.surface, r0.quantities.parking.surface);
+});
+ok('malformed pieces are reported, not crashed on', () => {
+  const r = V.validateLayout(lay(good().concat({ id: 'nan', kind: 'building', x: NaN, y: 1, w: 10, d: 10 })), briefFor());
+  assert.equal(st(r, 'geometry.valid'), 'fail');
+  assert.equal(V.validateLayout({ ring: [], elements: [] }, null).status, 'fail');
+});
+
+// ---------- templates ----------
+ok('templated buildings are whole modules with units from the schedule', () => {
+  const t = T.templateOf('mf-garden-breezeway-3s'), brief = B.canonicalBrief(B.briefFromProgram({ use: 'multifamily', units: 24, floors: 3 }, { ring: SITE, front: 0 }, { text: 'exactly 24 garden apartments' }));
+  const o = { program: { use: 'multifamily' }, elements: [{ id: 'b1', kind: 'building', use: 'multifamily', x: 200, y: 150, w: t.module.w * 2 + 37, d: 65, rot: 0, floors: 3 }] };
+  const r = T.applyTemplates({ ring: SITE }, o, brief), e = r.elements[0];
+  assert.equal(e.w, t.module.w * 2); assert.equal(e.d, t.module.d); assert.equal(e.units, 2 * t.module.unitsPerFloor * 3); assert.equal(e.template, t.id);
+  const v = V.validateLayout({ ring: SITE, front: 0, program: { use: 'multifamily' }, elements: r.elements }, brief); assert.equal(st(v, 'program.buildings'), 'pass');
+  const stretched = V.validateLayout({ ring: SITE, front: 0, program: { use: 'multifamily' }, elements: [{ ...e, w: e.w + 30 }] }, brief); // stretched, schedule kept
+  const short = T.applyTemplates({ ring: SITE }, { program: { use: 'multifamily' }, elements: [{ id: 'b2', kind: 'building', use: 'multifamily', x: 200, y: 150, w: t.module.w * 2 * 0.96, d: 65, rot: 0, floors: 3 }] }, brief).elements[0];
+  assert.equal(short.modules, 2); assert.equal(short.w, +(t.module.w * 2 * 0.96).toFixed(2)); // 4% short of two modules: two, kept as drawn (not stretched)
+  assert.equal(st(stretched, 'program.buildings'), 'fail');
+});
+
+// ---------- runs: outcomes, then 20 identical repeats ----------
+const RECT = { origin: [-96.42, 30.38], ring: [[0, 0], [900, 0], [900, 500], [0, 500]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
+const LSITE = { origin: [-96.42, 30.38], ring: [[0, 0], [800, 0], [800, 380], [420, 380], [420, 700], [0, 700]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
+ok('outcomes are told apart', () => {
+  assert.equal(RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)).outcome, 'unsupported');
+  assert.equal(RUN.runBrief(B.briefFromRequest('exactly 20000 garden apartments', RECT)).outcome, 'proven-infeasible');
+  assert.equal(RUN.runBrief({ ...B.briefFromRequest('100 apartments', RECT), site: { units: 'ft', ring: [] } }).outcome, 'missing-information');
+});
+const CASES = [['retail', '30,000 sf retail strip with 2 pad sites', RECT], ['townhomes', 'townhomes, as many as fit', LSITE], ['garden', 'garden apartments, as many as fit', RECT]];
+for (const [label, ask, plan] of CASES) {
+  ok('20 identical runs: ' + label, () => {
+    const brief = B.briefFromRequest(ask, plan), first = RUN.runBrief(brief), reps = QUICK ? 3 : 20;
+    assert.ok(first.options.length, 'options'); assert.ok(['feasible', 'needs-review', 'no-feasible-found'].includes(first.outcome));
+    const sig = r => JSON.stringify([r.outcome, r.rankingHash, r.options.map(o => [o.rank, o.geometryHash, hashOf(o.quantities), o.validation.status, o.elements.map(e => e.id).join()])]);
+    const s0 = sig(first);
+    for (let i = 1; i < reps; i++) assert.equal(sig(RUN.runBrief(JSON.parse(JSON.stringify(brief)))), s0, 'run ' + (i + 1) + ' differs');
+    const rp = RUN.replayRun(JSON.parse(JSON.stringify(first))); assert.ok(rp.identical, rp.diffs.join('; '));
+    console.log('   ', label, first.outcome, first.options.map(o => o.validation.status + ' ' + (o.quantities.totals.units || o.quantities.totals.gfa)).join(' | '), 'evals', JSON.stringify(first.solver.evaluation));
+  });
+}
+ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
+console.log('layoutrun: ' + n + ' passed');

@@ -1,0 +1,1552 @@
+{
+  "schema": "rei.ref.index/1",
+  "library_manifest": "04_Codex_Starter/reference_manifest.json",
+  "projects": [
+    {
+      "id": "P01",
+      "name": "Artisan Village",
+      "location": "Fort Worth, TX",
+      "family": "fw-artisan-village",
+      "partition": "dev",
+      "forms_guess": [
+        "garage-detached",
+        "garden-breezeway"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 2,
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "name": "1069 Kings Highway",
+      "location": "Fort Worth, TX",
+      "family": "p02",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 8,
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "name": "Beechwood Double Eagle",
+      "location": "Fort Worth, TX",
+      "family": "p03",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 21,
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "name": "Alliance Apartments",
+      "location": "Fort Worth, TX",
+      "family": "p04",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 3,
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "name": "Overture River District",
+      "location": "Fort Worth, TX",
+      "family": "p05",
+      "partition": "holdout",
+      "forms_guess": [
+        "senior"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 4,
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "name": "Landing at 2EightySeven",
+      "location": "Fort Worth, TX",
+      "family": "fw-landing-287",
+      "partition": "dev",
+      "forms_guess": [
+        "garage-detached",
+        "garden-breezeway"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 10,
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "name": "Sire Wellington",
+      "location": "Fort Worth, TX",
+      "family": "p07",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 20,
+      "notes": ""
+    },
+    {
+      "id": "P08",
+      "name": "130-unit Ennis apartment concept",
+      "location": "Ennis, TX",
+      "family": "ennis-concept",
+      "partition": "dev",
+      "forms_guess": [
+        "garden-breezeway"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 1,
+      "notes": ""
+    },
+    {
+      "id": "P09",
+      "name": "Porterville Plan 1",
+      "location": "Porterville, CA",
+      "family": "porterville-prototypes",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 45,
+      "notes": ""
+    },
+    {
+      "id": "P10",
+      "name": "Porterville Plan 7",
+      "location": "Porterville, CA",
+      "family": "porterville-prototypes",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 49,
+      "notes": ""
+    },
+    {
+      "id": "P11",
+      "name": "Creekview C-43",
+      "location": "Roseville, CA",
+      "family": "roseville-usa-properties-bassenian",
+      "partition": "dev",
+      "forms_guess": [
+        "affordable",
+        "mid-rise-corridor-elevator"
+      ],
+      "selected": true,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 24,
+      "notes": "",
+      "keyword_leads": {
+        "mixed_use": 1
+      }
+    },
+    {
+      "id": "P12",
+      "name": "8030 Dale development",
+      "location": "Buena Park, CA",
+      "family": "p12",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 17,
+      "notes": "text lead: 1,500 sf retail in 3-story massing (page 1-3 text); not reviewed",
+      "keyword_leads": {
+        "retail": 5,
+        "mixed_use": 1
+      }
+    },
+    {
+      "id": "P13",
+      "name": "San Francisco 2014.0031V rehabilitation",
+      "location": "San Francisco, CA",
+      "family": "p13",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 29,
+      "notes": ""
+    },
+    {
+      "id": "P14",
+      "name": "Maplewood Apartment Building",
+      "location": "Los Angeles, CA",
+      "family": "p14",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 130,
+      "notes": ""
+    },
+    {
+      "id": "P15",
+      "name": "10912 apartment proposal",
+      "location": "Los Angeles, CA",
+      "family": "p15",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 133,
+      "notes": "",
+      "keyword_leads": {
+        "mixed_use": 1
+      }
+    },
+    {
+      "id": "P16",
+      "name": "Brush Park Apartments \u2014 permit excerpt",
+      "location": "Detroit, MI",
+      "family": "p16",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 28,
+      "notes": ""
+    },
+    {
+      "id": "P17",
+      "name": "Pointe Grand Columbia Phase 2",
+      "location": "Columbia, SC",
+      "family": "pointe-grand-columbia",
+      "partition": "dev",
+      "forms_guess": [
+        "garage-detached",
+        "garden-breezeway"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 24,
+      "notes": "architectural/site sheets are raster; values read visually"
+    },
+    {
+      "id": "P18",
+      "name": "Lake Shore Town Homes / Beach Club archive",
+      "location": "Location to verify",
+      "family": "lake-shore-beach-club",
+      "partition": "holdout",
+      "forms_guess": [
+        "townhome"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 79,
+      "notes": "79 raster pages; no text layer"
+    },
+    {
+      "id": "P19",
+      "name": "Residences of South Brookline",
+      "location": "Brookline, MA",
+      "family": "p19",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 95,
+      "notes": ""
+    },
+    {
+      "id": "P20",
+      "name": "Magnolia Village",
+      "location": "Salina, KS",
+      "family": "magnolia-village",
+      "partition": "dev",
+      "forms_guess": [
+        "cottage-detached",
+        "duplex",
+        "garden-exterior-entry",
+        "tuck-under"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 17,
+      "pages": 267,
+      "notes": ""
+    },
+    {
+      "id": "P21",
+      "name": "Maryborough",
+      "location": "Cork, Ireland",
+      "family": "p21",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 39,
+      "pages": 51,
+      "notes": ""
+    },
+    {
+      "id": "P22",
+      "name": "Moygaddy",
+      "location": "Co. Meath, Ireland",
+      "family": "p22",
+      "partition": "dev",
+      "forms_guess": [
+        "duplex"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 40,
+      "pages": 40,
+      "notes": "text lead: 'retail ancillary' label on Moygaddy block plans; six duplex blocks per manifest; not reviewed",
+      "keyword_leads": {
+        "retail": 8
+      }
+    },
+    {
+      "id": "P23",
+      "name": "Southgate",
+      "location": "Drogheda, Ireland",
+      "family": "p23",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 28,
+      "pages": 28,
+      "notes": "text lead: retail line + goods lift + loading bay (Southgate); not reviewed",
+      "keyword_leads": {
+        "retail": 7
+      }
+    },
+    {
+      "id": "P24",
+      "name": "Old Fort Road",
+      "location": "Ballincollig, Ireland",
+      "family": "p24",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 31,
+      "pages": 31,
+      "notes": ""
+    },
+    {
+      "id": "P25",
+      "name": "Hawthorn",
+      "location": "Ireland",
+      "family": "hawthorn",
+      "partition": "dev",
+      "forms_guess": [
+        "mid-rise-corridor-elevator",
+        "podium",
+        "tower-on-podium"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 21,
+      "pages": 21,
+      "notes": ""
+    },
+    {
+      "id": "P26",
+      "name": "Castlelake",
+      "location": "Carrigtwohill, Ireland",
+      "family": "p26",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 8,
+      "pages": 8,
+      "notes": ""
+    },
+    {
+      "id": "P27",
+      "name": "The Rise / Vallco \u2014 selected drawings",
+      "location": "Cupertino, CA",
+      "family": "rise-vallco",
+      "partition": "dev",
+      "forms_guess": [
+        "affordable",
+        "mixed-use",
+        "podium",
+        "tower-on-podium",
+        "townhome"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 26,
+      "pages": 26,
+      "notes": "reviewed: 226,386 gsf retail + 1,954,613 gsf office alongside 2,669 units (mixed-use master plan)",
+      "keyword_leads": {
+        "retail": 90,
+        "office": 23,
+        "mixed_use": 21
+      }
+    },
+    {
+      "id": "P28",
+      "name": "Creekview C-40",
+      "location": "Roseville, CA",
+      "family": "roseville-usa-properties-bassenian",
+      "partition": "dev",
+      "forms_guess": [
+        "affordable",
+        "mid-rise-corridor-elevator"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 34,
+      "notes": "",
+      "keyword_leads": {
+        "mixed_use": 1
+      }
+    },
+    {
+      "id": "P29",
+      "name": "Royer Street Apartments",
+      "location": "Roseville, CA",
+      "family": "p29",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 19,
+      "notes": ""
+    },
+    {
+      "id": "P30",
+      "name": "West Roseville F-8A Apartments",
+      "location": "Roseville, CA",
+      "family": "p30",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 20,
+      "notes": ""
+    },
+    {
+      "id": "P31",
+      "name": "Hayden Parkway Apartments",
+      "location": "Roseville, CA",
+      "family": "p31",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 38,
+      "notes": ""
+    },
+    {
+      "id": "P32",
+      "name": "Shea Roseville Apartments",
+      "location": "Roseville, CA",
+      "family": "p32",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 56,
+      "notes": ""
+    },
+    {
+      "id": "P33",
+      "name": "Pleasant Grove Apartments",
+      "location": "Roseville, CA",
+      "family": "p33",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 31,
+      "notes": ""
+    },
+    {
+      "id": "P34",
+      "name": "Sierra Vista JM-30 Apartments",
+      "location": "Roseville, CA",
+      "family": "sierra-vista-westbrook",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 60,
+      "notes": ""
+    },
+    {
+      "id": "P35",
+      "name": "Sierra Vista WB-30 Senior Apartments",
+      "location": "Roseville, CA",
+      "family": "sierra-vista-westbrook",
+      "partition": "holdout",
+      "forms_guess": [
+        "affordable",
+        "mid-rise-corridor-elevator",
+        "senior"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 16,
+      "notes": ""
+    },
+    {
+      "id": "P36",
+      "name": "Sierra Vista WB-32 Senior Apartments",
+      "location": "Roseville, CA",
+      "family": "sierra-vista-westbrook",
+      "partition": "holdout",
+      "forms_guess": [
+        "affordable",
+        "mid-rise-corridor-elevator",
+        "senior"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 16,
+      "notes": ""
+    },
+    {
+      "id": "P37",
+      "name": "Terracina at Fiddyment",
+      "location": "Roseville, CA",
+      "family": "roseville-usa-properties-bassenian",
+      "partition": "dev",
+      "forms_guess": [
+        "affordable",
+        "carport",
+        "garden-breezeway"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 45,
+      "notes": ""
+    },
+    {
+      "id": "P38",
+      "name": "Westpark Apartments",
+      "location": "Roseville, CA",
+      "family": "p38",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 219,
+      "notes": "keyword 'flex' is a FLEX circulation room label, not a flex-industrial use",
+      "keyword_leads": {
+        "flex": 1
+      }
+    },
+    {
+      "id": "E001",
+      "name": "Reserves at Meadows 25",
+      "location": "Goddard, KS",
+      "family": "e001",
+      "partition": "dev",
+      "forms_guess": [
+        "mixed-use"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 5,
+      "pages": 161,
+      "notes": "text lead: 'new mixed-use residential' (Reserves at Meadows); not reviewed",
+      "keyword_leads": {
+        "retail": 1,
+        "mixed_use": 3
+      }
+    },
+    {
+      "id": "E002",
+      "name": "Landmark on Pine",
+      "location": "Texarkana, TX",
+      "family": "e002",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 4,
+      "pages": 646,
+      "notes": "",
+      "keyword_leads": {
+        "industrial": 1
+      }
+    },
+    {
+      "id": "E003",
+      "name": "Irving Lofts",
+      "location": "Cleburne, TX",
+      "family": "e003",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 9,
+      "pages": 1071,
+      "notes": ""
+    },
+    {
+      "id": "E004",
+      "name": "Landmark 601",
+      "location": "Conroe, TX",
+      "family": "e004",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 7,
+      "pages": 1015,
+      "notes": "",
+      "keyword_leads": {
+        "industrial": 2
+      }
+    },
+    {
+      "id": "E005",
+      "name": "Landmark on Cypress",
+      "location": "Abilene, TX",
+      "family": "e005",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 11,
+      "pages": 1176,
+      "notes": "",
+      "keyword_leads": {
+        "retail": 3
+      }
+    },
+    {
+      "id": "E006",
+      "name": "Lee Lofts Building III",
+      "location": "Salina, KS",
+      "family": "e006",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 7,
+      "pages": 1098,
+      "notes": "",
+      "keyword_leads": {
+        "industrial": 4
+      }
+    },
+    {
+      "id": "E007",
+      "name": "Residence at Carter Lake",
+      "location": "Carter Lake, IA",
+      "family": "e007",
+      "partition": "dev",
+      "forms_guess": [
+        "senior"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 13,
+      "pages": 704,
+      "notes": "",
+      "keyword_leads": {
+        "industrial": 1
+      }
+    },
+    {
+      "id": "E008",
+      "name": "Santa Fe Place",
+      "location": "Lubbock, TX",
+      "family": "e008",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 4,
+      "pages": 89,
+      "notes": ""
+    },
+    {
+      "id": "E009",
+      "name": "Reserves at Cobalt Circle",
+      "location": "Brownsville, TN",
+      "family": "e009",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 7,
+      "pages": 733,
+      "notes": "",
+      "keyword_leads": {
+        "retail": 1,
+        "industrial": 1
+      }
+    },
+    {
+      "id": "E010",
+      "name": "Sun Valley Apartments",
+      "location": "Wichita Falls, TX",
+      "family": "e010",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 9,
+      "pages": 328,
+      "notes": ""
+    },
+    {
+      "id": "E011",
+      "name": "Bridgeport Apartments",
+      "location": "Kansas City, MO",
+      "family": "e011",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 5,
+      "pages": 285,
+      "notes": ""
+    },
+    {
+      "id": "E012",
+      "name": "Bellefield Sterling Apartments \u2014 Phase 2B Lot 8",
+      "location": "Hyde Park, NY",
+      "family": "bellefield-hyde-park",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 2,
+      "pages": 41,
+      "notes": ""
+    },
+    {
+      "id": "E013",
+      "name": "Bellefield Townhouses \u2014 Phase 2A",
+      "location": "Hyde Park, NY",
+      "family": "bellefield-hyde-park",
+      "partition": "holdout",
+      "forms_guess": [
+        "townhome"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 27,
+      "notes": ""
+    },
+    {
+      "id": "E014",
+      "name": "Bellefield Condos and Villas \u2014 Phase 4",
+      "location": "Hyde Park, NY",
+      "family": "bellefield-hyde-park",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 52,
+      "notes": ""
+    },
+    {
+      "id": "E015",
+      "name": "Carriage Trails \u2014 Crofton Mews",
+      "location": "Hyde Park, NY",
+      "family": "e015",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 32,
+      "notes": ""
+    },
+    {
+      "id": "E016",
+      "name": "The Enclave at Hyde Park",
+      "location": "Hyde Park, NY",
+      "family": "e016",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 25,
+      "notes": ""
+    },
+    {
+      "id": "E017",
+      "name": "Bingham Center \u2014 Silver Diner site",
+      "location": "Arlington, VA",
+      "family": "e017",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 85,
+      "notes": ""
+    },
+    {
+      "id": "E018",
+      "name": "Green Valley Family Apartments",
+      "location": "El Dorado County, CA",
+      "family": "e018",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 44,
+      "notes": ""
+    },
+    {
+      "id": "E019",
+      "name": "Catalyst \u2014 LCL multifamily",
+      "location": "Hartland, WI",
+      "family": "e019",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 5,
+      "pages": 67,
+      "notes": ""
+    },
+    {
+      "id": "E020",
+      "name": "Shirlington House expansion",
+      "location": "Arlington, VA",
+      "family": "e020",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 81,
+      "notes": ""
+    },
+    {
+      "id": "E021",
+      "name": "Queens Court",
+      "location": "Arlington, VA",
+      "family": "e021",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 40,
+      "notes": ""
+    },
+    {
+      "id": "E022",
+      "name": "Dominion Arms \u2014 333 S Glebe",
+      "location": "Arlington, VA",
+      "family": "e022",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 57,
+      "notes": ""
+    },
+    {
+      "id": "E023",
+      "name": "1601 Fairfax \u2014 Inn of Rosslyn redevelopment",
+      "location": "Arlington, VA",
+      "family": "e023",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 62,
+      "notes": ""
+    },
+    {
+      "id": "E024",
+      "name": "Crystal Towers III",
+      "location": "Arlington, VA",
+      "family": "e024",
+      "partition": "holdout",
+      "forms_guess": [
+        "tower-on-podium"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 90,
+      "notes": "",
+      "keyword_leads": {
+        "retail": 2
+      }
+    },
+    {
+      "id": "E025",
+      "name": "Clarendon Square \u2014 3033 Wilson",
+      "location": "Arlington, VA",
+      "family": "e025",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 74,
+      "notes": "text lead: mixed-use mentions (Clarendon Square); not reviewed",
+      "keyword_leads": {
+        "mixed_use": 8
+      }
+    },
+    {
+      "id": "E026",
+      "name": "Fort Henry Gardens redevelopment",
+      "location": "Arlington, VA",
+      "family": "e026",
+      "partition": "dev",
+      "forms_guess": [
+        "garden-breezeway"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 4,
+      "pages": 82,
+      "notes": ""
+    },
+    {
+      "id": "E027",
+      "name": "10th and Irving",
+      "location": "Arlington, VA",
+      "family": "e027",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 65,
+      "notes": ""
+    },
+    {
+      "id": "E028",
+      "name": "2000 Clarendon Boulevard",
+      "location": "Arlington, VA",
+      "family": "e028",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 45,
+      "notes": "",
+      "keyword_leads": {
+        "retail": 2
+      }
+    },
+    {
+      "id": "E029",
+      "name": "1720 S Eads Street",
+      "location": "Arlington, VA",
+      "family": "e029",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 53,
+      "notes": ""
+    },
+    {
+      "id": "E030",
+      "name": "Tisdale Drive Apartments",
+      "location": "Dover, MA",
+      "family": "e030",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 4,
+      "pages": 28,
+      "notes": ""
+    },
+    {
+      "id": "E031",
+      "name": "Folly Hill \u2014 Trask Lane Option B",
+      "location": "Beverly, MA",
+      "family": "e031",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 69,
+      "notes": "",
+      "keyword_leads": {
+        "industrial": 1
+      }
+    },
+    {
+      "id": "E032",
+      "name": "214 Great Road multifamily",
+      "location": "Bedford, MA",
+      "family": "e032",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 2,
+      "pages": 11,
+      "notes": ""
+    },
+    {
+      "id": "E033",
+      "name": "269 and 277 Great Road multifamily",
+      "location": "Bedford, MA",
+      "family": "e033",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 30,
+      "notes": ""
+    },
+    {
+      "id": "E034",
+      "name": "10 Webber Avenue housing",
+      "location": "Bedford, MA",
+      "family": "e034",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 20,
+      "notes": ""
+    },
+    {
+      "id": "E035",
+      "name": "Cold Brook Crossing",
+      "location": "Sudbury, MA",
+      "family": "e035",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 4,
+      "pages": 61,
+      "notes": ""
+    },
+    {
+      "id": "E036",
+      "name": "St. Ann's Village",
+      "location": "Wayland, MA",
+      "family": "e036",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 2,
+      "pages": 15,
+      "notes": ""
+    },
+    {
+      "id": "E037",
+      "name": "Cascade \u2014 113\u2013115 Boston Post Road",
+      "location": "Wayland, MA",
+      "family": "e037",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 2,
+      "pages": 8,
+      "notes": ""
+    },
+    {
+      "id": "E038",
+      "name": "The Sanctuary at Manchester-by-the-Sea",
+      "location": "Manchester-by-the-Sea, MA",
+      "family": "e038",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 6,
+      "pages": 57,
+      "notes": ""
+    },
+    {
+      "id": "E039",
+      "name": "The Lodge Apartments",
+      "location": "Lacey, WA",
+      "family": "e039",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 5,
+      "notes": ""
+    },
+    {
+      "id": "E041",
+      "name": "Heronvale \u2014 apartments and mixed housing",
+      "location": "Kilternan, Ireland",
+      "family": "e041",
+      "partition": "holdout",
+      "forms_guess": [
+        "townhome"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 46,
+      "pages": 46,
+      "notes": ""
+    },
+    {
+      "id": "E042",
+      "name": "Onyx Townhomes",
+      "location": "Redmond, WA",
+      "family": "e042",
+      "partition": "dev",
+      "forms_guess": [
+        "townhome"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 3,
+      "pages": 192,
+      "notes": ""
+    },
+    {
+      "id": "E044",
+      "name": "486 NE 3rd Avenue Townhomes",
+      "location": "Canby, OR",
+      "family": "e044",
+      "partition": "dev",
+      "forms_guess": [
+        "townhome"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 14,
+      "notes": ""
+    },
+    {
+      "id": "E045",
+      "name": "Hope Village Campus Renovations",
+      "location": "Canby, OR",
+      "family": "e045",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion",
+        "senior"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 2,
+      "pages": 40,
+      "notes": ""
+    },
+    {
+      "id": "E046",
+      "name": "Manzanita Church multifamily conversion",
+      "location": "Canby, OR",
+      "family": "e046",
+      "partition": "dev",
+      "forms_guess": [
+        "rehab-conversion"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 4,
+      "notes": ""
+    },
+    {
+      "id": "E049",
+      "name": "Coral Blossom Apartments",
+      "location": "Elk Grove, CA",
+      "family": "e049",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 1,
+      "pages": 80,
+      "notes": ""
+    },
+    {
+      "id": "E051",
+      "name": "East Park Apartments Phase II",
+      "location": "Salem, OR",
+      "family": "e051",
+      "partition": "dev",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 18,
+      "pages": 59,
+      "notes": "text lead: retail/office mentions in East Park Ph II set; not reviewed",
+      "keyword_leads": {
+        "retail": 5,
+        "office": 1
+      }
+    },
+    {
+      "id": "E052",
+      "name": "Blossom Apartments",
+      "location": "Salem, OR",
+      "family": "e052",
+      "partition": "holdout",
+      "forms_guess": [
+        "multifamily-unspecified"
+      ],
+      "selected": false,
+      "visually_reviewed": false,
+      "docs": 28,
+      "pages": 62,
+      "notes": ""
+    },
+    {
+      "id": "E053",
+      "name": "Portland Road Apartments",
+      "location": "Salem, OR",
+      "family": "portland-road-salem",
+      "partition": "dev",
+      "forms_guess": [
+        "mixed-use",
+        "retail-pad",
+        "townhome",
+        "tuck-under"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 2,
+      "pages": 33,
+      "notes": "reviewed: stand-alone ~4,500 sf commercial retail pad (3 suites, drive-thru elevation) with 19 townhome rows",
+      "keyword_leads": {
+        "retail": 3,
+        "mixed_use": 2
+      }
+    },
+    {
+      "id": "E054",
+      "name": "Anderson Apartments",
+      "location": "Redmond, WA",
+      "family": "anderson-redmond",
+      "partition": "holdout",
+      "forms_guess": [
+        "courtyard",
+        "mid-rise-corridor-elevator",
+        "mixed-use",
+        "podium"
+      ],
+      "selected": true,
+      "visually_reviewed": true,
+      "docs": 1,
+      "pages": 91,
+      "notes": "reviewed (partly text): 999 sf ground-floor retail in podium building",
+      "keyword_leads": {
+        "retail": 1,
+        "mixed_use": 1
+      }
+    }
+  ],
+  "coverage": {
+    "by_form": {
+      "garden-breezeway": {
+        "projects": 6,
+        "selected": 5,
+        "visually_reviewed": 5
+      },
+      "garden-exterior-entry": {
+        "projects": 1,
+        "selected": 1,
+        "visually_reviewed": 1
+      },
+      "townhome": {
+        "projects": 7,
+        "selected": 3,
+        "visually_reviewed": 3
+      },
+      "duplex": {
+        "projects": 2,
+        "selected": 1,
+        "visually_reviewed": 1
+      },
+      "cottage-detached": {
+        "projects": 1,
+        "selected": 1,
+        "visually_reviewed": 1
+      },
+      "courtyard": {
+        "projects": 1,
+        "selected": 1,
+        "visually_reviewed": 1
+      },
+      "mid-rise-corridor-elevator": {
+        "projects": 6,
+        "selected": 6,
+        "visually_reviewed": 5
+      },
+      "tuck-under": {
+        "projects": 2,
+        "selected": 2,
+        "visually_reviewed": 2
+      },
+      "podium": {
+        "projects": 3,
+        "selected": 3,
+        "visually_reviewed": 3
+      },
+      "wrap": {
+        "projects": 0,
+        "selected": 0,
+        "visually_reviewed": 0
+      },
+      "tower-on-podium": {
+        "projects": 3,
+        "selected": 2,
+        "visually_reviewed": 2
+      },
+      "garage-detached": {
+        "projects": 3,
+        "selected": 3,
+        "visually_reviewed": 3
+      },
+      "carport": {
+        "projects": 1,
+        "selected": 1,
+        "visually_reviewed": 1
+      },
+      "retail-pad": {
+        "projects": 1,
+        "selected": 1,
+        "visually_reviewed": 1
+      },
+      "mixed-use": {
+        "projects": 4,
+        "selected": 3,
+        "visually_reviewed": 3
+      },
+      "rehab-conversion": {
+        "projects": 9,
+        "selected": 0,
+        "visually_reviewed": 0
+      },
+      "senior": {
+        "projects": 5,
+        "selected": 2,
+        "visually_reviewed": 2
+      },
+      "affordable": {
+        "projects": 6,
+        "selected": 6,
+        "visually_reviewed": 5
+      }
+    },
+    "by_use_family": {
+      "multifamily": {
+        "projects_with_leads": 87,
+        "visually_reviewed": 14
+      },
+      "retail": {
+        "projects_with_leads": 12,
+        "visually_reviewed": 3
+      },
+      "industrial": {
+        "projects_with_leads": 6,
+        "visually_reviewed": 0
+      },
+      "flex": {
+        "projects_with_leads": 1,
+        "visually_reviewed": 0
+      },
+      "mixed_use": {
+        "projects_with_leads": 9,
+        "visually_reviewed": 4
+      }
+    },
+    "families": 80,
+    "holdout_families": [
+      "anderson-redmond",
+      "bellefield-hyde-park",
+      "e009",
+      "e023",
+      "e024",
+      "e031",
+      "e032",
+      "e033",
+      "e035",
+      "e036",
+      "e041",
+      "e052",
+      "lake-shore-beach-club",
+      "p05",
+      "p23",
+      "p24",
+      "p29",
+      "p31",
+      "p32",
+      "porterville-prototypes",
+      "sierra-vista-westbrook"
+    ]
+  }
+}

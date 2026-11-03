@@ -1,0 +1,392 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "E054",
+  "name": "Anderson Apartments",
+  "location": "Redmond, WA",
+  "family": "anderson-redmond",
+  "partition": "holdout",
+  "forms": [
+    "podium",
+    "courtyard",
+    "mid-rise-corridor-elevator",
+    "mixed-use"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+      "sha256": "121d01eac38c63295e55b7479b83b4f92fcbe2d38e78b706e0ccea2f2d169640",
+      "pages_used": [
+        1,
+        5,
+        6,
+        7,
+        11
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": null,
+          "title": "Cover / project data",
+          "revision": "land use submittal",
+          "date": "2025-03-31"
+        },
+        {
+          "page": 6,
+          "sheet": "A0.23",
+          "title": "Zoning diagrams (ground floor facade)",
+          "revision": null,
+          "date": "2025-03-31"
+        },
+        {
+          "page": 7,
+          "sheet": "A0.24",
+          "title": "Open space diagrams",
+          "revision": null,
+          "date": "2025-03-31"
+        },
+        {
+          "page": 11,
+          "sheet": null,
+          "title": "Building sections / heights",
+          "revision": null,
+          "date": null
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_sf": {
+      "v": 81352,
+      "units": "sf",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "area_ac": {
+      "v": 1.87,
+      "units": "ac",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "units": {
+      "v": 172,
+      "units": "units",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "density_du_ac": {
+      "v": 92,
+      "units": "du/ac",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "text-only",
+      "note": "172/1.87"
+    },
+    "zoning": {
+      "v": "Anderson Park (AP)",
+      "units": null,
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "gsf": {
+      "v": 303800,
+      "units": "sf",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "retail_sf": {
+      "v": 999,
+      "units": "sf",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "amenity_sf": {
+      "v": 11620,
+      "units": "sf",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "common_open_space_sf": {
+      "v": 25394,
+      "units": "sf",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 7,
+        "sheet": "A0.24"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "L1 courtyard 24,992 + 402; required 16,249 (20% of site)"
+    },
+    "building_code_height_ft": {
+      "v": 69,
+      "units": "ft",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 11,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "MAIN",
+      "label": "U-shaped courtyard building: 2 Type IA levels (P1 + L1) below 5 Type VA levels",
+      "count": 1,
+      "floors": {
+        "v": 7,
+        "units": "levels incl. P1",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+          "page": 1,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "shape": "U (courtyard at L1 podium)",
+      "footprint": {
+        "w_ft": {
+          "v": 292.75,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+            "page": 6,
+            "sheet": "A0.23"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "NE 79th St ground floor facade length 292'-9\""
+        },
+        "d_ft": {
+          "v": 207.5,
+          "units": "ft",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+            "page": 6,
+            "sheet": "A0.23"
+          },
+          "method": "printed-dimension",
+          "confidence": "medium",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "168th Ave NE facade 207'-6\""
+        },
+        "area_sf": {
+          "v": 38701,
+          "units": "sf",
+          "src": {
+            "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+            "page": 1,
+            "sheet": null
+          },
+          "method": "text-search",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "text-only",
+          "note": "L2 GFA; L1 37,722; P1 71,083"
+        }
+      },
+      "units_per_building": {
+        "v": 172,
+        "units": "units",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+          "page": 1,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      },
+      "units_per_floor": {
+        "v": 34,
+        "units": "units/floor",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+          "page": 1,
+          "sheet": null
+        },
+        "method": "derived",
+        "confidence": "low",
+        "status": "derived",
+        "review": "text-only",
+        "note": "172 / 5 residential levels (L2-L6), approx; L1 also has some units"
+      },
+      "unit_mix": {},
+      "corridor": "double-loaded corridor (U plan)",
+      "stairs": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "elevators": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      },
+      "parking": "structured: P1 below-grade/podium level",
+      "gsf": {
+        "v": 303800,
+        "units": "sf",
+        "src": {
+          "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+          "page": 1,
+          "sheet": null
+        },
+        "method": "text-search",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "text-only"
+      }
+    }
+  ],
+  "unit_types": [],
+  "parking": {
+    "provided": {
+      "v": 210,
+      "units": "stalls",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "text-search",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "text-only"
+    },
+    "ratio_per_unit": {
+      "v": 1.22,
+      "units": "stalls/unit",
+      "src": {
+        "file": "02_Expanded_Collection/plans/E054_Anderson_Apartments/001_Architectural_plan_set.pdf",
+        "page": 1,
+        "sheet": null
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "text-only",
+      "note": "210/172"
+    },
+    "type": "podium / below-grade structured (P1)"
+  },
+  "amenities": [
+    "L1 landscaped courtyard (24,992 sf)",
+    "11,620 sf common amenity",
+    "public plazas"
+  ],
+  "access": [
+    "NE 79th St",
+    "168th Ave NE"
+  ],
+  "project_rules": [
+    {
+      "rule": "common open space",
+      "value": 20,
+      "units": "% of site",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "ground-floor street facade transparency/landscape",
+      "value": 60,
+      "units": "% of facade length",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "GFA by level",
+      "values": "71,083+37,722+38,701+39,414+39,104+39,104+38,672 = 303,800",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "open space required",
+      "values": "81,352 x 0.20 = 16,270 vs printed 16,249",
+      "result": "discrepancy",
+      "note": "minor (21 sf)"
+    }
+  ],
+  "open_questions": [
+    "unit mix",
+    "elevator/stair count",
+    "visual review limited to A0.23/A0.24"
+  ],
+  "manifest_name": "Anderson Apartments"
+}
