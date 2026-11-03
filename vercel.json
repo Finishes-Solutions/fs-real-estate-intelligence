@@ -22,6 +22,10 @@
     "api/pipeline-ai.js": {
       "maxDuration": 300
     },
+    "api/runs.js": {
+      "maxDuration": 300,
+      "includeFiles": "{fonts/**,templates/titleblock.pdf,node_modules/@sparticuz/chromium/bin/**,data/area.json}"
+    },
     "api/chat.js": {
       "maxDuration": 120
     },

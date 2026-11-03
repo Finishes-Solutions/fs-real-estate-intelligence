@@ -1399,15 +1399,18 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
   if(p.get('v')){ popping=true; navBoot=true; try{ setView(p.get('v')); }finally{ popping=false; navBoot=false; } } // the page a link opens on is the first history entry, not a new one
   syncTitle();
   // the project open on the Projects page
-  if(p.get('pj')&&view==='projects') ctx.sitePlan?.show(p.get('pj'),p.get('pt'));
+  // (a list kept in IndexedDB arrives a moment later: lib/projectstore.mjs)
+  // (a list kept in IndexedDB arrives a moment later, and a project this device doesn't have yet with the first sync)
+  if(p.get('pj')&&view==='projects'){ const pj=p.get('pj'),pt=p.get('pt'), later=()=>{ if(view==='projects'&&!ctx.sitePlan.where?.project) ctx.sitePlan.show(pj,pt); }; ctx.sitePlan?.ready?.then(later); ctx.sitePlan?.firstSync?.then(later); if(ctx.sitePlan?.loaded!==false) ctx.sitePlan?.show(pj,pt); }
   // the camera goes in the address (debounced), so a reload keeps the view: from the first move after the map loads (the fly-in, a link's card)
   map.once('load',()=>map.on('moveend',()=>{ camReady=true; scheduleHash(); }));
   // the map position (#ml=lat,lng,zoom[,bearing,pitch]): a copied link, or where you were before the reload
   const mll=parseCam(p.get('ml'));
   if(mll){ camReady=true; map.jumpTo(mll); }
   // the open site plan (#sp=project.plan): it frames its own site
-  const sp=parsePlanRef(p.get('sp')), spOk=view==='map'&&!!sp&&!!ctx.sitePlan?.has(sp[0],sp[1]);
-  if(spOk) map.once('load',()=>{ try{ ctx.sitePlan.open(sp[0],sp[1]); }catch(e){ console.error(e); } });
+  const sp=parsePlanRef(p.get('sp')), spLater=view==='map'&&!!sp&&(ctx.sitePlan?.loaded===false||(!ctx.sitePlan?.has(sp[0],sp[1])&&!!ctx.sitePlan?.firstSync)), spOk=view==='map'&&!!sp&&(spLater||!!ctx.sitePlan?.has(sp[0],sp[1]));
+  const spOpen=()=>{ try{ if(ctx.sitePlan.has(sp[0],sp[1])&&!ctx.sitePlan.editing) ctx.sitePlan.open(sp[0],sp[1]); }catch(e){ console.error(e); } };
+  if(spOk) map.once('load',()=>{ if(spLater) Promise.all([ctx.sitePlan.ready,ctx.sitePlan.firstSync]).then(spOpen); else spOpen(); });
   const f=!spOk&&p.get('f')&&BY_ID.get(p.get('f')); if(f) map.once('load',()=>select(f,true));
   // a property card (#b=lat,lng): that building, or the parcel there. With a kept map position, that view (the building
   // is in it unless you panned away with the card open), else close in on it.

@@ -31,6 +31,7 @@ assert.equal(R.heroTarget(plan, 'p').id, 'b3', 'a selected parking row is not a 
 assert.equal(R.heroTarget({ ...plan, front: 2 }).id, 'b1', 'a site fronting the north edge: the back building is now the front one');
 assert.equal(R.heroTarget({ ...plan, elements: plan.elements.filter(e => e.kind !== 'building') }), null, 'no buildings, no close-up');
 assert.ok(!R.SITE_VIEWS.includes('hero') && R.SITE_VIEWS.length === 4, 'All site views is the four whole-site views');
+assert.ok(!R.OFFERED_VIEWS.some(v => v.id === 'hero') && R.OFFERED_VIEWS.length === 8, 'the close-up is no longer offered (retired Nov 3)');
 const hero = R.cameraFor('hero', plan);
 assert.equal(hero.pitch, 45); assert.equal(hero.bearing, corner.bearing, 'the close-up turns like the corner view'); assert.deepEqual(hero.target, { id: 'b3', name: 'Building' }, 'unnamed: Building');
 assert.ok(hero.zoom >= cam.zoom, 'closer than the whole-site view: ' + hero.zoom + ' vs ' + cam.zoom);
@@ -244,7 +245,8 @@ console.log('render cancel test passed');
       { id: 'sel-line', type: 'line', source: 'sel' }, { id: 'focus-dot', type: 'circle', source: 'sel' }, { id: 'fs-bldg', type: 'fill-extrusion', source: 'omt' }, { id: 'fs-sp-b', type: 'fill-extrusion', source: 'fs-sp' }] };
   const base = new Set(['background', 'road', 'building-3d']), st = R.baseStyle(page, base);
   assert.deepEqual(st.layers.map(l => l.id), ['background', 'road', 'building-3d', 'live-hires'], 'the basemap and the imagery laid on it; no filings, heat, selection, pins, app buildings or plan');
-  assert.deepEqual(Object.keys(st.sources).sort(), ['hires', 'live-dem', 'omt'], 'only the sources those use, and the terrain’s');
+  assert.deepEqual(Object.keys(st.sources).sort(), ['hires', 'omt'], 'only the sources those use');
+  assert.equal(st.terrain, undefined, 'never the 3D terrain: it lifts the site toward the camera and the frame comes out zoomed in');
   assert.equal(page.layers.length, 10, 'the page map’s style is left as it was');
   assert.deepEqual(R.baseStyle(page, null).layers.map(l => l.id).filter(id => /^fs-/.test(id)), [], 'no base ids known: still no fs- layers');
   assert.ok(R.CAPTURE.w / R.CAPTURE.h === 16 / 9 && R.CAPTURE.ratio >= 2, 'a 16:9 picture drawn at twice the size');

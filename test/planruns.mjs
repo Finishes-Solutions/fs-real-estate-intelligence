@@ -63,8 +63,9 @@ assert.equal(deltaText('Floors 4', { units: 200, spaces: 300, required: 300 }, {
 
 // ---- the team copy and a full browser store ----
 const proj = { id: 'p1', name: 'Big', updated: '2026-10-01', plans: [{ id: 'o1', name: 'Option A', elements: [{ id: 'b1' }], lastRun: slimRun(big, 'k1') }, { id: 'o2', name: 'Option B', elements: [] }] };
-const sc = syncCopy(proj);
-assert.ok(sc.plans[0].lastRun.variants.every(v => !v.elements), 'the team copy keeps the layouts as numbers only');
+assert.equal(syncCopy(proj), proj, 'fits: the team copy is the whole project, saved layouts and all');
+const sc = syncCopy(proj, JSON.stringify(proj).length - 1);
+assert.ok(sc.plans[0].lastRun.variants.every(v => !v.elements), 'too big whole: the team copy keeps the layouts as numbers only');
 assert.equal(sc.plans[0].lastRun.variants.length, proj.plans[0].lastRun.variants.length); assert.deepEqual(sc.plans[0].elements, [{ id: 'b1' }], 'the option itself goes whole');
 assert.ok(proj.plans[0].lastRun.variants[0].elements, 'the local project is untouched'); assert.equal(sc.updated, proj.updated);
 assert.equal(syncCopy(proj, 500).plans[0].lastRun, undefined, 'still too big: no saved layouts in the team copy');

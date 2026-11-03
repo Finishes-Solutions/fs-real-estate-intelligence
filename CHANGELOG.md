@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-03
 
+### 5:04 PM CT: Builds, renderings and plan sets run on the server (1a1cc0c, this push)
+- **Build with AI keeps going when you leave.** It now runs on the server: refresh, close the tab or open something else and it carries on. Come back to the option and it's still running, or its pick is on the map and its layouts are in the list. Anyone on the team who opens the option sees the same, and **Cancel** stops it for everyone.
+- **Renderings keep going too.** The page takes the massing pictures (a few seconds each), then the server paints them. Each finished picture is added to the option for the whole team, and the Renderings tab shows the ones still being painted after a refresh.
+- **Plan sets are made on the server.** Close the page and the set still finishes; it's listed on the option for everyone and downloads on the computer that started it. A server set can be cancelled but not paused.
+- **A link to a plan or project now opens on a computer that hasn't loaded the team's projects yet** (it used to land on the plain map).
+- Without the team's cloud set up on the site, all three still run in the browser as before.
+
 ### 4:44 PM CT: Repeatable, independently checked layouts built from reviewed plan sets (c8e7998, dd4dddb, merged into main: this push)
 - **The same request gives the same layouts.** A layout run now has a saved description (the site, what to build and what each number means, the rules and where they come from, a seed) and replays it exactly: same buildings, ids, numbers and ranking on any machine, with no AI call. Tested with 20 repeats.
 - **A number means what you said.** Exactly, at least, at most, between, or as many as fit. "Exactly 120 garden apartments" gives 120 (it came out short before), "28,000 sf of retail" gives 28,000 sf (it gave 34,400), "a 40,000 sf anchor, 80,000 sf total" is 80,000 sf (it was read as 120,000).
@@ -16,6 +23,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ### 4:24 PM CT: Expand site-layout report with multifamily details (e6bf0c9)
 - Expanded the technical report to explain apartment layout strategies, unit/parking sizing, amenities, detention, and candidate validation.
+
+### 4:08 PM CT: Projects saved to the team's cloud reliably, Safari saving fixed, massing framing (bc1406e, dc9f046)
+- **Big projects now reach the team's cloud.** Before, a project over about half a megabyte (several built options is enough) was quietly left out of the team's copy and stayed only on the computer that made it, while the save mark still said it was synced. Now it is kept whole, and only projects the server confirms count as saved. A single project over about 4 MB is named in a message instead of being dropped silently.
+- **Teammates' changes show up within 30 seconds**, and as soon as you come back to the tab; only the projects that changed are downloaded, so a long project list keeps loading.
+- **The save mark says where a change is:** synced with the team, sending, or not in the cloud yet (with Retry). If the site's team database isn't set up it says the plan is on this device only.
+- **Safari no longer says "This browser won't let the page save projects."** Safari gives a website about half the browser storage Chrome does; projects that outgrow it now go to the browser's larger store. If Safari blocks storage outright (Block All Cookies, some Private windows) the message says so and how to fix it, and appears once a minute at most instead of on every change.
+- **Massing for renderings is always taken on flat ground.** With 3D Terrain on, the site was lifted toward the camera, so the massing came out zoomed in with the site cut off (worst on hilly sites).
+- **Building close-up is gone** from the Render views, the project page and the agents' renderings tool. Close-ups made before still show with their names.
 
 ### 2:37 PM CT: Five failing tests fixed: layout, landscape and AI-usage bugs, plus two updated expectations (this push)
 - **Townhomes "with an amenity center" get their commons again** (community center, playground, pavilion). Since Oct 27 those words were read as the neighbourhood's own leasing building, and the commons was dropped. Now a bare "amenity center" or "community center" is the commons; a size, a clubhouse, a leasing office or a model home is still the neighbourhood's own building.
