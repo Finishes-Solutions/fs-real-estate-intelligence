@@ -35,8 +35,8 @@ ok('locking keeps ids and records the shapes', () => {
   assert.equal(mv.ok, false); assert.match(mv.conflicts[0], /locked and can’t move/);
 });
 ok('a target that matches nothing is a conflict, not a guess', () => {
-  const r = ED.applyEdit(base, { op: 'keep-entrance', target: { entrance: 'north' } }); // the street is on the south side
-  assert.equal(r.ok, false); assert.match(r.conflicts[0], /No entrance lies north/);
+  const r = ED.applyEdit(base, { op: 'keep-entrance', target: { entrance: 'northeast' } }); // the streets are on the south and west sides
+  assert.equal(r.ok, false); assert.match(r.conflicts[0], /No entrance lies northeast/);
 });
 ok('an edit that would break a hard check is rejected and the record is untouched', () => {
   const before = JSON.stringify(base);

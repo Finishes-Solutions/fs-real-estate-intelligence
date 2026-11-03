@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-03
 
+### 5:26 PM CT: Build lays out through the new engine; studio buildings; no more empty apartment blocks (this push)
+- **Build now runs the reproducible engine.** The same request on the same site gives the same layouts; apartment buildings come from the reviewed building templates; each option carries its independent check and the saved run behind it. The re-solve after a settings change and the AI's revised program go the same way. If a run can't be made, Build falls back to the engine as before.
+- **"Garden apartments, townhomes and studio apartment buildings, as many as fits" on 23737 FM 2920, Hockley (29 ac):** before, 348 apartments with about 4 acres of the apartment block left empty and the studios drawn as the same buildings; the words alone gave 18 units. Now 144 garden apartments, 270 studio apartments and 109 townhomes, every option passing the independent check.
+- **Studio apartment buildings** are their own zone and building (six studio / one-bed homes a floor in the reviewed breezeway stack; an estimate, labelled so). "Studios" for a yoga or recording studio are left alone.
+- **No buildings too short to keep:** the layout no longer draws one-stair apartment stubs that were then removed (which left the empty parking blocks); it draws fewer, full-length buildings.
+- **Two apartment zones with no placement** (garden and studio) are laid out front to back in the order asked, and the run says so; before, the layout fell back to a simple one.
+
 ### 5:04 PM CT: Builds, renderings and plan sets run on the server (1a1cc0c, this push)
 - **Build with AI keeps going when you leave.** It now runs on the server: refresh, close the tab or open something else and it carries on. Come back to the option and it's still running, or its pick is on the map and its layouts are in the list. Anyone on the team who opens the option sees the same, and **Cancel** stops it for everyone.
 - **Renderings keep going too.** The page takes the massing pictures (a few seconds each), then the server paints them. Each finished picture is added to the option for the whole team, and the Renderings tab shows the ones still being painted after a refresh.

@@ -1155,6 +1155,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Build uses the new layout engine:** the same request on the same site gives the same layouts; apartment buildings follow the reviewed building types; studio apartment buildings are their own product ("garden apartments, townhomes and studio apartment buildings" gives all three); and every option comes with its independent check. On the 29-acre Hockley site the request now fills the land: 144 garden apartments, 270 studios and 109 townhomes, with no empty parking blocks.
 - **Builds, renderings and plan sets keep going when you leave (Nov 3):** they run on the server, so a refresh, a closed tab or another page no longer stops them; everyone on the team sees them running and gets what they made. A link to a plan or project now opens on a computer that hasn't loaded the team's projects yet.
 - **Projects live in the team's cloud (Nov 3):** big projects are no longer left off the team's copy, teammates' changes show up within 30 seconds, the save mark says plainly whether a change has reached the cloud, and Safari no longer refuses to save big projects.
 - **Better massing for renderings (Nov 3):** the massing is always taken on flat ground, so with 3D Terrain on the site is no longer pulled toward the camera and cut off; the Building close-up view has been taken out.

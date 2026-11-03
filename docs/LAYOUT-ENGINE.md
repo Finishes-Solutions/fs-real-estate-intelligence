@@ -99,6 +99,7 @@ From 15 reviewed projects (12 families) in the reference library; see `docs/REFE
 | mf-garden-breezeway-3s | breezeway stack 75 × 60 ft, 4 units a floor, ≥ 2 stacks (the 24-unit, 150 ft bar) | P37, P08, P06 | multiple projects; depth 60 ft is the midpoint of the bar cases |
 | mf-midrise-corridor-4s | corridor bay 50 × 65 ft, 4 units a floor, ≥ 4 bays | P28, P11 (one family) | multiple projects, one family |
 | mf-midrise-corridor-5s | same bay at 5 floors | extrapolated | estimate |
+| mf-garden-studio-3s | the garden stack with 6 studio / 1-bed homes a floor (~750 gsf a home) | extrapolated from the garden stack | estimate (no reviewed studio building) |
 
 A bar up to 5% short of whole modules keeps its drawn length and counts them (the reviewed bars span 146–154 ft); bars
 are never stretched. Holdout templates (Sierra Vista mid-rise, Lake Shore townhomes, Anderson podium) are for evaluation.
@@ -115,14 +116,18 @@ runs. Table: `docs/bench/layout-bench-v2-before-after.md`; drawings: `docs/bench
   garden apartments).
 - Replay identical: 15 of 15; `test/layoutrun.mjs` repeats three representative briefs 20 times each, identical.
 - Still failing, honestly: courtyard (corner overlaps, a wing far from a drive, 132 of 150), tower on podium (199 of
-  300), mixed use (216 of 240 apartments fit).
+  300).
+- After the smallest-building fix (Nov 3, later): **12 of 15** pass; mid-rise 128 → 288 units (no more over-parking),
+  mixed use now passes (320 units), garden as many as fit 168 → 180. Latest table: `docs/bench/layout-bench-v2.md`
+  (no before column); the before/after table above stays as the record of the first change.
 
 Separate measures, never one "accuracy" number:
 1. **Extraction**: 50 of 63 reconciliation checks agree in the reviewed fixtures (12 discrepancies recorded, 1 unknown);
    scaled footprints ±3 ft to ±10%.
 2. **Feasibility**: hard-check failures and unknowns per option (benchmark table).
 3. **Design quality**: not yet scored. Observed: trimming to an exact count leaves an empty parking bay (exact-120 plan,
-   284 spaces for 192 needed); the mid-rise plan keeps two 64-unit bars and over-parks; anchored center drawn as one box.
+   284 spaces for 192 needed); anchored center drawn as one box; some options differ only by mirroring. (The mid-rise
+   over-parking was fixed by the smallest-building rule.)
 4. **Reproducibility**: identical hashes on replay and 20 repeats; runtime 0.1–6 s a run on the benchmark.
 
 ## 7. Edits (`lib/layoutedit.mjs`; MCP `layout_edit`; `api/layoutrun.js` mode edit)
@@ -143,14 +148,19 @@ selection; placement edits only reorder zones of a mixed plan.
 - API: `api/layoutrun.js` (run, replay, edit, undo, caps). MCP: `layout_run`, `layout_replay`, `layout_edit`,
   `layout_capabilities`.
 - Browser build and service worker include the new modules (`build.mjs`, `src/sw.js`).
-- Not yet: the Build flow in the editor still calls the engine live (not through `runBrief`), so its options aren't run
-  records; the AI program step doesn't emit quantity modes; exports and the pro forma read the plan as before (they agree
-  with the validator's quantities only through the shared drawing).
+- **Build** (the editor's main build, its re-solve after a settings change, and the AI's revised program) runs through
+  `runPlan` (lib/layoutrun.mjs) in the page's worker (`src/sp-worker.js`, fn `run`): the editor's plan, program and search
+  settings become a brief (what a size means follows the Leftover land setting: fill or phase = at least, hold = exactly),
+  and each option comes back in the engine's shape with `check` (the validator's status) and `run` (input hash, seed,
+  versions and the brief to replay). Falls back to the plain engine when a run can't be made. Checked in Chrome through
+  the real worker: the Hockley request gives the same geometry hashes as Node.
+- Not yet: "More layouts" and scenario layouts still call the engine directly; the AI program step doesn't emit quantity
+  modes; exports and the pro forma read the plan as before.
 
 ## 9. Next tasks (in order)
 
-1. Route the editor's Build and the MCP `site_plan` tool through `runBrief` (save the run record on the option), and add
-   the quantity-meaning choice to Build.
+1. Done for Build (Nov 3). Still: "More layouts", scenarios and the MCP `site_plan` tool through `runPlan`; the
+   quantity-meaning choice in Build; options that differ only by mirroring (the Hockley run's first two).
 2. After trimming to an exact count, re-fit the parking (refit with the kept buildings pinned) so no empty bay is left.
 3. Mid-rise: let shorter bars take fewer bays (min 3) or join bars; score over-parking as land waste.
 4. Courtyard: a continuous courtyard building form (no corner overlaps), then mark it validated if the benchmark passes.

@@ -31,6 +31,7 @@ import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
 import * as LV from './lib/layoutcheck.mjs';
 import * as LB from './lib/layoutbrief.mjs';
+import { runPlan } from './lib/layoutrun.mjs';
 import * as STG from './lib/planstages.mjs';
 import * as PARC from './lib/siteparcels.mjs';
 import * as RF from './lib/sitefiles.mjs';
@@ -852,17 +853,24 @@ export function initSitePlan(ctx) {
   // kept with the plan's own working numbers (unapply); every other plan goes to the engine as it is
   function laid(fn, ...args) {
     if (fn === 'refit' && args[0]?.recipe?.parcels) args[1] = { ...(args[1] || {}), parcels: partsNow(P(), args[0]) }; // (laid out parcel by parcel: the parts again)
-    if (fn === 'options' && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
+    if ((fn === 'options' || fn === 'run') && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
     const g = fn === 'refit' ? G.forLayout(args[0], args[0]?.program, {}) : G.forLayout(args[0], args[1], args[2] || {});
     if (!g) return laid0(fn, ...args);
     const base = fn === 'refit' ? args[0] : { ...args[0], program: args[1] };
-    return laid0(fn, ...(fn === 'refit' ? [g.plan, args[1] || {}] : [g.plan, g.program, g.opts])).then(r => fn === 'refit' ? G.unapply(r, base) : (r || []).map(o => G.unapply(o, base)));
+    return laid0(fn, ...(fn === 'refit' ? [g.plan, args[1] || {}] : [g.plan, g.program, g.opts, ...args.slice(3)])).then(r => fn === 'refit' ? G.unapply(r, base) : fn === 'run' ? { ...r, options: (r?.options || []).map(o => G.unapply(o, base)) } : (r || []).map(o => G.unapply(o, base)));
   }
   function laid0(fn, ...args) {
     try { if (!worker) { worker = new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }); worker.onmessage = ({ data }) => { const w = wait.get(data.id); if (!w) return; wait.delete(data.id); data.ok ? w.ok(data.result) : w.no(new Error(data.error)); }; worker.onerror = e => { for (const w of wait.values()) w.no(new Error(e.message || 'layout worker failed')); wait.clear(); worker = null; }; } }
     catch (e) { worker = null; }
-    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'refit' ? refit(...args) : fn === 'pods' ? relayPods(...args) : fn === 'net' ? netEdit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
+    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'run' ? runPlan(...args) : fn === 'refit' ? refit(...args) : fn === 'pods' ? relayPods(...args) : fn === 'net' ? netEdit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
     const id = ++wseq; return new Promise((ok, no) => { wait.set(id, { ok, no }); worker.postMessage({ id, fn, args: JSON.parse(JSON.stringify(args)) }); });
+  }
+  // Build's layouts as runs (lib/layoutrun.mjs runPlan): the same engine inside a saved, replayable run (seeded, so the
+  // same request on the same site gives the same layouts), apartment buildings from the reviewed templates, each option
+  // with its independent check. The plain engine when the run can't be made.
+  async function laidRun(plan, prog, opts, ask) {
+    try { const r = await laid('run', plan, prog, opts, { ask }); if (r?.options?.length) return r.options; } catch (e) { console.warn('layout run', e); }
+    return laid('options', plan, prog, opts);
   }
   let lastKeep = null, keySig = '';
   function draw() {
@@ -2666,7 +2674,7 @@ export function initSitePlan(ctx) {
     const label = solveLabel, mark = o.force ? null : solveMark; solveLabel = ''; solveMark = null; ed.solveBar = false;
     const before = pl.elements.some(e => e.kind === 'building') ? GM(pl) : null, was = pl.variant ? { ...pl.variant } : null, hadAi = !!ed.variants?.some(v => v.ai);
     const run = startRun('resolve', ['Laying out new layouts with these settings'], o.src || '#spResolve'); if (!run) return;
-    let out = []; try { out = await laid('options', { ...pl, params: RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }) }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, deeper: true, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
+    let out = []; try { out = await laidRun({ ...pl, params: RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }) }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, deeper: true, ...koOpts(pl) }, ed.runMeta?.ask || pl.lastRun?.ask || ''); } catch (e) { console.warn('layout', e); }
     if (!live(run) || PL() !== pl) return;
     const variants = named(out, { ...pl });
     if (!variants.some(v => v.elements.length)) { endRun(run); ctx.toast('Nothing fits with these settings.'); return; }
@@ -3485,7 +3493,7 @@ export function initSitePlan(ctx) {
     if (np.form) params0 = { ...(params0 || pl.params || {}), form: np.form }; // the shape the request names ("L-shaped"): the layout reads params.form
     runStep(run, 2 + o0, lay);
     const wb = BR.wordsBrief(ask); // pads asked for in words ("with 2 pad sites", "an outparcel"): the engine places them, at every level
-    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}), ...parcelOpts(p, pl, prog) }); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
+    let out = [], failed = false; try { out = await laidRun({ ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}), ...parcelOpts(p, pl, prog) }, ask); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) };
     let variants = named(out, { ...plan, program: prog }, params0 ? { params: params0 } : {});
@@ -3535,7 +3543,7 @@ export function initSitePlan(ctx) {
         if (rv.revise && rv.program) {
           runStep(run, 4 + o0, (revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
           const params2 = RUN.fillParams({ ...params1, ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, { ask }), prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) }; // (its "fill" never holds land the words didn't ask to hold)
-          let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); } catch (e) { console.warn('layout', e); }
+          let out2 = []; try { out2 = await laidRun({ ...pl, setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...koOpts(pl), ...(wb ? { brief: wb } : {}) }, ask); } catch (e) { console.warn('layout', e); }
           if (!live(run)) return;
           const v2 = named(out2, { ...plan, params: params2, program: prog2 }, { params: params2, revisedBy: rv.why || 'the AI review' }).filter(v => v.elements.length);
           if (v2.length) { add = v2.slice(0, 3); progR = prog2; params1 = params2; revised.push(first.why || 'a better program'); }

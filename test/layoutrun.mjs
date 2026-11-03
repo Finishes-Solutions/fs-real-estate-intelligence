@@ -194,5 +194,24 @@ for (const [label, ask, plan] of CASES) {
     console.log('   ', label, first.outcome, first.options.map(o => o.validation.status + ' ' + (o.quantities.totals.units || o.quantities.totals.gfa)).join(' | '), 'evals', JSON.stringify(first.solver.evaluation));
   });
 }
+ok('studio apartment buildings are their own zone, in words', () => {
+  const g = SP.guessProgram('Garden apartments, townhomes, and studio apartment buildings, as many as fits');
+  assert.deepEqual(g.zones.map(z => [z.use, z.name || null, !!z.mix]), [['multifamily', 'Garden apartments', false], ['multifamily', 'Studio apartment buildings', true], ['townhomes', null, false]]);
+  assert.equal(SP.guessProgram('a studio for the clubhouse').zones, undefined); assert.equal(SP.guessProgram('retail with a yoga studio').use, 'retail');
+});
+ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre square (23737 FM 2920, Hockley)', () => {
+  // the parcel's outline in plan feet (1,187 x 1,065 ft, the street on the north edge); before: 18 apartments ("Simple
+  // layout") from the engine alone, or empty parking bays once templated
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [], setbacks: { ...SP.SETBACKS }, elements: [] };
+  const ask = 'Garden apartments, townhomes, and studio apartment buildings, as many as fits', r = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
+  assert.equal(r.outcome, 'feasible'); assert.ok(r.options.length >= 3);
+  const top = r.options[0], by = k => top.elements.filter(e => e.kind === 'building' && (e.template === k || e.use === k)).reduce((t, e) => t + (e.units || 0), 0);
+  assert.equal(top.check.status, 'pass', JSON.stringify(top.check));
+  assert.ok(by('mf-garden-breezeway-3s') >= 96 && by('mf-garden-studio-3s') >= 96 && by('townhomes') >= 60, [by('mf-garden-breezeway-3s'), by('mf-garden-studio-3s'), by('townhomes')].join(' '));
+  assert.ok(top.elements.every(e => !(e.kind === 'building' && e.use === 'multifamily') || e.modules >= 2), 'no apartment building under two stacks');
+  assert.ok(top.recipe && top.run.brief && top.run.inputHash, 'the editor gets its recipe and the run');
+  const again = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
+  assert.deepEqual(again.options.map(o => o.run.geometryHash), r.options.map(o => o.run.geometryHash));
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

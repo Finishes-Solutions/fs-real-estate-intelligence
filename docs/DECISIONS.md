@@ -171,3 +171,12 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - **No form is marked "validated" yet**: the benchmark is synthetic; courtyard and anchored center were downgraded to partial after the benchmark drawings showed corner overlaps and a single-box center.
 - **Proven infeasible only from a bound**: the footprint at the most floors a form allows exceeds the land inside the setbacks. Anything else that finds nothing is "no feasible layout found".
 - **Two failing tests were left failing** (test/layoutasks.mjs townhome commons; test/streetnet.mjs street bend 30 vs 60 ft): both fail identically on the base commit 50c0f1b. The layoutasks pads failure was fixed (pads only for shop, restaurant, office, medical and other uses).
+
+## Build through the run layer; studio buildings (2026-11-03)
+
+- **Build calls `runPlan` in the worker and falls back to the plain engine** if the run fails, so a run-layer problem can never leave the editor with nothing.
+- **Sizes in Build follow the Leftover land setting** (fill / phase = at least, hold = exactly), not the brief's "a bare number is exact" default, so the editor's existing behaviour and setting keep their meaning.
+- **The generator takes a smallest-building length (`params.minLen`)**: with templates it is two stacks (150 ft), so it draws fewer, full-length bars instead of one-stair stubs that the templates then removed (the empty parking blocks on the Hockley plan). Unset, the engine behaves as before.
+- **Two zones of the same use with no placement get a front-to-back order** in the run layer (stated in the run's notes). The band engine can't lay out two apartment zones (18 units on 29 ac); fixing the band engine itself is left for later.
+- **Studio buildings are an estimate**: the reviewed garden stack with six homes a floor instead of four. No studio-only building was reviewed in the library.
+- **A word "studio" makes studio homes only with apartment wording or the plural**, never for a yoga, dance, recording, art, fitness, photo or tattoo studio.
