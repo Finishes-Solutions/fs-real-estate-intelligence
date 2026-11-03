@@ -190,3 +190,13 @@ Every screen and report carries the scope statement, and the Fact & Assumption R
 7. **Re-check the budgeting suite for new work.** On 2026-10-24, 18:47–19:18 CT, a separate effort (not this integration, which only read the source repos through `git archive`) committed a local branch `upgrade/budgeting-v2` in fs-budgeting-suite: an estimate workflow, a budget engine v2 and code-review fixes. The port here is from `origin/feature` @ 4187c8c. Diff that branch once it's pushed, and port any engine changes into `lib/feasibility/rollup.mjs` / `csi.mjs` with their tests.
 8. MCP: decide whether agents should make renderings (they spend the image budget) and, after step 4, full plan sets. Both are on the website only for now.
 9. Optionally tag report PDFs (an accessible PDF) once the response limit allows: stream from Storage instead of the function's body.
+
+## Layout engine: reproducible runs, independent checks, reference templates (2026-11-03)
+
+Branch `matthew/site-engine-update-110326` (from `matthew/mcp-plan-sets-renderings` @ 50c0f1b; committed locally, not pushed). Full write-up: `docs/LAYOUT-ENGINE.md`; references: `docs/REFERENCE-PROVENANCE.md`, `data/reference/`.
+
+- **Done:** typed brief (lib/layoutbrief.mjs), deterministic runs and replay (lib/enginectx.mjs, lib/layoutrun.mjs), independent validator (lib/layoutcheck.mjs), capability matrix (lib/layoutcaps.mjs), templates from reviewed plans (lib/bldgtemplates.mjs, lib/reftemplates.mjs via scripts/refs/templates-to-lib.mjs), edits (lib/layoutedit.mjs), MCP tools layout_run / layout_replay / layout_edit / layout_capabilities, api/layoutrun.js, the editor's Independent check, benchmark script scripts/layout-bench-v2.mjs (results in docs/bench/).
+- **Tests:** test/layoutrun.mjs (26, incl. 20 identical repeats ×3), test/layoutedit.mjs (10), test/mcp-layout.mjs; added to `npm test`. Existing layout suites pass except two pre-existing failures (layoutasks townhome commons, streetnet bend) that fail the same on 50c0f1b. Full `npm test` not run end to end in this session.
+- **Reference library:** `/Users/matthewsinitiere/Finishes Marketing Dropbox/Matthew Sinitiere/NEW MK/MATTHEW/REAL ESTATE INTELLIGENCE/MULTIFAMILY DATA/REI_Complete_Reference_Library` (outside Git). Rendering needs PyMuPDF (`pip install pymupdf`), see scripts/refs/README.md.
+- **Next:** docs/LAYOUT-ENGINE.md §9 (route Build and site_plan through runBrief; re-fit parking after exact trims; mid-rise bar sizes; courtyard building; holdout reconstruction; wrap, tuck-under, cross-dock, vertical mixed use; turning and detention inputs).
+- **Infra:** none needed (pure computation; new Vercel function config for api/layoutrun.js only).

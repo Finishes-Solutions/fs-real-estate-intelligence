@@ -169,6 +169,8 @@ ok('templated buildings are whole modules with units from the schedule', () => {
   assert.equal(e.w, t.module.w * 2); assert.equal(e.d, t.module.d); assert.equal(e.units, 2 * t.module.unitsPerFloor * 3); assert.equal(e.template, t.id);
   const v = V.validateLayout({ ring: SITE, front: 0, program: { use: 'multifamily' }, elements: r.elements }, brief); assert.equal(st(v, 'program.buildings'), 'pass');
   const stretched = V.validateLayout({ ring: SITE, front: 0, program: { use: 'multifamily' }, elements: [{ ...e, w: e.w + 30 }] }, brief); // stretched, schedule kept
+  const short = T.applyTemplates({ ring: SITE }, { program: { use: 'multifamily' }, elements: [{ id: 'b2', kind: 'building', use: 'multifamily', x: 200, y: 150, w: t.module.w * 2 * 0.96, d: 65, rot: 0, floors: 3 }] }, brief).elements[0];
+  assert.equal(short.modules, 2); assert.equal(short.w, +(t.module.w * 2 * 0.96).toFixed(2)); // 4% short of two modules: two, kept as drawn (not stretched)
   assert.equal(st(stretched, 'program.buildings'), 'fail');
 });
 

@@ -3,6 +3,17 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-03
+
+### 4:44 PM CT: Repeatable, independently checked layouts built from reviewed plan sets (branch matthew/site-engine-update-110326; commit hashes added when pushed)
+- **The same request gives the same layouts.** A layout run now has a saved description (the site, what to build and what each number means, the rules and where they come from, a seed) and replays it exactly: same buildings, ids, numbers and ranking on any machine, with no AI call. Tested with 20 repeats.
+- **A number means what you said.** Exactly, at least, at most, between, or as many as fit. "Exactly 120 garden apartments" gives 120 (it came out short before), "28,000 sf of retail" gives 28,000 sf (it gave 34,400), "a 40,000 sf anchor, 80,000 sf total" is 80,000 sf (it was read as 120,000).
+- **An independent check of every layout**, separate from the engine's own numbers: pass, fail or unknown for the property line, setbacks, easements, overlaps (by level), access, connected drives and parking, parking needed vs drawn, the size asked for, and units by building. In the site plan's Numbers, and for agents. Unknown never counts as a pass; drainage, turning and grading are always "not checked".
+- **Garden apartments follow real buildings:** 15 projects from the reference plan library were read (site plans, building and unit schedules) and their buildings turned into templates with their sources. Garden buildings are whole 24-unit breezeway buildings (two stairs, four homes a floor at each); units come from that schedule.
+- **Changes as edits:** lock pieces, move the pool to the middle, keep an entrance and lay out the rest, change a count, compare garden apartments with townhomes, raise a flex office share. A change that breaks a rule or moves a lock isn't made, and says why; changes can be replayed and undone.
+- **Unsupported building types are said, not swapped:** a wrap building is reported unsupported rather than drawn as garden apartments. Which types are supported, partly supported or not is listed.
+- **Fixes:** flex loading aprons meet their end drives (a 2 ft gap left them disconnected); pad sites only on uses that have them.
+
 ## 2026-10-27
 
 ### 8:20 PM CT: The Feasibility workspace merged in, with a layout gallery on its Site step (b8532b3)

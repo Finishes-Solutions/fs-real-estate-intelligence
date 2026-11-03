@@ -1,0 +1,630 @@
+{
+  "schema": "rei.ref.project/1",
+  "id": "P18",
+  "name": "Lake Shore Town Homes / Beach Club",
+  "location": "Tega Cay, York County, SC (from plat; manifest says 'to verify')",
+  "family": "lake-shore-beach-club",
+  "partition": "holdout",
+  "forms": [
+    "townhome"
+  ],
+  "overlays": [],
+  "documents": [
+    {
+      "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+      "sha256": "066ab042e69c5246587923015a6f138ec55dc69b35c5e3891fe5cc6b3d42222f",
+      "pages_used": [
+        1,
+        10,
+        11,
+        12,
+        77
+      ],
+      "sheets": [
+        {
+          "page": 1,
+          "sheet": "CS.1",
+          "title": "Cover / index",
+          "revision": null,
+          "date": null
+        },
+        {
+          "page": 10,
+          "sheet": "AF1.3",
+          "title": "4-unit combined foundation plan",
+          "revision": null,
+          "date": null
+        },
+        {
+          "page": 11,
+          "sheet": "AF1.4",
+          "title": "5-unit combined foundation plan",
+          "revision": null,
+          "date": null
+        },
+        {
+          "page": 12,
+          "sheet": "AF1.5",
+          "title": "6-unit combined foundation plan",
+          "revision": null,
+          "date": null
+        },
+        {
+          "page": 77,
+          "sheet": "C1.0",
+          "title": "Preliminary plat",
+          "revision": "rev 2005-07-26 (approved for construction)",
+          "date": "2005-07-26"
+        }
+      ]
+    }
+  ],
+  "site": {
+    "area_ac": {
+      "v": 15.75,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "parcel 1 6.15 + parcel 2 9.60"
+    },
+    "lots": {
+      "v": 82,
+      "units": "lots",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "density_du_ac": {
+      "v": 5.2,
+      "units": "du/ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "derived",
+      "confidence": "high",
+      "status": "derived",
+      "review": "visually-reviewed",
+      "note": "82/15.75"
+    },
+    "zoning": {
+      "v": "R-6 PUD",
+      "units": null,
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "open_space_ac": {
+      "v": 9.6,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "MF commons open space"
+    },
+    "buffer_ac": {
+      "v": 3.5,
+      "units": "ac",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    }
+  },
+  "buildings": [
+    {
+      "type_id": "TH4",
+      "label": "4-unit townhome row",
+      "count": {
+        "v": null,
+        "units": "bldg",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "count per type not determined"
+      },
+      "floors": {
+        "v": "2-4",
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+          "page": 1,
+          "sheet": "CS.1"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "cover lists 2, 3 and 4 story units"
+      },
+      "shape": "row",
+      "footprint": {
+        "w_ft": {
+          "v": 117.875,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+            "page": 10,
+            "sheet": "AF1.3"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 55.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+            "page": 10,
+            "sheet": "AF1.3"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "55'-0\" foundation depth"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 4,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+          "page": 10,
+          "sheet": "AF1.3"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": "end+A+B+end",
+      "corridor": "exterior entry (fee-simple row)",
+      "stairs": null,
+      "elevators": null,
+      "parking": "front-load garages (approx 19'-2\" to 19'-8\" wide x 20'-23' deep)",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "TH5",
+      "label": "5-unit townhome row",
+      "count": {
+        "v": null,
+        "units": "bldg",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "count per type not determined"
+      },
+      "floors": {
+        "v": "2-4",
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+          "page": 1,
+          "sheet": "CS.1"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "cover lists 2, 3 and 4 story units"
+      },
+      "shape": "row",
+      "footprint": {
+        "w_ft": {
+          "v": 146.17,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+            "page": 11,
+            "sheet": "AF1.4"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 55.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+            "page": 11,
+            "sheet": "AF1.4"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "55'-0\" foundation depth"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 5,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+          "page": 11,
+          "sheet": "AF1.4"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": "end+B+A+B+end",
+      "corridor": "exterior entry (fee-simple row)",
+      "stairs": null,
+      "elevators": null,
+      "parking": "front-load garages (approx 19'-2\" to 19'-8\" wide x 20'-23' deep)",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "type_id": "TH6",
+      "label": "6-unit townhome row",
+      "count": {
+        "v": null,
+        "units": "bldg",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null,
+        "note": "count per type not determined"
+      },
+      "floors": {
+        "v": "2-4",
+        "units": "floors",
+        "src": {
+          "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+          "page": 1,
+          "sheet": "CS.1"
+        },
+        "method": "printed-schedule",
+        "confidence": "medium",
+        "status": "extracted",
+        "review": "visually-reviewed",
+        "note": "cover lists 2, 3 and 4 story units"
+      },
+      "shape": "row",
+      "footprint": {
+        "w_ft": {
+          "v": 171.46,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+            "page": 12,
+            "sheet": "AF1.5"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed"
+        },
+        "d_ft": {
+          "v": 55.0,
+          "units": "ft",
+          "src": {
+            "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+            "page": 12,
+            "sheet": "AF1.5"
+          },
+          "method": "printed-dimension",
+          "confidence": "high",
+          "status": "extracted",
+          "review": "visually-reviewed",
+          "note": "55'-0\" foundation depth"
+        },
+        "area_sf": {
+          "v": null,
+          "units": "sf",
+          "src": null,
+          "method": null,
+          "confidence": null,
+          "status": "unknown",
+          "review": null
+        }
+      },
+      "units_per_building": {
+        "v": 6,
+        "units": "units",
+        "src": {
+          "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+          "page": 12,
+          "sheet": "AF1.5"
+        },
+        "method": "printed-schedule",
+        "confidence": "high",
+        "status": "extracted",
+        "review": "visually-reviewed"
+      },
+      "units_per_floor": null,
+      "unit_mix": "end+B+A+A+B+end",
+      "corridor": "exterior entry (fee-simple row)",
+      "stairs": null,
+      "elevators": null,
+      "parking": "front-load garages (approx 19'-2\" to 19'-8\" wide x 20'-23' deep)",
+      "gsf": {
+        "v": null,
+        "units": "sf",
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "unit_types": [
+    {
+      "name": "End unit (Type C/End)",
+      "beds": null,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "name": "Type A",
+      "beds": null,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    },
+    {
+      "name": "Type B",
+      "beds": null,
+      "baths": null,
+      "sf": null,
+      "count": {
+        "v": null,
+        "units": null,
+        "src": null,
+        "method": null,
+        "confidence": null,
+        "status": "unknown",
+        "review": null
+      }
+    }
+  ],
+  "unit_widths": {
+    "end_ft": {
+      "v": 32.146,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 10,
+        "sheet": "AF1.3"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "32'-1 3/4\""
+    },
+    "A_ft": {
+      "v": 25.292,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 10,
+        "sheet": "AF1.3"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "25'-3 1/2\""
+    },
+    "B_ft": {
+      "v": 28.292,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 10,
+        "sheet": "AF1.3"
+      },
+      "method": "printed-dimension",
+      "confidence": "high",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "28'-3 1/2\""
+    }
+  },
+  "parking": {
+    "min_per_unit": {
+      "v": 2,
+      "units": "stalls/unit",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed",
+      "note": "9'x17' spaces; may be met by garages (raster partly legible)"
+    },
+    "stall_w_ft": {
+      "v": 9,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "stall_d_ft": {
+      "v": 17,
+      "units": "ft",
+      "src": {
+        "file": "01_Original_Collection/plans/P18_Beach_Club_Townhomes/001_Beach_Club_Townhomes.pdf",
+        "page": 77,
+        "sheet": "C1.0"
+      },
+      "method": "printed-schedule",
+      "confidence": "medium",
+      "status": "extracted",
+      "review": "visually-reviewed"
+    },
+    "type": "attached front-load garage + driveway"
+  },
+  "amenities": [
+    "common open space"
+  ],
+  "access": [
+    "24' private road ROW"
+  ],
+  "project_rules": [
+    {
+      "rule": "min front setback",
+      "value": 25,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "min rear setback",
+      "value": 24,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "min side setback",
+      "value": 8,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "private road ROW",
+      "value": 24,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    },
+    {
+      "rule": "utility easement",
+      "value": 40,
+      "units": "ft",
+      "note": "project-specific, not universal"
+    }
+  ],
+  "reconciliation": [
+    {
+      "check": "4-unit width",
+      "values": "32.146+25.292+28.292+32.146=117.875 = 117'-10 1/2\"",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "5-unit width",
+      "values": "2x32.146+2x28.292+25.292=146.17 = 146'-2\"",
+      "result": "consistent",
+      "note": ""
+    },
+    {
+      "check": "6-unit width",
+      "values": "2x(32.146+28.292+25.292)=171.46 = 171'-5 1/2\"",
+      "result": "consistent",
+      "note": ""
+    }
+  ],
+  "open_questions": [
+    "number of 4/5/6-unit buildings",
+    "unit sf",
+    "max height note illegible"
+  ],
+  "manifest_name": "Lake Shore Town Homes / Beach Club archive"
+}
