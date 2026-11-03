@@ -34,12 +34,12 @@ const painted = [], jpeg = Buffer.from('ffd8ffe000104a464946', 'hex').toString('
 RN.hooks.snapshot = async (svgs, { px }) => svgs.map(s => { assert.match(s, /^<svg/); assert.equal(px, 1600); return 'data:image/jpeg;base64,' + jpeg; });
 RN.hooks.paint = async (key, o) => { painted.push(o); return { b64: jpeg, size: o.sizes[0], model: 'test-image-model' }; };
 const text = r => r.content.find(c => c.type === 'text').text;
-let r = await callTool('site_renderings', { plan_id: 'plan0000002', views: ['corner', 'hero'], look: 'brick', time: 'golden' });
+let r = await callTool('site_renderings', { plan_id: 'plan0000002', views: ['corner', 'front'], look: 'brick', time: 'golden' });
 assert.notEqual(r.isError, true, text(r));
 assert.equal(painted.length, 2); assert.match(painted[0].prompt, /Turn this 3D massing model/); assert.match(painted[0].prompt, /red and tan brick/); assert.match(painted[0].prompt, /late-afternoon/);
-assert.match(painted[1].prompt, /close-up aerial of /, 'the close-up frames one building'); assert.deepEqual(painted[0].sizes[0], '2048x1152');
+assert.match(painted[1].prompt, /from over the street/, 'the second view'); assert.deepEqual(painted[0].sizes[0], '2048x1152');
 assert.equal(r.content.filter(c => c.type === 'resource' && c.resource.mimeType === 'image/jpeg').length, 2, 'the JPEGs in the answer');
-assert.match(text(r), /2 renderings \(brick and stone, late afternoon, typical surroundings\)/); assert.match(text(r), /- From the corner: 2048 × 1152, test-image-model\. https:\/\/storage\.test\//); assert.match(text(r), /Building close-up · /);
+assert.match(text(r), /2 renderings \(brick and stone, late afternoon, typical surroundings\)/); assert.match(text(r), /- From the corner: 2048 × 1152, test-image-model\. https:\/\/storage\.test\//); assert.match(text(r), /From the street: /);
 assert.match(text(r), /plan_set puts the newest four on its rendering sheets/); assert.match(text(r), /AI concept illustrations/);
 const saved = await ST.getJSON(mem, 'plans/plan0000002.json'); assert.equal(saved.renders.length, 2); assert.ok(await mem.get(saved.renders[0].path), 'kept in storage');
 // out of time: the views not started are named for the next call
