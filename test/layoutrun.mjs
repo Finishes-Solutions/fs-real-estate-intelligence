@@ -422,5 +422,12 @@ ok('vertical mixed use: shops on the ground floor, apartments above, each use co
   const pm = PF.metricsOf(plan); assert.equal(Math.round(pm.uses.retail.gsf), 20000); assert.ok(pm.uses.multifamily.gsf < SP.gfaOf(shops[0]) + M.filter(e => !e.ground).reduce((t, e) => t + SP.gfaOf(e), 0));
   assert.equal(RUN.replayRun(r).identical, true);
 });
+ok('stormwater handled off site: the words or the typed brief, no pond drawn, the check says it is an assumption', () => {
+  for (const [ask, want] of [['garden apartments, as many as fit, detention handled off site', 'offsite'], ['garden apartments, as many as fit, drains to the regional pond', 'offsite'], ['garden apartments, as many as fit, underground detention', 'underground'], ['garden apartments, as many as fit', null]]) assert.equal(B.briefFromRequest(ask, RECT).site.stormwater, want, ask);
+  const b = B.briefFromRequest('exactly 120 garden apartments', RECT); b.site.stormwater = 'offsite';
+  const r = RUN.runBrief(b), o = r.options[0]; assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.ok(!o.elements.some(e => e.kind === 'pond'), 'no pond on the site'); assert.match(o.validation.checks.find(c => c.id === 'eng.detention').note, /off site/);
+  const bad = B.briefFromRequest('exactly 120 garden apartments', RECT); bad.site.stormwater = 'lake'; assert.equal(B.validateBrief(bad).ok, false);
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

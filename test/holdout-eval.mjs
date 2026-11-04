@@ -21,3 +21,7 @@ for (const c of cases) assert.ok(Math.abs(area(c.ring) / 43560 - c.ref.acres) / 
 const p35 = cases.find(c => c.id === 'P35'), r = evalRun(p35, p35.runs.find(x => x.key === 'exact-ug'));
 assert.equal(r.status, 'pass', r.failed?.join()); assert.equal(r.units, p35.ref.units); assert.ok(r.parking >= r.required);
 console.log('holdout-eval ok: P35 with detention off the surface ' + r.units + ' / ' + p35.ref.units + ' units, parking ' + r.parking + ' / ' + r.required);
+// as many as fit reaches what an exact count passes on the same land (the search alone settled on 304; exactly 355 passes)
+const f = evalRun(p35, p35.runs.find(x => x.key === 'fill-ug'));
+assert.equal(f.status, 'pass', f.failed?.join()); assert.ok(f.units >= r.units, 'as many as fit ' + f.units + ' vs exactly ' + r.units);
+console.log('holdout-eval ok: P35 as many as fit ' + f.units);

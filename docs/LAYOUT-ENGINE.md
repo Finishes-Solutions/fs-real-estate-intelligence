@@ -202,6 +202,16 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    the master plan drains off site (P35: 224 -> 355 units with it off); as many as fit below an exact count that fits;
    one frame on a wedge site (P36: 1 building of 3); no compact urban podium-courtyard / wrap form and the 60% tower
    share (E054); no fee-simple townhome-lot product and an exact townhome count below the maximize result (P18).
+5a. Done Nov 4: stormwater as a brief input — `site.stormwater: 'onsite-pond' | 'underground' | 'offsite'`, read from
+   the words ("regional detention", "detention handled off site", "drains to the regional pond", "underground detention",
+   "no pond") or the plan's Settings storm mode, mapped to the engine's storm mode ('offsite' -> none: no pond, no vault);
+   the detention check's note says it's an assumption to confirm with the civil engineer and the drainage district.
+5b. Done Nov 4: as many as fit (one templated apartment use) is probed upward after the search (lib/layoutrun.mjs
+   probeUp): exact counts on a ladder (1.08-1.5 x the best found) run as an exact request runs, and every layout that
+   passes the request as asked with more homes joins the options; two rungs that find nothing end it. P35 with detention
+   off the surface: 304 -> 356 (exactly 355 passes). The cause is in the search (which counts come out depends on the
+   count asked, not smoothly: 330 and 341 short where 350 and 355 pass); the ladder works round it at about 2-3 s more
+   a request, and can still miss a passing count between rungs. Not applied to "at least N" (met at N) or mixed uses.
 6. Done Nov 4: tuck-under (6e, from E053), cross-dock (6c) and vertical mixed use (6d), each with its own geometry and tests.
 6c. Done Nov 4 (cross-dock, partial). "A cross-dock warehouse" (form ind-cross-dock; the engine program's `crossDock`)
    draws lib/sitegencom.mjs crossDock: a deep building running back from the street (400-600 ft across, its length the
@@ -214,7 +224,6 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    one stall for every two doors, a warning) and .trucks (no truck piece or truck drive touches car parking, hard).
    Bench IN-crossdock: 400,000 sf, 245 / 240 spaces, 130 trailer stalls. Still: no truck turning paths (no design
    vehicle), clear height a default, no guard house.
-5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
 6d. Done Nov 4 (vertical mixed use, partial). "A 5-story mixed-use building with 20,000 sf ground-floor retail and 200
    apartments above" (form mx-vertical, VERTICAL_WORDS in lib/layoutbrief.mjs) becomes one program (multifamily,
    arrangement 'vertical', groundRetail sf, floors with the shop floor counted). lib/sitegen.mjs verticalOf draws one
