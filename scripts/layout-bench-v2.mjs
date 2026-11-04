@@ -43,7 +43,7 @@ const CASES = [
   { id: 'MX-horizontal', family: 'mixed_use', site: 'big40', ask: '20,000 sf retail along the main road, 240 apartments behind and 80 townhomes' }
 ];
 const plan = id => ({ origin: [-96.42, 30.38], ring: SITES[id], front: 0, streets: [], setbacks: { ...SB } });
-const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
+const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
 
 let baseMods = null;
 if (BASE) baseMods = { SP: await import(pathToFileURL(path.resolve(BASE, 'lib/siteplan.mjs'))), L: await import(pathToFileURL(path.resolve(BASE, 'lib/sitelayout.mjs'))) };
@@ -65,7 +65,7 @@ for (const c of CASES) {
   let svg = ''; try { if (top) svg = planSVG({ ...p, elements: top.elements, program: top.program }, { px: 520, pad: 18 }).svg; } catch (e) { svg = '<p>drawing failed: ' + e.message + '</p>'; }
   cards.push({ c, row, svg, top });
   console.log(c.id.padEnd(16), rec.outcome.padEnd(18), (top ? top.validation.status + ' ' + (top.quantities.totals.units ? top.quantities.totals.units + ' u' : top.quantities.totals.gfa + ' sf') + ' pk ' + top.quantities.parking.provided + '/' + top.quantities.parking.required : (rec.problems || []).map(x => x.msg).join('; ').slice(0, 80)).padEnd(40),
-    'replay ' + (same ? 'same' : 'DIFF'), ms + 'ms', row.base ? '| before: ' + row.base.options.map(o => o.status + (o.failed.length ? '(' + o.failed.join(',') + ')' : '')).join(' ') : '');
+    'replay ' + (same ? 'same' : 'DIFF'), top ? 'warn ' + (top.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id).join(',') || '-') : '', ms + 'ms', row.base ? '| before: ' + row.base.options.map(o => o.status + (o.failed.length ? '(' + o.failed.join(',') + ')' : '')).join(' ') : '');
 }
 const esc = s => String(s ?? '').replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 fs.writeFileSync(path.join(OUT, 'bench.json'), JSON.stringify(rows, null, 1));

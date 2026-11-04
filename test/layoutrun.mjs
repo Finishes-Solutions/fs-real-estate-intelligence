@@ -215,6 +215,10 @@ ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre squ
   // over 200 apartments need a second way in: every option has one, or the check says it hasn't (never a silent pass);
   // with Becker Road every option gets one (the pond cut back where it took the side street)
   assert.ok(r.options.every(o => SP.entrancesOf(o.elements).length >= 2), r.options.map(o => SP.entrancesOf(o.elements).length).join());
+  // ponds without spikes (the grey triangle on the map) and no trail piece still marked closed (the tan wedge)
+  const ang = (r, i) => { const n = r.length, a = r[(i - 1 + n) % n], b = r[i], c = r[(i + 1) % n], u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]]; return Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v))))) * 180 / Math.PI; };
+  for (const o of r.options) { for (const p of o.elements.filter(e => e.kind === 'pond' && e.poly)) assert.ok(p.poly.every((_, i) => ang(p.poly, i) >= 34), 'pond spike in ' + o.name);
+    const tr = o.elements.filter(e => e.kind === 'trail'); if (tr.length > 1) assert.ok(tr.every(t => !t.closed), 'a split trail is open'); }
   const lone = RUN.runPlan({ ...site, streets: [], params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
   assert.ok(lone.options.every(o => SP.entrancesOf(o.elements).length >= 2 || o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | '));
 });

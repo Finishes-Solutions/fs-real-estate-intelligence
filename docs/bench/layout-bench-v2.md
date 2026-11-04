@@ -4,7 +4,7 @@
 | MF-garden-max | multifamily | feasible | pass · 180 units · parking 309/288 | — | 4 | identical | n/a |
 | MF-garden-rot | multifamily | feasible | pass · 372 units · parking 621/596 | — | 4 | identical | n/a |
 | MF-courtyard | multifamily | no-feasible-found | fail · 149 units · parking 246/239 | overlap.level-aware, separation.buildings, access.buildings, program.u1 | 4 | identical | n/a |
-| MF-midrise | multifamily | feasible | pass · 288 units · parking 481/461 | — | 4 | identical | n/a |
+| MF-midrise | multifamily | feasible | pass · 288 units · parking 479/461 | — | 4 | identical | n/a |
 | MF-townhomes | multifamily | feasible | pass · 58 units · parking 133/131 | — | 4 | identical | n/a |
 | MF-duplex | multifamily | feasible | pass · 44 units · parking 88/88 | — | 4 | identical | n/a |
 | MF-tower | multifamily | no-feasible-found | fail · 199 units · parking 338/319 | program.u1 | 4 | identical | n/a |
