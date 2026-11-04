@@ -200,15 +200,22 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    template), a four-sided wrap (the garage enclosed, entered through a portal) not offered.
 6b. Done Nov 3 (podium parking). A tower on a podium (form "tower", 4+ floors of apartments) parks on its podium:
    podiums are 128 ft deep (two double-loaded 60 ft modules inside 4 ft walls, lib/siteplan.mjs PODIUM) and 150-340 ft
-   long; their stalls are counted on that grid (9 ft stalls, a 24 ft turning aisle at each end of a row, 12 stalls a
-   level for the ramp, 85% of the ground level), not by area. The fewest podium levels that park the tower's homes are
+   long; their stalls are counted from a drawn garage plan (lib/siteplan.mjs garagePlan: 9 ft stalls in rows between a
+   24 ft cross aisle at each end, 12 stalls a level for the ramp at the entrance's end of the back row, two stair /
+   elevator cores of 3 stalls under the tower, the lobby's 9 stalls of the street-side row on the ground level, columns
+   every 3 stalls), not by area: a 240 x 128 podium holds 62 a level, 53 on the ground. The run puts the lobby on the
+   long face nearer a street and the garage entrance on an end or the back face where a drive reaches it (a 24 ft
+   "Garage entry" drive out to the network where none meets it, across a parking row only when it must, cutting just
+   the stalls under it: lib/layoutrun.mjs garageEntries); the validator fails a podium garage no drive reaches
+   (access.garage, hard). The plan sheet draws the ground level (stalls, ramp, cores, columns, lobby, the way in) under
+   the dashed tower; the 3D view shows the parking levels' open sides as dark bands. The fewest podium levels that park the tower's homes are
    parking (`parkLevels`, written on each building by the run, lib/layoutrun.mjs podiumLevels), the rest homes; the
    tower is 60% of the podium (PODIUM.towerShare, an estimate: no podium project in the reviewed library). The search
    is told up front: the program's footprint is the podiums' (wantFoot / towerAf) and a footprint's surface need is net
    of its podium (mfPer), so it lays only the surface rows the podiums leave short. The validator counts the podium on
-   its own grid (lib/layoutcheck.mjs podiumGrid) from the declared levels and the drawn tower outline. Bench MF-tower:
-   300 units, 491 / 480 spaces (354 podium, 137 surface). Still: no drawn garage plan (ramps, columns, cores), and the
-   generator's courtyard / loop layouts are not offered for towers.
+   the garage plan (lib/layoutcheck.mjs podiumGrid) from the declared levels and the drawn tower outline. Bench MF-tower:
+   300 units, 490 / 480 spaces (327 podium, 163 surface). Still: ramp slope and clear heights, structure and ventilation
+   aren't designed, and the generator's courtyard / loop layouts are not offered for towers.
 7. Turning movements with a declared design vehicle; detention from topography (needs engineering inputs).
 8. Done Nov 3 (two ways in apart). With two ways in needed (`program.entrances` 2: over 200 apartments or 30 homes,
    "at least N" counted at what the land holds), the search lays a second driveway with the layout at the far end of

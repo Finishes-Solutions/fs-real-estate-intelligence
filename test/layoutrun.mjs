@@ -274,8 +274,18 @@ ok('a tower on a parking podium: the podium parks the tower, exactly the units a
   const pk = o.quantities.parking; assert.ok(pk.podium > pk.surface, 'most spaces on the podium: ' + pk.podium + ' vs ' + pk.surface + ' surface');
   assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.08, 'parked without over-parking: ' + pk.provided + ' / ' + pk.required);
   assert.equal(SP.metrics({ ...RECT, elements: o.elements, program: o.program }).spaces, SP.metrics({ ...RECT, elements: o.elements, program: o.program }).stalls + SP.metrics({ ...RECT, elements: o.elements, program: o.program }).deck, 'the plan counts podium spaces as deck');
-  // the podium grid: a 240 x 128 ft podium holds 4 rows of 20 less a 12-stall ramp a level, 85% of it on the ground level
-  assert.equal(SP.podiumLevelStalls(240, 128), 68); assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2, parkLevels: 2 }), 57 + 68);
+  // the garage plan: 4 rows of 20 stalls, less the ramp's 12 and two cores' 3 each on every level (62), and the lobby's 9 on the ground (53)
+  assert.equal(SP.podiumLevelStalls(240, 128), 62); assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2, parkLevels: 2 }), 53 + 62);
+  const g = SP.garagePlan({ w: 240, d: 128 }); assert.equal(g.rows.reduce((t, r) => t + r.slots.filter(q => !q.use).length, 0), g.typical, 'the count is the drawn stalls');
+  assert.equal(g.cores.length, 2); assert.ok(g.ramp && g.lobby && g.cols.length > 20);
+  for (const f of ['-u', '+u', '+v']) assert.notEqual(SP.garagePlan({ w: 240, d: 128, garageFace: f, lobbyFace: '-v' }).entry.face, '-v', 'never on the lobby face');
+  // every tower's garage has a way in: a drive meets its entrance, on a face that isn't the lobby's
+  for (const b of T) { assert.ok(b.lobbyFace && b.garageFace && b.garageFace !== b.lobbyFace, b.id + ' faces'); }
+  assert.equal(o.validation.checks.find(c => c.id === 'access.garage').status, 'pass');
+  // the check fails a garage no drive reaches: one drive up the podium's left end; the entrance there passes, at the right end fails
+  const tw = { id: 't1', kind: 'building', use: 'multifamily', form: 'tower', x: 450, y: 250, w: 240, d: 128, floors: 8, podium: 2, parkLevels: 2, lobbyFace: '-v' }, dr = { id: 'd1', kind: 'drive', x: 318, y: 157, w: 24, d: 314, name: 'Main entry', entry: true };
+  const gar = f => V.validateLayout({ ...RECT, elements: [{ ...tw, garageFace: f }, dr], program: o.program }, r.brief).checks.find(c => c.id === 'access.garage').status;
+  assert.equal(gar('-u'), 'pass'); assert.equal(gar('+u'), 'fail');
   assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2 }), 0, 'a tower with no parking levels declared parks nothing on its podium (as before)');
 });
 ok('a wrap: one building round a garage that parks it, the pool in the courtyard, exactly the units asked', () => {
