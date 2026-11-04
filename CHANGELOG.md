@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 3:53 PM CT: Wedge-shaped lots fit a third apartment building when parking allows (HASH)
+- **Wedge lots:** on a triangular or tapering lot, apartments placed along the lot lines that would end up just over 200 homes (where the fire code would want a second way in that a single street can't give) are also offered trimmed back to 200. That is one more whole building where the land allows: a 6-acre triangle at one space per home now gets 3 buildings and 192 homes, up from 2 buildings and 160.
+- Nine wedge-lot cases added to the test sites (37 in all, every one passing with no warnings). The full test suite passes.
+
 ### 11:53 AM CT: 3D map back to plain blocks; stacked townhomes and cottages; awkward lots; drawing polish (2b458e4, 8109a45, 24b3efd, aaa0b61)
 - **The 3D map is back to the plain style:** each building a solid block coloured by its use, with a parapet and a line at each floor. The designed facades (brick, siding, windows, balconies, hip roofs) are off the map; plan sets and the BIM model still use the designs.
 - **Stacked townhomes** (homes stacked two high in 4-story rows, an estimate on the reviewed Portland Road bay) and **build-to-rent cottage communities** (detached cottages on private lanes round an amenity centre; the 2-bed from the reviewed Magnolia Village plans).
