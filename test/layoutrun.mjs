@@ -302,5 +302,32 @@ ok('a wrap: one building round a garage that parks it, the pool in the courtyard
   assert.ok(o.elements.some(e => e.kind === 'pool'), 'the pool in the courtyard');
   assert.equal(RUN.replayRun(r).identical, true);
 });
+ok('parking trimmed to the need: whole stalls off the far row ends, no empty paving, the drive-thru kept', () => {
+  for (const [ask, site] of [['exactly 120 garden apartments, 3 stories', RECT], ['courtyard apartments, 150 units', RECT], ['exactly 28,000 sf retail in four buildings', RECT]]) {
+    const o = RUN.runBrief(B.briefFromRequest(ask, site)).options[0], pk = o.quantities.parking;
+    assert.equal(o.validation.status, 'pass', ask + ': ' + o.validation.failed.join());
+    assert.ok(pk.provided >= pk.required && pk.provided <= Math.ceil(pk.required * 1.05) + 1, ask + ': ' + pk.provided + ' / ' + pk.required);
+    assert.ok(o.elements.every(e => e.kind), 'every piece has a kind (no bare outline)');
+    assert.ok(o.elements.filter(e => e.kind === 'parking' && !e.poly).every(e => Math.floor((e.w + 0.01) / 9) >= 6), 'no row left a stub');
+  }
+  const pad = RUN.runBrief(B.briefFromRequest('2,500 sf restaurant with a drive-thru', { ...RECT, ring: [[0, 0], [210, 0], [210, 230], [0, 230]] })).options[0];
+  assert.ok(pad.elements.some(e => e.kind === 'drive' && e.windowAt), 'the drive-thru lane asked for is kept');
+});
+ok('a second court that gives up its clubhouse keeps a garden; a court is never future development (Hockley, 350 courtyard units)', () => {
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+  const r = RUN.runBrief(B.briefFromRequest('courtyard apartments, 350 units', site));
+  for (const o of r.options) {
+    assert.equal(o.validation.status, 'pass', o.name + ': ' + o.validation.failed.join()); assert.equal(o.quantities.totals.units, 350);
+    const courts = o.elements.filter(e => e.kind === 'green' && e.note === 'Courtyard');
+    assert.ok(!o.elements.some(e => e.kind === 'green' && e.future && courts.some(c => SP.inRing(e.labelAt || SP.centroid(SP.shapeOf(e)), SP.shapeOf(c)))), 'no future development inside a court');
+    const n = new Set(o.elements.filter(e => e.court).map(e => e.court)).size, clubs = o.elements.filter(e => e.kind === 'building' && e.use === 'amenity').length;
+    if (n > clubs) assert.equal(o.elements.filter(e => e.name === 'Courtyard garden').length, n - clubs, 'each court without a clubhouse has its garden');
+  }
+});
+ok('an entrance drawn across the street line (its apron out in the street) is a way in', () => {
+  const plan = { ...RECT, elements: [{ id: 'd1', kind: 'drive', name: 'Main entry', entry: true, x: 450, y: 20, w: 24, d: 44 }, { id: 'b1', kind: 'building', use: 'retail', x: 450, y: 200, w: 100, d: 60 }] };
+  const c = V.validateLayout(plan, B.canonicalBrief(B.briefFromRequest('6,000 sf retail', RECT))).checks.find(k => k.id === 'access.entrance');
+  assert.equal(c.status, 'pass', JSON.stringify(c));
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

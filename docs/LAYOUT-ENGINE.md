@@ -185,7 +185,17 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    in a ring of double-loaded aisles outside, nothing paved inside. The ring is drawn at the size asked and never
    chopped (fitCount used to shorten wings apart); a ring too big to park is drawn again smaller, whole. One amenity
    centre per community removes a court's clubhouse, pool and deck together (a shared tag). Still: units are a floor
-   area estimate (no reviewed courtyard template); corner units, stairs and the gateway's arch over the walk aren't drawn.
+   area estimate: the library's only courtyard building (E054 Anderson Apartments, a podium U, 172 units) is in the
+   holdout partition, so it can only evaluate, not drive generation; corner units, stairs and the gateway's arch over
+   the walk aren't drawn. A court that gives up its clubhouse to the community's one amenity centre keeps a
+   "Courtyard garden" (seating and a shade pavilion) where it stood; open land inside a court is never marked future
+   development (lib/layoutrun.mjs courtGardens).
+4b. Parking to the need (lib/layoutrun.mjs pruneSurplus): after whole rows no building uses, whole stalls come off the
+   far ends of rows (farthest from a building first) down to 3% over the requirement; a row keeps 6 stalls or goes
+   whole; the lot's paving (field) loses what was taken out and the land goes back to the open land beside it. Bench:
+   every case within 4% (courtyard 248/240, was 266; garden 198/192; warehouse 155/150; pad 26/25). An option without
+   the drive-thru lane asked for ranks below one with it. The validator counts a drive that runs across the street
+   line (its apron in the street) as meeting it (a 1° frontage left Hockley's courtyard entry "2.001 ft" off).
 5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
 6. Tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
 6a. Done Nov 3 (wrap, partial). "A wrap building" (form mf-wrap, program arrangement 'wrap', 5 floors unless the words
