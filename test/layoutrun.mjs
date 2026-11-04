@@ -228,6 +228,15 @@ ok('a courtyard building: its wings one building, shared corners once, the pool 
   assert.equal(o.quantities.totals.units, 150);
   const wings = o.elements.filter(e => e.court); assert.ok(wings.length >= 3 && new Set(wings.map(e => e.court)).size === 1, 'the wings carry one court id');
   assert.ok(wings.every(e => !e.poly), 'wings stay rectangles (3D facades and plan sets read them)');
+  // one continuous building: every wing meets another end to side (no gaps, no overlaps), named as its parts
+  for (const a of wings) assert.ok(wings.some(b => b !== a && SP.gapBetween(SP.shapeOf(a), SP.shapeOf(b)) < 0.5), 'a wing meets the next: ' + a.name);
+  for (let i = 0; i < wings.length; i++) for (let j = i + 1; j < wings.length; j++) assert.ok(!SP.rectsOverlap(wings[i], wings[j], 1), 'wings never overlap at a corner');
+  assert.ok(wings.every(e => /^Bldg A · .* wing$/.test(e.name)), wings.map(e => e.name).join());
+  // the court: the pool inside it, no parking or drive inside it, the clubhouse at its gateway
+  const xs = wings.flatMap(e => SP.shapeOf(e).map(p => p[0])), ys = wings.flatMap(e => SP.shapeOf(e).map(p => p[1])), inHull = e => { const c = SP.centroid(SP.shapeOf(e)); return c[0] > Math.min(...xs) && c[0] < Math.max(...xs) && c[1] > Math.min(...ys) && c[1] < Math.max(...ys); };
+  assert.ok(o.elements.some(e => e.kind === 'pool' && inHull(e)), 'the pool in the court');
+  assert.ok(!o.elements.some(e => (e.kind === 'parking' || e.kind === 'drive') && inHull(e)), 'no parking inside the court');
+  assert.ok(o.elements.some(e => e.kind === 'building' && e.use === 'amenity' && inHull(e)), 'the clubhouse at the court');
   assert.ok(SP.planFeatures({ ...RECT, elements: o.elements, program: o.program }, null).features.filter(f => f.properties.k === 'fac').length > 100, 'the 3D facades are drawn (a joined outline had none)');
 });
 ok('two ways in far enough apart: the top option meets the spacing, the bigger one stays an option', () => {

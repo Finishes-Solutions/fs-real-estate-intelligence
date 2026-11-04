@@ -83,7 +83,7 @@ missing rules, quantity modes, locks, a 33° rotation, malformed pieces).
 
 | Family | Implemented | Partial (stated simplification) | Unsupported |
 |---|---|---|---|
-| Multifamily | garden (templated), townhomes, cottage / BTR, single-family lots | walk-up (garden geometry), courtyard (corner overlaps flagged), mid-rise (template, cores not drawn), podium and tower-on-podium (massing only), duplex/triplex/fourplex (duplex rows) | tuck-under, wrap, stacked townhomes |
+| Multifamily | garden (templated), townhomes, cottage / BTR, single-family lots | walk-up (garden geometry), courtyard (a continuous closed ring or U of wings, units from floor area: no reviewed courtyard template), mid-rise (template, cores not drawn), podium and tower-on-podium (massing only), duplex/triplex/fourplex (duplex rows) | tuck-under, wrap, stacked townhomes |
 | Retail | inline strip, strip with pads, freestanding, restaurant pad | anchored center (can draw one box), drive-through (queue length unchecked) | — |
 | Industrial | warehouse with truck court | rear-load, front-load, multi-building park | side-load, cross-dock |
 | Flex | — | multi-tenant small bay (bays and office share not drawn; office share changes parking) | — |
@@ -178,7 +178,14 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    quantity-meaning choice in Build; options that differ only by mirroring (the Hockley run's first two).
 2. After trimming to an exact count, re-fit the parking (refit with the kept buildings pinned) so no empty bay is left.
 3. Mid-rise: let shorter bars take fewer bays (min 3) or join bars; score over-parking as land waste.
-4. Courtyard: a continuous courtyard building form (no corner overlaps), then mark it validated if the benchmark passes.
+4. (Done Nov 3.) Courtyard: one continuous building (lib/sitegen.mjs courtyard1), in two shapes the grid tries — a
+   closed ring with the clubhouse in a 100 ft gateway in the street wing, or a U open to the street with the clubhouse
+   across its mouth — wings meeting end to side (no overlaps), named "Bldg A · left / right / rear / street L / street R
+   wing", the pool and deck in the court's middle, the court a planted lawn (never "future development"), the parking
+   in a ring of double-loaded aisles outside, nothing paved inside. The ring is drawn at the size asked and never
+   chopped (fitCount used to shorten wings apart); a ring too big to park is drawn again smaller, whole. One amenity
+   centre per community removes a court's clubhouse, pool and deck together (a shared tag). Still: units are a floor
+   area estimate (no reviewed courtyard template); corner units, stairs and the gateway's arch over the walk aren't drawn.
 5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
 6. Wrap, tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
 6b. Podium parking: the tower-on-podium form plans surface parking for every unit (194 of 300 on 10 ac); its podium
