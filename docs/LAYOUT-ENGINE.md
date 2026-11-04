@@ -196,7 +196,12 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    every case within 4% (courtyard 248/240, was 266; garden 198/192; warehouse 155/150; pad 26/25). An option without
    the drive-thru lane asked for ranks below one with it. The validator counts a drive that runs across the street
    line (its apron in the street) as meeting it (a 1° frontage left Hockley's courtyard entry "2.001 ft" off).
-5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
+5. Done Nov 4 (evaluation harness): `node scripts/refs/holdout-eval.mjs [--png]` runs the reviewed holdout projects (P35, P36
+   Sierra Vista; E054 Anderson; P18 Lake Shore) on reconstructed sites and writes docs/bench/holdout-eval.md (engine vs
+   as-built, with the reading). Findings to fix from dev evidence, never by fitting the holdout: on-site detention when
+   the master plan drains off site (P35: 224 -> 355 units with it off); as many as fit below an exact count that fits;
+   one frame on a wedge site (P36: 1 building of 3); no compact urban podium-courtyard / wrap form and the 60% tower
+   share (E054); no fee-simple townhome-lot product and an exact townhome count below the maximize result (P18).
 6. Tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
 6a. Done Nov 3 (wrap, partial). "A wrap building" (form mf-wrap, program arrangement 'wrap', 5 floors unless the words
    say) is drawn by lib/sitegen.mjs wrapOf: one double-loaded building (65 ft wings: a street wing the full width, a wing
