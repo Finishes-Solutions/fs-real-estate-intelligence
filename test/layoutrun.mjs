@@ -456,7 +456,7 @@ ok('front-load townhomes from the reviewed row (E053): a one-car garage and a dr
 });
 ok('a wedge: the strips park more where the land widens (a bay of their own length), no empty paving left', () => {
   const site = { ...RECT, ring: [[0, 0], [1100, 0], [0, 420]] }, o = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site)).options[0];
-  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 150, 'units ' + o.quantities.totals.units);
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 120, 'units ' + o.quantities.totals.units); assert.ok(!o.validation.failed.includes('program.template') && o.validation.checks.find(c => c.id === 'program.template')?.status !== 'fail', 'every building drawn to a reviewed template'); // (204 came from 4-floor garden bars no template fits; templated, 128)
   const aisles = o.elements.filter(e => e.kind === 'drive' && e.bayGroup); for (const a of aisles) assert.ok(o.elements.some(r => r.kind === 'parking' && r.bayGroup === a.bayGroup), 'an extra bay\'s aisle keeps its rows');
 });
 ok('a wedge: the densest passing layout, every building drawn to the mid-rise template (none estimated from floor area)', () => {
