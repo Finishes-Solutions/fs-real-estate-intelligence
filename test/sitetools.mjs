@@ -13,7 +13,7 @@ let n = 0; const newId = () => 'n' + (++n);
 
 // ---- a real apartment plan: moving and copying sets, with what's attached ----
 const tract = siteOf(mk([-95.6954, 29.6657], [[0, 0], [716, 25], [759, 1244], [-47, 1219]]));
-const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], plan = { ...tract, elements: o.elements, program: o.program, recipe: o.recipe }; // (the rest of the site filled and marked Phase 2, as Settings › Leftover land asks: the Phase 2 counts below)
+const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1, gallery: false })[0], plan = { ...tract, elements: o.elements, program: o.program, recipe: o.recipe }; // (the rest of the site filled and marked Phase 2, as Settings › Leftover land asks: the Phase 2 counts below)
 {
   const club = plan.elements.find(e => e.name === 'Clubhouse'), deck = plan.elements.find(e => /pool deck/i.test(e.note || '')), pool = plan.elements.find(e => e.kind === 'pool');
   assert.ok(club && deck && pool, 'the clubhouse, its deck and pool');
@@ -389,7 +389,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
 // ---- ways in: a real boulevard (two lanes, a planted median, the monument sign), and where entrances may go ----
 {
   const side = tract.ring.findIndex((q, i) => S.outwardOf(tract.ring, i)[0] > 0.9), T2 = { ...tract, streets: [side] }, sa = T2.ring[side], sb = T2.ring[(side + 1) % T2.ring.length];
-  const ob = L.layoutOptions(T2, { use: 'multifamily', units: 240, floors: 3, entrances: 1 }, { count: 1 })[0], base = { ...T2, elements: ob.elements, program: ob.program }, at = f => [sa[0] + (sb[0] - sa[0]) * f, sa[1] + (sb[1] - sa[1]) * f];
+  const ob = L.layoutOptions(T2, { use: 'multifamily', units: 240, floors: 3, entrances: 1 }, { count: 1, gallery: false })[0], base = { ...T2, elements: ob.elements, program: ob.program }, at = f => [sa[0] + (sb[0] - sa[0]) * f, sa[1] + (sb[1] - sa[1]) * f];
   const bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad');
   let r = S.addEntrance(base, at(0.2), { boulevard: true, id: 'bv' }); assert.ok(!r.error, r.error);
   const ent = r.entrance, md = r.added.find(S.isMedian), sg = r.added.filter(x => x.kind === 'sign'), rt = T.routeOf(ent, base.ring), n = rt.mouth, u = [n[1], -n[0]];
@@ -439,7 +439,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
     for (const d of [20, 45]) { const r2 = ED.applyEdits(p, [{ action: 'change', target: pond.id, turnBy: d }]); assert.deepEqual(S.check({ ...p, elements: r2.elements }).filter(i => i.level === 'bad' && !b0.includes(i.text)).map(i => i.text), [], d + '°: ' + r2.done.join(' ') + r2.skipped.join(' ')); }
     const un = structuredClone(p); un.elements = un.elements.filter(e => e.kind !== 'pond' || e.id === pond.id); delete un.elements.find(e => e.id === pond.id).name; assert.deepEqual(ED.guessEdits('turn the pond 20 degrees', un).map(o => o.target), [pond.id], 'the one pond, unnamed, by what it is'); }
   // a plan laid out with the narrow entry (a 40 ft drive, a 10 ft median): made a boulevard by name
-  const nw = L.layoutOptions({ ...tract, params: { entry: { style: 'narrow' } } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], np = { ...tract, params: { entry: { style: 'narrow' } }, elements: nw.elements, program: nw.program, recipe: nw.recipe };
+  const nw = L.layoutOptions({ ...tract, params: { entry: { style: 'narrow' } } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1, gallery: false })[0], np = { ...tract, params: { entry: { style: 'narrow' } }, elements: nw.elements, program: nw.program, recipe: nw.recipe };
   const nm = np.elements.find(e => e.name === 'Main entry'); assert.ok(!nm.blvd && /Boulevard · 40 ft/.test(nm.note), 'narrow: ' + nm.note);
   { const r3 = ED.applyEdits(np, [{ action: 'change', target: nm.id, turnBy: 10 }]); assert.ok(!r3.skipped.length && /turned 10°/.test(r3.done.join(' ')), 'where its signs went is said with the turn, not as something left undone: ' + r3.skipped.join(' ')); }
   ops = ED.guessEdits('make the main entry a boulevard', np); assert.deepEqual(ops, [{ action: 'change', target: nm.id, boulevard: true, signs: null }]);
@@ -494,7 +494,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.deepEqual(S.normalizeProgram(JSON.parse(JSON.stringify(q))), q, 'a save and a load give the same names');
   assert.equal(S.normalizeProgram({ use: 'retail', gfa: 20000, garage: true, partName: 'Market Square' }).zones.find(z => z.use === 'garage').partName, null, 'a garage zone has no name');
   assert.equal(S.normalizeProgram({ use: 'retail', gfa: 20000, garage: true, partName: 'Market Square' }).zones[0].partName, 'Market Square', 'a shop with a garage: the name is the shops’');
-  const tm = siteOf(mk([-95.6954, 29.6657], [[0, 0], [716, 25], [759, 1244], [-47, 1219]])), mo = L.layoutOptions(tm, q, { count: 1 })[0], mp = { ...tm, elements: mo.elements, program: mo.program, zones: mo.zones };
+  const tm = siteOf(mk([-95.6954, 29.6657], [[0, 0], [716, 25], [759, 1244], [-47, 1219]])), mo = L.layoutOptions(tm, q, { count: 1, gallery: false })[0], mp = { ...tm, elements: mo.elements, program: mo.program, zones: mo.zones };
   assert.ok(mo.zones.length > 1 && mo.zones.every(z => Number.isInteger(z.zone) && mo.program.zones[z.zone].use === z.use), 'each drawn zone knows its part');
   assert.equal(mo.program.community, 'Beacon Hill', 'the names ride through the layout');
   const parts = S.partsOf(mp), m = S.metrics(mp);
