@@ -31,7 +31,13 @@ const SITES = {
   ease14: { ring: [[0, 0], [900, 0], [900, 700], [0, 700]], keep: [{ name: 'Pipeline easement', ring: [[0, 320], [900, 380], [900, 430], [0, 370]] }] },
   wet14: { ring: [[0, 0], [900, 0], [900, 700], [0, 700]], keep: [{ name: 'Wetland', ring: [[520, 300], [700, 260], [760, 420], [600, 520], [500, 450]] }] },
   curve19: (() => { const arc = []; for (let k = 0; k <= 10; k++) { const a = Math.PI * 0.75 - k * Math.PI * 0.5 / 10; arc.push([+(450 + 900 * Math.cos(a)).toFixed(1), +(-780 + 900 * Math.sin(a)).toFixed(1)]); } arc.reverse(); return arc.concat([[arc[arc.length - 1][0], 700], [arc[0][0], 700]]); })(),
-  half05: [[0, 0], [150, 0], [150, 145], [0, 145]]
+  half05: [[0, 0], [150, 0], [150, 145], [0, 145]],
+  // wedge sites (synthetic): a right triangle on its long leg, a wedge whose back line curves (chords) to a point on the
+  // street, a trapezoid narrowing to 60 ft, and a triangle fronting on its hypotenuse
+  tri6: [[0, 0], [760, 0], [0, 700]],
+  arc5: (() => { const pts = [[0, 0], [1000, 0]]; for (let k = 1; k < 8; k++) { const t = k / 8, x = 1000 * (1 - t), y = 380 * t + 70 * Math.sin(Math.PI * t); pts.push([+x.toFixed(1), +y.toFixed(1)]); } return pts.concat([[0, 380]]); })(),
+  trap5: [[0, 0], [900, 0], [900, 60], [0, 420]],
+  hyp5: [[1000, 0], [0, 450], [0, 0]]
 };
 const CASES = [
   { id: 'MF-garden-exact', family: 'multifamily', site: 'rect10', ask: 'exactly 120 garden apartments, 3 stories' },
@@ -61,7 +67,18 @@ const CASES = [
   { id: 'LOT-easement-apt', family: 'multifamily', site: 'ease14', ask: 'garden apartments, as many as fit' },
   { id: 'LOT-wetland-apt', family: 'multifamily', site: 'wet14', ask: 'garden apartments, as many as fit' },
   { id: 'LOT-curved-apt', family: 'multifamily', site: 'curve19', ask: 'garden apartments, as many as fit' },
-  { id: 'LOT-half-th', family: 'multifamily', site: 'half05', ask: 'townhomes, as many as fit' }
+  { id: 'LOT-half-th', family: 'multifamily', site: 'half05', ask: 'townhomes, as many as fit' },
+  { id: 'WEDGE-tri-midrise', family: 'multifamily', site: 'tri6', ask: 'mid-rise apartments, 4 stories, as many as fit' },
+  { id: 'WEDGE-arc-midrise', family: 'multifamily', site: 'arc5', ask: 'mid-rise apartments, 4 stories, as many as fit' },
+  { id: 'WEDGE-trap-midrise', family: 'multifamily', site: 'trap5', ask: 'mid-rise apartments, 4 stories, as many as fit' },
+  { id: 'WEDGE-hyp-midrise', family: 'multifamily', site: 'hyp5', ask: 'mid-rise apartments, 4 stories, as many as fit' },
+  { id: 'WEDGE-tri-garden', family: 'multifamily', site: 'tri6', ask: 'garden apartments, as many as fit' },
+  // the same wedges where the parking rule is lower (one space a home: an urban, senior or affordable rule set in the
+  // brief), so the land along the lines, not the parking, decides how many buildings fit
+  { id: 'WEDGE-tri-1pk', family: 'multifamily', site: 'tri6', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 },
+  { id: 'WEDGE-arc-1pk', family: 'multifamily', site: 'arc5', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 },
+  { id: 'WEDGE-trap-1pk', family: 'multifamily', site: 'trap5', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 },
+  { id: 'WEDGE-hyp-1pk', family: 'multifamily', site: 'hyp5', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 }
 ];
 const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
@@ -73,6 +90,7 @@ const rows = [], cards = [];
 for (const c of CASES) {
   if (ONLY && !c.id.includes(ONLY)) continue;
   const p = plan(c.site), brief = B.briefFromRequest(c.ask, p);
+  if (c.perUnit) brief.rules.values.parkingPerUnit = { v: c.perUnit, cls: 'assumption', source: 'bench: a lower parking rule for this case' };
   const t0 = Date.now(), rec = RUN.runBrief(brief), ms = Date.now() - t0, again = RUN.runBrief(JSON.parse(JSON.stringify(brief)));
   const same = again.rankingHash === rec.rankingHash && again.options.every((o, i) => o.geometryHash === rec.options[i]?.geometryHash);
   const row = { id: c.id, family: c.family, site: c.site, ask: c.ask, outcome: rec.outcome, problems: (rec.problems || []).map(x => x.msg), ms, replayIdentical: same, evaluation: rec.solver?.evaluation || null,

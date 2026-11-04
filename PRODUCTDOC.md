@@ -1155,6 +1155,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Wedge lots (Nov 4):** on triangular or tapering lots, "as many as fit" can now fit one more apartment building where the land and parking allow, stopping just short of the size that would need a second entrance.
 - **Plain 3D again, more housing types (Nov 4):** tilt the map and buildings show as plain blocks coloured by use (the designed facades now appear only in plan sets and the BIM model); ask for "stacked townhomes" or "build-to-rent cottages"; flag lots, lots with an easement or wetland, curved frontages and very small lots now lay out.
 - **Detention from the storm, garage ventilation (Nov 4):** the pond is sized from the site's design-storm rainfall and how much of the plan is roofs and paving (an estimate for the civil engineer); a lot with no room for a pond plans underground storage; each garage is checked against the open-garage rule and flagged when it needs mechanical ventilation; ask for "83 ft deep corridor buildings" to draw deeper bars (marked as unreviewed).
 - **Short median and faster layouts (Nov 4):** where the street is too close to the parking for a full boulevard, the entry gets a short planted island between two fire lanes; courtyard requests lay out about twice as fast; corridor buildings' home sizes and podium proportions now come from reviewed projects.
