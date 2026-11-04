@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 3:50 AM CT: Faster "as many as fit", every building to a reviewed template, podiums parked to the need (a723a84, bc33c29, 0bb81b7, 2d1798f, 0eb201e, 8e6147a)
+- **"As many as fit" is 2-4 times faster** (Hockley mid-rise about 11 s, was 22) and finds what an exact count finds. The cause was in the search, not worked round any more.
+- **Every apartment building is drawn to a reviewed building type**, and the check flags one that isn't. Some counts that came from oversized buildings are lower and honest now: a wedge-shaped test site 128 apartments, Sierra Vista WB-30 320 as many as fit (355 as built; its buildings are deeper than any reviewed type).
+- **Odd-shaped lots** get more parking between the buildings along each edge.
+- **Podium courtyards park to the need:** the last parking level keeps only the spaces needed, the rest amenity and storage (Anderson 210 for 210, was 255).
+- **A corner townhome gives way for a fire truck's curb return** where two lanes meet square, instead of the whole layout dropping to a smaller one (Lake Shore 58 homes, had slipped to 51).
+- Fixes: the pool sits on a deck against the clubhouse in every layout; profit in the pro forma always equals value less cost as shown. All 20 test sites pass; the full test suite passes.
+
 ### 2:03 AM CT: Tuck-under, cross-dock, vertical mixed use, for-sale townhomes, turning paths, off-site detention, and a check against real projects (6427f76, ec376d8, 1fd11ef, ced222a, c72e2ad, 449f7df, 5a51bdf, 99786b9, d507b26, 4a303e3)
 - **New building types:**
   - **Tuck-under apartments:** each home over its own garage, rows back to back across garage courts (sizes from the reviewed Portland Road townhomes).
