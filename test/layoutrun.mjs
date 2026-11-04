@@ -469,6 +469,18 @@ ok('a wedge: the densest passing layout, every building drawn to the mid-rise te
   assert.ok(angles.size >= 1 && o.quantities.totals.units >= 90, 'units ' + o.quantities.totals.units);
   assert.equal(RUN.replayRun(r).identical, true);
 });
+ok('a wedge past 200 homes on one street: the strips cut back to 200 by whole modules (3 buildings, real entrance), not a gated lane or a building fewer', () => {
+  // a 6.1 ac right triangle fronting its 760 ft leg, one space a home: the strips hold 3 bars (208-240 homes), but the street
+  // can't give two ways in half the diagonal apart, so the full layout needs the gated emergency lane and used to lose to
+  // 2 buildings (160 homes); the cut copy of it stays under the fire code's 200
+  const site = { ...RECT, ring: [[0, 0], [760, 0], [0, 700]] }, b = B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site);
+  b.rules.values.parkingPerUnit = { v: 1, cls: 'assumption', source: 'test' };
+  const r = RUN.runBrief(b), o = r.options[0], bl = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(o.validation.counts.fail, 0, 'no warnings');
+  assert.ok(o.quantities.totals.units > 160 && o.quantities.totals.units <= 200, 'units ' + o.quantities.totals.units); assert.ok(bl.length >= 3, bl.length + ' buildings');
+  assert.ok(!o.elements.some(e => e.emergency), 'no gated emergency lane'); assert.ok(bl.every(e => e.template && !e.tplMiss), 'whole template modules');
+  assert.equal(RUN.replayRun(r).identical, true);
+});
 ok('a courtyard on a parking podium (5 over 2): the U above, the podium parking the homes, the levels as the words say', () => {
   const site = { ...RECT, ring: [[0, 0], [600, 0], [600, 400], [0, 400]] }, b = B.briefFromRequest('a 5 over 2 courtyard on a podium, 250 apartments', site);
   assert.equal(b.program.uses[0].form, 'mf-podium-courtyard');

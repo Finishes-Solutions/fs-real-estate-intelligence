@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 3:53 PM CT: Wedge-shaped lots fit a third apartment building when parking allows (917b329)
+- **Wedge lots:** on a triangular or tapering lot, apartments placed along the lot lines that would end up just over 200 homes (where the fire code would want a second way in that a single street can't give) are also offered trimmed back to 200. That is one more whole building where the land allows: a 6-acre triangle at one space per home now gets 3 buildings and 192 homes, up from 2 buildings and 160.
+- Nine wedge-lot cases added to the test sites (37 in all, every one passing with no warnings). The full test suite passes.
+
 ### 12:45 PM CT: The site-layout skill's sheet on the Finishes Solutions title block, the street at the bottom (this push)
 - **The skill's SP-1 sheet now looks like fs-site-plan's:** it's drawn on the Finishes Solutions 24 x 36 title block (logo, project, prepared by, phase, date, scale, the preliminary statement, the issue column, the sheet title and SP-1), with the view title, the not-for-construction stamp, and the numbers, independent check, notes and legend in two columns.
 - **The plan is turned so the front street is at the bottom**, the north arrow turned to match, drawn at an engineering scale (1" = 80'-0" and so on) with a scale bar. The plan-set model the sheet carries says the same turn, so the plan set is drawn the same way round.

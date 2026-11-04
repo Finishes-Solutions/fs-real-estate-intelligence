@@ -394,3 +394,15 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    fails the pond against it (never hard), its note naming the method, storm, CN and C values and the source; a
    deeper-pond option is judged at the depth it assumes. Still an estimate: no time of concentration, outfall or
    tailwater, and the pond depth is not yet read from the terrain.
+19. Nov 4 (wedge sites, synthetic cases only). Bench: nine WEDGE cases on four synthetic wedges (a 6.1 ac right triangle,
+   a 5.3 ac wedge whose back line curves to a point as chords, a 5 ac trapezoid narrowing to 60 ft, a 5.2 ac triangle
+   fronting its hypotenuse), at the default 1.6 spaces a home and at 1 a home (the brief's rule). Finding: at 1.6 the
+   strips are parking-bound (one or two bars is what their bays park); at 1 a home the strips held a third bar (208-240
+   homes) but the one street can't give two ways in half the diagonal apart, so the full layout needed the gated
+   emergency lane, which ranks below real entrances, and a two-building layout (160) won. lib/sitegen.mjs generate
+   (edgeTry): as many as fit, a strips layout a little past SECOND_WAY_AT (200 apartments, IFC D106.1) is also offered
+   cut back to 200 by whole modules, longest bar first, and isn't dropped as "fewer than the best so far". WEDGE-tri-1pk
+   160 -> 192 (3 buildings, every check passing, no lane). Tried and dropped (no measurable gain on these wedges): bars
+   along both lines facing one stepped parking court, bars carried past a strip's bays toward the point, a second
+   entrance from the strips, a pond sized to the drawn plan's own detention. Holdouts unchanged (P35 fill-ug 320, P36
+   fill 128, E054 podium-urban 172, P18 fill 58); P36 is still one building.
