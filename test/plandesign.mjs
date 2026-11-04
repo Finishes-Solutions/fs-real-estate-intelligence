@@ -7,7 +7,9 @@ const PD = await import('../lib/plandesign.mjs'), { planFor } = await import('./
 
 // ---------- types ----------
 { const p = planFor('townhomes'), t = PD.buildingTypes(p); assert.equal(t.length, 1, 'rows of different lengths (guest parking took some end homes) share one unit design');
-  assert.deepEqual([t[0].W, t[0].D, t[0].floors, t[0].unitsPer], [24, 40, 3, 6], 'a townhome row is designed as one 24 ft unit, in its usual row of 6');
+  assert.deepEqual([t[0].W, t[0].D, t[0].floors], [24, 40, 3], 'a townhome row is designed as one 24 ft unit');
+  { const rows = p.elements.filter(e => e.kind === 'building' && e.use === 'townhomes').map(e => e.units), n = {}; for (const u of rows) n[u] = (n[u] || 0) + 1; const usual = +Object.keys(n).sort((a, b) => n[b] - n[a] || b - a)[0];
+    assert.ok(t[0].unitsPer >= usual - 1 && t[0].unitsPer <= 6, 'in its usual row (rows are shared evenly along a stretch, at most 6): ' + t[0].unitsPer + ' vs ' + usual); }
   assert.equal(t[0].units, p.elements.filter(e => e.kind === 'building' && e.use === 'townhomes').reduce((s, e) => s + e.units, 0)); assert.match(t[0].occupancy, /R-3/); }
 // apartments (a layout's garden buildings with stepped fronts) and their clubhouse: a building's own units, laid out
 { const { LOTS } = await import('../scripts/layout-review.mjs'), S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs');

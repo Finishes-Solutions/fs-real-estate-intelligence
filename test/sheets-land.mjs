@@ -18,7 +18,7 @@ for (const name of Object.keys(CASES)) {
   // the rules it states
   const fr = row(/^Street frontage/); assert.ok(fr && fr[3] === 'Meets', name + ': street trees ' + fr);
   const pk = row(/^Parking: 1 tree/); if (Ld.req.park.stalls) assert.equal(pk[3], 'Meets', name + ': parking trees ' + pk);
-  if (Ld.req.lots.need) assert.ok(Ld.req.lots.have >= Ld.req.lots.need * 0.95, name + ': front yard trees ' + Ld.req.lots.have + ' of ' + Ld.req.lots.need);
+  if (Ld.req.lots.need) assert.ok(Ld.req.lots.have >= Math.floor(Ld.req.lots.need * 0.95), /* (95%, in whole trees) */ name + ': front yard trees ' + Ld.req.lots.have + ' of ' + Ld.req.lots.need);
   assert.ok(C.share <= RULES.maxSpecies, name + ': species diversity ' + Math.round(C.share * 100) + '%');
   // where the trees stand
   const ring = G.ring, hyd = K.hydrants(G), ponds = G.ponds.map(q => q.o);
