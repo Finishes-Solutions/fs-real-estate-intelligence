@@ -369,5 +369,13 @@ ok('a long frontage gets two real ways in far enough apart, not a gated lane (mi
     assert.ok(!o.elements.some(e => e.emergency), ask + ': no emergency lane where the street has room for a real entrance');
   }
 });
+ok('townhome rows share a stretch evenly (9 homes as 5 + 4, not 6 + a 3-home stub; a guest bay may take a home off the last)', () => {
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { ...SP.SETBACKS }, elements: [] };
+  const ask = 'townhomes, as many as fit', r = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask }), o = r.options[0];
+  assert.equal(o.check.status, 'pass', o.check.failed.join());
+  const B = o.elements.filter(e => e.kind === 'building' && e.use === 'townhomes'); let pairs = 0;
+  for (const a of B) for (const b of B) if (a !== b && a.units > b.units && SP.gapBetween(SP.shapeOf(a), SP.shapeOf(b)) < 30 && Math.abs(((a.rot || 0) - (b.rot || 0)) % 180) < 1) { pairs++; assert.ok(a.units - b.units <= 2, a.name + ' ' + a.units + ' beside ' + b.name + ' ' + b.units); }
+  assert.ok(B.reduce((t, e) => t + e.units, 0) >= 307, 'no fewer homes than before');
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
