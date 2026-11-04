@@ -2946,7 +2946,7 @@ export function initSitePlan(ctx) {
       const pl = PL(); if (!pl || pl.id !== plid || scenKey(pl) !== k) { S0.busy = true; scenOn = ''; return; }
       if (S0.runs[s]) continue;
       const p2 = G.withScenario({ ...pl }, s);
-      let out = []; try { out = await laid('options', p2, p2.program, { count: 3, ...koOpts(p2) }); } catch (e) { console.warn('scenario ' + s, e); }
+      let out = []; try { const ask = ed?.runMeta?.ask || pl.lastRun?.ask || ''; out = await laidRun({ ...p2, params: RUN.fillParams(p2.params, { ask }) }, p2.program, { count: 3, ...koOpts(p2) }, ask); } catch (e) { console.warn('scenario ' + s, e); }
       S0.runs[s] = out.filter(o => o.elements?.length).slice(0, 2).map(o => ({ plan: { ...p2, program: o.program || p2.program, params: o.params || p2.params, elements: o.elements }, scenario: s }));
     }
     S0.busy = false; scenOn = ''; const pl = PL(); if (pl?.id !== plid || scenKey(pl) !== k) return;
@@ -4097,7 +4097,7 @@ export function initSitePlan(ctx) {
   async function moreLayouts() {
     const pl2 = PL(), ask = (ed?.runMeta?.ask || pl2?.lastRun?.ask || '').trim(), withAi = !aiOff() && !!ask && !!ed?.variants?.some(v => v.ai);
     const run = startRun('more', withAi ? ['Looking for more layouts', 'The AI is reviewing the new layouts'] : ['Looking for more layouts'], '#spMore'); if (!run) return;
-    let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12, ...koOpts(pl2) }); } catch (e) { console.warn('layout', e); }
+    let more = []; try { more = await laidRun({ ...pl2, params: RUN.fillParams(pl2.params, { ask }) }, pl2.program, { count: 12, ...koOpts(pl2) }, ask); } /* (the same run as Build: every option checked, replayable) */ catch (e) { console.warn('layout', e); }
     if (!live(run) || PL() !== pl2) return;
     if (!more.length) { endRun(run); return; }
     const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; }
