@@ -236,5 +236,13 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
 9. A pond left in the land held for later (a compact first phase) moves beside the work it drains
    (lib/layoutrun.mjs pondBesideWork), its old outline given back to the land round it.
 10. Exact floor areas: shop, office and warehouse boxes record the area drawn before their sides are stored at 0.01 ft;
-   the validator takes it while the outline agrees. The drawing's label still rounds the stored outline (250,001 sf).
+   the validator and the drawing (lib/siteplan.mjs gfaOf) take it while the outline agrees.
 11. Anchored centers: the anchor at the size asked (validator `program.u1.anchor`) and the rest in shops.
+12. Done Nov 3: emergency access lane (lib/layoutrun.mjs addEmergencyAccess) as the fallback second way in where no
+   real entrance fits far enough away (a 20 ft gated fire lane; IFC D106.3 / D107.2; an easement where it meets a side
+   or rear line); real entrances always rank first. The pods engine now places two real ways in apart.
+13. Done Nov 3: a playground left on its own moves beside the homes (playNearHomes); townhome rows shared evenly along a
+   stretch; sheet labels alike within a use; massing pictures in feet (were metres read as feet).
+14. Still open: no reviewed courtyard, wrap or podium template in the dev partition (E054 Anderson is holdout), so
+   those unit counts are floor-area estimates; ramp slopes / structure / ventilation of garages aren't designed;
+   turning movements and detention from topography need engineering inputs.

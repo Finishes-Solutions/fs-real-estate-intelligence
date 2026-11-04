@@ -3,6 +3,19 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-04
+
+### 12:23 AM CT: Wrap buildings, drawn podium garages, emergency access lanes, parking trimmed to the need (b3f2ea6, 5aa3b7f, aa100f2, 8f407e9, 9508e44, fa70020, 135ce87, 84ced54, e4734be, 84ba9e8, 1fdb711, 1b42551, 7a0a252, b121882, 1bf5c20)
+- **Wrap buildings:** "a wrap building with 300 apartments" now lays out a 5-story apartment building on three sides of a parking garage that holds nearly all the parking, with the pool in a courtyard (300 units, 488 spaces for 480 needed). Before, wraps weren't supported.
+- **Podium garages are drawn:** a tower's podium shows its garage (stall rows, ramp, stair and elevator cores, the lobby on the street side, an arrow at the way in, which a drive always reaches), and the spaces are counted from that drawing.
+- **Parking trimmed to the need:** spare stalls come off the far ends of rows with their paving, so plans park within a few spaces of what's required (the courtyard test site 248 for 240, was 266; the retail strip 116 for 112, was 122).
+- **A second way in on narrow lots:** where the street is too short for two entrances far enough apart, the plan adds a gated emergency access lane (grass pavers, red outline), and says it needs the fire official's approval, plus an easement where it meets a neighbour's line. Real entrances always come first; the mixed-use and tower sites now get two real ones.
+- **Exact counts on Hockley:** "20,000 sf retail on FM 2920, 250 apartments behind" lands exactly 250 (was 240 and failing), with no empty parking block.
+- **The app and the check count parking the same way**, taking out the striped aisle beside accessible stalls.
+- **Townhome rows are shared evenly** along a block (5 + 4, not 6 + 3); Hockley fits 364 townhomes, was 307. Every building on the drawing carries a readable label.
+- **Other fixes:** a second courtyard without a clubhouse gets a courtyard garden; a stranded playground moves beside the homes; the warehouse drawing reads 250,000 sf; the massing pictures used for renderings draw buildings at their real height (they were about 3.3 times too low).
+- All 15 test sites pass every check with no warnings, and all 8 requests tried on the Hockley parcel pass. The full test suite passes.
+
 ## 2026-11-03
 
 ### 10:28 PM CT: Courtyards as one building, towers on parking podiums, anchored centres, two ways in far enough apart (74eef75, 3a68803, a0aff95, a089dd7, 17ac205, db23c2d, 9a0c02c, 477a3b5)

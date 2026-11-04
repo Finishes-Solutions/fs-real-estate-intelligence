@@ -231,3 +231,12 @@ Branch `matthew/build-through-run-engine` (PR #76, open, not merged). PR #75 (Ha
   scenarios and MCP site_plan through runPlan.
 - Next (docs/LAYOUT-ENGINE.md §9): wrap form; a narrow frontage's second way in (emergency access); garage plans for
   podiums; mid-rise shorter bars; courtyard units from a reviewed template.
+
+### Update (2026-11-04, early): wraps, drawn garages, emergency access, parking to the need
+- Bench: 15 of 15 top options pass every hard check, no warnings, all replay identical. Parking within 1-4% of required.
+- Done: wrap form; podium garage plans (count from the drawing, garage entrance reached); emergency access lane as the
+  fallback; pods with two real ways in; parking trimmed to the need; court gardens; mixed use exact counts; app and
+  check count parking alike; massing heights; townhome rows even; labels.
+- Hockley stress test (8 requests): all pass.
+- Next: reviewed templates for courtyard / wrap / podium (none in the dev partition); garage engineering; tuck-under,
+  cross-dock and vertical mixed use.
