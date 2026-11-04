@@ -4,6 +4,7 @@
 // rebuilds the model from them), which the sheet PDF carries as invisible text.
 import * as S from './engine/siteplan.mjs';
 import * as B from './engine/layoutbrief.mjs';
+import { frontRotation } from './pdf.mjs';
 
 const r2 = v => Math.round(v * 100) / 100, P = r => r.map(p => [r2(p[0]), r2(p[1])]);
 const ccw = r => (S.signedArea(r) >= 0 ? r : r.slice().reverse());
@@ -32,7 +33,7 @@ export function projectOf(rec, { option = 1, name = '', address = '', county = '
   const o = rec.options?.[option - 1]; if (!o) throw new Error('The run has no option ' + option + ' (it has ' + (rec.options?.length || 0) + ').');
   const eng = B.toEngine(rec.brief), plan = eng.plan, ring = plan.ring, q = o.quantities, v = o.validation, els = o.elements;
   const acres = S.ringArea(ring) / 43560;
-  const site = { boundary: P(ring), north_deg: 0, display_rotate_deg: 0, boundary_source: rec.brief.site?.source || 'the site outline given to the layout run (feet, x east, y north)',
+  const site = { boundary: P(ring), north_deg: 0, display_rotate_deg: +(frontRotation(ring, plan.front ?? 0) * 180 / Math.PI).toFixed(2), /* (as SP-1 is drawn: the front street at the bottom) */ boundary_source: rec.brief.site?.source || 'the site outline given to the layout run (feet, x east, y north)',
     setbacks: { front: plan.setbacks.front, rear: plan.setbacks.rear, side: plan.setbacks.side },
     buildings: [], paving: [], parking_rows: [], drives: [], ponds: [], lots: [], open_space: [], streets: [], easements: [] };
   // a type per distinct building (its use, footprint and floors), named A, B, C ... in the order first met

@@ -38,7 +38,7 @@ node <skill>/scripts/layout.mjs caps
 | `summary.txt` | outcome, each option's numbers, every check with its status, rule basis and measured / required value, the engine's notes |
 | `run.json` | the run record: the canonical brief, versions, input hash, every option's geometry, quantities and checks. Keep it: `edit` and `replay` start from it |
 | `option-N.svg` | each option's plan drawing (open or render it to look at it) |
-| `sheet.pdf` | the chosen option (`--option`, default 1) on a 24 x 36 sheet with the numbers and checks; the plan-set model rides inside as invisible text |
+| `sheet.pdf` | SP-1: the chosen option (`--option`, default 1) on the Finishes Solutions 24 x 36 title block, turned so the front street is at the bottom (north arrow turned to match), at an engineering scale with its scale bar, the not-for-construction stamp, the numbers, checks, notes and legend, and the title block filled from `--name`, `--address`, `--client`, `--number`, `--date`, `--drawn-by`, `--checked-by`; the plan-set model rides inside as invisible text (its `display_rotate_deg` is the same turn) |
 | `project.json` | the fs-set-plans project model of that option (exact geometry in feet) |
 | `project-model.txt` | the same model as `<<FS:nnnn:...:FS>>` lines (fs-set-plans `read_model.py` rebuilds it from them) |
 

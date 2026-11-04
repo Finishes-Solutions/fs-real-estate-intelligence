@@ -5,7 +5,7 @@
 //   node layout.mjs site    --geojson parcel.geojson [--front 0] [--streets 1,2] --out site.json
 //   node layout.mjs brief   --site site.json --request "exactly 240 garden apartments, 3 stories" --out brief.json
 //   node layout.mjs check   --brief brief.json
-//   node layout.mjs run     --brief brief.json --out out/ [--name "Project"] [--address "..."] [--option 1]
+//   node layout.mjs run     --brief brief.json --out out/ [--name "Project"] [--address "..."] [--client ...] [--number ...] [--date 2026-11-04] [--option 1]
 //   node layout.mjs run     --site site.json --request "..." --out out/
 //   node layout.mjs edit    --record out/run.json (--words "move the pool to the center" | --edits edits.json) [--option 1] --out out2/
 //   node layout.mjs replay  --record out/run.json
@@ -67,12 +67,12 @@ function writeAll(rec, out) {
   return text;
 }
 function handoff(rec, out) {
-  const option = Math.max(1, Math.min(rec.options.length, num('option', 1))), meta = { option, name: arg('name') || '', address: arg('address') || '', county: arg('county') || '', client: arg('client') || '', number: arg('number') || '' };
+  const option = Math.max(1, Math.min(rec.options.length, num('option', 1))), meta = { option, name: arg('name') || '', address: arg('address') || '', county: arg('county') || '', client: arg('client') || '', number: arg('number') || '', date: arg('date') || '', drawn_by: arg('drawn-by') || '', checked_by: arg('checked-by') || '' };
   const model = projectOf(rec, meta), lines = modelLines(model);
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'project.json'), JSON.stringify(model, null, 1));
   fs.writeFileSync(path.join(out, 'project-model.txt'), lines.join('\n') + '\n');
-  fs.writeFileSync(path.join(out, 'sheet.pdf'), sheetPDF(rec, { option, title: meta.name || 'Conceptual site layout', subtitle: meta.address, modelLines: lines }));
+  fs.writeFileSync(path.join(out, 'sheet.pdf'), sheetPDF(rec, { option, title: meta.name || 'Conceptual site layout', subtitle: meta.address, meta, modelLines: lines }));
   return model;
 }
 

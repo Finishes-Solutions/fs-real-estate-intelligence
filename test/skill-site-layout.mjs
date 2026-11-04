@@ -37,7 +37,16 @@ assert.equal(P.site.buildings.length, rec.options[0].elements.filter(e => e.kind
 assert.ok(P.types.every(t => t.id && t.use && t.W > 0 && t.D > 0 && t.count >= 1)); assert.ok(P.site.stated.acres > 10 && P.site.stated.units === 120);
 assert.ok(P.site.parking_rows.length > 0 && P.site.drives.length > 0 && P.site.ponds.length === 1); assert.ok(P.site.boundary.length === 4);
 assert.deepEqual(H.modelFromText(fs.readFileSync(path.join(T, 'r1/project-model.txt'), 'utf8')), P, 'the FS lines rebuild the model');
-const pdf = fs.readFileSync(path.join(T, 'r1/sheet.pdf'), 'latin1'); assert.ok(pdf.startsWith('%PDF-1.4') && pdf.trimEnd().endsWith('%%EOF'));
+const pdf = fs.readFileSync(path.join(T, 'r1/sheet.pdf'), 'latin1'); assert.ok(pdf.startsWith('%PDF-1.7') && pdf.trimEnd().endsWith('%%EOF'));
+// SP-1 on the Finishes Solutions title block: the border drawn as a Form XObject, the sheet number and the stamp
+assert.match(pdf, /\/XObject << \/TB \d+ 0 R >>/); assert.match(pdf, /q \/TB Do Q/); assert.match(pdf, /\(SP-1\) Tj/); assert.match(pdf, /\(Finishes Solutions\) Tj/); assert.match(pdf, /NOT FOR PERMIT OR CONSTRUCTION/);
+{ const objs = [...pdf.matchAll(/^(\d+) 0 obj/gm)].map(m => +m[1]), xn = +/\/Size (\d+)/.exec(pdf)[1]; assert.equal(objs.length, xn - 1, 'every object in the xref'); assert.deepEqual(objs, objs.map((_, i) => i + 1), 'objects numbered 1..n in order'); }
+// the front street at the bottom: the rectangle's front edge (edge 0, along y = 0) already faces down; a site whose front
+// faces east turns a quarter turn (the plan-set model carries the same turn)
+{ const { frontRotation } = await import(pathToFileURL(path.join(ROOT, 'skills/site-layout/scripts/pdf.mjs')).href);
+  assert.equal(frontRotation([[0, 0], [900, 0], [900, 500], [0, 500]], 0), 0); assert.equal(P.site.display_rotate_deg, 0);
+  assert.ok(Math.abs(frontRotation([[0, 0], [900, 0], [900, 500], [0, 500]], 1) + Math.PI / 2) < 1e-9, 'east front: a quarter turn clockwise');
+  assert.ok(Math.abs(Math.abs(frontRotation([[0, 0], [900, 0], [900, 500], [0, 500]], 2)) - Math.PI) < 1e-9, 'north front: a half turn'); }
 const fromPdf = H.modelFromText(pdf.replace(/\\([\\()])/g, '$1')); assert.deepEqual(fromPdf, P, 'the PDF carries the model as text');
 // the plan-set skill's own reader rebuilds it from the text lines (Python, when there is one)
 const py = spawnSync('python3', [path.join(ROOT, 'skills/fs-set-plans/scripts/read_model.py'), path.join(T, 'r1/project-model.txt'), '--out', path.join(T, 'back.json')], { encoding: 'utf8', cwd: path.join(ROOT, 'skills/fs-set-plans') });

@@ -5,7 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
-### 12:05 PM CT: A site-layout agent skill that runs the app's own layout engine (this push)
+### 12:45 PM CT: The site-layout skill's sheet on the Finishes Solutions title block, the street at the bottom (this push)
+- **The skill's SP-1 sheet now looks like fs-site-plan's:** it's drawn on the Finishes Solutions 24 x 36 title block (logo, project, prepared by, phase, date, scale, the preliminary statement, the issue column, the sheet title and SP-1), with the view title, the not-for-construction stamp, and the numbers, independent check, notes and legend in two columns.
+- **The plan is turned so the front street is at the bottom**, the north arrow turned to match, drawn at an engineering scale (1" = 80'-0" and so on) with a scale bar. The plan-set model the sheet carries says the same turn, so the plan set is drawn the same way round.
+- The agent can fill the title block with `--name`, `--address`, `--client`, `--number`, `--date`, `--drawn-by` and `--checked-by`. Still no packages and no network: the title block ships with the skill.
+
+### 12:05 PM CT: A site-layout agent skill that runs the app's own layout engine
 - **New agent skill `site-layout`** (skills/site-layout.zip): an AI agent can now lay out a site with the same engine the app's Build uses, offline in its own sandbox: from a parcel outline and words like "as many townhomes as fit", it writes a typed brief, runs the engine, reads the independent check of every option, iterates (compare forms, edit by words) and delivers a 24 x 36 layout sheet.
 - **Hands off to the plan-set agent unchanged:** the sheet carries the fs-set-plans project model inside it, so the plan-set skill builds the full set from the exact geometry.
 - **Agent instructions updated:** the site layout agent now uses site-layout; the older fs-site-plan skill stays documented as the alternative when the agent must pick the use itself.

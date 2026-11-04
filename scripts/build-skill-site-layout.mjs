@@ -44,12 +44,42 @@ export async function build({ zip = true } = {}) {
   const stamp = { engine: ver(/ENGINE_VERSION = '([^']+)'/), files: files.length, sha256: h.digest('hex'), from: 'fs-real-estate-intelligence lib/ at ' + (commit || 'unknown commit') };
   fs.writeFileSync(path.join(ENGINE, 'VERSION.json'), JSON.stringify(stamp, null, 1) + '\n');
   await writeForms();
+  await writeAssets();
   if (zip) {
     const out = path.join(ROOT, 'skills/site-layout.zip'); fs.rmSync(out, { force: true });
     execFileSync('zip', ['-r', '-X', '-q', out, 'site-layout', '-x', '*.DS_Store', '*/out/*', '*/__pycache__/*'], { cwd: path.join(ROOT, 'skills') });
   }
   return stamp;
 }
+
+// the sheet's Finishes Solutions title block and font widths, made here (pdf-lib, a dev package) so the skill's sheet
+// writer needs no package: the 24 x 36 border (skills/fs-site-plan/assets/titleblock.pdf, the same file fs-set-plans
+// uses) as one Form XObject in a classic-xref PDF with no object streams (scripts/pdf.mjs copies its objects in), and
+// the Helvetica / Helvetica-Bold widths of the WinAnsi characters (for wrapping and right-aligned text)
+export async function writeAssets() {
+  const { PDFDocument, StandardFonts } = await import('pdf-lib');
+  const { Font } = await import('@pdf-lib/standard-fonts');
+  const A = path.join(SKILL, 'assets'); fs.mkdirSync(A, { recursive: true });
+  const src = await PDFDocument.load(fs.readFileSync(path.join(ROOT, 'skills/fs-site-plan/assets/titleblock.pdf')));
+  const doc = await PDFDocument.create(), [emb] = await doc.embedPages([src.getPage(0)]);
+  const page = doc.addPage([2592, 1728]); page.drawPage(emb, { x: 0, y: 0 });
+  doc.setProducer('fs-real-estate-intelligence'); doc.setCreator('scripts/build-skill-site-layout.mjs'); doc.setCreationDate(new Date(0)); doc.setModificationDate(new Date(0));
+  fs.writeFileSync(path.join(A, 'titleblock-form.pdf'), await doc.save({ useObjectStreams: false }));
+  const widths = {};
+  for (const [key, name] of [['regular', StandardFonts.Helvetica], ['bold', StandardFonts.HelveticaBold]]) {
+    const f = Font.load(name), w = {};
+    for (let c = 32; c < 256; c++) { const g = f.CharMetrics.find(m => m.N === WIN_ANSI[c]); if (g) w[c] = g.WX; }
+    widths[key] = w;
+  }
+  fs.writeFileSync(path.join(A, 'helvetica-widths.json'), JSON.stringify(widths) + '\n');
+}
+// WinAnsi code -> glyph name (32..126 ASCII, then the ones the sheet uses)
+const WIN_ANSI = (() => { const m = {}; const ascii = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+  const names = ['space', 'exclam', 'quotedbl', 'numbersign', 'dollar', 'percent', 'ampersand', 'quotesingle', 'parenleft', 'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash', 'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'colon', 'semicolon', 'less', 'equal', 'greater', 'question', 'at',
+    ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), 'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore', 'grave', ...'abcdefghijklmnopqrstuvwxyz'.split(''), 'braceleft', 'bar', 'braceright', 'asciitilde'];
+  [...ascii].forEach((ch, i) => { m[ch.charCodeAt(0)] = names[i]; });
+  Object.assign(m, { 0x91: 'quoteleft', 0x92: 'quoteright', 0x93: 'quotedblleft', 0x94: 'quotedblright', 0x95: 'bullet', 0x96: 'endash', 0x97: 'emdash', 0xb0: 'degree', 0xb2: 'twosuperior', 0xb7: 'periodcentered', 0xd7: 'multiply', 0xbd: 'onehalf' });
+  return m; })();
 
 // requests that ask for each form (the words the brief reads; lib/layoutbrief.mjs FORM_WORDS)
 const ASK = { 'mf-garden': 'garden apartments, as many as fit', 'mf-garden-studio': 'studio apartment buildings, 150 units', 'mf-walkup': 'walk-up apartments, 96 units', 'mf-courtyard': 'courtyard apartments, 200 units', 'mf-midrise': 'mid-rise apartments, 4 stories, as many as fit',
