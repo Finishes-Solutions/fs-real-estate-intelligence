@@ -24,7 +24,14 @@ const SITES = {
   rot16: (() => { const a = 0.4, R = ([x, y]) => [+(x * Math.cos(a) - y * Math.sin(a)).toFixed(2), +(x * Math.sin(a) + y * Math.cos(a)).toFixed(2)]; return [[0, 0], [1000, 0], [1000, 700], [0, 700]].map(R); })(),
   big40: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]],
   pad1: [[0, 0], [210, 0], [210, 230], [0, 230]],
-  wedge11: [[0, 0], [1100, 0], [0, 420]]
+  wedge11: [[0, 0], [1100, 0], [0, 420]],
+  // awkward real-world lots: a flag lot (a 60 ft pole to the street), a pipeline easement across the site, a wetland in it,
+  // a curving frontage drawn as chords, a half-acre lot (keep-outs as plan keepout pieces: the brief's exclusions)
+  flag11: [[0, 0], [60, 0], [60, 300], [560, 300], [560, 900], [-200, 900], [-200, 300], [0, 300]],
+  ease14: { ring: [[0, 0], [900, 0], [900, 700], [0, 700]], keep: [{ name: 'Pipeline easement', ring: [[0, 320], [900, 380], [900, 430], [0, 370]] }] },
+  wet14: { ring: [[0, 0], [900, 0], [900, 700], [0, 700]], keep: [{ name: 'Wetland', ring: [[520, 300], [700, 260], [760, 420], [600, 520], [500, 450]] }] },
+  curve19: (() => { const arc = []; for (let k = 0; k <= 10; k++) { const a = Math.PI * 0.75 - k * Math.PI * 0.5 / 10; arc.push([+(450 + 900 * Math.cos(a)).toFixed(1), +(-780 + 900 * Math.sin(a)).toFixed(1)]); } arc.reverse(); return arc.concat([[arc[arc.length - 1][0], 700], [arc[0][0], 700]]); })(),
+  half05: [[0, 0], [150, 0], [150, 145], [0, 145]]
 };
 const CASES = [
   { id: 'MF-garden-exact', family: 'multifamily', site: 'rect10', ask: 'exactly 120 garden apartments, 3 stories' },
@@ -46,9 +53,15 @@ const CASES = [
   { id: 'IN-crossdock', family: 'industrial', site: 'big40', ask: 'cross-dock warehouse, 400,000 sf' },
   { id: 'FL-flex', family: 'flex', site: 'rect10', ask: 'flex industrial buildings, 60,000 sf' },
   { id: 'MX-horizontal', family: 'mixed_use', site: 'big40', ask: '20,000 sf retail along the main road, 240 apartments behind and 80 townhomes' },
-  { id: 'MX-vertical', family: 'mixed_use', site: 'rect10', ask: 'a 5-story mixed-use building with 20,000 sf ground-floor retail and 200 apartments above' }
+  { id: 'MX-vertical', family: 'mixed_use', site: 'rect10', ask: 'a 5-story mixed-use building with 20,000 sf ground-floor retail and 200 apartments above' },
+  { id: 'LOT-flag-th', family: 'multifamily', site: 'flag11', ask: 'townhomes, as many as fit' },
+  { id: 'LOT-flag-retail', family: 'retail', site: 'flag11', ask: '30,000 sf retail' },
+  { id: 'LOT-easement-apt', family: 'multifamily', site: 'ease14', ask: 'garden apartments, as many as fit' },
+  { id: 'LOT-wetland-apt', family: 'multifamily', site: 'wet14', ask: 'garden apartments, as many as fit' },
+  { id: 'LOT-curved-apt', family: 'multifamily', site: 'curve19', ask: 'garden apartments, as many as fit' },
+  { id: 'LOT-half-th', family: 'multifamily', site: 'half05', ask: 'townhomes, as many as fit' }
 ];
-const plan = id => ({ origin: [-96.42, 30.38], ring: SITES[id], front: 0, streets: [], setbacks: { ...SB } });
+const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
 
 let baseMods = null;

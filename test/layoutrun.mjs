@@ -519,6 +519,26 @@ ok('corridor buildings as deep as the request says: the bay drawn that deep, sai
   assert.equal(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', RECT).program.uses[0].depth, undefined, 'no depth unless asked');
   const bad = JSON.parse(JSON.stringify(b)); bad.program.uses[0].depth.value = 140; assert.equal(B.validateBrief(bad).ok, false);
 });
+ok('awkward lots: a flag lot, an easement and a wetland, a curving frontage, a half-acre lot', () => {
+  const at = (ring, extra = {}) => ({ ...RECT, ring, ...extra }), run = (ask, site) => RUN.runBrief(B.briefFromRequest(ask, site)).options[0];
+  // a flag lot: a 60 ft pole to the street (the entry narrows to a 24 ft driveway down it; before, no layout formed and the
+  // last-resort one had no drive at all)
+  const flag = at([[0, 0], [60, 0], [60, 300], [560, 300], [560, 900], [-200, 900], [-200, 300], [0, 300]]);
+  for (const ask of ['townhomes, as many as fit', '30,000 sf retail']) { const o = run(ask, flag); assert.equal(o.validation.status, 'pass', ask + ': ' + o.validation.failed.join()); assert.ok(o.elements.some(e => e.kind === 'drive' && e.name === 'Main entry'), ask + ': a main entry'); }
+  // keep-outs (a pipeline easement across, a wetland inside): nothing built or paved on them (the generator's layouts ignored them)
+  for (const ko of [[[0, 320], [900, 380], [900, 430], [0, 370]], [[520, 300], [700, 260], [760, 420], [600, 520], [500, 450]]]) {
+    const site = at([[0, 0], [900, 0], [900, 700], [0, 700]], { elements: [{ id: 'ko', kind: 'keepout', poly: ko, name: 'Easement', pinned: true }] }), o = run('garden apartments, as many as fit', site);
+    assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 140, 'units ' + o.quantities.totals.units);
+    assert.ok(!o.elements.some(e => !['keepout', 'green', 'tree', 'lot', 'trail', 'fence', 'sign'].includes(e.kind) && SP.rectsOverlap({ poly: SP.shapeOf(e) }, { poly: ko }, 1)), 'nothing on the keep-out'); }
+  // a curving frontage drawn as chords: the chords that carry the front's line on are street (entries along the curve)
+  const arc = []; for (let k = 0; k <= 10; k++) { const a = Math.PI * 0.75 - k * Math.PI * 0.5 / 10; arc.push([+(450 + 900 * Math.cos(a)).toFixed(1), +(-780 + 900 * Math.sin(a)).toFixed(1)]); } arc.reverse();
+  const curved = arc.concat([[arc[arc.length - 1][0], 700], [arc[0][0], 700]]);
+  assert.deepEqual(SP.streetRun(curved, 0), [1, 2, 3, 4, 5, 6, 7, 8, 9]); assert.deepEqual(SP.streetRun(RECT.ring, 0), []);
+  { const o = run('townhomes, as many as fit', at(curved)); assert.equal(o.validation.status, 'pass', o.validation.failed.join()); }
+  // a half-acre lot: a row of townhomes at the front setback, each with its driveway to the street
+  { const o = run('townhomes, as many as fit', at([[0, 0], [150, 0], [150, 145], [0, 145]])); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+    assert.ok(o.elements.filter(e => e.kind === 'drive' && e.driveway).length >= o.quantities.totals.units, 'a driveway a home'); }
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 ok('a smaller pond never costs homes: mid-rise as many as fit keeps its whole-module bars (288, every building templated)', () => {
   const o = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', { ...RECT, setbacks: { front: 25, side: 10, rear: 20, paving: 10 } })).options[0];
