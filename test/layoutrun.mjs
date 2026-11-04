@@ -246,5 +246,25 @@ ok('two ways in far enough apart: the top option meets the spacing, the bigger o
   assert.equal(r.options[0].validation.status, 'pass'); assert.equal(rem(r.options[0]).status, 'pass', JSON.stringify(rem(r.options[0])));
   assert.ok(r.options[0].quantities.totals.units >= 200);
 });
+const BIG40 = { origin: [-96.42, 30.38], ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+ok('an anchored center: the anchor at the size asked for and the rest in shops, not one box', () => {
+  const b = B.briefFromRequest('anchored shopping center with a 40,000 sf anchor, 80,000 sf total', BIG40);
+  assert.deepEqual(b.program.uses[0].anchor, { value: 40000, unit: 'sf' });
+  const r = RUN.runBrief(b), o = r.options[0], bs = o.elements.filter(e => e.kind === 'building').map(e => e.gfa ?? e.w * e.d).sort((x, y) => y - x);
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.gfa, 80000); assert.ok(bs.length >= 2 && Math.abs(bs[0] - 40000) <= 2000, bs.join());
+  assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+  // one 80,000 sf box meets the total but not the anchor: the check says so
+  const box = { ...B.toEngine(b).plan, elements: [{ id: 'b1', kind: 'building', use: 'retail', x: 700, y: 400, w: 400, d: 200, floors: 1 }] };
+  const c = V.validateLayout(box, B.canonicalBrief(b)).checks.find(k => k.id === 'program.u1.anchor'); assert.equal(c.status, 'fail');
+});
+ok('an exact floor area lands exactly: a 250,000 sf warehouse reads 250,000, not 250,001', () => {
+  const r = RUN.runBrief(B.briefFromRequest('warehouse with truck court, 250,000 sf', BIG40)), o = r.options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(o.quantities.byUse.industrial.gfa, 250000);
+  assert.equal(RUN.replayRun(r).identical, true);
+  // a stated area is taken only while the outline agrees with it: a box resized after the run reads its own area
+  const w = o.elements.find(e => e.kind === 'building'), moved = { ...B.toEngine(r.brief).plan, elements: [{ ...w, w: w.w + 50 }] };
+  assert.equal(V.quantities(moved, r.brief).byUse.industrial.gfa, Math.round((w.w + 50) * w.d));
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
