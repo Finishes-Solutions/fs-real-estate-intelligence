@@ -58,7 +58,7 @@ ok('changing the quantity keeps its meaning and replays', () => {
   const rp = ED.replayEdits(r.record.edit.base, r.record.edit.steps); assert.equal(rp.record.options[0].geometryHash, best.geometryHash);
 });
 ok('an unsupported form is a conflict', () => {
-  const r = ED.applyEdit(base, { op: 'set-form', use: 'multifamily', form: 'mf-wrap' }); assert.equal(r.ok, false); assert.match(r.conflicts[0], /Wrap/);
+  const r = ED.applyEdit(base, { op: 'set-form', use: 'multifamily', form: 'mf-tuck-under' }); assert.equal(r.ok, false); assert.match(r.conflicts[0], /Tuck-under/);
 });
 ok('a flex office share raises the parking required', () => {
   const flex = RUN.runBrief(B.briefFromRequest('flex industrial buildings, 60,000 sf', RECT)), r = ED.applyEdit(flex, { op: 'set-office-share', use: 'industrial', share: 0.3 });

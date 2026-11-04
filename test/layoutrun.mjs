@@ -178,7 +178,7 @@ ok('templated buildings are whole modules with units from the schedule', () => {
 const RECT = { origin: [-96.42, 30.38], ring: [[0, 0], [900, 0], [900, 500], [0, 500]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
 const LSITE = { origin: [-96.42, 30.38], ring: [[0, 0], [800, 0], [800, 380], [420, 380], [420, 700], [0, 700]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
 ok('outcomes are told apart', () => {
-  assert.equal(RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)).outcome, 'unsupported');
+  assert.equal(RUN.runBrief(B.briefFromRequest('stacked townhomes, 40 homes', RECT)).outcome, 'unsupported');
   assert.equal(RUN.runBrief(B.briefFromRequest('exactly 20000 garden apartments', RECT)).outcome, 'proven-infeasible');
   assert.equal(RUN.runBrief({ ...B.briefFromRequest('100 apartments', RECT), site: { units: 'ft', ring: [] } }).outcome, 'missing-information');
 });
@@ -277,6 +277,20 @@ ok('a tower on a parking podium: the podium parks the tower, exactly the units a
   // the podium grid: a 240 x 128 ft podium holds 4 rows of 20 less a 12-stall ramp a level, 85% of it on the ground level
   assert.equal(SP.podiumLevelStalls(240, 128), 68); assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2, parkLevels: 2 }), 57 + 68);
   assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2 }), 0, 'a tower with no parking levels declared parks nothing on its podium (as before)');
+});
+ok('a wrap: one building round a garage that parks it, the pool in the courtyard, exactly the units asked', () => {
+  const r = RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 300);
+  const g = o.elements.filter(e => e.kind === 'garage'), W = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.equal(g.length, 1); assert.ok(g[0].grid && g[0].levels >= 2 && g[0].levels <= 6, 'a garage on the stall grid');
+  assert.ok(W.length === 3 && W.every(e => e.wrap === g[0].wrap && e.court === g[0].wrap), 'three wings, one building with the garage');
+  for (const e of W) assert.ok(!SP.rectsOverlap(e, g[0], 0.5), 'a wing does not overlap the garage');
+  const pk = o.quantities.parking; assert.ok(pk.garage > pk.surface, 'most spaces in the garage: ' + pk.garage + ' vs ' + pk.surface);
+  assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.08, 'parked without over-parking: ' + pk.provided + ' / ' + pk.required);
+  assert.equal(SP.garageStalls(g[0]), SP.garageGrid(g[0].w, g[0].d, g[0].levels));
+  assert.ok(o.elements.some(e => e.kind === 'pool'), 'the pool in the courtyard');
+  assert.equal(RUN.replayRun(r).identical, true);
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

@@ -187,7 +187,17 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    centre per community removes a court's clubhouse, pool and deck together (a shared tag). Still: units are a floor
    area estimate (no reviewed courtyard template); corner units, stairs and the gateway's arch over the walk aren't drawn.
 5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
-6. Wrap, tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
+6. Tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
+6a. Done Nov 3 (wrap, partial). "A wrap building" (form mf-wrap, program arrangement 'wrap', 5 floors unless the words
+   say) is drawn by lib/sitegen.mjs wrapOf: one double-loaded building (65 ft wings: a street wing the full width, a wing
+   down each side) on three sides of a parking garage, an amenity courtyard with the pool between the street wing and the
+   garage, the garage's back face on a back drive (its entrance) that runs round to the street both sides, and a visitor
+   row along each side drive. The garage (kind 'garage', grid: true) is counted on the podium stall grid
+   (lib/siteplan.mjs garageGrid; the validator's own podiumGrid), on the fewest levels that park the homes less the
+   visitor rows, and its depth cut back so it doesn't over-park (the courtyard takes the rest). Wings and garage share a
+   wrap / court tag: one building. No overshoot for a wrap (it's drawn to the count). Bench MF-wrap: 300 units, 492 / 480
+   spaces (444 garage, 48 surface). Still: no drawn garage plan (ramps, cores), units from floor area (no reviewed wrap
+   template), a four-sided wrap (the garage enclosed, entered through a portal) not offered.
 6b. Done Nov 3 (podium parking). A tower on a podium (form "tower", 4+ floors of apartments) parks on its podium:
    podiums are 128 ft deep (two double-loaded 60 ft modules inside 4 ft walls, lib/siteplan.mjs PODIUM) and 150-340 ft
    long; their stalls are counted on that grid (9 ft stalls, a 24 ft turning aisle at each end of a row, 12 stalls a
