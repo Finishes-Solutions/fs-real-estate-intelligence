@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 11:53 AM CT: 3D map back to plain blocks; stacked townhomes and cottages; awkward lots; drawing polish (2b458e4, 8109a45, 24b3efd, aaa0b61)
+- **The 3D map is back to the plain style:** each building a solid block coloured by its use, with a parapet and a line at each floor. The designed facades (brick, siding, windows, balconies, hip roofs) are off the map; plan sets and the BIM model still use the designs.
+- **Stacked townhomes** (homes stacked two high in 4-story rows, an estimate on the reviewed Portland Road bay) and **build-to-rent cottage communities** (detached cottages on private lanes round an amenity centre; the 2-bed from the reviewed Magnolia Village plans).
+- **Awkward lots work:** flag lots, lots crossed by an easement or holding a wetland (nothing built on them), curved street frontages and half-acre lots now get usable layouts.
+- **Drawing polish:** entrance names stay inside the site, "1 space" not "1 spaces", no stray outlines or "Future development" pockets inside a community, playground and emergency-lane labels where they belong.
+- All 28 test sites pass every check; the full test suite passes.
+
 ### 7:34 AM CT: Detention sized from rainfall, garages checked for ventilation, deeper buildings on request (5aac4cc, d12d0e5, 70ea2a7)
 - **Detention is estimated from the storm, not a rule of thumb:** NOAA Atlas 14 rainfall for the site (a regional figure when the service can't be reached) and the plan's own roofs and paving, by the NRCS TR-55 method; the pond is sized to it and the check passes or fails it (still an estimate for the civil engineer). A site with no room for a pond plans underground storage, and says so.
 - **Garages checked for ventilation:** each garage is tested against the building code's open-garage rule (openings on at least two sides, 20% of the wall area); one that isn't open is flagged as needing mechanical ventilation and sprinklers. The wrap, podium and podium-courtyard garages drawn now are all open.
