@@ -3,6 +3,7 @@
 // (lib/layoutrun.mjs) repeated 20 times on representative briefs to prove identical geometry, quantities and ranking.
 // No network, no AI.  node test/layoutrun.mjs [--quick]
 import assert from 'node:assert/strict';
+import { planSVG } from '../lib/sitesheet.mjs';
 import crypto from 'node:crypto';
 import * as CX from '../lib/enginectx.mjs';
 import { sha256, hashOf } from '../lib/sha256.mjs';
@@ -220,7 +221,7 @@ ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre squ
   for (const o of r.options) { for (const p of o.elements.filter(e => e.kind === 'pond' && e.poly)) assert.ok(p.poly.every((_, i) => ang(p.poly, i) >= 34), 'pond spike in ' + o.name);
     const tr = o.elements.filter(e => e.kind === 'trail'); if (tr.length > 1) assert.ok(tr.every(t => !t.closed), 'a split trail is open'); }
   const lone = RUN.runPlan({ ...site, streets: [], params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
-  assert.ok(lone.options.every(o => SP.entrancesOf(o.elements).length >= 2 || o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | '));
+  assert.ok(lone.options.every(o => SP.entrancesOf(o.elements).length >= 2 || o.elements.some(e => e.emergency) || o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | ')); // (or a gated emergency lane)
 });
 ok('a courtyard building: its wings one building, shared corners once, the pool clear, exactly the units asked', () => {
   const r = RUN.runBrief(B.briefFromRequest('courtyard apartments, 150 units', RECT)), o = r.options[0];
@@ -346,6 +347,19 @@ ok('a schedule that combines homes reconciles; one that combines too many does n
   const site = { ...RECT }, bl = { id: 'b', kind: 'building', use: 'multifamily', x: 450, y: 250, w: 300, d: 60, floors: 3, template: 'mf-garden-breezeway-3s', modules: 4, units: 46, tplUnits: 46, tplL: 300, combined: 2 };
   const brief = B.briefFromRequest('exactly 46 garden apartments', site), chk = els => V.validateLayout({ ...site, elements: els }, brief).checks.find(c => c.id === 'program.buildings');
   assert.equal(chk([bl]).status, 'pass'); assert.equal(chk([{ ...bl, combined: 13, units: 35, tplUnits: 35 }]).status, 'fail');
+});
+ok('a narrow deep lot: an emergency access lane gives the second way in, counted by the check and drawn distinctly', () => {
+  const deep = { ...RECT, ring: [[0, 0], [330, 0], [330, 800], [0, 800]] }, r = RUN.runBrief(B.briefFromRequest('townhomes, as many as fit', deep)), o = r.options[0];
+  const ck = id => o.validation.checks.find(c => c.id === id);
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(ck('access.second').status, 'pass'); assert.equal(ck('access.remote').status, 'pass', JSON.stringify(ck('access.remote')));
+  const lane = o.elements.find(e => e.emergency); assert.ok(lane && lane.kind === 'drive' && lane.name === 'Emergency access', 'an emergency lane');
+  assert.match(lane.note, /easement/); assert.match(ck('access.second').note, /fire official/);
+  assert.ok(!o.elements.some(e => e.kind === 'building' && SP.gapBetween(SP.shapeOf(e), lane.poly) < 3), 'clear of the buildings');
+  assert.equal(ck('access.entrance').status, 'pass', 'a lane on a side or rear line is not an illegal entrance');
+  assert.ok(!SP.pavement({ elements: o.elements }).some(pv => SP.inRing(SP.centroid(lane.poly), pv.outer)), 'not drawn as asphalt');
+  assert.match(planSVG({ ...deep, elements: o.elements, program: o.program }, { px: 400 }).svg, /EMERGENCY ACCESS/);
+  assert.equal(RUN.replayRun(r).identical, true);
+  // a real entrance far enough away still ranks ahead of a lane (the rotated garden site: no lane on its top option)
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
