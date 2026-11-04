@@ -443,6 +443,14 @@ ok('townhomes: an exact count lands in rows of at most 6, each home on its lot; 
   const bar = { ...RECT, elements: [{ id: 't1', kind: 'building', use: 'townhomes', x: 450, y: 250, w: 264, d: 40, units: 11, floors: 2 }] };
   assert.equal(V.validateLayout(bar, B.canonicalBrief(B.briefFromRequest('exactly 11 townhomes', RECT))).checks.find(c => c.id === 'program.rowlength').status, 'fail', 'an 11-home row is flagged');
 });
+ok('townhomes as many as fit: rows line both sides of every lane end to end at the separation asked, corners used (5 ac rectangle)', () => {
+  const site = { origin: [-96.42, 30.38], ring: [[0, 0], [660, 0], [660, 330], [0, 330]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+  const o = RUN.runBrief(B.briefFromRequest('townhomes, as many as fit', site)).options[0], rows = o.elements.filter(e => e.kind === 'building' && e.use === 'townhomes');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.deepEqual(o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id), [], 'no warnings');
+  assert.ok(o.quantities.totals.units >= 55, 'packed: ' + o.quantities.totals.units + ' homes (was 37 in 15 short rows)');
+  assert.ok(rows.every(e => e.units >= 3 && e.units <= 6), 'rows of 3 to 6: ' + rows.map(e => e.units).join());
+  assert.equal(o.validation.checks.find(c => c.id === 'separation.buildings').status, 'pass');
+});
 ok('front-load townhomes from the reviewed row (E053): a one-car garage and a driveway a home, on lots of their own', () => {
   const b = B.briefFromRequest('front-load townhomes, as many as fit', RECT), r = RUN.runBrief(b), o = r.options[0];
   assert.equal(o.validation.status, 'pass', o.validation.failed.join());

@@ -37,7 +37,12 @@ const SITES = {
   tri6: [[0, 0], [760, 0], [0, 700]],
   arc5: (() => { const pts = [[0, 0], [1000, 0]]; for (let k = 1; k < 8; k++) { const t = k / 8, x = 1000 * (1 - t), y = 380 * t + 70 * Math.sin(Math.PI * t); pts.push([+x.toFixed(1), +y.toFixed(1)]); } return pts.concat([[0, 380]]); })(),
   trap5: [[0, 0], [900, 0], [900, 60], [0, 420]],
-  hyp5: [[1000, 0], [0, 450], [0, 0]]
+  hyp5: [[1000, 0], [0, 450], [0, 0]],
+  /* townhome subdivisions: 5 ac and 8 ac rectangles, a deeper 4 ac lot, 6 ac with streets on two sides (edges 0 and 1) */
+  th5: [[0, 0], [660, 0], [660, 330], [0, 330]],
+  th8: [[0, 0], [750, 0], [750, 465], [0, 465]],
+  thdeep4: [[0, 0], [300, 0], [300, 580], [0, 580]],
+  thcorner6: { ring: [[0, 0], [560, 0], [560, 467], [0, 467]], streets: [1] }
 };
 const CASES = [
   { id: 'MF-garden-exact', family: 'multifamily', site: 'rect10', ask: 'exactly 120 garden apartments, 3 stories' },
@@ -78,9 +83,13 @@ const CASES = [
   { id: 'WEDGE-tri-1pk', family: 'multifamily', site: 'tri6', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 },
   { id: 'WEDGE-arc-1pk', family: 'multifamily', site: 'arc5', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 },
   { id: 'WEDGE-trap-1pk', family: 'multifamily', site: 'trap5', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 },
-  { id: 'WEDGE-hyp-1pk', family: 'multifamily', site: 'hyp5', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 }
+  { id: 'WEDGE-hyp-1pk', family: 'multifamily', site: 'hyp5', ask: 'mid-rise apartments, 4 stories, as many as fit', perUnit: 1 },
+  { id: 'TH-sub5', family: 'multifamily', site: 'th5', ask: 'townhomes, as many as fit' },
+  { id: 'TH-sub8', family: 'multifamily', site: 'th8', ask: 'townhomes, as many as fit' },
+  { id: 'TH-deep4', family: 'multifamily', site: 'thdeep4', ask: 'townhomes, as many as fit' },
+  { id: 'TH-corner6', family: 'multifamily', site: 'thcorner6', ask: 'townhomes, as many as fit' }
 ];
-const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
+const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
 
 let baseMods = null;

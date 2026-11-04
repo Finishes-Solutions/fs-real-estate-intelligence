@@ -406,3 +406,23 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    along both lines facing one stepped parking court, bars carried past a strip's bays toward the point, a second
    entrance from the strips, a pond sized to the drawn plan's own detention. Holdouts unchanged (P35 fill-ug 320, P36
    fill 128, E054 podium-urban 172, P18 fill 58); P36 is still one building.
+
+20. Done Nov 4 (townhome packing). "Townhomes, as many as fit" packed loosely: short rows of 3-5 with wide gaps, block
+   ends and loop corners empty (5 ac: 37 homes in 8 rows). Measured on our own synthetic subdivisions (bench TH-sub5,
+   TH-sub8, TH-deep4, TH-corner6, plus the existing townhome cases); holdouts only as a non-regression check. Causes and
+   fixes: (a) rows stood 20 ft apart, not the brief's building separation (10 ft default): the brief's
+   `buildingSeparation` now goes to the engine (`params.homeGap`); (b) every cross drive held rows 32 ft off at the loop's
+   corners: 14 ft (12 ft off an inner cross drive) when filling, the curve's own outline still kept clear (a count asked
+   for keeps the roomier corners, and a count past what fits is laid out as many as fit); (c) the main entry held the row
+   across the first lane 14 ft off its end, emptying part of that row: now 14 ft off its sides only; (d) guest stalls
+   took a home or two off nearly every row (each 2-3 stalls owed): the strip at a row's end now takes as many stalls as
+   fit, the spare counted toward the next rows, and homes give way only once 6 are owed; (e) the pond drawn in its
+   reserve came out short (a strip at the end loses its edges to buffers and banks), so the densest tries were warned on
+   detention: such a try is laid out again with the reserve grown by the shortfall (twice at most); (f) packed rows can
+   leave no stretch of street for the second way in, and the run fell back on an emergency lane: under as many as fit
+   (or up to), the row nearest a street and farthest from the ways in gives way, with its lots and driveways, for a
+   real entrance (lib/layoutrun.mjs homesGiveWay). Bench (top option, all passing, no warnings): TH-sub5 37 -> 62,
+   TH-sub8 73 -> 104, TH-deep4 29 -> 44, TH-corner6 54 -> 77, MF-townhomes 57 -> 74, MF-townhome-lots 119 -> 136,
+   LOT-flag-th 122 -> 139; front-load on 10 ac 98 -> 130; other cases unchanged. Holdout check: P18 fill 58 -> 66,
+   exact 58 -> 71; P35, P36, E054 unchanged. Still: no rows facing the loop's outer legs, guest parking only in row
+   gaps (no parallel stalls along a lane), and 3-home rows remain where a stretch is short.
