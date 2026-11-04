@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 5:54 AM CT: Reviewed evidence for building sizes and podiums, a short median, faster courtyards (43386bf, 1ab709a, 67914fb, aada1a6, 500ef5f, 90bacc5)
+- **More numbers come from your reviewed projects instead of estimates:** the floor area a home for corridor buildings (courtyards, wraps, podiums, vertical mixed use) from three reviewed buildings, and how much of a podium the tower covers (Hawthorn and 2000 Clarendon). Three more projects were read into the library (Pleasant Grove, 10th & Irving, 2000 Clarendon). A one-level podium entered from the road draws no ramp.
+- **A short median** where a full boulevard doesn't fit: the entry widens to two fire lanes round a planted island, instead of no median at all.
+- **Faster:** the 300-courtyard request on Hockley takes about 13 s (was 28); duplexes and towers about a third faster.
+- **Wedge-shaped lots** keep more buildings (the wedge test site 144 apartments, was 128); a wrap's top garage level keeps only the spaces it needs.
+- Fixed: a drive stub ending 2 ft from a neighbour's line was read as a way in across their land, which pushed a 320-unit layout below a 304-unit one. All 20 test sites pass; the full test suite passes.
+
 ### 4:40 AM CT: Every layout finished alike: rounded corners, stepped fronts, the entry as Settings say (43386bf)
 - **Generated layouts look like the rest:** aisle ends meet their drives on a curve a fire truck can turn, apartment bars step their fronts, and the main entry follows Settings › Entrance (a boulevard with its median and signs where the first aisle is far enough in; otherwise a 40 ft entry with curb returns).
 - **Moving a building and re-fitting** a generated layout keeps it where you put it; what it overlaps gives way.
