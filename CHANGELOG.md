@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 12:05 PM CT: A site-layout agent skill that runs the app's own layout engine (this push)
+- **New agent skill `site-layout`** (skills/site-layout.zip): an AI agent can now lay out a site with the same engine the app's Build uses, offline in its own sandbox: from a parcel outline and words like "as many townhomes as fit", it writes a typed brief, runs the engine, reads the independent check of every option, iterates (compare forms, edit by words) and delivers a 24 x 36 layout sheet.
+- **Hands off to the plan-set agent unchanged:** the sheet carries the fs-set-plans project model inside it, so the plan-set skill builds the full set from the exact geometry.
+- **Agent instructions updated:** the site layout agent now uses site-layout; the older fs-site-plan skill stays documented as the alternative when the agent must pick the use itself.
+- The skill's engine is rebuilt from the app with one command, and the test suite fails if it falls out of date.
+
 ### 11:53 AM CT: 3D map back to plain blocks; stacked townhomes and cottages; awkward lots; drawing polish (2b458e4, 8109a45, 24b3efd, aaa0b61)
 - **The 3D map is back to the plain style:** each building a solid block coloured by its use, with a parapet and a line at each floor. The designed facades (brick, siding, windows, balconies, hip roofs) are off the map; plan sets and the BIM model still use the designs.
 - **Stacked townhomes** (homes stacked two high in 4-story rows, an estimate on the reviewed Portland Road bay) and **build-to-rent cottage communities** (detached cottages on private lanes round an amenity centre; the 2-bed from the reviewed Magnolia Village plans).
