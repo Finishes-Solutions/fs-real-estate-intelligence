@@ -1,0 +1,232 @@
+{
+ "schema": "rei.ref.project/1",
+ "id": "E028",
+ "name": "2000 Clarendon Boulevard",
+ "location": "Arlington, VA",
+ "family": "e028",
+ "partition": "dev",
+ "forms": [
+  "tower-on-podium",
+  "mixed-use",
+  "mid-rise-corridor-elevator"
+ ],
+ "overlays": [],
+ "documents": [
+  {
+   "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+   "sha256": "8254acd554cd4daa708ceb8492287bb2bb37a704747bbbb1c51895cb2a49e75a",
+   "pages_used": [
+    1,
+    5,
+    7,
+    8
+   ],
+   "sheets": [
+    {
+     "page": 1,
+     "sheet": "A1-00",
+     "title": "Project information (GFA summary)",
+     "revision": null,
+     "date": null
+    },
+    {
+     "page": 5,
+     "sheet": null,
+     "title": "Parking distribution",
+     "revision": null,
+     "date": null
+    },
+    {
+     "page": 8,
+     "sheet": null,
+     "title": "Typical floor plan",
+     "revision": null,
+     "date": null
+    }
+   ]
+  }
+ ],
+ "site": {
+  "gfa_sf": {
+   "v": 106039,
+   "units": "sf",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+    "page": 1,
+    "sheet": "A1-00"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "retail_sf": {
+   "v": 1921,
+   "units": "sf",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+    "page": 7,
+    "sheet": null
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only",
+   "note": "ground floor"
+  }
+ },
+ "buildings": [
+  {
+   "type_id": "A",
+   "label": "14-story double-loaded corridor tower, ground-floor retail and lobby",
+   "count": 1,
+   "floors": {
+    "v": 14,
+    "units": "floors",
+    "src": {
+     "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+     "page": 1,
+     "sheet": "A1-00"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   },
+   "typical_plate_sf": {
+    "v": 7599,
+    "units": "sf",
+    "src": {
+     "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+     "page": 1,
+     "sheet": "A1-00"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "3rd-11th typical; 2nd 6,206"
+   },
+   "ground_floor_sf": {
+    "v": 11568,
+    "units": "sf",
+    "src": {
+     "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+     "page": 1,
+     "sheet": "A1-00"
+    },
+    "method": "derived",
+    "confidence": "high",
+    "status": "derived",
+    "review": "text-only",
+    "note": "ground floor GFA 6,639 + non-GFA 4,929"
+   },
+   "typical_w_ft": {
+    "v": 122.25,
+    "units": "ft",
+    "src": {
+     "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+     "page": 8,
+     "sheet": null
+    },
+    "method": "printed-dimension",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "122'-3\""
+   },
+   "typical_d_ft": {
+    "v": 64.33,
+    "units": "ft",
+    "src": {
+     "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+     "page": 8,
+     "sheet": null
+    },
+    "method": "printed-dimension",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "64'-4\" (double-loaded corridor)"
+   }
+  }
+ ],
+ "unit_types": [],
+ "parking": {
+  "provided": {
+   "v": 112,
+   "units": "stalls",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+    "page": 5,
+    "sheet": null
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "stall": {
+   "v": "8'-6\" x 18'-0\"",
+   "units": null,
+   "src": {
+    "file": "02_Expanded_Collection/plans/E028_2000_Clarendon_Boulevard/003_Architecture.pdf",
+    "page": 5,
+    "sheet": null
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "levels": [
+   {
+    "level": "P2",
+    "gross_sf": 17306,
+    "stalls": 28
+   },
+   {
+    "level": "P3",
+    "gross_sf": 17102,
+    "stalls": 32
+   },
+   {
+    "level": "P4",
+    "gross_sf": 17102,
+    "stalls": 31
+   },
+   {
+    "level": "P5",
+    "gross_sf": 12400,
+    "stalls": 21
+   }
+  ]
+ },
+ "amenities": [
+  "fitness",
+  "pool deck (2nd floor)",
+  "roof lounge"
+ ],
+ "access": [
+  "Clarendon Blvd"
+ ],
+ "project_rules": [],
+ "reconciliation": [
+  {
+   "check": "parking",
+   "values": "28+32+31+21 = 112",
+   "result": "consistent",
+   "note": ""
+  },
+  {
+   "check": "GFA",
+   "values": "2,015+7,599+15,199+68,380+6,206+6,639 = 106,038",
+   "result": "consistent",
+   "note": "printed 106,039 (rounding)"
+  }
+ ],
+ "open_questions": [
+  "unit count and mix (not in the text layer)"
+ ],
+ "manifest_name": "2000 Clarendon Boulevard"
+}

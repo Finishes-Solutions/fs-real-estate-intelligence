@@ -213,3 +213,37 @@ Branch `matthew/site-engine-update-110326` (from `matthew/mcp-plan-sets-renderin
 - **Reference library:** `/Users/matthewsinitiere/Finishes Marketing Dropbox/Matthew Sinitiere/NEW MK/MATTHEW/REAL ESTATE INTELLIGENCE/MULTIFAMILY DATA/REI_Complete_Reference_Library` (outside Git). Rendering needs PyMuPDF (`pip install pymupdf`), see scripts/refs/README.md.
 - **Next:** docs/LAYOUT-ENGINE.md §9 (route Build and site_plan through runBrief; re-fit parking after exact trims; mid-rise bar sizes; courtyard building; holdout reconstruction; wrap, tuck-under, cross-dock, vertical mixed use; turning and detention inputs).
 - **Infra:** none needed (pure computation; new Vercel function config for api/layoutrun.js only).
+
+### Update (2026-11-03, evening): Build on the run engine, layout repairs, tested in the real editor
+
+Branch `matthew/build-through-run-engine` (PR #76, open, not merged). PR #75 (Harris County acreage from the parcel outline) also open.
+
+- **Done:** the editor's Build, re-solve and AI-revised layouts run through `runPlan` in the worker; studio apartment buildings (estimate template); a bare number in Build is exact unless Leftover land was chosen; validator checks for a second way in (hard), their spacing (warning), detention against the rule of thumb (always unknown), trail conflicts; run-layer repairs (courtyard wings joined, one amenity centre per 400 units, amenities nudged off buildings, exact counts by unit size for untemplated forms, pond spikes trimmed, unused parking pruned, a second/third way in found with the pond cut back); courtyards in two rows (lib/sitegen.mjs); options that differ.
+- **Evidence:** benchmark 13/15 (docs/bench/layout-bench-v2.md, .png); the full `npm test` passed (114/114 commands) on commit 0bc4541; the Hockley parcel (23737 FM 2920) driven through the real editor in Chrome (Build, layouts, Independent check, 3D massing) with no page errors.
+- **Next:** podium parking in the layout search (docs/LAYOUT-ENGINE.md §9 6b), wrap, the main entry off-centre for fire-code spacing on one frontage, a continuous courtyard building form, "More layouts" and scenarios through runPlan, the MCP site_plan tool through runPlan.
+
+### Update (2026-11-03, night): courtyards, podium towers, anchored centres, two ways in apart
+- Bench (scripts/layout-bench-v2.mjs): 14 of 15 top options pass every hard check (was 13), all replay identical. Only
+  the wrap building is unsupported.
+- Done: courtyard as one continuous building (ring or U); tower-on-podium parks on its podium (300 / 300 units);
+  anchored centre = anchor + shops (validator checks the anchor); exact floor areas land exactly; two ways in planned
+  with the layout, main entry off centre where needed; ponds in held land moved beside the work; More layouts,
+  scenarios and MCP site_plan through runPlan.
+- Next (docs/LAYOUT-ENGINE.md §9): wrap form; a narrow frontage's second way in (emergency access); garage plans for
+  podiums; mid-rise shorter bars; courtyard units from a reviewed template.
+
+### Update (2026-11-04, early): wraps, drawn garages, emergency access, parking to the need
+- Bench: 15 of 15 top options pass every hard check, no warnings, all replay identical. Parking within 1-4% of required.
+- Done: wrap form; podium garage plans (count from the drawing, garage entrance reached); emergency access lane as the
+  fallback; pods with two real ways in; parking trimmed to the need; court gardens; mixed use exact counts; app and
+  check count parking alike; massing heights; townhome rows even; labels.
+- Hockley stress test (8 requests): all pass.
+- Next: reviewed templates for courtyard / wrap / podium (none in the dev partition); garage engineering; tuck-under,
+  cross-dock and vertical mixed use.
+
+### Update (2026-11-04, night): new forms, turning, holdout evaluation
+- Bench (20 cases): all pass every hard check, all replay identical. New: tuck-under, cross-dock, vertical mixed use,
+  fee-simple townhome lots, wedge site. Holdout evaluation (scripts/refs/holdout-eval.mjs) in npm test.
+- Next: the search's count sensitivity in lib/sitelayout.mjs (the upward probe works round it at a runtime cost);
+  P36 wedge still 128 of 192; podium courtyard over-parks with two full levels; reviewed templates for courtyard /
+  wrap / podium / vertical mixed use (none in the dev partition).

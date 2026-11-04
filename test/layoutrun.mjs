@@ -3,6 +3,7 @@
 // (lib/layoutrun.mjs) repeated 20 times on representative briefs to prove identical geometry, quantities and ranking.
 // No network, no AI.  node test/layoutrun.mjs [--quick]
 import assert from 'node:assert/strict';
+import { planSVG } from '../lib/sitesheet.mjs';
 import crypto from 'node:crypto';
 import * as CX from '../lib/enginectx.mjs';
 import { sha256, hashOf } from '../lib/sha256.mjs';
@@ -13,6 +14,7 @@ import * as T from '../lib/bldgtemplates.mjs';
 import * as SP from '../lib/siteplan.mjs';
 
 const QUICK = process.argv.includes('--quick');
+const PF = await import('../lib/proforma.mjs'), REFT = await import('../lib/reftemplates.mjs'), FS = await import('node:fs');
 let n = 0; const ok = (name, f) => { f(); n++; console.log('ok', n, name); };
 
 // ---------- primitives ----------
@@ -78,7 +80,8 @@ ok('a clean layout passes what it can measure, and says what it cannot', () => {
   for (const id of ['geometry.valid', 'site.containment', 'site.setbacks.buildings', 'overlap.level-aware', 'access.entrance', 'access.connectivity', 'access.buildings', 'parking.count', 'parking.geometry', 'program.u1']) assert.equal(st(r, id), 'pass', id + ' ' + JSON.stringify(r.checks.find(c => c.id === id)));
   assert.equal(r.quantities.parking.surface, 26); assert.equal(r.quantities.parking.required, 24); // 6,000 sf at 4 a 1,000
   assert.equal(r.quantities.totals.gfa, 6000);
-  for (const id of ['eng.detention', 'eng.turning', 'eng.fire-route']) assert.equal(st(r, id), 'unknown'); // never passed
+  for (const id of ['eng.detention', 'eng.fire-route']) assert.equal(st(r, id), 'unknown'); // never passed
+  for (const id of ['eng.turning.car', 'access.fire-width', 'access.dead-end']) assert.ok(['pass', 'n/a'].includes(st(r, id)), id + ' ' + JSON.stringify(r.checks.find(c => c.id === id))); // measured on the drawing
   assert.equal(r.status, 'pass'); assert.ok(r.restsOnAssumptions.includes('parking.count'));
 });
 ok('a building past the property line fails containment (concave site: inside the box, outside the L)', () => {
@@ -117,7 +120,7 @@ ok('exclusions are kept clear', () => {
 ok('parking required and provided reported separately; a shortfall fails with no tolerance', () => {
   const b = briefFor(); b.rules.values.parkingPer1000 = { v: 5, cls: 'verified', source: 'Test ordinance §1' };
   const r = V.validateLayout(lay(good()), b), c = r.checks.find(x => x.id === 'parking.count');
-  assert.equal(c.status, 'fail'); assert.equal(c.required, 30); assert.equal(c.measured, 26); assert.equal(c.basis, 'verified');
+  assert.equal(c.status, 'fail'); assert.equal(c.required, 30); assert.equal(c.measured, 25); assert.equal(c.basis, 'verified'); // (26 stalls drawn, less the accessible pair's aisle)
 });
 ok('missing evidence is never a pass', () => {
   const b = briefFor(); delete b.rules.values.buildingSeparation;
@@ -178,7 +181,7 @@ ok('templated buildings are whole modules with units from the schedule', () => {
 const RECT = { origin: [-96.42, 30.38], ring: [[0, 0], [900, 0], [900, 500], [0, 500]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
 const LSITE = { origin: [-96.42, 30.38], ring: [[0, 0], [800, 0], [800, 380], [420, 380], [420, 700], [0, 700]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
 ok('outcomes are told apart', () => {
-  assert.equal(RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)).outcome, 'unsupported');
+  assert.equal(RUN.runBrief(B.briefFromRequest('a side-load warehouse, 200,000 sf', RECT)).outcome, 'unsupported');
   assert.equal(RUN.runBrief(B.briefFromRequest('exactly 20000 garden apartments', RECT)).outcome, 'proven-infeasible');
   assert.equal(RUN.runBrief({ ...B.briefFromRequest('100 apartments', RECT), site: { units: 'ft', ring: [] } }).outcome, 'missing-information');
 });
@@ -194,5 +197,409 @@ for (const [label, ask, plan] of CASES) {
     console.log('   ', label, first.outcome, first.options.map(o => o.validation.status + ' ' + (o.quantities.totals.units || o.quantities.totals.gfa)).join(' | '), 'evals', JSON.stringify(first.solver.evaluation));
   });
 }
+ok('studio apartment buildings are their own zone, in words', () => {
+  const g = SP.guessProgram('Garden apartments, townhomes, and studio apartment buildings, as many as fits');
+  assert.deepEqual(g.zones.map(z => [z.use, z.name || null, !!z.mix]), [['multifamily', 'Garden apartments', false], ['multifamily', 'Studio apartment buildings', true], ['townhomes', null, false]]);
+  assert.equal(SP.guessProgram('a studio for the clubhouse').zones, undefined); assert.equal(SP.guessProgram('retail with a yoga studio').use, 'retail');
+});
+ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre square (23737 FM 2920, Hockley)', () => {
+  // the parcel's outline in plan feet (1,187 x 1,065 ft, the street on the north edge); before: 18 apartments ("Simple
+  // layout") from the engine alone, or empty parking bays once templated
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { ...SP.SETBACKS }, elements: [] }; // FM 2920 on the north, Becker Road on the west
+  const ask = 'Garden apartments, townhomes, and studio apartment buildings, as many as fits', r = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
+  assert.equal(r.outcome, 'feasible'); assert.ok(r.options.length >= 3);
+  const top = r.options[0], by = k => top.elements.filter(e => e.kind === 'building' && (e.template === k || e.use === k)).reduce((t, e) => t + (e.units || 0), 0);
+  assert.equal(top.check.status, 'pass', JSON.stringify(top.check));
+  assert.ok(by('mf-garden-breezeway-3s') >= 96 && by('mf-garden-studio-3s') >= 96 && by('townhomes') >= 60, [by('mf-garden-breezeway-3s'), by('mf-garden-studio-3s'), by('townhomes')].join(' '));
+  assert.ok(top.elements.every(e => !(e.kind === 'building' && e.use === 'multifamily') || e.modules >= 2), 'no apartment building under two stacks');
+  assert.ok(top.recipe && top.run.brief && top.run.inputHash, 'the editor gets its recipe and the run');
+  const again = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
+  assert.deepEqual(again.options.map(o => o.run.geometryHash), r.options.map(o => o.run.geometryHash));
+  // over 200 apartments need a second way in: every option has one, or the check says it hasn't (never a silent pass);
+  // with Becker Road every option gets one (the pond cut back where it took the side street)
+  assert.ok(r.options.every(o => SP.entrancesOf(o.elements).length >= 2), r.options.map(o => SP.entrancesOf(o.elements).length).join());
+  // ponds without spikes (the grey triangle on the map) and no trail piece still marked closed (the tan wedge)
+  const ang = (r, i) => { const n = r.length, a = r[(i - 1 + n) % n], b = r[i], c = r[(i + 1) % n], u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]]; return Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v))))) * 180 / Math.PI; };
+  for (const o of r.options) { for (const p of o.elements.filter(e => e.kind === 'pond' && e.poly)) assert.ok(p.poly.every((_, i) => ang(p.poly, i) >= 34), 'pond spike in ' + o.name);
+    const tr = o.elements.filter(e => e.kind === 'trail'); if (tr.length > 1) assert.ok(tr.every(t => !t.closed), 'a split trail is open'); }
+  const lone = RUN.runPlan({ ...site, streets: [], params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
+  assert.ok(lone.options.every(o => SP.entrancesOf(o.elements).length >= 2 || o.elements.some(e => e.emergency) || o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | ')); // (or a gated emergency lane)
+});
+ok('a courtyard building: its wings one building, shared corners once, the pool clear, exactly the units asked', () => {
+  const r = RUN.runBrief(B.briefFromRequest('courtyard apartments, 150 units', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 150);
+  const wings = o.elements.filter(e => e.court); assert.ok(wings.length >= 3 && new Set(wings.map(e => e.court)).size === 1, 'the wings carry one court id');
+  assert.ok(wings.every(e => !e.poly), 'wings stay rectangles (3D facades and plan sets read them)');
+  // one continuous building: every wing meets another end to side (no gaps, no overlaps), named as its parts
+  for (const a of wings) assert.ok(wings.some(b => b !== a && SP.gapBetween(SP.shapeOf(a), SP.shapeOf(b)) < 0.5), 'a wing meets the next: ' + a.name);
+  for (let i = 0; i < wings.length; i++) for (let j = i + 1; j < wings.length; j++) assert.ok(!SP.rectsOverlap(wings[i], wings[j], 1), 'wings never overlap at a corner');
+  assert.ok(wings.every(e => /^Bldg A · .* wing$/.test(e.name)), wings.map(e => e.name).join());
+  // the court: the pool inside it, no parking or drive inside it, the clubhouse at its gateway
+  const xs = wings.flatMap(e => SP.shapeOf(e).map(p => p[0])), ys = wings.flatMap(e => SP.shapeOf(e).map(p => p[1])), inHull = e => { const c = SP.centroid(SP.shapeOf(e)); return c[0] > Math.min(...xs) && c[0] < Math.max(...xs) && c[1] > Math.min(...ys) && c[1] < Math.max(...ys); };
+  assert.ok(o.elements.some(e => e.kind === 'pool' && inHull(e)), 'the pool in the court');
+  assert.ok(!o.elements.some(e => (e.kind === 'parking' || e.kind === 'drive') && inHull(e)), 'no parking inside the court');
+  assert.ok(o.elements.some(e => e.kind === 'building' && e.use === 'amenity' && inHull(e)), 'the clubhouse at the court');
+  assert.ok(SP.planFeatures({ ...RECT, elements: o.elements, program: o.program }, null).features.filter(f => f.properties.k === 'b3').length >= 2 * o.elements.filter(e => e.court).length, 'the 3D massing is drawn: parapets and floor lines on every wing (a joined outline had none)');
+});
+ok('two ways in far enough apart: the top option meets the spacing, the bigger one stays an option', () => {
+  const a = 0.4, R = ([x, y]) => [+(x * Math.cos(a) - y * Math.sin(a)).toFixed(2), +(x * Math.sin(a) + y * Math.cos(a)).toFixed(2)];
+  const site = { ...RECT, ring: [[0, 0], [1000, 0], [1000, 700], [0, 700]].map(R) }, r = RUN.runBrief(B.briefFromRequest('at least 200 garden apartments', site));
+  const rem = o => o.validation.checks.find(c => c.id === 'access.remote');
+  assert.equal(r.options[0].validation.status, 'pass'); assert.equal(rem(r.options[0]).status, 'pass', JSON.stringify(rem(r.options[0])));
+  assert.ok(r.options[0].quantities.totals.units >= 200);
+});
+const BIG40 = { origin: [-96.42, 30.38], ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+ok('an anchored center: the anchor at the size asked for and the rest in shops, not one box', () => {
+  const b = B.briefFromRequest('anchored shopping center with a 40,000 sf anchor, 80,000 sf total', BIG40);
+  assert.deepEqual(b.program.uses[0].anchor, { value: 40000, unit: 'sf' });
+  const r = RUN.runBrief(b), o = r.options[0], bs = o.elements.filter(e => e.kind === 'building').map(e => e.gfa ?? e.w * e.d).sort((x, y) => y - x);
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.gfa, 80000); assert.ok(bs.length >= 2 && Math.abs(bs[0] - 40000) <= 2000, bs.join());
+  assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+  // one 80,000 sf box meets the total but not the anchor: the check says so
+  const box = { ...B.toEngine(b).plan, elements: [{ id: 'b1', kind: 'building', use: 'retail', x: 700, y: 400, w: 400, d: 200, floors: 1 }] };
+  const c = V.validateLayout(box, B.canonicalBrief(b)).checks.find(k => k.id === 'program.u1.anchor'); assert.equal(c.status, 'fail');
+});
+ok('an exact floor area lands exactly: a 250,000 sf warehouse reads 250,000, not 250,001', () => {
+  const r = RUN.runBrief(B.briefFromRequest('warehouse with truck court, 250,000 sf', BIG40)), o = r.options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(o.quantities.byUse.industrial.gfa, 250000);
+  assert.equal(RUN.replayRun(r).identical, true);
+  // a stated area is taken only while the outline agrees with it: a box resized after the run reads its own area
+  const w = o.elements.find(e => e.kind === 'building'), moved = { ...B.toEngine(r.brief).plan, elements: [{ ...w, w: w.w + 50 }] };
+  assert.equal(V.quantities(moved, r.brief).byUse.industrial.gfa, Math.round((w.w + 50) * w.d));
+});
+ok('a tower on a parking podium: the podium parks the tower, exactly the units asked, modest surface rows', () => {
+  const r = RUN.runBrief(B.briefFromRequest('tower on a podium, 8 stories, 300 apartments', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 300);
+  const T = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'); assert.ok(T.length && T.every(e => e.form === 'tower' && Number.isInteger(e.parkLevels) && e.parkLevels >= 1), 'every tower declares its parking levels');
+  const pk = o.quantities.parking; assert.ok(pk.podium > pk.surface, 'most spaces on the podium: ' + pk.podium + ' vs ' + pk.surface + ' surface');
+  assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.08, 'parked without over-parking: ' + pk.provided + ' / ' + pk.required);
+  assert.equal(SP.metrics({ ...RECT, elements: o.elements, program: o.program }).spaces, SP.metrics({ ...RECT, elements: o.elements, program: o.program }).stalls + SP.metrics({ ...RECT, elements: o.elements, program: o.program }).deck, 'the plan counts podium spaces as deck');
+  // the garage plan: 4 rows of 20 stalls, less the ramp's 12 and two cores' 3 each on every level (62), and the lobby's 9 on the ground (53)
+  assert.equal(SP.podiumLevelStalls(240, 128), 62); assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2, parkLevels: 2 }), 53 + 62);
+  const g = SP.garagePlan({ w: 240, d: 128 }); assert.equal(g.rows.reduce((t, r) => t + r.slots.filter(q => !q.use).length, 0), g.typical, 'the count is the drawn stalls');
+  assert.equal(g.cores.length, 2); assert.ok(g.ramp && g.lobby && g.cols.length > 20);
+  for (const f of ['-u', '+u', '+v']) assert.notEqual(SP.garagePlan({ w: 240, d: 128, garageFace: f, lobbyFace: '-v' }).entry.face, '-v', 'never on the lobby face');
+  // every tower's garage has a way in: a drive meets its entrance, on a face that isn't the lobby's
+  for (const b of T) { assert.ok(b.lobbyFace && b.garageFace && b.garageFace !== b.lobbyFace, b.id + ' faces'); }
+  assert.equal(o.validation.checks.find(c => c.id === 'access.garage').status, 'pass');
+  // the check fails a garage no drive reaches: one drive up the podium's left end; the entrance there passes, at the right end fails
+  const tw = { id: 't1', kind: 'building', use: 'multifamily', form: 'tower', x: 450, y: 250, w: 240, d: 128, floors: 8, podium: 2, parkLevels: 2, lobbyFace: '-v' }, dr = { id: 'd1', kind: 'drive', x: 318, y: 157, w: 24, d: 314, name: 'Main entry', entry: true };
+  const gar = f => V.validateLayout({ ...RECT, elements: [{ ...tw, garageFace: f }, dr], program: o.program }, r.brief).checks.find(c => c.id === 'access.garage').status;
+  assert.equal(gar('-u'), 'pass'); assert.equal(gar('+u'), 'fail');
+  assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2 }), 0, 'a tower with no parking levels declared parks nothing on its podium (as before)');
+});
+ok('a wrap: one building round a garage that parks it, the pool in the courtyard, exactly the units asked', () => {
+  const r = RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 300);
+  const g = o.elements.filter(e => e.kind === 'garage'), W = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.equal(g.length, 1); assert.ok(g[0].grid && g[0].levels >= 2 && g[0].levels <= 6, 'a garage on the stall grid');
+  assert.ok(W.length === 3 && W.every(e => e.wrap === g[0].wrap && e.court === g[0].wrap), 'three wings, one building with the garage');
+  for (const e of W) assert.ok(!SP.rectsOverlap(e, g[0], 0.5), 'a wing does not overlap the garage');
+  const pk = o.quantities.parking; assert.ok(pk.garage > pk.surface, 'most spaces in the garage: ' + pk.garage + ' vs ' + pk.surface);
+  assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.08, 'parked without over-parking: ' + pk.provided + ' / ' + pk.required);
+  assert.equal(SP.garageStalls(g[0]), SP.garageGrid(g[0].w, g[0].d, g[0].levels, g[0].parkLast));
+  assert.ok(o.elements.some(e => e.kind === 'pool'), 'the pool in the courtyard');
+  assert.equal(RUN.replayRun(r).identical, true);
+});
+ok('parking trimmed to the need: whole stalls off the far row ends, no empty paving, the drive-thru kept', () => {
+  for (const [ask, site] of [['exactly 120 garden apartments, 3 stories', RECT], ['courtyard apartments, 150 units', RECT], ['exactly 28,000 sf retail in four buildings', RECT]]) {
+    const o = RUN.runBrief(B.briefFromRequest(ask, site)).options[0], pk = o.quantities.parking;
+    assert.equal(o.validation.status, 'pass', ask + ': ' + o.validation.failed.join());
+    assert.ok(pk.provided >= pk.required && pk.provided <= Math.ceil(pk.required * 1.05) + 1, ask + ': ' + pk.provided + ' / ' + pk.required);
+    assert.ok(o.elements.every(e => e.kind), 'every piece has a kind (no bare outline)');
+    assert.ok(o.elements.filter(e => e.kind === 'parking' && !e.poly).every(e => Math.floor((e.w + 0.01) / 9) >= 6), 'no row left a stub');
+  }
+  const pad = RUN.runBrief(B.briefFromRequest('2,500 sf restaurant with a drive-thru', { ...RECT, ring: [[0, 0], [210, 0], [210, 230], [0, 230]] })).options[0];
+  assert.ok(pad.elements.some(e => e.kind === 'drive' && e.windowAt), 'the drive-thru lane asked for is kept');
+});
+ok('a second court that gives up its clubhouse keeps a garden; a court is never future development (Hockley, 350 courtyard units)', () => {
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+  const r = RUN.runBrief(B.briefFromRequest('courtyard apartments, 350 units', site));
+  for (const o of r.options) {
+    assert.equal(o.validation.status, 'pass', o.name + ': ' + o.validation.failed.join()); assert.equal(o.quantities.totals.units, 350);
+    const courts = o.elements.filter(e => e.kind === 'green' && e.note === 'Courtyard');
+    assert.ok(!o.elements.some(e => e.kind === 'green' && e.future && courts.some(c => SP.inRing(e.labelAt || SP.centroid(SP.shapeOf(e)), SP.shapeOf(c)))), 'no future development inside a court');
+    const n = new Set(o.elements.filter(e => e.court).map(e => e.court)).size, clubs = o.elements.filter(e => e.kind === 'building' && e.use === 'amenity').length;
+    if (n > clubs) assert.equal(o.elements.filter(e => e.name === 'Courtyard garden').length, n - clubs, 'each court without a clubhouse has its garden');
+  }
+});
+ok('an entrance drawn across the street line (its apron out in the street) is a way in', () => {
+  const plan = { ...RECT, elements: [{ id: 'd1', kind: 'drive', name: 'Main entry', entry: true, x: 450, y: 20, w: 24, d: 44 }, { id: 'b1', kind: 'building', use: 'retail', x: 450, y: 200, w: 100, d: 60 }] };
+  const c = V.validateLayout(plan, B.canonicalBrief(B.briefFromRequest('6,000 sf retail', RECT))).checks.find(k => k.id === 'access.entrance');
+  assert.equal(c.status, 'pass', JSON.stringify(c));
+});
+ok('mixed use on the Hockley parcel: exactly the apartments asked, no empty paved block, the check and the app count parking alike', () => {
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { ...SP.SETBACKS }, elements: [] };
+  const ask = '20,000 sf retail on FM 2920, 250 apartments behind', r = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask }), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.check.status, 'pass', o.check.failed.join());
+  const B = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'); assert.equal(B.reduce((t, e) => t + e.units, 0), 250);
+  assert.ok(B.some(e => e.combined > 0), 'the last homes combined into larger ones (whole stacks give 252)');
+  // every parking row has a building within 120 ft (trimming to the count shortens buildings, it doesn't empty a block)
+  const far = o.elements.filter(e => e.kind === 'parking').filter(p => !o.elements.some(b => b.kind === 'building' && SP.gapBetween(SP.shapeOf(p), SP.shapeOf(b)) <= 120));
+  assert.equal(far.length, 0, far.length + ' parking rows with no building near');
+  const m = SP.metrics({ ...site, elements: o.elements, program: o.program }), q = V.quantities({ ...site, elements: o.elements, program: o.program }, o.run.brief);
+  assert.equal(q.parking.provided, m.spaces, 'the validator and the app count the same spaces (accessible aisles taken out)');
+  assert.ok(m.spaces >= m.required);
+});
+ok('a schedule that combines homes reconciles; one that combines too many does not', () => {
+  const site = { ...RECT }, bl = { id: 'b', kind: 'building', use: 'multifamily', x: 450, y: 250, w: 300, d: 60, floors: 3, template: 'mf-garden-breezeway-3s', modules: 4, units: 46, tplUnits: 46, tplL: 300, combined: 2 };
+  const brief = B.briefFromRequest('exactly 46 garden apartments', site), chk = els => V.validateLayout({ ...site, elements: els }, brief).checks.find(c => c.id === 'program.buildings');
+  assert.equal(chk([bl]).status, 'pass'); assert.equal(chk([{ ...bl, combined: 13, units: 35, tplUnits: 35 }]).status, 'fail');
+});
+ok('a narrow deep lot: an emergency access lane gives the second way in, counted by the check and drawn distinctly', () => {
+  const deep = { ...RECT, ring: [[0, 0], [330, 0], [330, 800], [0, 800]] }, r = RUN.runBrief(B.briefFromRequest('townhomes, as many as fit', deep)), o = r.options[0];
+  const ck = id => o.validation.checks.find(c => c.id === id);
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(ck('access.second').status, 'pass'); assert.equal(ck('access.remote').status, 'pass', JSON.stringify(ck('access.remote')));
+  const lane = o.elements.find(e => e.emergency); assert.ok(lane && lane.kind === 'drive' && lane.name === 'Emergency access', 'an emergency lane');
+  assert.match(lane.note, /easement/); assert.match(ck('access.second').note, /fire official/);
+  assert.ok(!o.elements.some(e => e.kind === 'building' && SP.gapBetween(SP.shapeOf(e), lane.poly) < 3), 'clear of the buildings');
+  assert.equal(ck('access.entrance').status, 'pass', 'a lane on a side or rear line is not an illegal entrance');
+  assert.ok(!SP.pavement({ elements: o.elements }).some(pv => SP.inRing(SP.centroid(lane.poly), pv.outer)), 'not drawn as asphalt');
+  assert.match(planSVG({ ...deep, elements: o.elements, program: o.program }, { px: 400 }).svg, /EMERGENCY ACCESS/);
+  assert.equal(RUN.replayRun(r).identical, true);
+  // a real entrance far enough away still ranks ahead of a lane (the rotated garden site: no lane on its top option)
+});
+ok('a long frontage gets two real ways in far enough apart, not a gated lane (mixed use on 40 ac, a tower on 10 ac)', () => {
+  const big = { ...RECT, ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]] };
+  for (const [ask, site] of [['20,000 sf retail along the main road, 240 apartments behind and 80 townhomes', big], ['tower on a podium, 8 stories, 300 apartments', RECT]]) {
+    const o = RUN.runBrief(B.briefFromRequest(ask, site)).options[0], rm = o.validation.checks.find(c => c.id === 'access.remote');
+    assert.equal(o.validation.status, 'pass', ask + ': ' + o.validation.failed.join()); assert.equal(rm.status, 'pass', ask + ': ' + JSON.stringify(rm));
+    assert.ok(!o.elements.some(e => e.emergency), ask + ': no emergency lane where the street has room for a real entrance');
+  }
+});
+ok('townhome rows share a stretch evenly (9 homes as 5 + 4, not 6 + a 3-home stub; a guest bay may take a home off the last)', () => {
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { ...SP.SETBACKS }, elements: [] };
+  const ask = 'townhomes, as many as fit', r = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask }), o = r.options[0];
+  assert.equal(o.check.status, 'pass', o.check.failed.join());
+  const B = o.elements.filter(e => e.kind === 'building' && e.use === 'townhomes'); let pairs = 0;
+  for (const a of B) for (const b of B) if (a !== b && a.units > b.units && SP.gapBetween(SP.shapeOf(a), SP.shapeOf(b)) < 30 && Math.abs(((a.rot || 0) - (b.rot || 0)) % 180) < 1) { pairs++; assert.ok(a.units - b.units <= 2, a.name + ' ' + a.units + ' beside ' + b.name + ' ' + b.units); }
+  assert.ok(B.reduce((t, e) => t + e.units, 0) >= 307, 'no fewer homes than before');
+});
+ok('tuck-under rows: a garage under every home, exactly the homes asked, garages counted and capped by what fits', () => {
+  const r = RUN.runBrief(B.briefFromRequest('tuck-under apartments, 120 units', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 120);
+  const T = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.ok(T.length && T.every(e => e.tuck === e.units && e.template === 'mf-tuckunder-2s' && e.units >= 3 && e.units <= 6), 'every row a tuck-under row of 3 to 6 homes');
+  const pk = o.quantities.parking; assert.equal(pk.tucked, 120); assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.06, pk.provided + ' / ' + pk.required);
+  assert.ok(o.elements.some(e => e.kind === 'drive' && e.name === 'Garage court'), 'the garages open onto a garage court');
+  assert.equal(SP.metrics({ ...RECT, elements: o.elements, program: o.program }).spaces, pk.provided, 'the app and the check count the garages alike');
+  // the check never counts more garages than fit along a row (11 ft each)
+  const one = { ...B.toEngine(r.brief).plan, elements: [{ id: 't', kind: 'building', use: 'multifamily', x: 450, y: 250, w: 60, d: 42, floors: 2, units: 3, tuck: 9 }] };
+  assert.equal(V.quantities(one, r.brief).parking.tucked, 5);
+});
+ok('a cross-dock: doors and a truck court on both long sides, trailer stalls, trucks kept off the car park, exactly the floor area', () => {
+  const big = { origin: [-96.42, 30.38], ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+  const b = B.briefFromRequest('cross-dock warehouse, 400,000 sf', big); assert.equal(b.program.uses[0].form, 'ind-cross-dock');
+  const r = RUN.runBrief(b), o = r.options[0], chk = id => o.validation.checks.find(c => c.id === 'program.u1.' + id);
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.gfa, 400000);
+  const X = o.elements.find(e => e.kind === 'building' && e.crossDock); assert.ok(X && X.docks.faces.length === 2 && X.docks.perFace > 40, 'dock doors on both long walls');
+  assert.equal(chk('crossdock').status, 'pass'); assert.ok(chk('crossdock').measured.every(d => d >= 130), JSON.stringify(chk('crossdock').measured));
+  assert.equal(chk('trailers').status, 'pass'); assert.ok(chk('trailers').measured >= X.docks.perFace, 'trailer stalls counted');
+  assert.equal(chk('trucks').status, 'pass', 'no truck piece touches the car parking');
+  assert.ok(o.elements.some(e => e.kind === 'drive' && e.trucks && /^Entrance\b/.test(e.name || '')) && o.elements.some(e => e.kind === 'drive' && e.name === 'Main entry' && !e.trucks), 'a truck entrance and a car entrance of their own');
+  assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+  // the check reads the drawing: a warehouse with a court on one side only fails it
+  const one = o.elements.filter(e => !(e.kind === 'truck' && e.x > X.x));
+  assert.equal(V.validateLayout({ ...B.toEngine(r.brief).plan, elements: one, program: o.program }, r.brief).checks.find(c => c.id === 'program.u1.crossdock').status, 'fail');
+});
+ok('vertical mixed use: shops on the ground floor, apartments above, each use counted and parked at its own ratio', () => {
+  const ask = 'a 5-story mixed-use building with 20,000 sf ground-floor retail and 200 apartments above', b = B.briefFromRequest(ask, RECT);
+  assert.deepEqual(b.program.uses.map(u => [u.use, u.form]), [['retail', 'mx-vertical'], ['multifamily', 'mx-vertical']]);
+  const r = RUN.runBrief(b), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.byUse.multifamily.units, 200); assert.equal(o.quantities.byUse.retail.gfa, 20000);
+  const M = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'), shops = M.filter(e => e.ground);
+  assert.equal(shops.length, 1, 'one stretch with shops below'); assert.ok(M.every(e => e.floors === 5 && e.mixed === M[0].mixed), 'one 5-story building');
+  const pk = o.quantities.parking; assert.equal(pk.required, Math.ceil(200 * 1.6 + 20000 / 1000 * 4)); assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.06, pk.provided + ' / ' + pk.required);
+  const plan = { ...RECT, elements: o.elements, program: o.program }, m = SP.metrics(plan); assert.equal(m.units, 200); assert.equal(m.required, pk.required); assert.equal(m.spaces, pk.provided, 'the app and the check count the same spaces');
+  assert.match(SP.labelOf(shops[0], o.program).size, /20,000 sf retail \+ \d+ units · 5 fl/);
+  assert.ok(SP.planFeatures(plan, null).features.some(f => f.properties.k === 'b3' && f.properties.part === 'storefront'), 'storefronts in 3D');
+  const pm = PF.metricsOf(plan); assert.equal(Math.round(pm.uses.retail.gsf), 20000); assert.ok(pm.uses.multifamily.gsf < SP.gfaOf(shops[0]) + M.filter(e => !e.ground).reduce((t, e) => t + SP.gfaOf(e), 0));
+  assert.equal(RUN.replayRun(r).identical, true);
+});
+ok('stormwater handled off site: the words or the typed brief, no pond drawn, the check says it is an assumption', () => {
+  for (const [ask, want] of [['garden apartments, as many as fit, detention handled off site', 'offsite'], ['garden apartments, as many as fit, drains to the regional pond', 'offsite'], ['garden apartments, as many as fit, underground detention', 'underground'], ['garden apartments, as many as fit', null]]) assert.equal(B.briefFromRequest(ask, RECT).site.stormwater, want, ask);
+  const b = B.briefFromRequest('exactly 120 garden apartments', RECT); b.site.stormwater = 'offsite';
+  const r = RUN.runBrief(b), o = r.options[0]; assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.ok(!o.elements.some(e => e.kind === 'pond'), 'no pond on the site'); assert.match(o.validation.checks.find(c => c.id === 'eng.detention').note, /off site/);
+  const bad = B.briefFromRequest('exactly 120 garden apartments', RECT); bad.site.stormwater = 'lake'; assert.equal(B.validateBrief(bad).ok, false);
+});
+ok('townhomes: an exact count lands in rows of at most 6, each home on its lot; more than fit gives the most that do, never 11-home bars', () => {
+  const th = o => o.elements.filter(e => e.kind === 'building' && ['townhomes', 'multifamily'].includes(e.use));
+  const fifty = RUN.runBrief(B.briefFromRequest('exactly 50 townhomes', RECT)).options[0];
+  assert.equal(fifty.validation.status, 'pass', fifty.validation.failed.join()); assert.equal(fifty.quantities.totals.units, 50);
+  assert.equal(fifty.elements.filter(e => e.kind === 'lot').length, 50, 'a lot for every home, none left empty by the trim');
+  const fill = RUN.runBrief(B.briefFromRequest('townhomes, as many as fit', RECT)).options[0].quantities.totals.units;
+  const many = RUN.runBrief(B.briefFromRequest('exactly 200 townhomes', RECT)).options[0];
+  assert.ok(th(many).every(e => (e.units || 1) <= 6), 'rows of at most 6: ' + th(many).map(e => e.units).join());
+  assert.ok(many.quantities.totals.units >= fill * 0.9, 'the most that fit (' + many.quantities.totals.units + ' vs ' + fill + ' as many as fit)');
+  assert.equal(many.validation.checks.find(c => c.id === 'program.rowlength').status, 'pass');
+  const bar = { ...RECT, elements: [{ id: 't1', kind: 'building', use: 'townhomes', x: 450, y: 250, w: 264, d: 40, units: 11, floors: 2 }] };
+  assert.equal(V.validateLayout(bar, B.canonicalBrief(B.briefFromRequest('exactly 11 townhomes', RECT))).checks.find(c => c.id === 'program.rowlength').status, 'fail', 'an 11-home row is flagged');
+});
+ok('front-load townhomes from the reviewed row (E053): a one-car garage and a driveway a home, on lots of their own', () => {
+  const b = B.briefFromRequest('front-load townhomes, as many as fit', RECT), r = RUN.runBrief(b), o = r.options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  const T = o.elements.filter(e => e.kind === 'building' && e.use === 'townhomes'), n = T.reduce((t, e) => t + e.units, 0);
+  assert.ok(n >= 60, n + ' homes'); assert.ok(T.every(e => e.garagePer === 1 && /front-load/.test(e.note) && e.template === 'th-frontload-row-2s' && e.units <= 6));
+  assert.equal(o.elements.filter(e => e.kind === 'lot').length, n); assert.equal(o.elements.filter(e => e.note === 'Driveway').length, n);
+  const m = SP.metrics({ ...RECT, elements: o.elements, program: o.program }); assert.equal(o.quantities.parking.provided, m.spaces, 'the check and the app count the same spaces');
+  assert.ok(o.quantities.parking.privateGarages === n && o.quantities.parking.driveways === n, 'a garage and a driveway a home');
+  assert.equal(RUN.replayRun(r).identical, true);
+  assert.equal(SP.normalizeProgram(SP.guessProgram('fee simple townhomes with garages')).product, 'lots', 'for-sale words: lots, never the rental court');
+});
+ok('a wedge: the strips park more where the land widens (a bay of their own length), no empty paving left', () => {
+  const site = { ...RECT, ring: [[0, 0], [1100, 0], [0, 420]] }, o = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site)).options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 140, 'units (a bay behind the street strip and past the strips\' ends parks a bigger bar: 144, was 128) ' + o.quantities.totals.units); assert.ok(!o.validation.failed.includes('program.template') && o.validation.checks.find(c => c.id === 'program.template')?.status !== 'fail', 'every building drawn to a reviewed template'); // (204 came from 4-floor garden bars no template fits; templated, 128)
+  const aisles = o.elements.filter(e => e.kind === 'drive' && e.bayGroup); for (const a of aisles) assert.ok(o.elements.some(r => r.kind === 'parking' && r.bayGroup === a.bayGroup), 'an extra bay\'s aisle keeps its rows');
+});
+ok('a wedge: the densest passing layout, every building drawn to the mid-rise template (none estimated from floor area)', () => {
+  const site = { ...RECT, ring: [[0, 0], [1100, 0], [0, 420]] }, r = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site)), o = r.options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  // (strips along the edges are offered where template-sized bars, 200 ft and up, fit along them; on this thin
+  // triangle they don't: the 96- and 111-home layouts it once showed were 110-125 ft buildings no template fits)
+  for (const x of r.options) assert.ok(x.elements.filter(e => e.kind === 'building' && e.use === 'multifamily').every(e => e.template && !e.tplMiss), x.name + ': a building no template fits');
+  const B0 = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'), angles = new Set(B0.map(e => Math.round(((e.rot || 0) % 180 + 180) % 180)));
+  assert.ok(angles.size >= 1 && o.quantities.totals.units >= 90, 'units ' + o.quantities.totals.units);
+  assert.equal(RUN.replayRun(r).identical, true);
+});
+ok('a wedge past 200 homes on one street: the strips cut back to 200 by whole modules (3 buildings, real entrance), not a gated lane or a building fewer', () => {
+  // a 6.1 ac right triangle fronting its 760 ft leg, one space a home: the strips hold 3 bars (208-240 homes), but the street
+  // can't give two ways in half the diagonal apart, so the full layout needs the gated emergency lane and used to lose to
+  // 2 buildings (160 homes); the cut copy of it stays under the fire code's 200
+  const site = { ...RECT, ring: [[0, 0], [760, 0], [0, 700]] }, b = B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site);
+  b.rules.values.parkingPerUnit = { v: 1, cls: 'assumption', source: 'test' };
+  const r = RUN.runBrief(b), o = r.options[0], bl = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(o.validation.counts.fail, 0, 'no warnings');
+  assert.ok(o.quantities.totals.units > 160 && o.quantities.totals.units <= 200, 'units ' + o.quantities.totals.units); assert.ok(bl.length >= 3, bl.length + ' buildings');
+  assert.ok(!o.elements.some(e => e.emergency), 'no gated emergency lane'); assert.ok(bl.every(e => e.template && !e.tplMiss), 'whole template modules');
+  assert.equal(RUN.replayRun(r).identical, true);
+});
+ok('a courtyard on a parking podium (5 over 2): the U above, the podium parking the homes, the levels as the words say', () => {
+  const site = { ...RECT, ring: [[0, 0], [600, 0], [600, 400], [0, 400]] }, b = B.briefFromRequest('a 5 over 2 courtyard on a podium, 250 apartments', site);
+  assert.equal(b.program.uses[0].form, 'mf-podium-courtyard');
+  const o = RUN.runBrief(b).options[0], e = o.elements.find(x => x.upper === 'U');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(o.quantities.totals.units, 250);
+  assert.ok(e && e.podium === 2 && e.floors === 7, 'a 2-level podium under 5 floors'); assert.ok(o.quantities.parking.podium >= o.quantities.parking.required * 0.9, 'the podium parks the homes');
+  assert.equal(SP.towerOutline(e).length, 8, 'the floors above are a U');
+  // the top parking level only partly parking when the full level would over-park: the plan and the check count it alike
+  const pk = o.quantities.parking; assert.ok(pk.provided >= pk.required && pk.provided <= Math.ceil(pk.required * 1.05), 'parked to the need: ' + pk.provided + ' / ' + pk.required);
+  if (e.parkLast != null) { const g = SP.garagePlan(e); assert.ok(e.parkLast < (+e.parkLevels === 1 ? g.ground : g.typical)); assert.equal(SP.podiumStalls(e), SP.podiumLevelSum(g, +e.parkLevels, e.parkLast)); }
+  assert.equal(SP.metrics({ ...site, elements: o.elements, program: o.program }).spaces, pk.provided, 'the app and the check count the podium alike');
+});
+ok('a wrap the site can’t hold is said, not swapped silently', () => {
+  const site = { ...RECT, ring: [[0, 0], [380, 0], [380, 216], [0, 216]] }, o = RUN.runBrief(B.briefFromRequest('a wrap building with 172 apartments', site)).options[0];
+  if (!o.elements.some(e => e.wrap && e.kind === 'garage')) assert.ok((o.tplNotes || o.notes || []).concat(o.notes || []).some(t => /No wrap fits this site/.test(t)), JSON.stringify(o.tplNotes || o.notes));
+});
+ok('engine numbers from the reviewed dev evidence: corridor homes, the tower share, no ramp on one podium level', () => {
+  const RT = REFT, idx = JSON.parse(FS.readFileSync(new URL('../data/reference/index.json', import.meta.url), 'utf8')), part = Object.fromEntries((idx.projects || idx).map(p => [p.id, p.partition]));
+  for (const k of ['REF_CORRIDOR', 'REF_PODIUM']) { assert.ok(RT[k]?.evidence?.length >= 2, k + ' cites projects'); for (const id of RT[k].evidence) assert.equal(part[id], 'dev', k + ' cites ' + id + ' (dev only)'); }
+  assert.ok(RT.REF_CORRIDOR.gsfPerUnit > 900 && RT.REF_CORRIDOR.gsfPerUnit < 1150 && RT.REF_CORRIDOR.eff > 0.7 && RT.REF_CORRIDOR.eff < 0.9);
+  assert.equal(SP.PODIUM.towerShare, RT.REF_PODIUM.towerShare);
+  // a courtyard, a wrap, a courtyard on a podium and vertical mixed use count their homes at the reviewed gross area a home; a tower keeps the default
+  for (const [ask, want] of [['courtyard apartments, 150 units', Math.round(RT.REF_CORRIDOR.gsfPerUnit * 0.85)], ['a wrap building with 300 apartments', Math.round(RT.REF_CORRIDOR.gsfPerUnit * 0.85)], ['tower on a podium, 8 stories, 300 apartments', undefined]]) assert.equal(B.toEngine(B.briefFromRequest(ask, RECT)).program.unitSf, want, ask);
+  // one parking level: entered at grade, no ramp (P25); two levels: the ramp's 12 stalls
+  const one = SP.garagePlan({ w: 240, d: 128, parkLevels: 1 }), two = SP.garagePlan({ w: 240, d: 128, parkLevels: 2 });
+  assert.equal(one.ramp, null); assert.ok(two.ramp); assert.equal(one.typical - two.typical, SP.PODIUM.ramp);
+  // a wrap's garage that would over-park keeps only what it needs on its top level, and the plan and the check count it alike
+  const o = RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)).options[0], g = o.elements.find(e => e.kind === 'garage'), pk = o.quantities.parking;
+  assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.04, pk.provided + ' / ' + pk.required); assert.equal(SP.garageStalls(g), SP.garageGrid(g.w, g.d, g.levels, g.parkLast));
+});
+ok('a garage open to the air or not (IBC 406.5.2): a podium open on its sides, a garage boxed in by buildings needs ventilation', () => {
+  const r = RUN.runBrief(B.briefFromRequest('tower on a podium, 8 stories, 300 apartments', RECT)), o = r.options[0], c = o.validation.checks.find(k => k.id === 'eng.garage-vent');
+  assert.equal(c.status, 'pass', JSON.stringify(c)); assert.ok(o.elements.filter(e => e.form === 'tower').every(e => e.openness?.open === true && /open garage/.test(e.note || '')), 'each podium marked an open garage');
+  const g = { id: 'g', kind: 'garage', x: 450, y: 250, w: 200, d: 120, levels: 3, grid: true }, wall = (x, y, w, d, id) => ({ id, kind: 'building', use: 'multifamily', x, y, w, d, floors: 5 });
+  const boxed = [g, wall(450, 175, 260, 28, 'a'), wall(450, 325, 260, 28, 'b'), wall(335, 250, 28, 120, 'c'), wall(565, 250, 28, 120, 'd')];
+  const v = SP.garageOpenness(g, boxed); assert.equal(v.open, false); assert.ok(v.area < 0.2, 'openings ' + v.area);
+  assert.equal(SP.garageOpenness(g, [g]).open, true, 'a free-standing garage is open');
+  const k = V.validateLayout({ ...RECT, elements: boxed }, B.canonicalBrief(B.briefFromRequest('200 apartments', RECT))).checks.find(x => x.id === 'eng.garage-vent');
+  assert.equal(k.status, 'fail'); assert.match(k.note, /mechanical ventilation/);
+});
+ok('corridor buildings as deep as the request says: the bay drawn that deep, said to be an assumption, the default untouched', () => {
+  const b = B.briefFromRequest('mid-rise apartments, 4 stories, 83 ft deep corridor buildings, as many as fit', RECT);
+  assert.equal(b.program.uses[0].depth.value, 83); assert.equal(B.validateBrief(b).ok, true);
+  const o = RUN.runBrief(b).options[0], bs = o.elements.filter(e => e.template);
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(bs.length && bs.every(e => /-d83$/.test(e.template) && Math.round(Math.min(e.w, e.d)) === 83), 'every bar 83 ft deep');
+  assert.ok(bs.every(e => /deeper than any reviewed corridor building/.test(e.note)), 'the buildings say so');
+  assert.match(o.validation.checks.find(c => c.id === 'program.template').note, /83 ft deep as the request asks/);
+  assert.equal(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', RECT).program.uses[0].depth, undefined, 'no depth unless asked');
+  const bad = JSON.parse(JSON.stringify(b)); bad.program.uses[0].depth.value = 140; assert.equal(B.validateBrief(bad).ok, false);
+});
+ok('awkward lots: a flag lot, an easement and a wetland, a curving frontage, a half-acre lot', () => {
+  const at = (ring, extra = {}) => ({ ...RECT, ring, ...extra }), run = (ask, site) => RUN.runBrief(B.briefFromRequest(ask, site)).options[0];
+  // a flag lot: a 60 ft pole to the street (the entry narrows to a 24 ft driveway down it; before, no layout formed and the
+  // last-resort one had no drive at all)
+  const flag = at([[0, 0], [60, 0], [60, 300], [560, 300], [560, 900], [-200, 900], [-200, 300], [0, 300]]);
+  for (const ask of ['townhomes, as many as fit', '30,000 sf retail']) { const o = run(ask, flag); assert.equal(o.validation.status, 'pass', ask + ': ' + o.validation.failed.join()); assert.ok(o.elements.some(e => e.kind === 'drive' && e.name === 'Main entry'), ask + ': a main entry'); }
+  // keep-outs (a pipeline easement across, a wetland inside): nothing built or paved on them (the generator's layouts ignored them)
+  for (const ko of [[[0, 320], [900, 380], [900, 430], [0, 370]], [[520, 300], [700, 260], [760, 420], [600, 520], [500, 450]]]) {
+    const site = at([[0, 0], [900, 0], [900, 700], [0, 700]], { elements: [{ id: 'ko', kind: 'keepout', poly: ko, name: 'Easement', pinned: true }] }), o = run('garden apartments, as many as fit', site);
+    assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 140, 'units ' + o.quantities.totals.units);
+    assert.ok(!o.elements.some(e => !['keepout', 'green', 'tree', 'lot', 'trail', 'fence', 'sign'].includes(e.kind) && SP.rectsOverlap({ poly: SP.shapeOf(e) }, { poly: ko }, 1)), 'nothing on the keep-out'); }
+  // a curving frontage drawn as chords: the chords that carry the front's line on are street (entries along the curve)
+  const arc = []; for (let k = 0; k <= 10; k++) { const a = Math.PI * 0.75 - k * Math.PI * 0.5 / 10; arc.push([+(450 + 900 * Math.cos(a)).toFixed(1), +(-780 + 900 * Math.sin(a)).toFixed(1)]); } arc.reverse();
+  const curved = arc.concat([[arc[arc.length - 1][0], 700], [arc[0][0], 700]]);
+  assert.deepEqual(SP.streetRun(curved, 0), [1, 2, 3, 4, 5, 6, 7, 8, 9]); assert.deepEqual(SP.streetRun(RECT.ring, 0), []);
+  { const o = run('townhomes, as many as fit', at(curved)); assert.equal(o.validation.status, 'pass', o.validation.failed.join()); }
+  // a half-acre lot: a row of townhomes at the front setback, each with its driveway to the street
+  { const o = run('townhomes, as many as fit', at([[0, 0], [150, 0], [150, 145], [0, 145]])); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+    assert.ok(o.elements.filter(e => e.kind === 'drive' && e.driveway).length >= o.quantities.totals.units, 'a driveway a home'); }
+});
+ok('stacked townhomes: rows of stacked bays from the reviewed townhome bay, exactly the homes asked, an estimate said so', () => {
+  const b = B.briefFromRequest('stacked townhomes, 120 units', RECT); assert.equal(b.program.uses[0].form, 'mf-stacked-townhome'); assert.equal(b.program.uses[0].use, 'multifamily');
+  const r = RUN.runBrief(b), o = r.options[0]; assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 120);
+  const S2 = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.ok(S2.length && S2.every(e => e.template === 'mf-stacked-2over2-4s' && e.floors === 4 && e.modules >= 6 && e.modules <= 10 && e.units === 2 * e.modules && Math.min(e.w, e.d) === 42), 'rows of 6-10 stacked bays, two homes a bay');
+  assert.ok(S2.every(e => /estimate/.test(e.note) && e.stacked?.bays === e.modules), 'the stacking said to be an estimate, the bays recorded for the drawing');
+  assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+  assert.ok(planSVG({ ...RECT, elements: o.elements, program: o.program }, { px: 520 }).svg.length > 1000);
+  assert.equal(RUN.replayRun(r).identical, true);
+});
+ok('build-to-rent cottages: a community of detached cottages for rent on private lanes, the reviewed P20 cottage, 1.5 spaces a home', () => {
+  const b = B.briefFromRequest('build-to-rent cottages, as many as fit', RECT); assert.equal(b.program.uses[0].form, 'mf-cottage-btr');
+  const r = RUN.runBrief(b), o = r.options[0]; assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.ok(!o.validation.checks.some(c => !c.hard && c.status === 'fail'), 'no warnings: ' + o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id).join());
+  const H = o.elements.filter(e => e.kind === 'building' && e.use === 'sfr'); assert.ok(H.length >= 50 && H.every(e => e.cottage && e.floors === 1 && e.padSpaces >= 1), H.length + ' cottages');
+  assert.ok(H.some(e => /2 bed 37 × 45 · 1,331 sf/.test(e.note)), 'the reviewed P20 two-bed cottage');
+  const pk = o.quantities.parking; assert.equal(pk.required, Math.ceil(H.length * 1.5 - 0.01)); assert.ok(pk.provided >= pk.required);
+  const m = SP.metrics({ ...RECT, elements: o.elements, program: o.program }); assert.equal(m.units, H.length);
+  const exact = RUN.runBrief(B.briefFromRequest('a cottage community of 60 rental cottages', RECT)).options[0]; assert.equal(exact.validation.status, 'pass'); assert.equal(exact.quantities.totals.units, 60);
+  const pf = PF.metricsOf({ ...RECT, elements: o.elements, program: o.program }); assert.equal(pf.uses.sfr.homes.cottage, H.length, 'the pro forma rents them as cottages');
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
+ok('a smaller pond never costs homes: mid-rise as many as fit keeps its whole-module bars (288, every building templated)', () => {
+  const o = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', { ...RECT, setbacks: { front: 25, side: 10, rear: 20, paving: 10 } })).options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 288, 'units ' + o.quantities.totals.units);
+  assert.ok(o.validation.checks.every(c => c.hard || c.status !== 'fail'), 'no warnings: ' + o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id).join());
+  assert.ok(o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily').every(e => Math.round(Math.max(e.w, e.d)) % 50 === 0), 'bars in whole 50 ft bays');
+});
+ok('no room for a pond: detention goes underground, said as an assumption', () => {
+  const o = RUN.runBrief(B.briefFromRequest('2,500 sf restaurant with a drive-thru', { ...RECT, ring: [[0, 0], [210, 0], [210, 230], [0, 230]], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } })).options[0];
+  const d = o.validation.checks.find(c => c.id === 'eng.detention');
+  assert.notEqual(d.status, 'fail', JSON.stringify(d).slice(0, 300));
+  if (!o.elements.some(e => e.kind === 'pond')) { assert.equal(o.program.storm, 'underground'); assert.ok((o.tplNotes || o.notes || []).some(t => /underground/i.test(t)) || /underground/i.test(d.note || ''), 'said'); }
+});
+ok('drawing polish: an entrance\'s name inside the site, "1 space", a trail that follows its pond, held land shut in by the work is open space', () => {
+  // the entrance's name where its drive meets the street stays inside the lot line (it ran across it: "AIN ENTRY")
+  const site = { ...RECT, elements: [{ id: 'm', kind: 'drive', name: 'Main entry', entry: true, x: 450, y: 22, w: 24, d: 46 }, { id: 'a', kind: 'drive', x: 450, y: 57, w: 400, d: 24 }] };
+  const svg = planSVG(site, { px: 1040, pad: 18 }).svg, t = /<text x="([\d.]+)" y="([\d.]+)"[^>]*>(?:<tspan[^>]*>)?MAIN ENTRY/.exec(svg); assert.ok(t, 'the entry is named');
+  const k = 1040 / 936, fy = 518 - +t[2] / k; // (the label's middle in plan feet: the drawing runs 18 ft past the site each side)
+  assert.ok(fy > 0, 'the name sits inside the site, not across its street line: ' + fy.toFixed(1) + ' ft');
+  // one stall reads "1 space"
+  assert.equal(SP.labelOf({ kind: 'parking', x: 100, y: 100, w: 9, d: 18, row: 1 }).size, '1 space');
+  // a pond moved beside the work takes its walking loop with it
+  const pond = { id: 'p', kind: 'pond', x: 800, y: 420, w: 120, d: 80 }, trail = { id: 't', kind: 'trail', closed: true, path: SP.grow(SP.corners(pond), 15) }, bld = { id: 'b', kind: 'building', use: 'retail', x: 200, y: 120, w: 160, d: 80 }, drv = { id: 'd', kind: 'drive', x: 200, y: 40, w: 300, d: 24, entry: true };
+  const moved = RUN.pondBesideWork(RECT, { elements: [pond, trail, bld, drv] }), p2 = moved.elements.find(e => e.id === 'p'), t2 = moved.elements.find(e => e.id === 't');
+  assert.notEqual(p2.x, 800, 'the pond moved'); assert.ok(!t2 || t2.path.every(q => SP.inRing(q, SP.grow(SP.corners(p2), 40))), 'its trail went with it, or went (never left round the old spot)');
+  // a scrap of held land shut in by drives is open space; a piece held for a purpose stays
+  const scrap = { id: 's', kind: 'green', future: true, name: 'Future development', poly: [[300, 200], [400, 200], [400, 260], [300, 260]] }, pad = { id: 'f', kind: 'green', future: true, name: 'Future pad site', poly: [[500, 200], [600, 200], [600, 260], [500, 260]] };
+  const r = RUN.shutInFuture(RECT, { elements: [scrap, pad] }); assert.equal(r.elements.find(e => e.id === 's').name, 'Open space'); assert.ok(!r.elements.find(e => e.id === 's').future); assert.ok(r.elements.find(e => e.id === 'f').future);
+});
 console.log('layoutrun: ' + n + ' passed');
