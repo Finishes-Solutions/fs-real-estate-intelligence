@@ -361,5 +361,13 @@ ok('a narrow deep lot: an emergency access lane gives the second way in, counted
   assert.equal(RUN.replayRun(r).identical, true);
   // a real entrance far enough away still ranks ahead of a lane (the rotated garden site: no lane on its top option)
 });
+ok('a long frontage gets two real ways in far enough apart, not a gated lane (mixed use on 40 ac, a tower on 10 ac)', () => {
+  const big = { ...RECT, ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]] };
+  for (const [ask, site] of [['20,000 sf retail along the main road, 240 apartments behind and 80 townhomes', big], ['tower on a podium, 8 stories, 300 apartments', RECT]]) {
+    const o = RUN.runBrief(B.briefFromRequest(ask, site)).options[0], rm = o.validation.checks.find(c => c.id === 'access.remote');
+    assert.equal(o.validation.status, 'pass', ask + ': ' + o.validation.failed.join()); assert.equal(rm.status, 'pass', ask + ': ' + JSON.stringify(rm));
+    assert.ok(!o.elements.some(e => e.emergency), ask + ': no emergency lane where the street has room for a real entrance');
+  }
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
