@@ -14,6 +14,7 @@ import * as T from '../lib/bldgtemplates.mjs';
 import * as SP from '../lib/siteplan.mjs';
 
 const QUICK = process.argv.includes('--quick');
+const PF = await import('../lib/proforma.mjs');
 let n = 0; const ok = (name, f) => { f(); n++; console.log('ok', n, name); };
 
 // ---------- primitives ----------
@@ -405,6 +406,20 @@ ok('a cross-dock: doors and a truck court on both long sides, trailer stalls, tr
   // the check reads the drawing: a warehouse with a court on one side only fails it
   const one = o.elements.filter(e => !(e.kind === 'truck' && e.x > X.x));
   assert.equal(V.validateLayout({ ...B.toEngine(r.brief).plan, elements: one, program: o.program }, r.brief).checks.find(c => c.id === 'program.u1.crossdock').status, 'fail');
+});
+ok('vertical mixed use: shops on the ground floor, apartments above, each use counted and parked at its own ratio', () => {
+  const ask = 'a 5-story mixed-use building with 20,000 sf ground-floor retail and 200 apartments above', b = B.briefFromRequest(ask, RECT);
+  assert.deepEqual(b.program.uses.map(u => [u.use, u.form]), [['retail', 'mx-vertical'], ['multifamily', 'mx-vertical']]);
+  const r = RUN.runBrief(b), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.byUse.multifamily.units, 200); assert.equal(o.quantities.byUse.retail.gfa, 20000);
+  const M = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'), shops = M.filter(e => e.ground);
+  assert.equal(shops.length, 1, 'one stretch with shops below'); assert.ok(M.every(e => e.floors === 5 && e.mixed === M[0].mixed), 'one 5-story building');
+  const pk = o.quantities.parking; assert.equal(pk.required, Math.ceil(200 * 1.6 + 20000 / 1000 * 4)); assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.06, pk.provided + ' / ' + pk.required);
+  const plan = { ...RECT, elements: o.elements, program: o.program }, m = SP.metrics(plan); assert.equal(m.units, 200); assert.equal(m.required, pk.required); assert.equal(m.spaces, pk.provided, 'the app and the check count the same spaces');
+  assert.match(SP.labelOf(shops[0], o.program).size, /20,000 sf retail \+ \d+ units · 5 fl/);
+  assert.ok(SP.planFeatures(plan, null).features.some(f => f.properties.k === 'b3' && f.properties.part === 'storefront'), 'storefronts in 3D');
+  const pm = PF.metricsOf(plan); assert.equal(Math.round(pm.uses.retail.gsf), 20000); assert.ok(pm.uses.multifamily.gsf < SP.gfaOf(shops[0]) + M.filter(e => !e.ground).reduce((t, e) => t + SP.gfaOf(e), 0));
   assert.equal(RUN.replayRun(r).identical, true);
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });

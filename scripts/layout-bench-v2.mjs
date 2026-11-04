@@ -42,7 +42,8 @@ const CASES = [
   { id: 'IN-warehouse', family: 'industrial', site: 'big40', ask: 'warehouse with truck court, 250,000 sf' },
   { id: 'IN-crossdock', family: 'industrial', site: 'big40', ask: 'cross-dock warehouse, 400,000 sf' },
   { id: 'FL-flex', family: 'flex', site: 'rect10', ask: 'flex industrial buildings, 60,000 sf' },
-  { id: 'MX-horizontal', family: 'mixed_use', site: 'big40', ask: '20,000 sf retail along the main road, 240 apartments behind and 80 townhomes' }
+  { id: 'MX-horizontal', family: 'mixed_use', site: 'big40', ask: '20,000 sf retail along the main road, 240 apartments behind and 80 townhomes' },
+  { id: 'MX-vertical', family: 'mixed_use', site: 'rect10', ask: 'a 5-story mixed-use building with 20,000 sf ground-floor retail and 200 apartments above' }
 ];
 const plan = id => ({ origin: [-96.42, 30.38], ring: SITES[id], front: 0, streets: [], setbacks: { ...SB } });
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });

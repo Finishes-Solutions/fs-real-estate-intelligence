@@ -202,7 +202,7 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    the master plan drains off site (P35: 224 -> 355 units with it off); as many as fit below an exact count that fits;
    one frame on a wedge site (P36: 1 building of 3); no compact urban podium-courtyard / wrap form and the 60% tower
    share (E054); no fee-simple townhome-lot product and an exact townhome count below the maximize result (P18).
-6. Tuck-under (done Nov 4) and vertical mixed use, each with its own geometry and tests.
+6. Done Nov 4: tuck-under (6e, from E053), cross-dock (6c) and vertical mixed use (6d), each with its own geometry and tests.
 6c. Done Nov 4 (cross-dock, partial). "A cross-dock warehouse" (form ind-cross-dock; the engine program's `crossDock`)
    draws lib/sitegencom.mjs crossDock: a deep building running back from the street (400-600 ft across, its length the
    floor area over that), dock doors at 12 ft centres on both long walls (`docks` on the building, marked on the sheet),
@@ -214,6 +214,19 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    one stall for every two doors, a warning) and .trucks (no truck piece or truck drive touches car parking, hard).
    Bench IN-crossdock: 400,000 sf, 245 / 240 spaces, 130 trailer stalls. Still: no truck turning paths (no design
    vehicle), clear height a default, no guard house.
+5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
+6d. Done Nov 4 (vertical mixed use, partial). "A 5-story mixed-use building with 20,000 sf ground-floor retail and 200
+   apartments above" (form mx-vertical, VERTICAL_WORDS in lib/layoutbrief.mjs) becomes one program (multifamily,
+   arrangement 'vertical', groundRetail sf, floors with the shop floor counted). lib/sitegen.mjs verticalOf draws one
+   double-loaded building along the street: a stretch drawn to the shops' floor area carries `ground: { use: 'retail',
+   floors: 1 }` (shops below, apartments above), the rest apartments on every floor; the pieces share a `mixed` / `court`
+   tag (one building). A drive down each end to a shared surface field behind, each use parked at its own ratio (no
+   shared-parking reduction). Every consumer reads `ground` through lib/siteplan.mjs groundOf: metrics (units, parking,
+   leasable), the validator (byUse retail gfa from the ground floor, the building's use the floors above; levels with a
+   16 ft shop floor), the tally, labels ("20,000 sf retail + 75 units · 5 fl"), the sheet (a storefront band in the
+   shops' colour along the street face), the map and massing (a taller shop floor, glass storefronts), the pro forma.
+   Bench MX-vertical: 200 units, 20,000 sf, 409 / 400 spaces. Still: no garage option, the shops' loading / trash and
+   the residential lobby aren't drawn, units from floor area (no reviewed vertical mixed-use template).
 6a. Done Nov 3 (wrap, partial). "A wrap building" (form mf-wrap, program arrangement 'wrap', 5 floors unless the words
    say) is drawn by lib/sitegen.mjs wrapOf: one double-loaded building (65 ft wings: a street wing the full width, a wing
    down each side) on three sides of a parking garage, an amenity courtyard with the pool between the street wing and the
