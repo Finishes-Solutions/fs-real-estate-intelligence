@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-03
 
+### 7:09 PM CT: Cleaner layouts: exact counts without empty bays, ponds without spikes, a second way in found, courtyards as one building (this push)
+- **A number you give is exactly that, unless you've set Leftover land yourself.** "200 courtyard apartments" builds 200 and leaves the rest as future development; "as many as fit" still fills the site; choosing Fill under Settings › Leftover land still fills it.
+- **No empty paved blocks after an exact count:** the layout is drawn for the count first (exactly 120 garden apartments: 204 spaces for 192 needed, was 284; about a quarter less paving), and parking rows nothing uses are taken out.
+- **A second way in is found** where the fire code asks for one, cutting the pond back if it took the only free stretch of street (Hockley: every option now has two), and a third at the far end when two are too close together.
+- **Ponds without spikes:** a pond's thin wedge into a corner is trimmed (it showed as a grey triangle along FM 2920), and a walking trail split round a new entrance no longer draws a tan wedge across the site.
+- **Courtyard buildings** are one building: wings that meet or stand a breezeway apart round one court; shared corners counted once; the clubhouse in the court is reached through it; a pool that ran into a wing moves (or gets a little smaller) to fit the court. Courtyard requests show courtyard layouts first among the ones that pass.
+- **Options differ:** layouts with the same numbers as one already shown, or far below the best, are left out; capped requests ("up to 150") aim for the cap (144, was 24).
+
 ### 6:16 PM CT: The independent check asks for a second way in, and shows detention against the rule of thumb (this push)
 - **A second way in where the fire code asks for one** (over 200 apartments or 30 homes, IFC Appendix D where adopted): a plan without one fails the check; how far apart the two are (at least half the site's diagonal) is shown as its own line. Plans that will need two now plan for them from the start.
 - **Detention is measured:** the pond against the rule-of-thumb area for the site (Hockley: about 70%), saying what the rest needs; still never shown as passing, since it isn't a drainage design.

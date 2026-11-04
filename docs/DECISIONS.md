@@ -180,3 +180,12 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - **Two zones of the same use with no placement get a front-to-back order** in the run layer (stated in the run's notes). The band engine can't lay out two apartment zones (18 units on 29 ac); fixing the band engine itself is left for later.
 - **Studio buildings are an estimate**: the reviewed garden stack with six homes a floor instead of four. No studio-only building was reviewed in the library.
 - **A word "studio" makes studio homes only with apartment wording or the plural**, never for a yoga, dance, recording, art, fitness, photo or tattoo studio.
+
+## Layout repair passes; what a bare number means in Build (2026-11-03, later)
+
+- **A bare number in Build is exact** unless Leftover land was chosen in Settings (fillBy 'you') or the words asked to hold land (fillBy 'ask'). The earlier "fill the site" default turned a stated count into fill-the-site, which the layout-engine brief rules out; "as many as fit" still fills.
+- **Repairs live in the run layer, not the engine**, each kept only when no hard check gets worse; the engine's own behaviour is unchanged outside a run.
+- **Courtyard wings stay rectangles** tagged with one court id: a joined outline lost the 3D facades and confused the plan sets (one big building, one unit).
+- **Unit counts on buildings without a template** (courtyard, tower) are floor-area estimates, so an exact count may be met by sizing homes between 750 and 1,400 gross sf; templated buildings never change their schedule.
+- **A pool may shrink to 75%** to fit its court rather than overlap a wing; the note says so.
+- **Fire-code spacing between ways in is a warning, not a hard check**: fire officials commonly accept an emergency-only access; the count of ways in (two past 200 apartments or 30 homes) is hard.

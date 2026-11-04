@@ -3052,8 +3052,8 @@ export function initSitePlan(ctx) {
   }
   function verifyHTML(pl) {
     let r; try {
-      const brief = LB.canonicalBrief(LB.briefFromProgram(pl.program, pl, { text: '' })), fm = SP.fillMode(pl.params);
-      for (const u of brief.program.uses) if (u.quantity.mode !== 'maximize') u.quantity.mode = fm === 'hold' ? 'exact' : 'min'; // what Leftover land says the size means
+      const brief = LB.canonicalBrief(pl.run?.brief ? { ...pl.run.brief, site: LB.siteFromPlan(pl), locks: [], locked: {} } : LB.briefFromProgram(pl.program, pl, { text: '' })), fm = SP.fillMode(pl.params);
+      if (!pl.run?.brief) for (const u of brief.program.uses) if (u.quantity.mode !== 'maximize') u.quantity.mode = fm === 'hold' ? 'exact' : 'min'; // (a plan without a run: what Leftover land says the size means)
       r = LV.validateLayout(pl, brief);
     } catch (e) { return '<div class="rnote">The check couldn’t run on this plan: ' + esc(e.message) + '</div>'; }
     const icon = { pass: '✓', fail: '✕', unknown: '?', 'n/a': '–' }, val = v => v == null ? '' : Array.isArray(v) ? v.join('–') : typeof v === 'object' ? Object.entries(v).map(([k, x]) => k + ' ' + x).join(', ') : typeof v === 'number' ? f0(v) : String(v);
@@ -4133,7 +4133,7 @@ export function initSitePlan(ctx) {
     let v = ed.variants?.[i]; if (!v || Array.isArray(v.elements) && !v.elements.length) return false;
     const was = v.stale; if (!v.elements || was) { v = await relay(i, was); if (!v) return false; i = ed.variants.indexOf(v); } // out of date, or numbers only: laid out again for this site first
     applying = true;
-    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = SP.keepNames({ ...(v.program || x.program) }, x.program, !o.fresh); /* (the names as they are now: the layout's copy is from when it was laid out; a build's own new layouts carry its names) */ x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; if (v.laidAs || x.laidAs) x.laidAs = v.laidAs || null; }); }
+    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; if (v.run?.brief) x.run = { inputHash: v.run.inputHash, seed: v.run.seed, versions: v.run.versions, brief: v.run.brief }; else delete x.run; /* (the run it came from: the Independent check reads what each size meant) */ x.program = SP.keepNames({ ...(v.program || x.program) }, x.program, !o.fresh); /* (the names as they are now: the layout's copy is from when it was laid out; a build's own new layouts carry its names) */ x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; if (v.laidAs || x.laidAs) x.laidAs = v.laidAs || null; }); }
     finally { applying = false; }
     ed.sel = null; ed.solveBar = false; if (was) PL().stale = null; saveRun(); if (!o.quiet) { draw(); panel(); }
     nameNew(PL()); // (street names on: a new layout's streets named too, in the same undo step)

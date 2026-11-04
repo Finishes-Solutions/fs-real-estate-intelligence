@@ -222,5 +222,13 @@ ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre squ
   const lone = RUN.runPlan({ ...site, streets: [], params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
   assert.ok(lone.options.every(o => SP.entrancesOf(o.elements).length >= 2 || o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | '));
 });
+ok('a courtyard building: its wings one building, shared corners once, the pool clear, exactly the units asked', () => {
+  const r = RUN.runBrief(B.briefFromRequest('courtyard apartments, 150 units', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 150);
+  const wings = o.elements.filter(e => e.court); assert.ok(wings.length >= 3 && new Set(wings.map(e => e.court)).size === 1, 'the wings carry one court id');
+  assert.ok(wings.every(e => !e.poly), 'wings stay rectangles (3D facades and plan sets read them)');
+  assert.ok(SP.planFeatures({ ...RECT, elements: o.elements, program: o.program }, null).features.filter(f => f.properties.k === 'fac').length > 100, 'the 3D facades are drawn (a joined outline had none)');
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

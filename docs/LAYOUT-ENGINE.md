@@ -160,6 +160,16 @@ selection; placement edits only reorder zones of a mixed plan.
 - Not yet: "More layouts" and scenario layouts still call the engine directly; the AI program step doesn't emit quantity
   modes; exports and the pro forma read the plan as before.
 
+## 8b. Layout repair passes in the run (Nov 3, later)
+
+Each runs after the engine and is kept only when no hard check gets worse (`keepIfNoWorse`):
+joinCourtyard (wings within 15 ft round one court tagged as one building, corner overlaps trimmed) → nudgeAmenities
+(pools / courts / play / trash off buildings and paving; a pool may shrink to 75%) → exactByUnitSize (untemplated exact
+counts: homes 750–1,400 gross sf) → templates → trimHomes → fitParking → tidyPonds (corners under 35° cut, ≥ 90% of area)
+→ pruneSurplus (unused parking rows and dead-end drives) → addSecondAccess (pond set aside and cut back; a third way in
+for fire-code spacing) → tidyPonds again. Exact counts ask the engine for the count first and retry with more only when
+short. A bare number in Build is exact unless Leftover land was set by the user or the words.
+
 ## 9. Next tasks (in order)
 
 1. Done for Build (Nov 3). Still: "More layouts", scenarios and the MCP `site_plan` tool through `runPlan`; the
@@ -169,5 +179,7 @@ selection; placement edits only reorder zones of a mixed plan.
 4. Courtyard: a continuous courtyard building form (no corner overlaps), then mark it validated if the benchmark passes.
 5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
 6. Wrap, tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
+6b. Podium parking: the tower-on-podium form plans surface parking for every unit (199 of 300 on 10 ac); its podium
+   levels should hold structured parking.
 7. Turning movements with a declared design vehicle; detention from topography (needs engineering inputs).
-8. Main entry off-centre when two remote ways in are needed (on a 900 ft frontage a centred entry can't be 515 ft from another); the pond kept off the street frontage (Hockley's pond wedge took the corner a second entry needed); mirrored options with the same numbers.
+8. (Partly done: a third way in at the far end.) Main entry off-centre when two remote ways in are needed (on a 900 ft frontage a centred entry can't be 515 ft from another); the pond kept off the street frontage (Hockley's pond wedge took the corner a second entry needed); mirrored options with the same numbers.
