@@ -181,7 +181,7 @@ ok('templated buildings are whole modules with units from the schedule', () => {
 const RECT = { origin: [-96.42, 30.38], ring: [[0, 0], [900, 0], [900, 500], [0, 500]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
 const LSITE = { origin: [-96.42, 30.38], ring: [[0, 0], [800, 0], [800, 380], [420, 380], [420, 700], [0, 700]], front: 0, streets: [], setbacks: { ...SP.SETBACKS } };
 ok('outcomes are told apart', () => {
-  assert.equal(RUN.runBrief(B.briefFromRequest('stacked townhomes, 40 homes', RECT)).outcome, 'unsupported');
+  assert.equal(RUN.runBrief(B.briefFromRequest('a side-load warehouse, 200,000 sf', RECT)).outcome, 'unsupported');
   assert.equal(RUN.runBrief(B.briefFromRequest('exactly 20000 garden apartments', RECT)).outcome, 'proven-infeasible');
   assert.equal(RUN.runBrief({ ...B.briefFromRequest('100 apartments', RECT), site: { units: 'ft', ring: [] } }).outcome, 'missing-information');
 });
@@ -538,6 +538,28 @@ ok('awkward lots: a flag lot, an easement and a wetland, a curving frontage, a h
   // a half-acre lot: a row of townhomes at the front setback, each with its driveway to the street
   { const o = run('townhomes, as many as fit', at([[0, 0], [150, 0], [150, 145], [0, 145]])); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
     assert.ok(o.elements.filter(e => e.kind === 'drive' && e.driveway).length >= o.quantities.totals.units, 'a driveway a home'); }
+});
+ok('stacked townhomes: rows of stacked bays from the reviewed townhome bay, exactly the homes asked, an estimate said so', () => {
+  const b = B.briefFromRequest('stacked townhomes, 120 units', RECT); assert.equal(b.program.uses[0].form, 'mf-stacked-townhome'); assert.equal(b.program.uses[0].use, 'multifamily');
+  const r = RUN.runBrief(b), o = r.options[0]; assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 120);
+  const S2 = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.ok(S2.length && S2.every(e => e.template === 'mf-stacked-2over2-4s' && e.floors === 4 && e.modules >= 6 && e.modules <= 10 && e.units === 2 * e.modules && Math.min(e.w, e.d) === 42), 'rows of 6-10 stacked bays, two homes a bay');
+  assert.ok(S2.every(e => /estimate/.test(e.note) && e.stacked?.bays === e.modules), 'the stacking said to be an estimate, the bays recorded for the drawing');
+  assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+  assert.ok(planSVG({ ...RECT, elements: o.elements, program: o.program }, { px: 520 }).svg.length > 1000);
+  assert.equal(RUN.replayRun(r).identical, true);
+});
+ok('build-to-rent cottages: a community of detached cottages for rent on private lanes, the reviewed P20 cottage, 1.5 spaces a home', () => {
+  const b = B.briefFromRequest('build-to-rent cottages, as many as fit', RECT); assert.equal(b.program.uses[0].form, 'mf-cottage-btr');
+  const r = RUN.runBrief(b), o = r.options[0]; assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.ok(!o.validation.checks.some(c => !c.hard && c.status === 'fail'), 'no warnings: ' + o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id).join());
+  const H = o.elements.filter(e => e.kind === 'building' && e.use === 'sfr'); assert.ok(H.length >= 50 && H.every(e => e.cottage && e.floors === 1 && e.padSpaces >= 1), H.length + ' cottages');
+  assert.ok(H.some(e => /2 bed 37 × 45 · 1,331 sf/.test(e.note)), 'the reviewed P20 two-bed cottage');
+  const pk = o.quantities.parking; assert.equal(pk.required, Math.ceil(H.length * 1.5 - 0.01)); assert.ok(pk.provided >= pk.required);
+  const m = SP.metrics({ ...RECT, elements: o.elements, program: o.program }); assert.equal(m.units, H.length);
+  const exact = RUN.runBrief(B.briefFromRequest('a cottage community of 60 rental cottages', RECT)).options[0]; assert.equal(exact.validation.status, 'pass'); assert.equal(exact.quantities.totals.units, 60);
+  const pf = PF.metricsOf({ ...RECT, elements: o.elements, program: o.program }); assert.equal(pf.uses.sfr.homes.cottage, H.length, 'the pro forma rents them as cottages');
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 ok('a smaller pond never costs homes: mid-rise as many as fit keeps its whole-module bars (288, every building templated)', () => {

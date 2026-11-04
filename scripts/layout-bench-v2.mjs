@@ -46,6 +46,8 @@ const CASES = [
   { id: 'MF-tower', family: 'multifamily', site: 'rect10', ask: 'tower on a podium, 8 stories, 300 apartments' },
   { id: 'MF-wrap', family: 'multifamily', site: 'rect10', ask: 'a wrap building with 300 apartments' },
   { id: 'MF-tuckunder', family: 'multifamily', site: 'rect10', ask: 'tuck-under apartments, 120 units' },
+  { id: 'MF-stacked', family: 'multifamily', site: 'rect10', ask: 'stacked townhomes, 120 units' },
+  { id: 'MF-btr', family: 'multifamily', site: 'rect10', ask: 'build-to-rent cottages, as many as fit' },
   { id: 'RE-strip', family: 'retail', site: 'rect10', ask: 'exactly 28,000 sf retail in four buildings' },
   { id: 'RE-anchored', family: 'retail', site: 'big40', ask: 'anchored shopping center with a 40,000 sf anchor, 80,000 sf total' },
   { id: 'RE-pad', family: 'retail', site: 'pad1', ask: '2,500 sf restaurant with a drive-thru' },

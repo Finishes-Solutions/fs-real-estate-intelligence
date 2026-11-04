@@ -18,7 +18,7 @@ const rp = await callTool('layout_replay', { record: rec }); assert.match(text(r
 const ed = await callTool('layout_edit', { record: rec, edits: [{ op: 'set-quantity', use: 'retail', quantity: { mode: 'exact', value: 20000, unit: 'sf' } }] });
 assert.ok(!ed.isError, text(ed)); assert.match(text(ed), /Done: retail/); const rec2 = recOf(ed); assert.equal(rec2.edit.steps.length, 1);
 const no = await callTool('layout_edit', { record: rec, words: 'Lock these two buildings' }); assert.ok(no.isError); assert.match(text(no), /selection/); console.log('mcp layout_edit ok');
-const un = await callTool('layout_run', { request: 'stacked townhomes, 40 homes', ring_ft: ring }); assert.match(text(un), /^Outcome: unsupported/);
+const un = await callTool('layout_run', { request: 'a side-load warehouse, 200,000 sf', ring_ft: ring }); assert.match(text(un), /^Outcome: unsupported/);
 const caps = await callTool('layout_capabilities', {}); assert.match(text(caps), /mf-podium \(multifamily\): partial/); console.log('mcp layout_capabilities ok');
 const bad = await callTool('layout_run', {}); assert.ok(bad.isError); assert.match(text(bad), /Give brief/);
 
