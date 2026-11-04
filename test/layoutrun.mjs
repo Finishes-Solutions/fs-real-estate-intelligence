@@ -117,7 +117,7 @@ ok('exclusions are kept clear', () => {
 ok('parking required and provided reported separately; a shortfall fails with no tolerance', () => {
   const b = briefFor(); b.rules.values.parkingPer1000 = { v: 5, cls: 'verified', source: 'Test ordinance §1' };
   const r = V.validateLayout(lay(good()), b), c = r.checks.find(x => x.id === 'parking.count');
-  assert.equal(c.status, 'fail'); assert.equal(c.required, 30); assert.equal(c.measured, 26); assert.equal(c.basis, 'verified');
+  assert.equal(c.status, 'fail'); assert.equal(c.required, 30); assert.equal(c.measured, 25); assert.equal(c.basis, 'verified'); // (26 stalls drawn, less the accessible pair's aisle)
 });
 ok('missing evidence is never a pass', () => {
   const b = briefFor(); delete b.rules.values.buildingSeparation;
@@ -328,6 +328,24 @@ ok('an entrance drawn across the street line (its apron out in the street) is a 
   const plan = { ...RECT, elements: [{ id: 'd1', kind: 'drive', name: 'Main entry', entry: true, x: 450, y: 20, w: 24, d: 44 }, { id: 'b1', kind: 'building', use: 'retail', x: 450, y: 200, w: 100, d: 60 }] };
   const c = V.validateLayout(plan, B.canonicalBrief(B.briefFromRequest('6,000 sf retail', RECT))).checks.find(k => k.id === 'access.entrance');
   assert.equal(c.status, 'pass', JSON.stringify(c));
+});
+ok('mixed use on the Hockley parcel: exactly the apartments asked, no empty paved block, the check and the app count parking alike', () => {
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { ...SP.SETBACKS }, elements: [] };
+  const ask = '20,000 sf retail on FM 2920, 250 apartments behind', r = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask }), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.check.status, 'pass', o.check.failed.join());
+  const B = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'); assert.equal(B.reduce((t, e) => t + e.units, 0), 250);
+  assert.ok(B.some(e => e.combined > 0), 'the last homes combined into larger ones (whole stacks give 252)');
+  // every parking row has a building within 120 ft (trimming to the count shortens buildings, it doesn't empty a block)
+  const far = o.elements.filter(e => e.kind === 'parking').filter(p => !o.elements.some(b => b.kind === 'building' && SP.gapBetween(SP.shapeOf(p), SP.shapeOf(b)) <= 120));
+  assert.equal(far.length, 0, far.length + ' parking rows with no building near');
+  const m = SP.metrics({ ...site, elements: o.elements, program: o.program }), q = V.quantities({ ...site, elements: o.elements, program: o.program }, o.run.brief);
+  assert.equal(q.parking.provided, m.spaces, 'the validator and the app count the same spaces (accessible aisles taken out)');
+  assert.ok(m.spaces >= m.required);
+});
+ok('a schedule that combines homes reconciles; one that combines too many does not', () => {
+  const site = { ...RECT }, bl = { id: 'b', kind: 'building', use: 'multifamily', x: 450, y: 250, w: 300, d: 60, floors: 3, template: 'mf-garden-breezeway-3s', modules: 4, units: 46, tplUnits: 46, tplL: 300, combined: 2 };
+  const brief = B.briefFromRequest('exactly 46 garden apartments', site), chk = els => V.validateLayout({ ...site, elements: els }, brief).checks.find(c => c.id === 'program.buildings');
+  assert.equal(chk([bl]).status, 'pass'); assert.equal(chk([{ ...bl, combined: 13, units: 35, tplUnits: 35 }]).status, 'fail');
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
