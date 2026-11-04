@@ -30,7 +30,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.equal(Math.round(T.footprintOf([club, apt])), Math.round(S.footArea(club) + S.footArea(apt)));
 
   // copying: a curved connector drive (a path) comes out whole, with new ids and finite points
-  const curve = plan.elements.find(e => e.kind === 'drive' && e.path), d = T.dupPieces(plan, [curve.id], { newId });
+  const curve = plan.elements.find(e => e.kind === 'drive' && e.path && !e.entry && e.name !== 'Main entry'), d = T.dupPieces(plan, [curve.id], { newId }); // (a connector, not the way in: an entrance drawn along its centre line copies with its median and signs)
   assert.equal(d.elements.length, plan.elements.length + 1); const c = d.elements.find(e => e.id === d.ids[0]);
   assert.ok(c && c.id !== curve.id && finite(c) && c.path.length === curve.path.length && c.pinned, 'a copied path drive has finite points');
   assert.ok(Math.hypot(c.x - curve.x, c.y - curve.y) > 20, 'beside the original, not on it');
@@ -342,8 +342,8 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.ok(S.ringArea(S.outline(bent)) < S.ringArea(S.outline(tight)), 'a bigger Curve rounds the bend off more');
 }
 // ---- turning any piece (curved ponds, lawns, drawn outlines, routes, medians, fences): the real 240-unit plan ----
-// (a plan with the entry's median for this part: the generator's layout of rows wins this site with a plain entry, no room
-// in front of its first aisle for a median, so the search's layout is used here)
+// (a plan with the entry's median for this part: the default layout, its short median at the mouth; the search's layout
+// only if a layout comes without one)
 const planM = plan.elements.some(S.isMedian) ? plan : (o2 => ({ ...tract, elements: o2.elements, program: o2.program, recipe: o2.recipe }))(L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1, gallery: false })[0]);
 {
   const ED = await import('../lib/siteedit.mjs');

@@ -22,7 +22,7 @@ for (const c of cases) assert.ok(Math.abs(area(c.ring) / 43560 - c.ref.acres) / 
 // asked: 330 and 341 short where 350 and 355 passed, those on buildings no template fit; as many as fit settled on 304)
 const p35 = cases.find(c => c.id === 'P35'), ask = n => ({ key: 'n' + n, ask: 'exactly ' + n + ' senior apartments, mid-rise, 4 stories, with elevators, underground detention' });
 const f = evalRun(p35, p35.runs.find(x => x.key === 'fill-ug'));
-assert.equal(f.status, 'pass', f.failed?.join()); assert.ok(!(f.failed || []).includes('program.template'));
+assert.equal(f.status, 'pass', f.failed?.join()); assert.ok(!(f.failed || []).includes('program.template')); assert.ok(f.units >= 320, 'as many as fit ' + f.units + ' (320 before the generated layouts got their entry finish; a split spine touching a side lot line cost it 16)');
 const at = evalRun(p35, ask(f.units)), above = evalRun(p35, ask(f.units + 16));
 assert.equal(at.status, 'pass', 'exactly ' + f.units + ': ' + at.failed?.join()); assert.notEqual(above.status, 'pass', 'exactly ' + (f.units + 16) + ' passes, above as many as fit (' + f.units + ')');
 const r = evalRun(p35, p35.runs.find(x => x.key === 'exact-ug')); if (r.status === 'pass') assert.ok(f.units >= r.units, 'as many as fit ' + f.units + ' vs exactly ' + r.units);
