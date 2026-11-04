@@ -213,3 +213,11 @@ Branch `matthew/site-engine-update-110326` (from `matthew/mcp-plan-sets-renderin
 - **Reference library:** `/Users/matthewsinitiere/Finishes Marketing Dropbox/Matthew Sinitiere/NEW MK/MATTHEW/REAL ESTATE INTELLIGENCE/MULTIFAMILY DATA/REI_Complete_Reference_Library` (outside Git). Rendering needs PyMuPDF (`pip install pymupdf`), see scripts/refs/README.md.
 - **Next:** docs/LAYOUT-ENGINE.md §9 (route Build and site_plan through runBrief; re-fit parking after exact trims; mid-rise bar sizes; courtyard building; holdout reconstruction; wrap, tuck-under, cross-dock, vertical mixed use; turning and detention inputs).
 - **Infra:** none needed (pure computation; new Vercel function config for api/layoutrun.js only).
+
+### Update (2026-11-03, evening): Build on the run engine, layout repairs, tested in the real editor
+
+Branch `matthew/build-through-run-engine` (PR #76, open, not merged). PR #75 (Harris County acreage from the parcel outline) also open.
+
+- **Done:** the editor's Build, re-solve and AI-revised layouts run through `runPlan` in the worker; studio apartment buildings (estimate template); a bare number in Build is exact unless Leftover land was chosen; validator checks for a second way in (hard), their spacing (warning), detention against the rule of thumb (always unknown), trail conflicts; run-layer repairs (courtyard wings joined, one amenity centre per 400 units, amenities nudged off buildings, exact counts by unit size for untemplated forms, pond spikes trimmed, unused parking pruned, a second/third way in found with the pond cut back); courtyards in two rows (lib/sitegen.mjs); options that differ.
+- **Evidence:** benchmark 13/15 (docs/bench/layout-bench-v2.md, .png); the full `npm test` passed (114/114 commands) on commit 0bc4541; the Hockley parcel (23737 FM 2920) driven through the real editor in Chrome (Build, layouts, Independent check, 3D massing) with no page errors.
+- **Next:** podium parking in the layout search (docs/LAYOUT-ENGINE.md §9 6b), wrap, the main entry off-centre for fire-code spacing on one frontage, a continuous courtyard building form, "More layouts" and scenarios through runPlan, the MCP site_plan tool through runPlan.

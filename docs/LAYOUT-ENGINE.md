@@ -112,7 +112,8 @@ are never stretched. Holdout templates (Sierra Vista mid-rise, Lake Shore townho
 15 synthetic cases across the five families, the same validator judging the old engine (live, words only) and the new
 runs. Table: `docs/bench/layout-bench-v2-before-after.md`; drawings: `docs/bench/layout-bench-v2.png`.
 
-- Top option passes every measurable hard check: **11 of 15** now; before, the first option passed in 6 of 15 (garden
+- Top option passes every measurable hard check: **13 of 15** at the end of Nov 3 (courtyard now passes; tower-on-podium
+  and wrap remain); **11 of 15** after the first change; before, the first option passed in 6 of 15 (garden
   max, garden rotated, mid-rise, townhomes, duplex, restaurant pad).
 - Exact quantities now land: 120 garden apartments (was short), 28,000 sf strip (was 34,400), 80,000 sf anchored
   center (was read as 120,000), 250,000 sf warehouse; flex connectivity fixed; wrap reported unsupported (was drawn as
@@ -180,7 +181,12 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
 4. Courtyard: a continuous courtyard building form (no corner overlaps), then mark it validated if the benchmark passes.
 5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
 6. Wrap, tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
-6b. Podium parking: the tower-on-podium form plans surface parking for every unit (199 of 300 on 10 ac); its podium
-   levels should hold structured parking.
+6b. Podium parking: the tower-on-podium form plans surface parking for every unit (194 of 300 on 10 ac); its podium
+   levels should hold structured parking. Tried Nov 3 and reverted: marking the podium floors as parking (residential
+   floor area = tower outline x floors above the podium; podium spaces ~ footprint x levels / 330 in lib/siteplan.mjs
+   metrics, lib/sitelayout.mjs tally and lib/layoutcheck.mjs) over-parked (344-561 podium spaces for 196-284 needed) and
+   lowered the yield, because the layout search (lib/sitelayout.mjs buildingsIn, lib/sitegen.mjs) still sizes buildings
+   and lays surface rows for a surface-parked program. Needs: the search told the podium's spaces up front (fewer surface
+   rows, bigger or more towers), and the tower share of the podium (60%) as a template value.
 7. Turning movements with a declared design vehicle; detention from topography (needs engineering inputs).
 8. (Partly done: a third way in at the far end.) Main entry off-centre when two remote ways in are needed (on a 900 ft frontage a centred entry can't be 515 ft from another); the pond kept off the street frontage (Hockley's pond wedge took the corner a second entry needed); mirrored options with the same numbers.
