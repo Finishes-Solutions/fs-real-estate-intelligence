@@ -212,10 +212,11 @@ ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre squ
   assert.ok(top.recipe && top.run.brief && top.run.inputHash, 'the editor gets its recipe and the run');
   const again = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
   assert.deepEqual(again.options.map(o => o.run.geometryHash), r.options.map(o => o.run.geometryHash));
-  // over 200 apartments need a second way in, half the site's diagonal from the first: without Becker Road there is no
-  // room for one, and the check says so instead of passing
+  // over 200 apartments need a second way in: every option has one, or the check says it hasn't (never a silent pass);
+  // with Becker Road every option gets one (the pond cut back where it took the side street)
+  assert.ok(r.options.every(o => SP.entrancesOf(o.elements).length >= 2), r.options.map(o => SP.entrancesOf(o.elements).length).join());
   const lone = RUN.runPlan({ ...site, streets: [], params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
-  assert.ok(lone.options.every(o => o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | '));
+  assert.ok(lone.options.every(o => SP.entrancesOf(o.elements).length >= 2 || o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | '));
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
