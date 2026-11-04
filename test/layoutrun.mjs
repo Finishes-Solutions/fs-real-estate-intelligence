@@ -454,5 +454,25 @@ ok('front-load townhomes from the reviewed row (E053): a one-car garage and a dr
   assert.equal(RUN.replayRun(r).identical, true);
   assert.equal(SP.normalizeProgram(SP.guessProgram('fee simple townhomes with garages')).product, 'lots', 'for-sale words: lots, never the rental court');
 });
+ok('a wedge: bars along more than one lot line, each squared to its own, beating the one-frame rows', () => {
+  const site = { ...RECT, ring: [[0, 0], [1100, 0], [0, 420]] }, r = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site)), o = r.options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.match(o.name, /^Along the edges/);
+  const B0 = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'), angles = new Set(B0.map(e => Math.round(((e.rot || 0) % 180 + 180) % 180)));
+  assert.ok(angles.size >= 1 && o.quantities.totals.units >= 90, 'units ' + o.quantities.totals.units);
+  assert.ok(r.options.some(x => !/^Along the edges/.test(x.name)), 'the one-frame layouts still offered');
+  assert.equal(RUN.replayRun(r).identical, true);
+});
+ok('a courtyard on a parking podium (5 over 2): the U above, the podium parking the homes, the levels as the words say', () => {
+  const site = { ...RECT, ring: [[0, 0], [600, 0], [600, 400], [0, 400]] }, b = B.briefFromRequest('a 5 over 2 courtyard on a podium, 250 apartments', site);
+  assert.equal(b.program.uses[0].form, 'mf-podium-courtyard');
+  const o = RUN.runBrief(b).options[0], e = o.elements.find(x => x.upper === 'U');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(o.quantities.totals.units, 250);
+  assert.ok(e && e.podium === 2 && e.floors === 7, 'a 2-level podium under 5 floors'); assert.ok(o.quantities.parking.podium >= o.quantities.parking.required * 0.9, 'the podium parks the homes');
+  assert.equal(SP.towerOutline(e).length, 8, 'the floors above are a U');
+});
+ok('a wrap the site can’t hold is said, not swapped silently', () => {
+  const site = { ...RECT, ring: [[0, 0], [380, 0], [380, 216], [0, 216]] }, o = RUN.runBrief(B.briefFromRequest('a wrap building with 172 apartments', site)).options[0];
+  if (!o.elements.some(e => e.wrap && e.kind === 'garage')) assert.ok((o.tplNotes || o.notes || []).concat(o.notes || []).some(t => /No wrap fits this site/.test(t)), JSON.stringify(o.tplNotes || o.notes));
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

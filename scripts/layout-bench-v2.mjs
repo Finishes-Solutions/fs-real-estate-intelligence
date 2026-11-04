@@ -23,7 +23,8 @@ const SITES = {
   wedge9: [[0, 0], [800, 0], [640, 560], [120, 600]],
   rot16: (() => { const a = 0.4, R = ([x, y]) => [+(x * Math.cos(a) - y * Math.sin(a)).toFixed(2), +(x * Math.sin(a) + y * Math.cos(a)).toFixed(2)]; return [[0, 0], [1000, 0], [1000, 700], [0, 700]].map(R); })(),
   big40: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]],
-  pad1: [[0, 0], [210, 0], [210, 230], [0, 230]]
+  pad1: [[0, 0], [210, 0], [210, 230], [0, 230]],
+  wedge11: [[0, 0], [1100, 0], [0, 420]]
 };
 const CASES = [
   { id: 'MF-garden-exact', family: 'multifamily', site: 'rect10', ask: 'exactly 120 garden apartments, 3 stories' },
@@ -34,6 +35,7 @@ const CASES = [
   { id: 'MF-townhomes', family: 'multifamily', site: 'deep6', ask: 'townhomes, as many as fit' },
   { id: 'MF-townhome-lots', family: 'multifamily', site: 'rect10', ask: 'fee simple townhomes with garages, as many as fit' },
   { id: 'MF-duplex', family: 'multifamily', site: 'wedge9', ask: 'duplexes, as many as fit' },
+  { id: 'MF-wedge-midrise', family: 'multifamily', site: 'wedge11', ask: 'mid-rise apartments, 4 stories, as many as fit' },
   { id: 'MF-tower', family: 'multifamily', site: 'rect10', ask: 'tower on a podium, 8 stories, 300 apartments' },
   { id: 'MF-wrap', family: 'multifamily', site: 'rect10', ask: 'a wrap building with 300 apartments' },
   { id: 'MF-tuckunder', family: 'multifamily', site: 'rect10', ask: 'tuck-under apartments, 120 units' },

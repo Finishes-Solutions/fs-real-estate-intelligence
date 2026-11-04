@@ -321,3 +321,22 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    driveway apron each, rows of 3 to 6), parked one in the garage and one on the driveway (`garagePer`, counted alike
    by the app and the validator). Holdout P18 (evaluation only): exactly 82 was 33 homes in 11-home bars, now 59 on
    lots in rows of at most 6 (82 don't fit the 6.15 ac rectangle with the engine's pond and guest parking).
+15. Done Nov 4 (holdout findings 3 and 4, partly):
+   - Irregular lots (lib/sitegen.mjs alongEdges): on a lot under 80% of its frame's box, the generator also lays a strip
+     of bars along each of the 2-3 longest lot lines, each squared to its own line (runs of edges turning under 30° are
+     one line, so a curved street drawn as chords counts; a line bowing into the site starts the strip past its deepest
+     point), 1-3 parking bays a strip, strips clear of each other, aisles joined, the entry square in from the street,
+     the clubhouse in the land between; "as many as fit" runs it too (target from the land). A bar gives way where a
+     strip can't park it. Bench MF-wedge-midrise (a 1,100 x 420 ft triangle): 96 units passing (the one-frame rows: 80).
+     P36 Sierra Vista WB-32 is unchanged at 96 / 192: on that thin wedge the parking, not the frame, binds (each strip
+     parks one bay); the gap is now the next step (parking fields in the land between the strips).
+   - Courtyard on a podium (lib/sitegen.mjs podiumCourt, form mf-podium-courtyard: "courtyard on a podium", "5 over 2"):
+     one podium over most of the buildable land, 1-3 levels (as the words say, else the fewest that park the homes, the
+     podium's depth searched for the least over-parking), the floors above a U of 65 ft wings round the amenity deck
+     (lib/siteplan.mjs towerOutline, upper 'U'), a side drive to the garage and fire lane. Offered when asked, and for a
+     tower-on-podium request on a lot under 3 ac (where the search's towers can't hold the count; the fill step's cut of
+     the count is undone for it: opts.askedUnits). E054 Anderson (urban run): 172 / 172 passing (was 136, failing), but
+     255 spaces for 210 (two full podium levels under the U). Units are a floor-area estimate (no dev reference).
+   - A wrap the site can't hold says so in each option's notes (and points to the courtyard on a podium); the least
+     courtyard in a wrap is 40 ft (was 50). E054's 1.87 ac still holds no wrap: its garage would park too few past the
+     ramp and cores.
