@@ -520,4 +520,16 @@ ok('corridor buildings as deep as the request says: the bay drawn that deep, sai
   const bad = JSON.parse(JSON.stringify(b)); bad.program.uses[0].depth.value = 140; assert.equal(B.validateBrief(bad).ok, false);
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
+ok('a smaller pond never costs homes: mid-rise as many as fit keeps its whole-module bars (288, every building templated)', () => {
+  const o = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', { ...RECT, setbacks: { front: 25, side: 10, rear: 20, paving: 10 } })).options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 288, 'units ' + o.quantities.totals.units);
+  assert.ok(o.validation.checks.every(c => c.hard || c.status !== 'fail'), 'no warnings: ' + o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id).join());
+  assert.ok(o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily').every(e => Math.round(Math.max(e.w, e.d)) % 50 === 0), 'bars in whole 50 ft bays');
+});
+ok('no room for a pond: detention goes underground, said as an assumption', () => {
+  const o = RUN.runBrief(B.briefFromRequest('2,500 sf restaurant with a drive-thru', { ...RECT, ring: [[0, 0], [210, 0], [210, 230], [0, 230]], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } })).options[0];
+  const d = o.validation.checks.find(c => c.id === 'eng.detention');
+  assert.notEqual(d.status, 'fail', JSON.stringify(d).slice(0, 300));
+  if (!o.elements.some(e => e.kind === 'pond')) { assert.equal(o.program.storm, 'underground'); assert.ok((o.tplNotes || o.notes || []).some(t => /underground/i.test(t)) || /underground/i.test(d.note || ''), 'said'); }
+});
 console.log('layoutrun: ' + n + ' passed');
