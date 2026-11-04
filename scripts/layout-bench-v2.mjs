@@ -23,7 +23,15 @@ const SITES = {
   wedge9: [[0, 0], [800, 0], [640, 560], [120, 600]],
   rot16: (() => { const a = 0.4, R = ([x, y]) => [+(x * Math.cos(a) - y * Math.sin(a)).toFixed(2), +(x * Math.sin(a) + y * Math.cos(a)).toFixed(2)]; return [[0, 0], [1000, 0], [1000, 700], [0, 700]].map(R); })(),
   big40: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]],
-  pad1: [[0, 0], [210, 0], [210, 230], [0, 230]]
+  pad1: [[0, 0], [210, 0], [210, 230], [0, 230]],
+  wedge11: [[0, 0], [1100, 0], [0, 420]],
+  // awkward real-world lots: a flag lot (a 60 ft pole to the street), a pipeline easement across the site, a wetland in it,
+  // a curving frontage drawn as chords, a half-acre lot (keep-outs as plan keepout pieces: the brief's exclusions)
+  flag11: [[0, 0], [60, 0], [60, 300], [560, 300], [560, 900], [-200, 900], [-200, 300], [0, 300]],
+  ease14: { ring: [[0, 0], [900, 0], [900, 700], [0, 700]], keep: [{ name: 'Pipeline easement', ring: [[0, 320], [900, 380], [900, 430], [0, 370]] }] },
+  wet14: { ring: [[0, 0], [900, 0], [900, 700], [0, 700]], keep: [{ name: 'Wetland', ring: [[520, 300], [700, 260], [760, 420], [600, 520], [500, 450]] }] },
+  curve19: (() => { const arc = []; for (let k = 0; k <= 10; k++) { const a = Math.PI * 0.75 - k * Math.PI * 0.5 / 10; arc.push([+(450 + 900 * Math.cos(a)).toFixed(1), +(-780 + 900 * Math.sin(a)).toFixed(1)]); } arc.reverse(); return arc.concat([[arc[arc.length - 1][0], 700], [arc[0][0], 700]]); })(),
+  half05: [[0, 0], [150, 0], [150, 145], [0, 145]]
 };
 const CASES = [
   { id: 'MF-garden-exact', family: 'multifamily', site: 'rect10', ask: 'exactly 120 garden apartments, 3 stories' },
@@ -32,18 +40,31 @@ const CASES = [
   { id: 'MF-courtyard', family: 'multifamily', site: 'rect10', ask: 'courtyard apartments, 150 units' },
   { id: 'MF-midrise', family: 'multifamily', site: 'rect10', ask: 'mid-rise apartments, 4 stories, as many as fit' },
   { id: 'MF-townhomes', family: 'multifamily', site: 'deep6', ask: 'townhomes, as many as fit' },
+  { id: 'MF-townhome-lots', family: 'multifamily', site: 'rect10', ask: 'fee simple townhomes with garages, as many as fit' },
   { id: 'MF-duplex', family: 'multifamily', site: 'wedge9', ask: 'duplexes, as many as fit' },
+  { id: 'MF-wedge-midrise', family: 'multifamily', site: 'wedge11', ask: 'mid-rise apartments, 4 stories, as many as fit' },
   { id: 'MF-tower', family: 'multifamily', site: 'rect10', ask: 'tower on a podium, 8 stories, 300 apartments' },
   { id: 'MF-wrap', family: 'multifamily', site: 'rect10', ask: 'a wrap building with 300 apartments' },
+  { id: 'MF-tuckunder', family: 'multifamily', site: 'rect10', ask: 'tuck-under apartments, 120 units' },
+  { id: 'MF-stacked', family: 'multifamily', site: 'rect10', ask: 'stacked townhomes, 120 units' },
+  { id: 'MF-btr', family: 'multifamily', site: 'rect10', ask: 'build-to-rent cottages, as many as fit' },
   { id: 'RE-strip', family: 'retail', site: 'rect10', ask: 'exactly 28,000 sf retail in four buildings' },
   { id: 'RE-anchored', family: 'retail', site: 'big40', ask: 'anchored shopping center with a 40,000 sf anchor, 80,000 sf total' },
   { id: 'RE-pad', family: 'retail', site: 'pad1', ask: '2,500 sf restaurant with a drive-thru' },
   { id: 'IN-warehouse', family: 'industrial', site: 'big40', ask: 'warehouse with truck court, 250,000 sf' },
+  { id: 'IN-crossdock', family: 'industrial', site: 'big40', ask: 'cross-dock warehouse, 400,000 sf' },
   { id: 'FL-flex', family: 'flex', site: 'rect10', ask: 'flex industrial buildings, 60,000 sf' },
-  { id: 'MX-horizontal', family: 'mixed_use', site: 'big40', ask: '20,000 sf retail along the main road, 240 apartments behind and 80 townhomes' }
+  { id: 'MX-horizontal', family: 'mixed_use', site: 'big40', ask: '20,000 sf retail along the main road, 240 apartments behind and 80 townhomes' },
+  { id: 'MX-vertical', family: 'mixed_use', site: 'rect10', ask: 'a 5-story mixed-use building with 20,000 sf ground-floor retail and 200 apartments above' },
+  { id: 'LOT-flag-th', family: 'multifamily', site: 'flag11', ask: 'townhomes, as many as fit' },
+  { id: 'LOT-flag-retail', family: 'retail', site: 'flag11', ask: '30,000 sf retail' },
+  { id: 'LOT-easement-apt', family: 'multifamily', site: 'ease14', ask: 'garden apartments, as many as fit' },
+  { id: 'LOT-wetland-apt', family: 'multifamily', site: 'wet14', ask: 'garden apartments, as many as fit' },
+  { id: 'LOT-curved-apt', family: 'multifamily', site: 'curve19', ask: 'garden apartments, as many as fit' },
+  { id: 'LOT-half-th', family: 'multifamily', site: 'half05', ask: 'townhomes, as many as fit' }
 ];
-const plan = id => ({ origin: [-96.42, 30.38], ring: SITES[id], front: 0, streets: [], setbacks: { ...SB } });
-const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
+const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
+const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
 
 let baseMods = null;
 if (BASE) baseMods = { SP: await import(pathToFileURL(path.resolve(BASE, 'lib/siteplan.mjs'))), L: await import(pathToFileURL(path.resolve(BASE, 'lib/sitelayout.mjs'))) };
@@ -65,7 +86,7 @@ for (const c of CASES) {
   let svg = ''; try { if (top) svg = planSVG({ ...p, elements: top.elements, program: top.program }, { px: 520, pad: 18 }).svg; } catch (e) { svg = '<p>drawing failed: ' + e.message + '</p>'; }
   cards.push({ c, row, svg, top });
   console.log(c.id.padEnd(16), rec.outcome.padEnd(18), (top ? top.validation.status + ' ' + (top.quantities.totals.units ? top.quantities.totals.units + ' u' : top.quantities.totals.gfa + ' sf') + ' pk ' + top.quantities.parking.provided + '/' + top.quantities.parking.required : (rec.problems || []).map(x => x.msg).join('; ').slice(0, 80)).padEnd(40),
-    'replay ' + (same ? 'same' : 'DIFF'), ms + 'ms', row.base ? '| before: ' + row.base.options.map(o => o.status + (o.failed.length ? '(' + o.failed.join(',') + ')' : '')).join(' ') : '');
+    'replay ' + (same ? 'same' : 'DIFF'), top ? 'warn ' + (top.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id).join(',') || '-') : '', ms + 'ms', row.base ? '| before: ' + row.base.options.map(o => o.status + (o.failed.length ? '(' + o.failed.join(',') + ')' : '')).join(' ') : '');
 }
 const esc = s => String(s ?? '').replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 fs.writeFileSync(path.join(OUT, 'bench.json'), JSON.stringify(rows, null, 1));

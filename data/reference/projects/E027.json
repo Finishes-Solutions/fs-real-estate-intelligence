@@ -1,0 +1,246 @@
+{
+ "schema": "rei.ref.project/1",
+ "id": "E027",
+ "name": "10th and Irving",
+ "location": "Arlington, VA",
+ "family": "e027",
+ "partition": "dev",
+ "forms": [
+  "mixed-use",
+  "mid-rise-corridor-elevator",
+  "podium"
+ ],
+ "overlays": [],
+ "documents": [
+  {
+   "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+   "sha256": "a5ee1fd7e0e4cf216d33acc6dd164a2432eec124f307b7a7ac297960bf5dfcc5",
+   "pages_used": [
+    2,
+    4,
+    5,
+    6,
+    7
+   ],
+   "sheets": [
+    {
+     "page": 4,
+     "sheet": "A0-11",
+     "title": "Area & parking tabulations (garage levels)",
+     "revision": null,
+     "date": "2022-11-22"
+    },
+    {
+     "page": 5,
+     "sheet": "A0-12",
+     "title": "Area & parking tabulations (levels 1-4)",
+     "revision": null,
+     "date": "2022-11-04"
+    },
+    {
+     "page": 6,
+     "sheet": "A0-13",
+     "title": "Area & parking tabulations",
+     "revision": null,
+     "date": "2022-11-04"
+    },
+    {
+     "page": 7,
+     "sheet": "A0-14",
+     "title": "Area & parking tabulations",
+     "revision": null,
+     "date": "2022-11-04"
+    }
+   ]
+  }
+ ],
+ "site": {
+  "area_sf": {
+   "v": 32102,
+   "units": "sf",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+    "page": 4,
+    "sheet": "A0-11"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "units": {
+   "v": 241,
+   "units": "units",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+    "page": 4,
+    "sheet": "A0-11"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "retail_gfa_sf": {
+   "v": 3639,
+   "units": "sf",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+    "page": 5,
+    "sheet": "A0-12"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only",
+   "note": "on level 1, beside the residential lobby and 4,378 sf of parking"
+  },
+  "residential_gfa_sf": {
+   "v": 184713,
+   "units": "sf",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+    "page": 5,
+    "sheet": "A0-12"
+   },
+   "method": "derived",
+   "confidence": "high",
+   "status": "derived",
+   "review": "text-only",
+   "note": "sum of the printed floors: L1 13,972, L2 13,205, L3-L7 each 19,181, L8-L9 each 18,803, L10-L11 each 11,915, roof 195"
+  }
+ },
+ "buildings": [
+  {
+   "type_id": "A",
+   "label": "Residential over ground-floor retail, garage P1-P3 below",
+   "count": 1,
+   "floors": {
+    "v": 11,
+    "units": "floors",
+    "src": {
+     "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+     "page": 2,
+     "sheet": null
+    },
+    "method": "text-search",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "sheet index: floor plans levels 1-11 and P1-P3"
+   },
+   "typical_plate_sf": {
+    "v": 19181,
+    "units": "sf",
+    "src": {
+     "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+     "page": 5,
+     "sheet": "A0-12"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "L3-L7; 18,803 at L8-L9, 11,915 at L10-L11"
+   },
+   "ground_floor": {
+    "retail_sf": 3639,
+    "residential_sf": 13972,
+    "parking_sf": 4378
+   }
+  }
+ ],
+ "unit_types": [],
+ "parking": {
+  "provided": {
+   "v": 176,
+   "units": "stalls",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+    "page": 4,
+    "sheet": "A0-11"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "residential_ratio": {
+   "v": 0.64,
+   "units": "stalls/unit",
+   "src": {
+    "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+    "page": 4,
+    "sheet": "A0-11"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only",
+   "note": "Rosslyn-Ballston metro corridor"
+  },
+  "retail_ratio": {
+   "v": "1/455 sf",
+   "units": null,
+   "src": {
+    "file": "02_Expanded_Collection/plans/E027_10th_and_Irving/001_Full_Plan_Set_PDF_29MB.pdf",
+    "page": 4,
+    "sheet": "A0-11"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "levels": [
+   {
+    "level": "P3",
+    "gross_sf": 23145,
+    "stalls": 59
+   },
+   {
+    "level": "P2",
+    "gross_sf": 26459,
+    "stalls": 66
+   },
+   {
+    "level": "P1",
+    "gross_sf": 24605,
+    "stalls": 51,
+    "note": "incl. 12 visitor and 7 retail"
+   }
+  ]
+ },
+ "amenities": [],
+ "access": [
+  "N Irving St",
+  "10th St N"
+ ],
+ "project_rules": [
+  {
+   "rule": "parking ratio",
+   "value": 0.64,
+   "units": "stalls/unit",
+   "note": "metro corridor, project-specific"
+  }
+ ],
+ "reconciliation": [
+  {
+   "check": "garage stalls",
+   "values": "P3 54+1+4 = 59; P2 60+2+4 = 66; total 176",
+   "result": "consistent",
+   "note": "P1 = 176 - 59 - 66 = 51"
+  },
+  {
+   "check": "residential GFA",
+   "values": "13,972+13,205+5x19,181+2x18,803+2x11,915+195 = 184,713",
+   "result": "derived",
+   "note": "the FAR table's 93,095 is the base-density share, not the building"
+  }
+ ],
+ "open_questions": [
+  "unit mix not on the tabulation sheets",
+  "building depth"
+ ],
+ "manifest_name": "10th and Irving"
+}

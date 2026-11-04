@@ -47,7 +47,7 @@ for (const e of rows) { const x = T.get(e.id); assert.ok(x, 'row ' + e.id + ' ha
 // the selected building keeps its highlight (no wall finishes over it; its windows and roof stay); Phase 2 stays plain
 { const e = rows[0], fc = S.planFeatures(th, e.id), f = fc.features.find(q => q.properties.id === e.id && q.properties.k === 'building');
   const sel = facades(th, { skip: new Set([e.id]) }).get(e.id); assert.equal(skinParts(sel).length, 0, 'selected: no wall finish over the highlight'); assert.ok(sel.parts.some(q => glassy.has(q.c)), 'selected: its windows still show');
-  assert.equal(f.properties.fac, 1, 'the building is drawn with its facade'); assert.equal(f.properties.h, +(T.get(e.id).wallH / 3.280839895).toFixed(1), 'the plain massing stops at the walls’ top, under the roof');
+  assert.ok(!f.properties.fac && !fc.features.some(q => q.properties.k === 'fac'), 'the 3D map draws plain massing, not the designed facades (taken off the map Nov 4; the designs still drive plan sets and the BIM model)');
   const p2 = { ...th, elements: th.elements.map(q => q.id === e.id ? { ...q, phase: 2 } : q) }, g = S.planFeatures(p2, null).features.find(q => q.properties.id === e.id && q.properties.k === 'building');
   assert.ok(!g.properties.fac, 'a Phase 2 building stays plain, faint massing'); }
 

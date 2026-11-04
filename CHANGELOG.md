@@ -3,7 +3,100 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-04
+
+### 11:53 AM CT: 3D map back to plain blocks; stacked townhomes and cottages; awkward lots; drawing polish (2b458e4, 8109a45, 24b3efd, aaa0b61)
+- **The 3D map is back to the plain style:** each building a solid block coloured by its use, with a parapet and a line at each floor. The designed facades (brick, siding, windows, balconies, hip roofs) are off the map; plan sets and the BIM model still use the designs.
+- **Stacked townhomes** (homes stacked two high in 4-story rows, an estimate on the reviewed Portland Road bay) and **build-to-rent cottage communities** (detached cottages on private lanes round an amenity centre; the 2-bed from the reviewed Magnolia Village plans).
+- **Awkward lots work:** flag lots, lots crossed by an easement or holding a wetland (nothing built on them), curved street frontages and half-acre lots now get usable layouts.
+- **Drawing polish:** entrance names stay inside the site, "1 space" not "1 spaces", no stray outlines or "Future development" pockets inside a community, playground and emergency-lane labels where they belong.
+- All 28 test sites pass every check; the full test suite passes.
+
+### 7:34 AM CT: Detention sized from rainfall, garages checked for ventilation, deeper buildings on request (5aac4cc, d12d0e5, 70ea2a7)
+- **Detention is estimated from the storm, not a rule of thumb:** NOAA Atlas 14 rainfall for the site (a regional figure when the service can't be reached) and the plan's own roofs and paving, by the NRCS TR-55 method; the pond is sized to it and the check passes or fails it (still an estimate for the civil engineer). A site with no room for a pond plans underground storage, and says so.
+- **Garages checked for ventilation:** each garage is tested against the building code's open-garage rule (openings on at least two sides, 20% of the wall area); one that isn't open is flagged as needing mechanical ventilation and sprinklers. The wrap, podium and podium-courtyard garages drawn now are all open.
+- **Deeper corridor buildings when you ask** ("83 ft deep corridor buildings"), marked as deeper than any reviewed building.
+- **Fixes:** mid-rise bars are shortened a whole bay at a time (288 apartments on the test site, Hockley mid-rise 960, was 896); a walking trail no longer runs through parking; a corner townhome gives way for a fire truck's turn only as far as an exact count allows. Hockley garden apartments stay at 756 with their detention now met. All 20 test sites pass with no warnings; the full test suite passes.
+
+### 5:54 AM CT: Reviewed evidence for building sizes and podiums, a short median, faster courtyards (43386bf, 1ab709a, 67914fb, aada1a6, 500ef5f, 90bacc5)
+- **More numbers come from your reviewed projects instead of estimates:** the floor area a home for corridor buildings (courtyards, wraps, podiums, vertical mixed use) from three reviewed buildings, and how much of a podium the tower covers (Hawthorn and 2000 Clarendon). Three more projects were read into the library (Pleasant Grove, 10th & Irving, 2000 Clarendon). A one-level podium entered from the road draws no ramp.
+- **A short median** where a full boulevard doesn't fit: the entry widens to two fire lanes round a planted island, instead of no median at all.
+- **Faster:** the 300-courtyard request on Hockley takes about 13 s (was 28); duplexes and towers about a third faster.
+- **Wedge-shaped lots** keep more buildings (the wedge test site 144 apartments, was 128); a wrap's top garage level keeps only the spaces it needs.
+- Fixed: a drive stub ending 2 ft from a neighbour's line was read as a way in across their land, which pushed a 320-unit layout below a 304-unit one. All 20 test sites pass; the full test suite passes.
+
+### 4:40 AM CT: Every layout finished alike: rounded corners, stepped fronts, the entry as Settings say (43386bf)
+- **Generated layouts look like the rest:** aisle ends meet their drives on a curve a fire truck can turn, apartment bars step their fronts, and the main entry follows Settings › Entrance (a boulevard with its median and signs where the first aisle is far enough in; otherwise a 40 ft entry with curb returns).
+- **Moving a building and re-fitting** a generated layout keeps it where you put it; what it overlaps gives way.
+- A courtyard asked for leads its options even when drawn a little smaller to park. The 300-courtyard request on Hockley takes longer (about 28 s). The full test suite passes.
+
+### 3:50 AM CT: Faster "as many as fit", every building to a reviewed template, podiums parked to the need (a723a84, bc33c29, 0bb81b7, 2d1798f, 0eb201e, 8e6147a)
+- **"As many as fit" is 2-4 times faster** (Hockley mid-rise about 11 s, was 22) and finds what an exact count finds. The cause was in the search, not worked round any more.
+- **Every apartment building is drawn to a reviewed building type**, and the check flags one that isn't. Some counts that came from oversized buildings are lower and honest now: a wedge-shaped test site 128 apartments, Sierra Vista WB-30 320 as many as fit (355 as built; its buildings are deeper than any reviewed type).
+- **Odd-shaped lots** get more parking between the buildings along each edge.
+- **Podium courtyards park to the need:** the last parking level keeps only the spaces needed, the rest amenity and storage (Anderson 210 for 210, was 255).
+- **A corner townhome gives way for a fire truck's curb return** where two lanes meet square, instead of the whole layout dropping to a smaller one (Lake Shore 58 homes, had slipped to 51).
+- Fixes: the pool sits on a deck against the clubhouse in every layout; profit in the pro forma always equals value less cost as shown. All 20 test sites pass; the full test suite passes.
+
+### 2:03 AM CT: Tuck-under, cross-dock, vertical mixed use, for-sale townhomes, turning paths, off-site detention, and a check against real projects (6427f76, ec376d8, 1fd11ef, ced222a, c72e2ad, 449f7df, 5a51bdf, 99786b9, d507b26, 4a303e3)
+- **New building types:**
+  - **Tuck-under apartments:** each home over its own garage, rows back to back across garage courts (sizes from the reviewed Portland Road townhomes).
+  - **Cross-dock warehouses:** dock doors and a truck court on both long sides, trailer stalls counted, trucks on their own drives away from the car parking.
+  - **Vertical mixed use:** shops on the ground floor, apartments above, each use parked at its own ratio.
+  - **A courtyard on a parking podium ("5 over 2")** for small urban lots.
+- **For-sale townhomes on their own lots** ("fee simple", "for-sale", "with garages"), including a front-load row with a one-car garage and driveway; exact townhome counts now land in rows of 6 or fewer (they could collapse into 11-home buildings before).
+- **Turning paths:** the check tests drive corners against a car, a fire truck, a service truck and a semitrailer, plus fire-lane width and dead ends over 150 ft; corners too tight get a curb return. Garages show their ramp (slope and length) and clear heights. Planning-level, not swept-path software.
+- **Detention handled off site:** "regional detention" or "detention off site" leaves out the pond (the check notes it needs the civil engineer's confirmation).
+- **"As many as fit" no longer stops short:** it now tries larger counts and keeps any that pass. The biggest requests take longer (Hockley mid-rise about 22 s, was 10).
+- **Odd-shaped lots:** buildings can line more than one lot line on a wedge-shaped site.
+- **A check against real projects:** the engine now runs on four built projects held back for testing (Sierra Vista WB-30 / WB-32, Anderson, Lake Shore) and reports where it falls short. Sierra Vista WB-30: 356 units with off-site detention (355 built); Anderson as a courtyard on a podium: 172 of 172.
+- Options show a variety of arrangements; "Future development" labels stay off ponds and buildings. All 20 test sites pass every check; the full test suite passes.
+
+### 12:23 AM CT: Wrap buildings, drawn podium garages, emergency access lanes, parking trimmed to the need (b3f2ea6, 5aa3b7f, aa100f2, 8f407e9, 9508e44, fa70020, 135ce87, 84ced54, e4734be, 84ba9e8, 1fdb711, 1b42551, 7a0a252, b121882, 1bf5c20)
+- **Wrap buildings:** "a wrap building with 300 apartments" now lays out a 5-story apartment building on three sides of a parking garage that holds nearly all the parking, with the pool in a courtyard (300 units, 488 spaces for 480 needed). Before, wraps weren't supported.
+- **Podium garages are drawn:** a tower's podium shows its garage (stall rows, ramp, stair and elevator cores, the lobby on the street side, an arrow at the way in, which a drive always reaches), and the spaces are counted from that drawing.
+- **Parking trimmed to the need:** spare stalls come off the far ends of rows with their paving, so plans park within a few spaces of what's required (the courtyard test site 248 for 240, was 266; the retail strip 116 for 112, was 122).
+- **A second way in on narrow lots:** where the street is too short for two entrances far enough apart, the plan adds a gated emergency access lane (grass pavers, red outline), and says it needs the fire official's approval, plus an easement where it meets a neighbour's line. Real entrances always come first; the mixed-use and tower sites now get two real ones.
+- **Exact counts on Hockley:** "20,000 sf retail on FM 2920, 250 apartments behind" lands exactly 250 (was 240 and failing), with no empty parking block.
+- **The app and the check count parking the same way**, taking out the striped aisle beside accessible stalls.
+- **Townhome rows are shared evenly** along a block (5 + 4, not 6 + 3); Hockley fits 364 townhomes, was 307. Every building on the drawing carries a readable label.
+- **Other fixes:** a second courtyard without a clubhouse gets a courtyard garden; a stranded playground moves beside the homes; the warehouse drawing reads 250,000 sf; the massing pictures used for renderings draw buildings at their real height (they were about 3.3 times too low).
+- All 15 test sites pass every check with no warnings, and all 8 requests tried on the Hockley parcel pass. The full test suite passes.
+
 ## 2026-11-03
+
+### 10:28 PM CT: Courtyards as one building, towers on parking podiums, anchored centres, two ways in far enough apart (74eef75, 3a68803, a0aff95, a089dd7, 17ac205, db23c2d, 9a0c02c, 477a3b5)
+- **Courtyard apartments are one continuous building**, a closed ring or a U open to the street, round a planted court with the pool; the clubhouse sits at the gateway and all the parking is outside. Before, they were loose bars with small stub buildings and a parking row inside the court. Hockley, 200 courtyard units: one ring, exactly 200, 320 spaces for 320 needed.
+- **A tower on a podium parks on its podium:** "tower on a podium, 8 stories, 300 apartments" now fits all 300, with the podium's parking floors counted stall by stall (491 spaces for 480 needed); before, it fit 194 because it planned surface parking for every apartment. The tower's outline shows dashed over its podium.
+- **Anchored shopping centres:** "a 40,000 sf anchor, 80,000 sf total" draws the anchor and 40,000 sf of shops beside it, not one 80,000 sf box; the check now fails a plan whose anchor isn't the size asked.
+- **Exact floor areas:** a 250,000 sf warehouse totals 250,000, not 250,001.
+- **Two ways in far enough apart:** where the fire code wants two entrances half the site's diagonal apart, the second is planned with the layout and the main entry moves off centre when needed; a layout that meets it goes first, with a bigger one that doesn't still offered (the rotated test site: 336 units passing, 372 with the warning).
+- **Ponds beside the buildings they drain**, not out in the land held for later.
+- **More layouts, scenario layouts and the agents' site plans** now come from the same engine and checks as Build.
+- Test sites: 14 of 15 now pass every check (was 13); only the wrap building remains unsupported. Full test suite passes.
+
+### 7:09 PM CT: Cleaner layouts: exact counts without empty bays, ponds without spikes, a second way in found, courtyards as one building (this push)
+- **A number you give is exactly that, unless you've set Leftover land yourself.** "200 courtyard apartments" builds 200 and leaves the rest as future development; "as many as fit" still fills the site; choosing Fill under Settings › Leftover land still fills it.
+- **No empty paved blocks after an exact count:** the layout is drawn for the count first (exactly 120 garden apartments: 204 spaces for 192 needed, was 284; about a quarter less paving), and parking rows nothing uses are taken out.
+- **A second way in is found** where the fire code asks for one, cutting the pond back if it took the only free stretch of street (Hockley: every option now has two), and a third at the far end when two are too close together.
+- **Ponds without spikes:** a pond's thin wedge into a corner is trimmed (it showed as a grey triangle along FM 2920), and a walking trail split round a new entrance no longer draws a tan wedge across the site.
+- **Courtyard buildings** are one building: wings that meet or stand a breezeway apart round one court; shared corners counted once; the clubhouse in the court is reached through it; a pool that ran into a wing moves (or gets a little smaller) to fit the court. Courtyard requests show courtyard layouts first among the ones that pass.
+- **Courtyards in two rows** when one row of courts can't hold the program (Hockley: 200 or 350 courtyard units as 4 courts in 2 rows), with **one clubhouse and pool for the community** (one per 400 units) instead of one per court, and the outer parking rows nothing needs taken out (466 spaces for 320 needed became 364).
+- **Options differ:** layouts with the same numbers as one already shown, or far below the best, are left out; capped requests ("up to 150") aim for the cap (144, was 24).
+
+### 6:16 PM CT: The independent check asks for a second way in, and shows detention against the rule of thumb (this push)
+- **A second way in where the fire code asks for one** (over 200 apartments or 30 homes, IFC Appendix D where adopted): a plan without one fails the check; how far apart the two are (at least half the site's diagonal) is shown as its own line. Plans that will need two now plan for them from the start.
+- **Detention is measured:** the pond against the rule-of-thumb area for the site (Hockley: about 70%), saying what the rest needs; still never shown as passing, since it isn't a drainage design.
+- **A walking trail through a building, a parking row or along a drive** is flagged.
+- **Program lines are named by zone** ("Garden apartments", "Studio apartment buildings").
+- Tested in the real editor on 23737 FM 2920, Hockley: the request, Build, the layouts, the check panel and the 3D massing (garden and studio breezeway buildings, townhome rows) all work with no page errors.
+
+### 5:26 PM CT: Build lays out through the new engine; studio buildings; no more empty apartment blocks (this push)
+- **Build now runs the reproducible engine.** The same request on the same site gives the same layouts; apartment buildings come from the reviewed building templates; each option carries its independent check and the saved run behind it. The re-solve after a settings change and the AI's revised program go the same way. If a run can't be made, Build falls back to the engine as before.
+- **"Garden apartments, townhomes and studio apartment buildings, as many as fits" on 23737 FM 2920, Hockley (29 ac):** before, 348 apartments with about 4 acres of the apartment block left empty and the studios drawn as the same buildings; the words alone gave 18 units. Now 144 garden apartments, 270 studio apartments and 109 townhomes, every option passing the independent check.
+- **Studio apartment buildings** are their own zone and building (six studio / one-bed homes a floor in the reviewed breezeway stack; an estimate, labelled so). "Studios" for a yoga or recording studio are left alone.
+- **No buildings too short to keep:** the layout no longer draws one-stair apartment stubs that were then removed (which left the empty parking blocks); it draws fewer, full-length buildings.
+- **Two apartment zones with no placement** (garden and studio) are laid out front to back in the order asked, and the run says so; before, the layout fell back to a simple one.
 
 ### 5:04 PM CT: Builds, renderings and plan sets run on the server (1a1cc0c, this push)
 - **Build with AI keeps going when you leave.** It now runs on the server: refresh, close the tab or open something else and it carries on. Come back to the option and it's still running, or its pick is on the map and its layouts are in the list. Anyone on the team who opens the option sees the same, and **Cancel** stops it for everyone.

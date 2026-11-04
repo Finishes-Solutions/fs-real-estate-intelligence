@@ -59,14 +59,14 @@ function usable(plan, o, what) {
     assert.ok(lawn < 0.15 * m.siteSf, o.name + ': ' + Math.round(lawn / m.siteSf * 100) + '% open lawn');
     // curved where it should be (drives on arcs, an entry with curb returns), square where it reads cleaner (ponds), staggered buildings
     assert.ok(o.elements.some(e => e.kind === 'drive' && e.path && e.r > 0), o.name + ': curved drives');
-    assert.ok(o.elements.some(e => e.name === 'Main entry' && e.poly?.length > 12), 'curb returns');
+    assert.ok(o.elements.some(e => e.name === 'Main entry' && (e.poly?.length > 12 || e.path?.length >= 2 && e.flare > 0)), 'curb returns'); // (an outline with its returns, or a way in along its centre line with flares: the short-median entry)
     assert.ok(o.elements.filter(e => e.kind === 'pond').every(e => !e.poly || e.poly.length <= 30), 'clean straight-edged ponds, no blobs (the default)');
     assert.ok(o.elements.some(e => e.kind === 'building' && e.jog), 'staggered buildings');
   }
   assert.ok(opts.some(o => o.elements.some(e => e.name === 'Clubhouse')), 'a clubhouse');
   // a curved piece moves as a whole and stays valid
-  const o = opts[0], pd = o.elements.find(e => e.name === 'Main entry'), before = S.ringArea(pd.poly);
-  const moved = S.moveBy({ ...pd }, 3, -2); assert.ok(Math.abs(S.ringArea(moved.poly) - before) < 1 && Math.abs(moved.poly[0][0] - pd.poly[0][0] - 3) < 0.01);
+  const o = opts[0], pd = o.elements.find(e => e.name === 'Main entry'), before = S.ringArea(S.outline(pd)); // (an outline, or a way in along its centre line)
+  const moved = S.moveBy(structuredClone(pd), 3, -2); assert.ok(Math.abs(S.ringArea(S.outline(moved)) - before) < 1 && Math.abs(S.outline(moved)[0][0] - S.outline(pd)[0][0] - 3) < 0.01);
   // drawings: plan SVG with curved drives' centre lines, the sheet, the DXF
   const p = { ...plan, elements: o.elements, zones: o.zones, program: o.program }, svg = G.planSVG(p, { px: 900 }).svg;
   assert.match(svg, /<polyline/); assert.ok(!/NaN/.test(svg), 'no NaN in the drawing');
@@ -238,8 +238,7 @@ function usable(plan, o, what) {
   const loop = [{ kind: 'drive', x: 0, y: 100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: 0, y: -100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: -138, y: 0, w: 24, d: 224, rot: 0 }, { kind: 'drive', x: 138, y: 0, w: 24, d: 224, rot: 0 }];
   const pv = S.pavement({ ...site, elements: loop }); assert.equal(pv.length, 1); assert.equal(pv[0].holes.length, 1, 'the lawn inside the loop is a hole');
   const fc = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'b1', form: 'U' }, { id: 'p', kind: 'parking', x: 0, y: -160, w: 180, d: 60, rot: 0 }], params: { trees: true } });
-  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('fac') && ks.has('tree'), '3D detail (the building drawn from its design) and 3D trees');
-  assert.ok(new Set(fc.features.filter(f => f.properties.k === 'fac' && !f.geometry.coordinates[1]).map(f => f.properties.b)).has(0), 'its walls from the ground up');
+  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('b3') && ks.has('tree') && !ks.has('fac'), '3D detail (plain massing: parapet and floor lines, no designed facades on the map) and 3D trees');
   // a building with no design (a hotel) keeps the plain detail: a parapet round the roof and a line at each floor
   const fh = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'h1', use: 'hotel' }] });
   assert.ok(fh.features.some(f => f.properties.k === 'b3' && f.properties.part === 'parapet'), 'a hotel: a parapet');

@@ -31,6 +31,7 @@ import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
 import * as LV from './lib/layoutcheck.mjs';
 import * as LB from './lib/layoutbrief.mjs';
+import { runPlan } from './lib/layoutrun.mjs';
 import * as STG from './lib/planstages.mjs';
 import * as PARC from './lib/siteparcels.mjs';
 import * as RF from './lib/sitefiles.mjs';
@@ -713,8 +714,8 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-medl', type: 'line', source: SRC, filter: ['all', kind('green'), ['==', ['get', 'med'], 1]], paint: { 'line-color': Ln.curb, 'line-width': 1 } });
     add({ id: 'fs-sp-sign', type: 'fill-extrusion', source: SRC, filter: kind('sign'), paint: { 'fill-extrusion-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, sel1, P.sel(C.sign || '#8b8073'), C.sign || '#8b8073'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .95 } }); // a monument sign: a low stone wall
     add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'field', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
-      paint: { 'fill-color': ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'field', C.drive, 'pond', C.pond, 'plaza', C.plaza, 'court', ['coalesce', ['get', 'c'], C.court], 'pool', C.pool, 'play', C.play, C.green],
-        'fill-opacity': ['case', sel1, .5, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } });
+      paint: { 'fill-color': ['case', ['==', ['get', 'em'], 1], '#cfdcae', ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'field', C.drive, 'pond', C.pond, 'plaza', C.plaza, 'court', ['coalesce', ['get', 'c'], C.court], 'pool', C.pool, 'play', C.play, C.green]],
+        'fill-opacity': ['case', sel1, .5, ['==', ['get', 'em'], 1], .9, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } }); // (an emergency access lane: grass pavers, not asphalt)
     add({ id: 'fs-sp-courtarea', type: 'fill', source: SRC, filter: kind('courtarea'), paint: { 'fill-color': ['get', 'c'], 'fill-opacity': .95 } }); // a court's playing surface (its lines and net are marks)
     add({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 17, layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.lots, 'line-width': 1, 'line-dasharray': [0.1, 2.4] } }); // house lots, dotted, close in
     add({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': Ln.walk, 'fill-opacity': .85 } });
@@ -752,7 +753,7 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-bldg2', type: 'fill-extrusion', source: SRC, filter: ['all', bk, ['!', sel1], ph2], paint: { 'fill-extrusion-color': bcol(id), 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .6 } });
     add({ id: 'fs-sp-bsel', type: 'fill-extrusion', source: SRC, filter: ['all', bk, sel1], paint: { 'fill-extrusion-color': bcol(lit), 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': .95 } });
     const b3 = f => ({ 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': .95, // towers, parapets, floor lines
-      'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
+      'fill-extrusion-color': ['match', ['get', 'part'], 'tower', ['case', ph2, useCol(c => f(P.p2(c))), useCol(f)], 'parapet', ['case', ['==', ['get', 'g'], 1], '#8b9092', '#6d635a'], 'storefront', '#2f5d73', 'opening', '#2a2724', ['case', ['==', ['get', 'g'], 1], '#6f7476', '#4f453c']] });
     add({ id: 'fs-sp-b3', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), ['!', sel1]], paint: b3(id) });
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
     add({ id: 'fs-sp-fac', type: 'fill-extrusion', source: SRC, filter: kind('fac'), paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 1 }, layout: { visibility: mp === map ? facWanted() : 'visible' } }); // the facades: finishes, windows, doors, roofs (lib/massing.mjs)
@@ -852,17 +853,37 @@ export function initSitePlan(ctx) {
   // kept with the plan's own working numbers (unapply); every other plan goes to the engine as it is
   function laid(fn, ...args) {
     if (fn === 'refit' && args[0]?.recipe?.parcels) args[1] = { ...(args[1] || {}), parcels: partsNow(P(), args[0]) }; // (laid out parcel by parcel: the parts again)
-    if (fn === 'options' && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
+    if ((fn === 'options' || fn === 'run') && args[0]?.ring?.length >= 3 && !args[0].terrain) { const t = terrainNow(args[0]); if (t) args[0] = { ...args[0], terrain: t }; else terrainOf(args[0]); } // the pond goes on the low side (lib/sitelayout.mjs)
     const g = fn === 'refit' ? G.forLayout(args[0], args[0]?.program, {}) : G.forLayout(args[0], args[1], args[2] || {});
     if (!g) return laid0(fn, ...args);
     const base = fn === 'refit' ? args[0] : { ...args[0], program: args[1] };
-    return laid0(fn, ...(fn === 'refit' ? [g.plan, args[1] || {}] : [g.plan, g.program, g.opts])).then(r => fn === 'refit' ? G.unapply(r, base) : (r || []).map(o => G.unapply(o, base)));
+    return laid0(fn, ...(fn === 'refit' ? [g.plan, args[1] || {}] : [g.plan, g.program, g.opts, ...args.slice(3)])).then(r => fn === 'refit' ? G.unapply(r, base) : fn === 'run' ? { ...r, options: (r?.options || []).map(o => G.unapply(o, base)) } : (r || []).map(o => G.unapply(o, base)));
   }
   function laid0(fn, ...args) {
     try { if (!worker) { worker = new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }); worker.onmessage = ({ data }) => { const w = wait.get(data.id); if (!w) return; wait.delete(data.id); data.ok ? w.ok(data.result) : w.no(new Error(data.error)); }; worker.onerror = e => { for (const w of wait.values()) w.no(new Error(e.message || 'layout worker failed')); wait.clear(); worker = null; }; } }
     catch (e) { worker = null; }
-    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'refit' ? refit(...args) : fn === 'pods' ? relayPods(...args) : fn === 'net' ? netEdit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
+    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'run' ? runPlan(...args) : fn === 'refit' ? refit(...args) : fn === 'pods' ? relayPods(...args) : fn === 'net' ? netEdit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
     const id = ++wseq; return new Promise((ok, no) => { wait.set(id, { ok, no }); worker.postMessage({ id, fn, args: JSON.parse(JSON.stringify(args)) }); });
+  }
+  // Build's layouts as runs (lib/layoutrun.mjs runPlan): the same engine inside a saved, replayable run (seeded, so the
+  // same request on the same site gives the same layouts), apartment buildings from the reviewed templates, each option
+  // with its independent check. The plain engine when the run can't be made.
+  // the design storm's rainfall at the site (api/rainfall: NOAA Atlas 14, else a regional figure), asked once per place
+  // and handed to the run on the plan's settings, so its detention estimate (lib/hydrology.mjs) uses the point figure
+  // and the saved run records it; the live plan keeps it too (its check panel and notes read the same number)
+  const rains = new Map();
+  async function withRain(plan) {
+    const st = plan?.params?.storm && typeof plan.params.storm === 'object' ? plan.params.storm : {}; if (st.rain || !Array.isArray(plan?.origin)) return plan;
+    const [lon, lat] = plan.origin, key = lat.toFixed(2) + ',' + lon.toFixed(2);
+    if (!rains.has(key)) rains.set(key, fetch('api/rainfall?lat=' + lat + '&lon=' + lon).then(r => r.ok ? r.json() : null).then(d => d?.rain || null).catch(() => null));
+    const rain = await rains.get(key); if (!rain) { rains.delete(key); return plan; }
+    const params = { ...(plan.params || {}), storm: { ...st, rain } }, live = PL(); if (live && live.id === plan.id && !live.params?.storm?.rain) live.params = { ...(live.params || {}), storm: { ...(typeof live.params?.storm === 'object' ? live.params.storm : {}), rain } };
+    return { ...plan, params };
+  }
+  async function laidRun(plan, prog, opts, ask) {
+    try { plan = await withRain(plan); } catch (e) { console.warn('rainfall', e); }
+    try { const r = await laid('run', plan, prog, opts, { ask }); if (r?.options?.length) return r.options; } catch (e) { console.warn('layout run', e); }
+    return laid('options', plan, prog, opts);
   }
   let lastKeep = null, keySig = '';
   function draw() {
@@ -2666,7 +2687,7 @@ export function initSitePlan(ctx) {
     const label = solveLabel, mark = o.force ? null : solveMark; solveLabel = ''; solveMark = null; ed.solveBar = false;
     const before = pl.elements.some(e => e.kind === 'building') ? GM(pl) : null, was = pl.variant ? { ...pl.variant } : null, hadAi = !!ed.variants?.some(v => v.ai);
     const run = startRun('resolve', ['Laying out new layouts with these settings'], o.src || '#spResolve'); if (!run) return;
-    let out = []; try { out = await laid('options', { ...pl, params: RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }) }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, deeper: true, ...koOpts(pl) }); } catch (e) { console.warn('layout', e); }
+    let out = []; try { out = await laidRun({ ...pl, params: RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }) }, pl.program, { count: ed.variants?.length > 3 ? 12 : 3, deeper: true, ...koOpts(pl) }, ed.runMeta?.ask || pl.lastRun?.ask || ''); } catch (e) { console.warn('layout', e); }
     if (!live(run) || PL() !== pl) return;
     const variants = named(out, { ...pl });
     if (!variants.some(v => v.elements.length)) { endRun(run); ctx.toast('Nothing fits with these settings.'); return; }
@@ -2938,7 +2959,7 @@ export function initSitePlan(ctx) {
       const pl = PL(); if (!pl || pl.id !== plid || scenKey(pl) !== k) { S0.busy = true; scenOn = ''; return; }
       if (S0.runs[s]) continue;
       const p2 = G.withScenario({ ...pl }, s);
-      let out = []; try { out = await laid('options', p2, p2.program, { count: 3, ...koOpts(p2) }); } catch (e) { console.warn('scenario ' + s, e); }
+      let out = []; try { const ask = ed?.runMeta?.ask || pl.lastRun?.ask || ''; out = await laidRun({ ...p2, params: RUN.fillParams(p2.params, { ask }) }, p2.program, { count: 3, ...koOpts(p2) }, ask); } catch (e) { console.warn('scenario ' + s, e); }
       S0.runs[s] = out.filter(o => o.elements?.length).slice(0, 2).map(o => ({ plan: { ...p2, program: o.program || p2.program, params: o.params || p2.params, elements: o.elements }, scenario: s }));
     }
     S0.busy = false; scenOn = ''; const pl = PL(); if (pl?.id !== plid || scenKey(pl) !== k) return;
@@ -3044,8 +3065,8 @@ export function initSitePlan(ctx) {
   }
   function verifyHTML(pl) {
     let r; try {
-      const brief = LB.canonicalBrief(LB.briefFromProgram(pl.program, pl, { text: '' })), fm = SP.fillMode(pl.params);
-      for (const u of brief.program.uses) if (u.quantity.mode !== 'maximize') u.quantity.mode = fm === 'hold' ? 'exact' : 'min'; // what Leftover land says the size means
+      const brief = LB.canonicalBrief(pl.run?.brief ? { ...pl.run.brief, site: LB.siteFromPlan(pl), locks: [], locked: {} } : LB.briefFromProgram(pl.program, pl, { text: '' })), fm = SP.fillMode(pl.params);
+      if (!pl.run?.brief) for (const u of brief.program.uses) if (u.quantity.mode !== 'maximize') u.quantity.mode = fm === 'hold' ? 'exact' : 'min'; // (a plan without a run: what Leftover land says the size means)
       r = LV.validateLayout(pl, brief);
     } catch (e) { return '<div class="rnote">The check couldn’t run on this plan: ' + esc(e.message) + '</div>'; }
     const icon = { pass: '✓', fail: '✕', unknown: '?', 'n/a': '–' }, val = v => v == null ? '' : Array.isArray(v) ? v.join('–') : typeof v === 'object' ? Object.entries(v).map(([k, x]) => k + ' ' + x).join(', ') : typeof v === 'number' ? f0(v) : String(v);
@@ -3485,7 +3506,7 @@ export function initSitePlan(ctx) {
     if (np.form) params0 = { ...(params0 || pl.params || {}), form: np.form }; // the shape the request names ("L-shaped"): the layout reads params.form
     runStep(run, 2 + o0, lay);
     const wb = BR.wordsBrief(ask); // pads asked for in words ("with 2 pad sites", "an outparcel"): the engine places them, at every level
-    let out = [], failed = false; try { out = await laid('options', { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}), ...parcelOpts(p, pl, prog) }); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
+    let out = [], failed = false; try { out = await laidRun({ ...pl, setbacks, ...(params0 ? { params: params0 } : {}) }, prog, { ...L.layout, deeper: true, ...koOpts(pl), ...(wb ? { brief: wb } : {}), ...parcelOpts(p, pl, prog) }, ask); /* (deeper: the same layouts again with a 6 and an 8 ft deep pond, each labelled with the depth it assumes) */ } catch (e) { console.warn('layout', e); failed = true; if (live(run)) ctx.toast('The layout failed: ' + e.message + '. Try a smaller request, or draw it by hand.'); }
     if (!live(run) || PL() !== pl) return;
     const plan = { ...pl, setbacks, ...(params0 ? { params: params0 } : {}) };
     let variants = named(out, { ...plan, program: prog }, params0 ? { params: params0 } : {});
@@ -3535,7 +3556,7 @@ export function initSitePlan(ctx) {
         if (rv.revise && rv.program) {
           runStep(run, 4 + o0, (revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
           const params2 = RUN.fillParams({ ...params1, ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, { ask }), prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) }; // (its "fill" never holds land the words didn't ask to hold)
-          let out2 = []; try { out2 = await laid('options', { ...pl, setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...koOpts(pl), ...(wb ? { brief: wb } : {}) }); } catch (e) { console.warn('layout', e); }
+          let out2 = []; try { out2 = await laidRun({ ...pl, setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...koOpts(pl), ...(wb ? { brief: wb } : {}) }, ask); } catch (e) { console.warn('layout', e); }
           if (!live(run)) return;
           const v2 = named(out2, { ...plan, params: params2, program: prog2 }, { params: params2, revisedBy: rv.why || 'the AI review' }).filter(v => v.elements.length);
           if (v2.length) { add = v2.slice(0, 3); progR = prog2; params1 = params2; revised.push(first.why || 'a better program'); }
@@ -4089,7 +4110,7 @@ export function initSitePlan(ctx) {
   async function moreLayouts() {
     const pl2 = PL(), ask = (ed?.runMeta?.ask || pl2?.lastRun?.ask || '').trim(), withAi = !aiOff() && !!ask && !!ed?.variants?.some(v => v.ai);
     const run = startRun('more', withAi ? ['Looking for more layouts', 'The AI is reviewing the new layouts'] : ['Looking for more layouts'], '#spMore'); if (!run) return;
-    let more = []; try { more = await laid('options', { ...pl2 }, pl2.program, { count: 12, ...koOpts(pl2) }); } catch (e) { console.warn('layout', e); }
+    let more = []; try { more = await laidRun({ ...pl2, params: RUN.fillParams(pl2.params, { ask }) }, pl2.program, { count: 12, ...koOpts(pl2) }, ask); } /* (the same run as Build: every option checked, replayable) */ catch (e) { console.warn('layout', e); }
     if (!live(run) || PL() !== pl2) return;
     if (!more.length) { endRun(run); return; }
     const old = new Map((ed.variants || []).map(v => [v.key, v])), nv = named(more, pl2); for (const v of nv) { const o = old.get(v.key); if (o?.ai) v.ai = o.ai; }
@@ -4125,7 +4146,7 @@ export function initSitePlan(ctx) {
     let v = ed.variants?.[i]; if (!v || Array.isArray(v.elements) && !v.elements.length) return false;
     const was = v.stale; if (!v.elements || was) { v = await relay(i, was); if (!v) return false; i = ed.variants.indexOf(v); } // out of date, or numbers only: laid out again for this site first
     applying = true;
-    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; x.program = SP.keepNames({ ...(v.program || x.program) }, x.program, !o.fresh); /* (the names as they are now: the layout's copy is from when it was laid out; a build's own new layouts carry its names) */ x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; if (v.laidAs || x.laidAs) x.laidAs = v.laidAs || null; }); }
+    try { change(x => { x.elements = withKeepouts(v.elements, x.elements); x.spareRows = []; if (v.run?.brief) x.run = { inputHash: v.run.inputHash, seed: v.run.seed, versions: v.run.versions, brief: v.run.brief }; else delete x.run; /* (the run it came from: the Independent check reads what each size meant) */ x.program = SP.keepNames({ ...(v.program || x.program) }, x.program, !o.fresh); /* (the names as they are now: the layout's copy is from when it was laid out; a build's own new layouts carry its names) */ x.setbacks = v.setbacks || x.setbacks; if (v.params) x.params = clone(v.params); x.zones = clone(v.zones || []); x.recipe = v.recipe ? clone(v.recipe) : null; x.variant = { key: v.key, name: v.name, at: new Date().toISOString() }; if (v.laidAs || x.laidAs) x.laidAs = v.laidAs || null; }); }
     finally { applying = false; }
     ed.sel = null; ed.solveBar = false; if (was) PL().stale = null; saveRun(); if (!o.quiet) { draw(); panel(); }
     nameNew(PL()); // (street names on: a new layout's streets named too, in the same undo step)

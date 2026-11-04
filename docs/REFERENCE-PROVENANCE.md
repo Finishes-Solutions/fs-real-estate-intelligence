@@ -6,7 +6,7 @@ The source library (87 projects, 500 PDFs, ~5.5 GB) stays outside Git.
 
 ## What was reviewed (Nov 2026)
 
-15 projects, 12 families. Every value carries its file, sha256, page, sheet, revision/date, method,
+18 projects, 15 families (P33, E027 and E028 added Nov 4 from their text layers). Every value carries its file, sha256, page, sheet, revision/date, method,
 confidence, status and review flag.
 
 | ID | Project | Forms (overlays) | Partition | Main sources |
@@ -26,6 +26,9 @@ confidence, status and review flag.
 | P37 | Terracina at Fiddyment, Roseville CA | garden breezeway 24-plex, carports | dev | C2 preliminary site plan (Feb/Apr 2024) |
 | E053 | Portland Road Townhomes, Salem OR | townhome with garage, retail pad | dev | C100 (May 2025), A2/A3 |
 | E054 | Anderson Apartments, Redmond WA | podium 5-over-2, courtyard, mixed use | **holdout** | cover data (text), A0.23, A0.24 (Mar 2025) |
+| P33 | Pleasant Grove Apartments, Roseville CA | 3-story corridor + elevator | dev | sheet 05 project data, sheet 10 plan (Jan 2021); text only |
+| E027 | 10th and Irving, Arlington VA | 11-story over ground-floor retail, 3 garage levels below | dev | A0-11 to A0-14 area & parking tabulations (Nov 2022); text only |
+| E028 | 2000 Clarendon Blvd, Arlington VA | 14-story corridor tower, ground-floor retail, 4 garage levels below | dev | A1-00 GFA summary, parking distribution, typical plan; text only |
 
 ## Method
 
@@ -59,11 +62,11 @@ checked; if they turn out to share an architect with a dev family, move them.
 | Duplex / small multiplex | P20 duplex | — | triplex/fourplex absent; P22 duplex blocks not reviewed |
 | Cottage / detached BTR | P20 | — | |
 | Courtyard building | E054 (U on podium) | — | garden courtyard absent |
-| Mid-rise 4–5 story, corridor + elevator | P35 (elevators/stairs seen), P28 | P11, P36 (prototype) | |
+| Mid-rise 4–5 story, corridor + elevator | P35 (elevators/stairs seen), P28 | P11, P33 (3-story), P36 (prototype) | |
 | Tuck-under / unit over garage | E053 (garage in unit), P20 (unit over 3-car garage, legend only) | — | classic tuck-under walk-up absent |
-| Podium | P25, E054, P27 | — | |
+| Podium | P25, E054, P27 | E027, E028 (garages below grade: stalls a level) | |
 | Wrap (around garage) | — | — | **absent** |
-| Tower on podium | P25, P27 (footprint estimate only) | — | |
+| Tower on podium | P25, P27 (footprint estimate only) | E028 (plate over ground floor) | |
 | Senior overlay | P35, P36 | — | |
 | Affordable overlay | P27, P28, P35, P36, P37 | P11 | |
 | Adaptive reuse / rehab | — | — | 9 projects in corpus, not reviewed |
@@ -106,6 +109,23 @@ checked; if they turn out to share an architect with a dev family, move them.
   medium/low. P27's tower footprints are estimates (the printed scale wasn't calibrated).
 - Aerials were not used.
 
+## What the engine takes from the evidence (Nov 4)
+
+Derived in scripts/refs/templates-to-lib.mjs (dev partition only), written to lib/reftemplates.mjs:
+
+- **Corridor homes (REF_CORRIDOR):** gross sf a home and net / gross for 3-4 story double-loaded corridor buildings,
+  the mean of P28 (945 gsf, 0.827), P11 (1,039, 0.766) and P33 (1,100, 0.816): 1,028 gsf a home at 0.803. The engine
+  counts the homes of courtyards, wraps, courtyards on a podium and vertical mixed use with it (it converts at 85%, so
+  the unit size reads 874 sf). Towers keep the default: the reviewed high-rise homes are urban and smaller (P25 899,
+  E027 766 gsf a home).
+- **Tower share (REF_PODIUM):** the tower's plate over the podium, P25 0.529 (L01 over L00) and E028 0.657 (typical
+  plate over the ground floor), mean 0.593 (was a 0.6 estimate). P25's podium is one level entered from the road with
+  no ramp; the garage plan now draws none on a single parking level.
+- **Not wired, recorded for evaluation:** below-grade garage stalls a level, E027 392-482 sf a stall (8'-6" stalls),
+  E028 534-618 (a small, narrow site); the engine's drawn podium plan holds about 495 sf a stall on a typical level
+  (9 ft stalls), inside that range. Corridor depth: P28 65 ft and E028 64'-4" agree with the 65 ft template; no dev
+  corridor building deeper than 65 ft was found (the 83 ft bar is holdout P35/P36).
+
 ## Known gaps
 
 - Unit sizes are missing for several garden projects, and P35/P36 have no per-type unit counts.
@@ -113,6 +133,8 @@ checked; if they turn out to share an architect with a dev family, move them.
 - E053's unit counts for types A.2, B and C, and its site area, are unknown.
 - E054's unit mix is unknown, and most of its values are text-only.
 - Tower storey counts for P27 are unknown.
-- No wrap, stacked-townhome or classic tuck-under walk-up references.
-- Not reviewed: Arlington VA mid/high-rise sets (E022–E029), Bellefield, Catalyst, Onyx and the
+- No wrap, stacked-townhome or garden-courtyard references; no dev courtyard building (E054 is holdout).
+- No dev corridor building deeper than 65 ft (P33's depth isn't printed as one dimension).
+- E027 and E028 have no unit mix in their text layers; E028 has no unit count.
+- Not reviewed: Arlington VA sets E022, E025 (raster), E029, Bellefield, Catalyst, Onyx and the
   Irish duplex blocks (P21–P24, E041).

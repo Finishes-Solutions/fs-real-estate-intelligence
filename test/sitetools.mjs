@@ -30,7 +30,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.equal(Math.round(T.footprintOf([club, apt])), Math.round(S.footArea(club) + S.footArea(apt)));
 
   // copying: a curved connector drive (a path) comes out whole, with new ids and finite points
-  const curve = plan.elements.find(e => e.kind === 'drive' && e.path), d = T.dupPieces(plan, [curve.id], { newId });
+  const curve = plan.elements.find(e => e.kind === 'drive' && e.path && !e.entry && e.name !== 'Main entry'), d = T.dupPieces(plan, [curve.id], { newId }); // (a connector, not the way in: an entrance drawn along its centre line copies with its median and signs)
   assert.equal(d.elements.length, plan.elements.length + 1); const c = d.elements.find(e => e.id === d.ids[0]);
   assert.ok(c && c.id !== curve.id && finite(c) && c.path.length === curve.path.length && c.pinned, 'a copied path drive has finite points');
   assert.ok(Math.hypot(c.x - curve.x, c.y - curve.y) > 20, 'beside the original, not on it');
@@ -291,7 +291,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   for (const x of g) for (const it of x.items) assert.equal(T.layerOf(it.kind), x.id, it.name + ' under its own layer');
   for (const it of all) assert.ok(it.sub && !/NaN|undefined|null/.test(it.sub), it.name + ': ' + it.sub);
   const names = g[0].items.map(i => i.name); assert.ok(names.indexOf('Apt Bldg 2') < names.indexOf('Apt Bldg 10'), 'Bldg 2 before Bldg 10');
-  const apt = plan.elements.find(e => e.name === 'Apt Bldg 3'), ai = all.find(i => i.id === apt.id);
+  const apt = plan.elements.find(e => e.name === 'Apt Bldg 3' && e.phase !== 2) || plan.elements.find(e => e.kind === 'building' && e.use === 'multifamily' && e.phase !== 2), ai = all.find(i => i.id === apt.id); // (a first-phase building: one marked Phase 2 says so and is drawn lighter)
   assert.match(ai.sub, /^Multifamily · 3 floors · \d+ units · [\d,]+ sf$/); assert.equal(ai.color, M.buildingColor(P, 'multifamily'), 'the map colour');
   const row = plan.elements.find(e => e.kind === 'parking'), ri = all.find(i => i.id === row.id);
   assert.equal(ri.sub, S.spacesWord(S.stalls(row).count), 'a parking row: its spaces'); assert.equal(ri.color, M.COL.parking);
@@ -317,7 +317,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.equal(ED.labelOf({ ...shop, name: T.cleanName('   ') }), 'Building'); assert.equal(ED.labelOf({ kind: 'keepout' }), 'Easement');
   const renamed = { ...plan, elements: plan.elements.map(e => e.id === apt.id ? { ...e, name: 'AAA Leasing' } : e) }, rg = T.itemGroups(renamed);
   assert.equal(rg[0].items[0].id, apt.id, 'the renamed building sorts to its new place'); assert.equal(rg[0].items[0].name, 'AAA Leasing');
-  assert.equal(plan.elements.find(e => e.id === apt.id).name, 'Apt Bldg 3', 'the plan given is not changed');
+  assert.equal(plan.elements.find(e => e.id === apt.id).name, apt.name, 'the plan given is not changed');
   assert.deepEqual(T.itemGroups({}), [], 'an empty plan: nothing');
 }
 // ---- a drive as a route: Edit Shape on aisles, drawn drives and entrances ----
@@ -342,13 +342,16 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.ok(S.ringArea(S.outline(bent)) < S.ringArea(S.outline(tight)), 'a bigger Curve rounds the bend off more');
 }
 // ---- turning any piece (curved ponds, lawns, drawn outlines, routes, medians, fences): the real 240-unit plan ----
+// (a plan with the entry's median for this part: the default layout, its short median at the mouth; the search's layout
+// only if a layout comes without one)
+const planM = plan.elements.some(S.isMedian) ? plan : (o2 => ({ ...tract, elements: o2.elements, program: o2.program, recipe: o2.recipe }))(L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1, gallery: false })[0]);
 {
   const ED = await import('../lib/siteedit.mjs');
-  const fresh = () => structuredClone(plan), lens = (r, closed) => r.slice(0, closed ? r.length : -1).map((p, i) => Math.hypot(r[(i + 1) % r.length][0] - p[0], r[(i + 1) % r.length][1] - p[1])).sort((a, b) => a - b);
-  const pond = plan.elements.find(e => e.kind === 'pond'), med = plan.elements.find(S.isMedian), aisle = plan.elements.find(e => e.kind === 'drive' && !S.isFree(e) && !T.isEntrance(e));
-  assert.ok(pond && med && aisle, 'the plan has a pond, the entry’s median and a straight aisle');
-  const drawn = [T.areaPiece(plan, 'green', [[100, 0], [180, 10], [170, 90], [90, 70]], 'lawn1'), T.areaPiece(plan, 'building', [[-200, 100], [-120, 100], [-120, 160], [-160, 160], [-160, 200], [-200, 200]], 'cb1'), T.areaPiece(plan, 'keepout', [[-300, 300], [-100, 300], [-100, 330], [-300, 330]], 'k1'),
-    T.linePiece(plan, 'trail', [[0, 300], [80, 340], [160, 300]], 'tr1'), T.linePiece(plan, 'drive', [[0, 400], [100, 450], [200, 420]], 'dr1'), { ...T.routeOf(aisle), id: 'cn1' }, { id: 'fe1', kind: 'fence', path: [[-250, -200], [-150, -200], [-150, -120], [-250, -120]], x: -200, y: -160, name: '' }];
+  const fresh = () => structuredClone(planM), lens = (r, closed) => r.slice(0, closed ? r.length : -1).map((p, i) => Math.hypot(r[(i + 1) % r.length][0] - p[0], r[(i + 1) % r.length][1] - p[1])).sort((a, b) => a - b);
+  const pond = planM.elements.find(e => e.kind === 'pond'), med = planM.elements.find(S.isMedian), aisle = planM.elements.find(e => e.kind === 'drive' && !S.isFree(e) && !T.isEntrance(e));
+  assert.ok(pond && med && aisle, 'the planM has a pond, the entry’s median and a straight aisle');
+  const drawn = [T.areaPiece(planM, 'green', [[100, 0], [180, 10], [170, 90], [90, 70]], 'lawn1'), T.areaPiece(planM, 'building', [[-200, 100], [-120, 100], [-120, 160], [-160, 160], [-160, 200], [-200, 200]], 'cb1'), T.areaPiece(planM, 'keepout', [[-300, 300], [-100, 300], [-100, 330], [-300, 330]], 'k1'),
+    T.linePiece(planM, 'trail', [[0, 300], [80, 340], [160, 300]], 'tr1'), T.linePiece(planM, 'drive', [[0, 400], [100, 450], [200, 420]], 'dr1'), { ...T.routeOf(aisle), id: 'cn1' }, { id: 'fe1', kind: 'fence', path: [[-250, -200], [-150, -200], [-150, -120], [-250, -120]], x: -200, y: -160, name: '' }];
   const cases = [['an organic pond', p => S.reshape(p.elements.find(e => e.id === pond.id), 'organic')], ['the entry’s median', p => p.elements.find(e => e.id === med.id)], ...drawn.map(d => [d.kind + (d.path ? ' route' : ' outline'), p => { p.elements.push(structuredClone(d)); return p.elements[p.elements.length - 1]; }])];
   for (const [what, pick] of cases) {
     const p = fresh(), e = pick(p), e0 = structuredClone(e), a0 = S.elArea(e), c0 = S.centroid(S.shapeOf(e)), r0 = e.rot || 0, pts0 = e.poly || e.path;
@@ -369,7 +372,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   assert.deepEqual(e.mouth, T.lotLineAt(p.ring, e.path[0]).mouth, 'coming in square to the street');
   const slid = Math.hypot(e.path[0][0] - was.path[0][0], e.path[0][1] - was.path[0][1]); assert.ok(slid >= 5 && slid <= 80, 'the mouth slid along the street: ' + slid.toFixed(1) + ' ft');
   assert.ok(Math.abs(way(e.path) - way(was.path) - 15) <= 1, 'the way in turned 15°'); assert.ok(Math.abs(S.elArea(e) - a0) <= a0 * 0.06, 'about the same paving');
-  // the sheet turns the plan to put its street at the bottom: the way in turns with it (its throat, curb returns and stop bar are drawn from it)
+  // the sheet turns the planM to put its street at the bottom: the way in turns with it (its throat, curb returns and stop bar are drawn from it)
   { const te = G.turned(p, 30).elements.find(x => x.id === e.id), want = S.outline(e).map(q => S.rotPt(q, -30)), got = S.outline(te), off = (A, B) => Math.max(...A.map(q => Math.min(...B.map((b, i) => S.segDist(q, b, B[(i + 1) % B.length])))));
     assert.ok(Math.max(off(want, got), off(got, want)) < 0.1, 'the turned entrance turned for the sheet: ' + Math.max(off(want, got), off(got, want)).toFixed(2) + ' ft off'); }
   const es = S.shapeOf(e), md = S.entryParts(p, e).filter(S.isMedian); assert.equal(md.length, 1, 'its median went with it');
@@ -381,15 +384,15 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   q2.elements = add.elements; const e2 = q2.elements.find(x => x.id === 'e2'); Object.assign(e2, T.routeOf(e2, q2.ring)); delete e2.poly;
   r = S.turnPiece(q2, e2, -20); assert.ok(S.segDist(e2.path[0], sa, sb) < 0.05 && r.deg === -20, 'its mouth on the side street');
   // what goes with it: the main entry carries its median and sign; moved, they move; removed, they go
-  const m0 = plan.elements.find(x => x.name === 'Main entry'), parts = S.entryParts(plan, m0); assert.ok(parts.some(S.isMedian) && parts.some(x => x.kind === 'sign'), 'its median and monument sign');
-  assert.deepEqual(S.attachedTo(plan, m0).map(x => x.id).sort(), parts.map(x => x.id).sort(), 'they go with it');
-  const mv = T.moveSet(plan, [m0.id], 12, 0); for (const x of parts) assert.ok(Math.abs(mv.elements.find(y => y.id === x.id).x - x.x - 12) < 0.02, 'moved with it');
-  const gone = ED.applyEdits(plan, [{ action: 'remove', target: m0.id }]); assert.ok(!gone.elements.some(x => parts.some(y => y.id === x.id)), 'removed with it: ' + gone.done.join(' '));
+  const m0 = planM.elements.find(x => x.name === 'Main entry'), parts = S.entryParts(planM, m0); assert.ok(parts.some(S.isMedian) && parts.some(x => x.kind === 'sign'), 'its median and monument sign');
+  assert.deepEqual(S.attachedTo(planM, m0).map(x => x.id).sort(), parts.map(x => x.id).sort(), 'they go with it');
+  const mv = T.moveSet(planM, [m0.id], 12, 0); for (const x of parts) assert.ok(Math.abs(mv.elements.find(y => y.id === x.id).x - x.x - 12) < 0.02, 'moved with it');
+  const gone = ED.applyEdits(planM, [{ action: 'remove', target: m0.id }]); assert.ok(!gone.elements.some(x => parts.some(y => y.id === x.id)), 'removed with it: ' + gone.done.join(' '));
 }
 // ---- ways in: a real boulevard (two lanes, a planted median, the monument sign), and where entrances may go ----
 {
   const side = tract.ring.findIndex((q, i) => S.outwardOf(tract.ring, i)[0] > 0.9), T2 = { ...tract, streets: [side] }, sa = T2.ring[side], sb = T2.ring[(side + 1) % T2.ring.length];
-  const ob = L.layoutOptions(T2, { use: 'multifamily', units: 240, floors: 3, entrances: 1 }, { count: 1 })[0], base = { ...T2, elements: ob.elements, program: ob.program }, at = f => [sa[0] + (sb[0] - sa[0]) * f, sa[1] + (sb[1] - sa[1]) * f];
+  const ob = L.layoutOptions(T2, { use: 'multifamily', units: 240, floors: 3, entrances: 1 }, { count: 1, gallery: false })[0], /* (the search's layout as the base: the generator's rows run an end drive along the side street, too near for a median there; the tool is what's tested here) */ base = { ...T2, elements: ob.elements, program: ob.program }, at = f => [sa[0] + (sb[0] - sa[0]) * f, sa[1] + (sb[1] - sa[1]) * f];
   const bad = els => S.check({ ...base, elements: els }).filter(i => i.level === 'bad');
   let r = S.addEntrance(base, at(0.2), { boulevard: true, id: 'bv' }); assert.ok(!r.error, r.error);
   const ent = r.entrance, md = r.added.find(S.isMedian), sg = r.added.filter(x => x.kind === 'sign'), rt = T.routeOf(ent, base.ring), n = rt.mouth, u = [n[1], -n[0]];
@@ -439,7 +442,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
     for (const d of [20, 45]) { const r2 = ED.applyEdits(p, [{ action: 'change', target: pond.id, turnBy: d }]); assert.deepEqual(S.check({ ...p, elements: r2.elements }).filter(i => i.level === 'bad' && !b0.includes(i.text)).map(i => i.text), [], d + '°: ' + r2.done.join(' ') + r2.skipped.join(' ')); }
     const un = structuredClone(p); un.elements = un.elements.filter(e => e.kind !== 'pond' || e.id === pond.id); delete un.elements.find(e => e.id === pond.id).name; assert.deepEqual(ED.guessEdits('turn the pond 20 degrees', un).map(o => o.target), [pond.id], 'the one pond, unnamed, by what it is'); }
   // a plan laid out with the narrow entry (a 40 ft drive, a 10 ft median): made a boulevard by name
-  const nw = L.layoutOptions({ ...tract, params: { entry: { style: 'narrow' } } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1 })[0], np = { ...tract, params: { entry: { style: 'narrow' } }, elements: nw.elements, program: nw.program, recipe: nw.recipe };
+  const nw = L.layoutOptions({ ...tract, params: { entry: { style: 'narrow' } } }, { use: 'multifamily', units: 240, floors: 3 }, { count: 1, gallery: false })[0], /* (the search's layout: room in front of its first aisle for the boulevard the edit makes; the edit is what's tested) */ np = { ...tract, params: { entry: { style: 'narrow' } }, elements: nw.elements, program: nw.program, recipe: nw.recipe };
   const nm = np.elements.find(e => e.name === 'Main entry'); assert.ok(!nm.blvd && /Boulevard · 40 ft/.test(nm.note), 'narrow: ' + nm.note);
   { const r3 = ED.applyEdits(np, [{ action: 'change', target: nm.id, turnBy: 10 }]); assert.ok(!r3.skipped.length && /turned 10°/.test(r3.done.join(' ')), 'where its signs went is said with the turn, not as something left undone: ' + r3.skipped.join(' ')); }
   ops = ED.guessEdits('make the main entry a boulevard', np); assert.deepEqual(ops, [{ action: 'change', target: nm.id, boulevard: true, signs: null }]);
@@ -449,7 +452,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   const side = tract.ring.findIndex((q, i) => S.outwardOf(tract.ring, i)[0] > 0.9), sp = { ...p, streets: [side] };
   ops = ED.guessEdits('add a boulevard entrance off the side street with monument signs on both sides', sp); assert.equal(ops.length, 1); const f = ED.sheetFrame(sp), st = f.from([ops[0].x, ops[0].y]);
   assert.ok(ops[0].action === 'add' && ops[0].kind === 'entrance' && ops[0].boulevard && ops[0].signs === 'both' && S.segDist(st, tract.ring[side], tract.ring[(side + 1) % tract.ring.length]) < 1, 'on the east lot line: ' + JSON.stringify(ops));
-  r = ED.applyEdits(sp, ops); const ne = S.entrancesOf(r.elements).find(e => e.name !== 'Main entry'), np2 = { ...sp, elements: r.elements }; assert.ok(ne, r.skipped.join(' ')); assert.equal(S.entryParts(np2, ne).filter(x => x.kind === 'sign').length, 2, r.done.join(' '));
+  r = ED.applyEdits(sp, ops); const had = new Set(S.entrancesOf(sp.elements).map(e => e.id)), ne = S.entrancesOf(r.elements).find(e => !had.has(e.id)), np2 = { ...sp, elements: r.elements }; assert.ok(ne, r.skipped.join(' ')); assert.equal(S.entryParts(np2, ne).filter(x => x.kind === 'sign').length, 2, r.done.join(' '));
   // (the drives sit 40 ft in from that street: no room for a median, so a plain driveway with its signs at the corners,
   // and it says why; never a 50 ft throat with nothing down its middle, nor a median claimed that isn't there)
   assert.ok(!ne.blvd && /26 ft driveway/.test(ne.note) && !S.entryParts(np2, ne).some(S.isMedian) && /signs at both corners\. Not a boulevard: it meets the first drive \d+ ft in/.test(r.done.join(' ')), ne.note + ' / ' + r.done.join(' '));
@@ -480,7 +483,7 @@ const o = L.layoutOptions({ ...tract, params: { fill: 'phase' } }, { use: 'multi
   // sign deleted by hand stays gone; a pinned main entry's own median and sign aren't kept off as pieces of their own
   for (const mode of ['both', 'none']) { const q = structuredClone(plan), me = q.elements.find(e => e.name === 'Main entry'); q.elements = S.refreshEntry(q, me, mode).elements; const rf = L.refit(q, { amount: 'current', keep: true });
     assert.equal(rf.elements.filter(e => e.kind === 'sign').length, mode === 'both' ? 2 : 0, mode + ': ' + rf.elements.filter(e => e.kind === 'sign').map(e => e.note)); }
-  { const q = structuredClone(plan), g0 = q.elements.find(e => e.kind === 'sign'); assert.ok(g0, 'the layout has its sign'); const dr = ED.applyEdits(q, [{ action: 'remove', target: g0.id }]); assert.equal(L.refit({ ...q, elements: dr.elements }, { amount: 'current', keep: true }).elements.filter(e => e.kind === 'sign').length, 0, 'deleted, it stays gone'); }
+  { const q = structuredClone(plan), g0 = q.elements.find(e => e.kind === 'sign'); assert.ok(g0, 'the layout has its sign'); const n0 = q.elements.filter(e => e.kind === 'sign').length, dr = ED.applyEdits(q, [{ action: 'remove', target: g0.id }]); assert.equal(L.refit({ ...q, elements: dr.elements }, { amount: 'current', keep: true }).elements.filter(e => e.kind === 'sign').length, n0 - 1, 'deleted, it stays gone (the other entrances keep theirs)'); }
   { const q0 = L.refit(structuredClone(plan), { amount: 'current', keep: true }), q = structuredClone(plan); q.elements.find(e => e.name === 'Main entry').pinned = true; const q1 = L.refit(q, { amount: 'current', keep: true }), un = els => S.metrics({ ...plan, elements: els }).units;
     assert.ok(un(q1.elements) >= un(q0.elements) * 0.97, 'the main entry pinned: ' + un(q1.elements) + ' units, ' + un(q0.elements) + ' with it laid out again'); }
 }
