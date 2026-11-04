@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 4:40 AM CT: Every layout finished alike: rounded corners, stepped fronts, the entry as Settings say (43386bf)
+- **Generated layouts look like the rest:** aisle ends meet their drives on a curve a fire truck can turn, apartment bars step their fronts, and the main entry follows Settings › Entrance (a boulevard with its median and signs where the first aisle is far enough in; otherwise a 40 ft entry with curb returns).
+- **Moving a building and re-fitting** a generated layout keeps it where you put it; what it overlaps gives way.
+- A courtyard asked for leads its options even when drawn a little smaller to park. The 300-courtyard request on Hockley takes longer (about 28 s). The full test suite passes.
+
 ### 3:50 AM CT: Faster "as many as fit", every building to a reviewed template, podiums parked to the need (a723a84, bc33c29, 0bb81b7, 2d1798f, 0eb201e, 8e6147a)
 - **"As many as fit" is 2-4 times faster** (Hockley mid-rise about 11 s, was 22) and finds what an exact count finds. The cause was in the search, not worked round any more.
 - **Every apartment building is drawn to a reviewed building type**, and the check flags one that isn't. Some counts that came from oversized buildings are lower and honest now: a wedge-shaped test site 128 apartments, Sierra Vista WB-30 320 as many as fit (355 as built; its buildings are deeper than any reviewed type).
