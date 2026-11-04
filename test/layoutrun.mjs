@@ -389,6 +389,22 @@ ok('tuck-under rows: a garage under every home, exactly the homes asked, garages
   // the check never counts more garages than fit along a row (11 ft each)
   const one = { ...B.toEngine(r.brief).plan, elements: [{ id: 't', kind: 'building', use: 'multifamily', x: 450, y: 250, w: 60, d: 42, floors: 2, units: 3, tuck: 9 }] };
   assert.equal(V.quantities(one, r.brief).parking.tucked, 5);
+});
+ok('a cross-dock: doors and a truck court on both long sides, trailer stalls, trucks kept off the car park, exactly the floor area', () => {
+  const big = { origin: [-96.42, 30.38], ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+  const b = B.briefFromRequest('cross-dock warehouse, 400,000 sf', big); assert.equal(b.program.uses[0].form, 'ind-cross-dock');
+  const r = RUN.runBrief(b), o = r.options[0], chk = id => o.validation.checks.find(c => c.id === 'program.u1.' + id);
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.gfa, 400000);
+  const X = o.elements.find(e => e.kind === 'building' && e.crossDock); assert.ok(X && X.docks.faces.length === 2 && X.docks.perFace > 40, 'dock doors on both long walls');
+  assert.equal(chk('crossdock').status, 'pass'); assert.ok(chk('crossdock').measured.every(d => d >= 130), JSON.stringify(chk('crossdock').measured));
+  assert.equal(chk('trailers').status, 'pass'); assert.ok(chk('trailers').measured >= X.docks.perFace, 'trailer stalls counted');
+  assert.equal(chk('trucks').status, 'pass', 'no truck piece touches the car parking');
+  assert.ok(o.elements.some(e => e.kind === 'drive' && e.trucks && /^Entrance\b/.test(e.name || '')) && o.elements.some(e => e.kind === 'drive' && e.name === 'Main entry' && !e.trucks), 'a truck entrance and a car entrance of their own');
+  assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+  // the check reads the drawing: a warehouse with a court on one side only fails it
+  const one = o.elements.filter(e => !(e.kind === 'truck' && e.x > X.x));
+  assert.equal(V.validateLayout({ ...B.toEngine(r.brief).plan, elements: one, program: o.program }, r.brief).checks.find(c => c.id === 'program.u1.crossdock').status, 'fail');
   assert.equal(RUN.replayRun(r).identical, true);
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });

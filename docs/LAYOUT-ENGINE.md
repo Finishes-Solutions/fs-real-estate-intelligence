@@ -202,7 +202,18 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    the master plan drains off site (P35: 224 -> 355 units with it off); as many as fit below an exact count that fits;
    one frame on a wedge site (P36: 1 building of 3); no compact urban podium-courtyard / wrap form and the 60% tower
    share (E054); no fee-simple townhome-lot product and an exact townhome count below the maximize result (P18).
-6. Tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
+6. Tuck-under (done Nov 4) and vertical mixed use, each with its own geometry and tests.
+6c. Done Nov 4 (cross-dock, partial). "A cross-dock warehouse" (form ind-cross-dock; the engine program's `crossDock`)
+   draws lib/sitegencom.mjs crossDock: a deep building running back from the street (400-600 ft across, its length the
+   floor area over that), dock doors at 12 ft centres on both long walls (`docks` on the building, marked on the sheet),
+   a truck court each side (the apron against the dock wall, 55 ft trailer stalls along the outer edge, 130-185 ft in
+   all, the trailer stalls striped and counted), the employees' car park across the front with its own Main entry, and
+   the trucks on their own drives up both sides from their own entrances (Entrance 2 / 3, `trucks`), joined behind the
+   building. Its layouts lead the plain warehouses when the words ask for one. The validator measures it from the
+   drawing: program.<use>.crossdock (truck court at least 130 ft deep along both long walls, hard), .trailers (about
+   one stall for every two doors, a warning) and .trucks (no truck piece or truck drive touches car parking, hard).
+   Bench IN-crossdock: 400,000 sf, 245 / 240 spaces, 130 trailer stalls. Still: no truck turning paths (no design
+   vehicle), clear height a default, no guard house.
 6a. Done Nov 3 (wrap, partial). "A wrap building" (form mf-wrap, program arrangement 'wrap', 5 floors unless the words
    say) is drawn by lib/sitegen.mjs wrapOf: one double-loaded building (65 ft wings: a street wing the full width, a wing
    down each side) on three sides of a parking garage, an amenity courtyard with the pool between the street wing and the
