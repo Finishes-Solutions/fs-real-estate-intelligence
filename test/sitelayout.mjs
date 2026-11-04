@@ -238,8 +238,7 @@ function usable(plan, o, what) {
   const loop = [{ kind: 'drive', x: 0, y: 100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: 0, y: -100, w: 300, d: 24, rot: 0 }, { kind: 'drive', x: -138, y: 0, w: 24, d: 224, rot: 0 }, { kind: 'drive', x: 138, y: 0, w: 24, d: 224, rot: 0 }];
   const pv = S.pavement({ ...site, elements: loop }); assert.equal(pv.length, 1); assert.equal(pv[0].holes.length, 1, 'the lawn inside the loop is a hole');
   const fc = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'b1', form: 'U' }, { id: 'p', kind: 'parking', x: 0, y: -160, w: 180, d: 60, rot: 0 }], params: { trees: true } });
-  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('fac') && ks.has('tree'), '3D detail (the building drawn from its design) and 3D trees');
-  assert.ok(new Set(fc.features.filter(f => f.properties.k === 'fac' && !f.geometry.coordinates[1]).map(f => f.properties.b)).has(0), 'its walls from the ground up');
+  const ks = new Set(fc.features.map(f => f.properties.k)); assert.ok(ks.has('b3') && ks.has('tree') && !ks.has('fac'), '3D detail (plain massing: parapet and floor lines, no designed facades on the map) and 3D trees');
   // a building with no design (a hotel) keeps the plain detail: a parapet round the roof and a line at each floor
   const fh = S.planFeatures({ ...site, origin: site.origin, elements: [{ ...b, id: 'h1', use: 'hotel' }] });
   assert.ok(fh.features.some(f => f.properties.k === 'b3' && f.properties.part === 'parapet'), 'a hotel: a parapet');

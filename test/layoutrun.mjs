@@ -240,7 +240,7 @@ ok('a courtyard building: its wings one building, shared corners once, the pool 
   assert.ok(o.elements.some(e => e.kind === 'pool' && inHull(e)), 'the pool in the court');
   assert.ok(!o.elements.some(e => (e.kind === 'parking' || e.kind === 'drive') && inHull(e)), 'no parking inside the court');
   assert.ok(o.elements.some(e => e.kind === 'building' && e.use === 'amenity' && inHull(e)), 'the clubhouse at the court');
-  assert.ok(SP.planFeatures({ ...RECT, elements: o.elements, program: o.program }, null).features.filter(f => f.properties.k === 'fac').length > 100, 'the 3D facades are drawn (a joined outline had none)');
+  assert.ok(SP.planFeatures({ ...RECT, elements: o.elements, program: o.program }, null).features.filter(f => f.properties.k === 'b3').length >= 2 * o.elements.filter(e => e.court).length, 'the 3D massing is drawn: parapets and floor lines on every wing (a joined outline had none)');
 });
 ok('two ways in far enough apart: the top option meets the spacing, the bigger one stays an option', () => {
   const a = 0.4, R = ([x, y]) => [+(x * Math.cos(a) - y * Math.sin(a)).toFixed(2), +(x * Math.sin(a) + y * Math.cos(a)).toFixed(2)];
