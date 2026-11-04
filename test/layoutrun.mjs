@@ -14,7 +14,7 @@ import * as T from '../lib/bldgtemplates.mjs';
 import * as SP from '../lib/siteplan.mjs';
 
 const QUICK = process.argv.includes('--quick');
-const PF = await import('../lib/proforma.mjs');
+const PF = await import('../lib/proforma.mjs'), REFT = await import('../lib/reftemplates.mjs'), FS = await import('node:fs');
 let n = 0; const ok = (name, f) => { f(); n++; console.log('ok', n, name); };
 
 // ---------- primitives ----------
@@ -301,7 +301,7 @@ ok('a wrap: one building round a garage that parks it, the pool in the courtyard
   for (const e of W) assert.ok(!SP.rectsOverlap(e, g[0], 0.5), 'a wing does not overlap the garage');
   const pk = o.quantities.parking; assert.ok(pk.garage > pk.surface, 'most spaces in the garage: ' + pk.garage + ' vs ' + pk.surface);
   assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.08, 'parked without over-parking: ' + pk.provided + ' / ' + pk.required);
-  assert.equal(SP.garageStalls(g[0]), SP.garageGrid(g[0].w, g[0].d, g[0].levels));
+  assert.equal(SP.garageStalls(g[0]), SP.garageGrid(g[0].w, g[0].d, g[0].levels, g[0].parkLast));
   assert.ok(o.elements.some(e => e.kind === 'pool'), 'the pool in the courtyard');
   assert.equal(RUN.replayRun(r).identical, true);
 });
@@ -484,6 +484,20 @@ ok('a courtyard on a parking podium (5 over 2): the U above, the podium parking 
 ok('a wrap the site can’t hold is said, not swapped silently', () => {
   const site = { ...RECT, ring: [[0, 0], [380, 0], [380, 216], [0, 216]] }, o = RUN.runBrief(B.briefFromRequest('a wrap building with 172 apartments', site)).options[0];
   if (!o.elements.some(e => e.wrap && e.kind === 'garage')) assert.ok((o.tplNotes || o.notes || []).concat(o.notes || []).some(t => /No wrap fits this site/.test(t)), JSON.stringify(o.tplNotes || o.notes));
+});
+ok('engine numbers from the reviewed dev evidence: corridor homes, the tower share, no ramp on one podium level', () => {
+  const RT = REFT, idx = JSON.parse(FS.readFileSync(new URL('../data/reference/index.json', import.meta.url), 'utf8')), part = Object.fromEntries((idx.projects || idx).map(p => [p.id, p.partition]));
+  for (const k of ['REF_CORRIDOR', 'REF_PODIUM']) { assert.ok(RT[k]?.evidence?.length >= 2, k + ' cites projects'); for (const id of RT[k].evidence) assert.equal(part[id], 'dev', k + ' cites ' + id + ' (dev only)'); }
+  assert.ok(RT.REF_CORRIDOR.gsfPerUnit > 900 && RT.REF_CORRIDOR.gsfPerUnit < 1150 && RT.REF_CORRIDOR.eff > 0.7 && RT.REF_CORRIDOR.eff < 0.9);
+  assert.equal(SP.PODIUM.towerShare, RT.REF_PODIUM.towerShare);
+  // a courtyard, a wrap, a courtyard on a podium and vertical mixed use count their homes at the reviewed gross area a home; a tower keeps the default
+  for (const [ask, want] of [['courtyard apartments, 150 units', Math.round(RT.REF_CORRIDOR.gsfPerUnit * 0.85)], ['a wrap building with 300 apartments', Math.round(RT.REF_CORRIDOR.gsfPerUnit * 0.85)], ['tower on a podium, 8 stories, 300 apartments', undefined]]) assert.equal(B.toEngine(B.briefFromRequest(ask, RECT)).program.unitSf, want, ask);
+  // one parking level: entered at grade, no ramp (P25); two levels: the ramp's 12 stalls
+  const one = SP.garagePlan({ w: 240, d: 128, parkLevels: 1 }), two = SP.garagePlan({ w: 240, d: 128, parkLevels: 2 });
+  assert.equal(one.ramp, null); assert.ok(two.ramp); assert.equal(one.typical - two.typical, SP.PODIUM.ramp);
+  // a wrap's garage that would over-park keeps only what it needs on its top level, and the plan and the check count it alike
+  const o = RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)).options[0], g = o.elements.find(e => e.kind === 'garage'), pk = o.quantities.parking;
+  assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.04, pk.provided + ' / ' + pk.required); assert.equal(SP.garageStalls(g), SP.garageGrid(g.w, g.d, g.levels, g.parkLast));
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

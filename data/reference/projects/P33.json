@@ -1,0 +1,366 @@
+{
+ "schema": "rei.ref.project/1",
+ "id": "P33",
+ "name": "Pleasant Grove Apartments",
+ "location": "Roseville, CA",
+ "family": "p33",
+ "partition": "dev",
+ "forms": [
+  "mid-rise-corridor-elevator"
+ ],
+ "overlays": [],
+ "documents": [
+  {
+   "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+   "sha256": "708e6605814fc15c408d28d0d32a79cdda685fb1a251a3d0406bd03ddc91d34e",
+   "pages_used": [
+    2,
+    6,
+    12
+   ],
+   "sheets": [
+    {
+     "page": 6,
+     "sheet": "05",
+     "title": "Project data",
+     "revision": null,
+     "date": "2021-01-22"
+    },
+    {
+     "page": 12,
+     "sheet": "10",
+     "title": "Bldg 2 - second floor plan (corridor, elevator, stairs)",
+     "revision": null,
+     "date": "2021-01-22"
+    }
+   ]
+  }
+ ],
+ "site": {
+  "area_ac": {
+   "v": 4.96,
+   "units": "ac",
+   "src": {
+    "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+    "page": 6,
+    "sheet": "05"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "units": {
+   "v": 98,
+   "units": "units",
+   "src": {
+    "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+    "page": 6,
+    "sheet": "05"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "density_du_ac": {
+   "v": 19.8,
+   "units": "du/ac",
+   "src": {
+    "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+    "page": 6,
+    "sheet": "05"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "lot_coverage_max_pct": {
+   "v": 50,
+   "units": "%",
+   "src": {
+    "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+    "page": 6,
+    "sheet": "05"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "height_max_ft": {
+   "v": 45,
+   "units": "ft",
+   "src": {
+    "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+    "page": 6,
+    "sheet": "05"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  }
+ },
+ "buildings": [
+  {
+   "type_id": "2",
+   "label": "Bldg 2 (Bldg 3 the same): 3-story double-loaded corridor with an elevator",
+   "count": 2,
+   "floors": {
+    "v": 3,
+    "units": "floors",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 2,
+     "sheet": null
+    },
+    "method": "text-search",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "sheet index: first, second and third floor plans per building"
+   },
+   "units": {
+    "v": 47,
+    "units": "units",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   },
+   "net_rentable_sf": {
+    "v": 42211,
+    "units": "sf",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   },
+   "support_sf": {
+    "v": 1367,
+    "units": "sf",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   },
+   "circulation_sf": {
+    "v": 6757,
+    "units": "sf",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "Bldg 3: 6,748"
+   },
+   "amenity_sf": {
+    "v": 1385,
+    "units": "sf",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   },
+   "gross_sf": {
+    "v": 51720,
+    "units": "sf",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "Bldg 3: 51,711"
+   },
+   "corridor": {
+    "v": "double-loaded interior corridor, elevator, two stairs",
+    "units": null,
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 12,
+     "sheet": "10"
+    },
+    "method": "text-search",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   },
+   "length_ft": {
+    "v": 232.41,
+    "units": "ft",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 12,
+     "sheet": "10"
+    },
+    "method": "printed-dimension",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only",
+    "note": "232'-4 7/8\" overall; an L with a 130'-3\" leg"
+   }
+  }
+ ],
+ "unit_types": [
+  {
+   "name": "A1 1BR/1BA",
+   "sf": 608,
+   "count": {
+    "v": 30,
+    "units": "units",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   }
+  },
+  {
+   "name": "B1 2BR/1BA",
+   "sf": 850,
+   "count": {
+    "v": 34,
+    "units": "units",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   }
+  },
+  {
+   "name": "C1/C1.1 3BR/2BA",
+   "sf": 1095,
+   "count": {
+    "v": 30,
+    "units": "units",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   }
+  },
+  {
+   "name": "C2 3BR/2BA",
+   "sf": 1108,
+   "count": {
+    "v": 4,
+    "units": "units",
+    "src": {
+     "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+     "page": 6,
+     "sheet": "05"
+    },
+    "method": "printed-schedule",
+    "confidence": "high",
+    "status": "extracted",
+    "review": "text-only"
+   }
+  }
+ ],
+ "parking": {
+  "required": {
+   "v": 191,
+   "units": "stalls",
+   "src": {
+    "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+    "page": 6,
+    "sheet": "05"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only"
+  },
+  "provided": {
+   "v": 191,
+   "units": "stalls",
+   "src": {
+    "file": "01_Original_Collection/plans/P33_Pleasant_Grove_Apartments/001_Pleasant_Grove_Apartments.pdf",
+    "page": 6,
+    "sheet": "05"
+   },
+   "method": "printed-schedule",
+   "confidence": "high",
+   "status": "extracted",
+   "review": "text-only",
+   "note": "1.95 a unit"
+  }
+ },
+ "amenities": [
+  "clubhouse (3,500 sf)",
+  "playground",
+  "community garden"
+ ],
+ "access": [
+  "Pleasant Grove Blvd"
+ ],
+ "project_rules": [],
+ "reconciliation": [
+  {
+   "check": "Bldg 2 gross",
+   "values": "42,211 + 1,367 + 6,757 + 1,385 = 51,720",
+   "result": "consistent",
+   "note": ""
+  },
+  {
+   "check": "units",
+   "values": "47 + 47 = 98; 30+34+24+6+4 = 98",
+   "result": "consistent",
+   "note": ""
+  },
+  {
+   "check": "net",
+   "values": "18,240+28,900+26,280+6,570+4,432 = 84,422 = 2 x 42,211",
+   "result": "consistent",
+   "note": ""
+  }
+ ],
+ "open_questions": [
+  "building depth not printed as one dimension (the plan's dimension strings are unit and corridor widths)"
+ ],
+ "manifest_name": "Pleasant Grove Apartments"
+}

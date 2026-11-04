@@ -529,11 +529,11 @@
       "forms_guess": [
         "multifamily-unspecified"
       ],
-      "selected": false,
+      "selected": true,
       "visually_reviewed": false,
       "docs": 1,
       "pages": 31,
-      "notes": ""
+      "notes": "Text-reviewed Nov 4 2026: area / parking tabulations (data/reference/projects/P33.json)."
     },
     {
       "id": "P34",
@@ -1047,11 +1047,11 @@
       "forms_guess": [
         "multifamily-unspecified"
       ],
-      "selected": false,
+      "selected": true,
       "visually_reviewed": false,
       "docs": 1,
       "pages": 65,
-      "notes": ""
+      "notes": "Text-reviewed Nov 4 2026: area / parking tabulations (data/reference/projects/E027.json)."
     },
     {
       "id": "E028",
@@ -1062,11 +1062,11 @@
       "forms_guess": [
         "multifamily-unspecified"
       ],
-      "selected": false,
+      "selected": true,
       "visually_reviewed": false,
       "docs": 3,
       "pages": 45,
-      "notes": "",
+      "notes": "Text-reviewed Nov 4 2026: area / parking tabulations (data/reference/projects/E028.json).",
       "keyword_leads": {
         "retail": 2
       }

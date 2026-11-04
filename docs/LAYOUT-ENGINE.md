@@ -312,9 +312,14 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    or rear line); real entrances always rank first. The pods engine now places two real ways in apart.
 13. Done Nov 3: a playground left on its own moves beside the homes (playNearHomes); townhome rows shared evenly along a
    stretch; sheet labels alike within a use; massing pictures in feet (were metres read as feet).
-14. Still open: no reviewed courtyard, wrap or podium template in the dev partition (E054 Anderson is holdout), so
-   those unit counts are floor-area estimates; ramp slopes / structure / ventilation of garages aren't designed;
-   turning movements and detention from topography need engineering inputs.
+14. Nov 4 (evidence): courtyard, wrap, courtyard-on-podium and vertical mixed-use homes are counted at the reviewed
+   dev corridor buildings' gross area a home (lib/reftemplates.mjs REF_CORRIDOR: P28, P11, P33, 1,028 gsf), the
+   tower's plate is the reviewed share of its podium (REF_PODIUM: P25 0.53, E028 0.66, mean 0.593), a single
+   podium level has no ramp (P25), and a wrap's garage keeps only the spaces it needs on its top level (the rest
+   storage and amenity, with a 60 ft pool court where a level more allows). See docs/REFERENCE-PROVENANCE.md. Still
+   open: no dev courtyard or wrap building and no dev corridor deeper than 65 ft (the 83 ft holdout bar), so those
+   shapes and P35's depth stay unevidenced; garage structure and ventilation aren't designed; detention from
+   topography needs engineering inputs.
 15. Done Nov 4 (tuck-under, partial). "Tuck-under apartments" (form mf-tuck-under, arrangement 'tuck', 2 floors unless the
    words say): rows of homes each over its own 1-car garage (template mf-tuckunder-2s from E053 Portland Road, dev: 20 ft
    bays, 42 ft deep, garages 11 x 22 ft on an internal drive), back to back in pairs across 24 ft garage courts, two side
