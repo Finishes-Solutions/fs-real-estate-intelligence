@@ -1,10 +1,11 @@
-# Agent instructions for the three skills
+# Agent instructions for the skills
 
 Three agents, run in order. Each one passes the next **a single PDF**. The model each one builds travels inside that PDF,
 so never attach the JSON files: a platform that pastes attachments into the prompt can overflow it.
 
 ```
-fs-site-plan  ──SP-1 PDF──►  fs-set-plans  ──plan set PDF──►  fs-site-renderings
+site-layout  ──sheet PDF──►  fs-set-plans  ──plan set PDF──►  fs-site-renderings
+(or fs-site-plan, the older layout skill: it hands the plan set the same kind of PDF)
 ```
 
 For each agent, paste the **Agent instructions** text into the agent's instructions, install the skill, and give each
@@ -13,7 +14,42 @@ for fs-site-renderings.
 
 ---
 
-## 1. Site layout agent (fs-site-plan)
+## 1. Site layout agent (site-layout)
+
+**Skill:** `site-layout.zip` — the Real Estate Intelligence app's own layout engine, run offline (Node 18+, no packages,
+no network). Rebuilt from the app with `npm run skill:site-layout` so it lays out exactly as the app's Build does.
+
+**Agent instructions**
+
+```
+You lay out sites with the site-layout skill. Follow the skill's SKILL.md step by step.
+
+- Read every file you are given before deciding anything. Get the site outline in feet with `layout.mjs site`
+  (GeoJSON) and check its acreage against the task or the files; if they differ only by rounding, use the files'
+  exact figure and say so. Pick the street edges from the printed edge list.
+- Write the brief with `layout.mjs brief`, then set what you know: the quantity's meaning (exact / at least / up to /
+  range / as many as fit), setbacks and parking ratios with their source (verified only with a citation you read),
+  stormwater (on-site pond, underground or off site). `layout.mjs check` until it is valid.
+- Run it, read summary.txt and look at the option drawings. Compare alternatives (other forms, quantities) with new
+  briefs or `layout.mjs edit` (compare-forms). Never hand-draw or retype geometry.
+- Deliver sheet.pdf (SP-1 on the Finishes Solutions title block) from `layout.mjs handoff --option N --name "<project>" --address "<address>" --date <YYYY-MM-DD>` for the option you recommend. It carries the plan-set model
+  inside; the next agent (the plan set) reads it from there. Do not attach or paste run.json or project.json.
+- Keep the conversation small: never print a whole JSON or geometry file; look at drawings at low resolution.
+- End with a short summary: the layout chosen and why (and what you compared), the key numbers (acres, units or sf,
+  buildings, parking provided / required, detention), every failing or unknown check and every unverified
+  assumption, the engine version and input hash, and that it is a conceptual layout, not engineering.
+```
+
+**Material:** the parcel outline (GeoJSON / the app's Map File export / Regrid or appraisal parcels) or a survey, the
+app's exports, flood, utility, traffic and market reports, zoning documents.
+
+**Task:** `Lay out <address>, <total acres> acres: <what to build, e.g. "as many garden apartments as fit", "exactly 120 townhomes", "30,000 sf retail strip with a pad">.`
+
+**Older alternative — fs-site-plan** (`fs-site-plan.zip`): draws the layout with its own Python scripts and adds a
+highest-and-best-use comparison. Use it when the agent must choose the use itself across families; its instructions
+follow.
+
+### fs-site-plan agent instructions (older alternative)
 
 **Skill:** `fs-site-plan.zip`
 
