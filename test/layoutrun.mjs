@@ -454,6 +454,11 @@ ok('front-load townhomes from the reviewed row (E053): a one-car garage and a dr
   assert.equal(RUN.replayRun(r).identical, true);
   assert.equal(SP.normalizeProgram(SP.guessProgram('fee simple townhomes with garages')).product, 'lots', 'for-sale words: lots, never the rental court');
 });
+ok('a wedge: the strips park more where the land widens (a bay of their own length), no empty paving left', () => {
+  const site = { ...RECT, ring: [[0, 0], [1100, 0], [0, 420]] }, o = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site)).options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 150, 'units ' + o.quantities.totals.units);
+  const aisles = o.elements.filter(e => e.kind === 'drive' && e.bayGroup); for (const a of aisles) assert.ok(o.elements.some(r => r.kind === 'parking' && r.bayGroup === a.bayGroup), 'an extra bay\'s aisle keeps its rows');
+});
 ok('a wedge: bars along more than one lot line, each squared to its own, beating the one-frame rows', () => {
   const site = { ...RECT, ring: [[0, 0], [1100, 0], [0, 420]] }, r = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site)), o = r.options[0];
   assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(r.options.some(x => /^Along the edges/.test(x.name) && x.validation.status === 'pass'), 'the along-the-edges layout offered and passing: ' + r.options.map(x => x.name + ' ' + x.quantities.totals.units).join(' | ')); // (the top may be denser rows found by the upward probe)
@@ -468,6 +473,10 @@ ok('a courtyard on a parking podium (5 over 2): the U above, the podium parking 
   assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.equal(o.quantities.totals.units, 250);
   assert.ok(e && e.podium === 2 && e.floors === 7, 'a 2-level podium under 5 floors'); assert.ok(o.quantities.parking.podium >= o.quantities.parking.required * 0.9, 'the podium parks the homes');
   assert.equal(SP.towerOutline(e).length, 8, 'the floors above are a U');
+  // the top parking level only partly parking when the full level would over-park: the plan and the check count it alike
+  const pk = o.quantities.parking; assert.ok(pk.provided >= pk.required && pk.provided <= Math.ceil(pk.required * 1.05), 'parked to the need: ' + pk.provided + ' / ' + pk.required);
+  if (e.parkLast != null) { const g = SP.garagePlan(e); assert.ok(e.parkLast < (+e.parkLevels === 1 ? g.ground : g.typical)); assert.equal(SP.podiumStalls(e), SP.podiumLevelSum(g, +e.parkLevels, e.parkLast)); }
+  assert.equal(SP.metrics({ ...site, elements: o.elements, program: o.program }).spaces, pk.provided, 'the app and the check count the podium alike');
 });
 ok('a wrap the site can’t hold is said, not swapped silently', () => {
   const site = { ...RECT, ring: [[0, 0], [380, 0], [380, 216], [0, 216]] }, o = RUN.runBrief(B.briefFromRequest('a wrap building with 172 apartments', site)).options[0];

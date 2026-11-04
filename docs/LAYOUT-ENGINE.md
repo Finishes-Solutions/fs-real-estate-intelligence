@@ -340,3 +340,15 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    - A wrap the site can't hold says so in each option's notes (and points to the courtyard on a podium); the least
      courtyard in a wrap is 40 ft (was 50). E054's 1.87 ac still holds no wrap: its garage would park too few past the
      ramp and cores.
+   Nov 4 (later): wedge strips park more and podium courtyards park to the need. (a) A strip takes the most bays (up to
+   the try's) that still leave a run for a bar, and each strip off the street gets up to three further bays on its
+   inner side, each as long as the land there allows (the wedge widens away from its point), reached by a drive across
+   each of its ends; such a bay is a leaf (`bayGroup`): when trimming to the need leaves it no rows, its aisle and
+   end drives go too (no empty paving). Pieces of a row cut by a drive keep at least six stalls. On a lot under 65% of
+   its frame's box the strips are judged against the other layouts, not the footprint estimate (an L-shaped lot keeps
+   the gate: its rows do better there). Bench MF-wedge-midrise 111 -> 204 units; holdout P36 128 -> 152 (all four
+   runs; reference 192). (b) lib/layoutrun.mjs podiumTrim: a podium whose last parking level would over-park keeps only
+   the spaces still needed on that level (`parkLast`; the rest is amenity, leasing and storage), counted the same way
+   by the plan and the check (lib/siteplan.mjs podiumLevelSum). E054 podium-urban 255 -> 210 / 210; MF-tower 487 -> 480.
+   Still: the ground-level garage drawing doesn't show a partial level; the apex of a wedge stays open land; P36 is
+   parking-bound (174 spaces for 152 homes) where the reference parks 217.
