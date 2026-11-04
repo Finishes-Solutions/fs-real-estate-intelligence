@@ -251,3 +251,10 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
 14. Still open: no reviewed courtyard, wrap or podium template in the dev partition (E054 Anderson is holdout), so
    those unit counts are floor-area estimates; ramp slopes / structure / ventilation of garages aren't designed;
    turning movements and detention from topography need engineering inputs.
+15. Done Nov 4 (tuck-under, partial). "Tuck-under apartments" (form mf-tuck-under, arrangement 'tuck', 2 floors unless the
+   words say): rows of homes each over its own 1-car garage (template mf-tuckunder-2s from E053 Portland Road, dev: 20 ft
+   bays, 42 ft deep, garages 11 x 22 ft on an internal drive), back to back in pairs across 24 ft garage courts, two side
+   drives in from the street, guest rows along them (inner rows and a back drive where the outer rows are short), the
+   clubhouse by the entry; one home a bay, so counts are exact. The validator counts the garages a row states, capped at
+   what fits along it (11 ft each). Bench MF-tuckunder: 120 units, 198 / 192 (120 garages). Still: 3 floors and rows of
+   5-6 homes are estimates (the reference row is 4 homes, 2 floors); aprons aren't counted; 3D shows plain massing.

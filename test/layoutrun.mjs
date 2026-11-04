@@ -377,5 +377,19 @@ ok('townhome rows share a stretch evenly (9 homes as 5 + 4, not 6 + a 3-home stu
   for (const a of B) for (const b of B) if (a !== b && a.units > b.units && SP.gapBetween(SP.shapeOf(a), SP.shapeOf(b)) < 30 && Math.abs(((a.rot || 0) - (b.rot || 0)) % 180) < 1) { pairs++; assert.ok(a.units - b.units <= 2, a.name + ' ' + a.units + ' beside ' + b.name + ' ' + b.units); }
   assert.ok(B.reduce((t, e) => t + e.units, 0) >= 307, 'no fewer homes than before');
 });
+ok('tuck-under rows: a garage under every home, exactly the homes asked, garages counted and capped by what fits', () => {
+  const r = RUN.runBrief(B.briefFromRequest('tuck-under apartments, 120 units', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 120);
+  const T = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily');
+  assert.ok(T.length && T.every(e => e.tuck === e.units && e.template === 'mf-tuckunder-2s' && e.units >= 3 && e.units <= 6), 'every row a tuck-under row of 3 to 6 homes');
+  const pk = o.quantities.parking; assert.equal(pk.tucked, 120); assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.06, pk.provided + ' / ' + pk.required);
+  assert.ok(o.elements.some(e => e.kind === 'drive' && e.name === 'Garage court'), 'the garages open onto a garage court');
+  assert.equal(SP.metrics({ ...RECT, elements: o.elements, program: o.program }).spaces, pk.provided, 'the app and the check count the garages alike');
+  // the check never counts more garages than fit along a row (11 ft each)
+  const one = { ...B.toEngine(r.brief).plan, elements: [{ id: 't', kind: 'building', use: 'multifamily', x: 450, y: 250, w: 60, d: 42, floors: 2, units: 3, tuck: 9 }] };
+  assert.equal(V.quantities(one, r.brief).parking.tucked, 5);
+  assert.equal(RUN.replayRun(r).identical, true);
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
