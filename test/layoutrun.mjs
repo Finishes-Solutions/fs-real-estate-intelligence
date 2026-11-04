@@ -499,5 +499,25 @@ ok('engine numbers from the reviewed dev evidence: corridor homes, the tower sha
   const o = RUN.runBrief(B.briefFromRequest('a wrap building with 300 apartments', RECT)).options[0], g = o.elements.find(e => e.kind === 'garage'), pk = o.quantities.parking;
   assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.04, pk.provided + ' / ' + pk.required); assert.equal(SP.garageStalls(g), SP.garageGrid(g.w, g.d, g.levels, g.parkLast));
 });
+ok('a garage open to the air or not (IBC 406.5.2): a podium open on its sides, a garage boxed in by buildings needs ventilation', () => {
+  const r = RUN.runBrief(B.briefFromRequest('tower on a podium, 8 stories, 300 apartments', RECT)), o = r.options[0], c = o.validation.checks.find(k => k.id === 'eng.garage-vent');
+  assert.equal(c.status, 'pass', JSON.stringify(c)); assert.ok(o.elements.filter(e => e.form === 'tower').every(e => e.openness?.open === true && /open garage/.test(e.note || '')), 'each podium marked an open garage');
+  const g = { id: 'g', kind: 'garage', x: 450, y: 250, w: 200, d: 120, levels: 3, grid: true }, wall = (x, y, w, d, id) => ({ id, kind: 'building', use: 'multifamily', x, y, w, d, floors: 5 });
+  const boxed = [g, wall(450, 175, 260, 28, 'a'), wall(450, 325, 260, 28, 'b'), wall(335, 250, 28, 120, 'c'), wall(565, 250, 28, 120, 'd')];
+  const v = SP.garageOpenness(g, boxed); assert.equal(v.open, false); assert.ok(v.area < 0.2, 'openings ' + v.area);
+  assert.equal(SP.garageOpenness(g, [g]).open, true, 'a free-standing garage is open');
+  const k = V.validateLayout({ ...RECT, elements: boxed }, B.canonicalBrief(B.briefFromRequest('200 apartments', RECT))).checks.find(x => x.id === 'eng.garage-vent');
+  assert.equal(k.status, 'fail'); assert.match(k.note, /mechanical ventilation/);
+});
+ok('corridor buildings as deep as the request says: the bay drawn that deep, said to be an assumption, the default untouched', () => {
+  const b = B.briefFromRequest('mid-rise apartments, 4 stories, 83 ft deep corridor buildings, as many as fit', RECT);
+  assert.equal(b.program.uses[0].depth.value, 83); assert.equal(B.validateBrief(b).ok, true);
+  const o = RUN.runBrief(b).options[0], bs = o.elements.filter(e => e.template);
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(bs.length && bs.every(e => /-d83$/.test(e.template) && Math.round(Math.min(e.w, e.d)) === 83), 'every bar 83 ft deep');
+  assert.ok(bs.every(e => /deeper than any reviewed corridor building/.test(e.note)), 'the buildings say so');
+  assert.match(o.validation.checks.find(c => c.id === 'program.template').note, /83 ft deep as the request asks/);
+  assert.equal(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', RECT).program.uses[0].depth, undefined, 'no depth unless asked');
+  const bad = JSON.parse(JSON.stringify(b)); bad.program.uses[0].depth.value = 140; assert.equal(B.validateBrief(bad).ok, false);
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

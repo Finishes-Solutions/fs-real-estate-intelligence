@@ -368,3 +368,16 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    by the plan and the check (lib/siteplan.mjs podiumLevelSum). E054 podium-urban 255 -> 210 / 210; MF-tower 487 -> 480.
    Still: the ground-level garage drawing doesn't show a partial level; the apex of a wedge stays open land; P36 is
    parking-bound (174 spaces for 152 homes) where the reference parks 217.
+16. Done Nov 4: open or enclosed garage (eng.garage-vent, non-hard; lib/siteplan.mjs garageOpenness, IBC 406.5.2): each
+   garage's walls that face the open air (no building or garage within 3 ft), openings between a 42 in spandrel and an
+   18 in beam, a podium's lobby closing its length of the ground tier; open when each tier's openings are at least 20%
+   of its wall area and 40% of its perimeter on two or more sides, else mechanical ventilation (IMC 404) and sprinklers
+   (IBC 903.2.10). Recorded on the garage (`openness`) and in its note. Schematic, not an engineered design.
+17. Done Nov 4: corridor buildings as deep as the request says ("83 ft deep corridor buildings", "deep corridor bars":
+   66-95 ft, use.depth in the brief, an assumption): the reviewed mid-rise bay drawn that deep (lib/bldgtemplates.mjs
+   templatesFor, a derived template `<id>-d<depth>`, evidence_strength 'user-chosen'), the same homes a floor, each larger;
+   the buildings and program.template say it's deeper than any reviewed corridor building. Default unchanged.
+   Evaluation (holdout, nothing fitted): P35 fill with off-site detention 320 at 65 ft, 272 at 83 ft; P36 128 either way.
+   Deeper bars don't raise the count here because the bay keeps its homes a floor; the as-built 64-plexes are about 30 ft
+   a home across, wider than the reviewed 25 ft bay (a wider-unit corridor bay needs dev evidence too).
+
