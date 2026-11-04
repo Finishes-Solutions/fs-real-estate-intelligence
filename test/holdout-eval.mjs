@@ -17,14 +17,16 @@ for (const t of tpl.filter(t => Object.values(REF_TEMPLATES).some(r => r.source 
 // the sites have the printed areas
 const area = r => Math.abs(r.reduce((t, p, i) => { const q = r[(i + 1) % r.length]; return t + p[0] * q[1] - q[0] * p[1]; }, 0) / 2);
 for (const c of cases) assert.ok(Math.abs(area(c.ring) / 43560 - c.ref.acres) / c.ref.acres < 0.005, c.id + ': ' + (area(c.ring) / 43560).toFixed(2) + ' ac vs ' + c.ref.acres);
-// one run end to end
-const p35 = cases.find(c => c.id === 'P35'), r = evalRun(p35, p35.runs.find(x => x.key === 'exact-ug'));
-assert.equal(r.status, 'pass', r.failed?.join()); assert.equal(r.units, p35.ref.units); assert.ok(r.parking >= r.required);
-console.log('holdout-eval ok: P35 with detention off the surface ' + r.units + ' / ' + p35.ref.units + ' units, parking ' + r.parking + ' / ' + r.required);
-// as many as fit reaches what an exact count passes on the same land (the search alone settled on 304; exactly 355 passes)
+// one run end to end, and the search monotone in the count: as many as fit reaches the most an exact count passes on the
+// same land, and a count a module of homes above it doesn't pass (before, which counts passed jumped with the count
+// asked: 330 and 341 short where 350 and 355 passed, those on buildings no template fit; as many as fit settled on 304)
+const p35 = cases.find(c => c.id === 'P35'), ask = n => ({ key: 'n' + n, ask: 'exactly ' + n + ' senior apartments, mid-rise, 4 stories, with elevators, underground detention' });
 const f = evalRun(p35, p35.runs.find(x => x.key === 'fill-ug'));
-assert.equal(f.status, 'pass', f.failed?.join()); assert.ok(f.units >= r.units, 'as many as fit ' + f.units + ' vs exactly ' + r.units);
-console.log('holdout-eval ok: P35 as many as fit ' + f.units);
+assert.equal(f.status, 'pass', f.failed?.join()); assert.ok(!(f.failed || []).includes('program.template'));
+const at = evalRun(p35, ask(f.units)), above = evalRun(p35, ask(f.units + 16));
+assert.equal(at.status, 'pass', 'exactly ' + f.units + ': ' + at.failed?.join()); assert.notEqual(above.status, 'pass', 'exactly ' + (f.units + 16) + ' passes, above as many as fit (' + f.units + ')');
+const r = evalRun(p35, p35.runs.find(x => x.key === 'exact-ug')); if (r.status === 'pass') assert.ok(f.units >= r.units, 'as many as fit ' + f.units + ' vs exactly ' + r.units);
+console.log('holdout-eval ok: P35 with detention off the surface, as many as fit ' + f.units + ' (as built ' + p35.ref.units + '); exactly ' + f.units + ' passes, ' + (f.units + 16) + ' does not; exactly ' + p35.ref.units + ': ' + r.status);
 // townhomes as many as fit keep their count when a fire truck's turn is tight at a lane T: the corner home gives way
 // for a curb return (one home and its lot), not the whole layout for a smaller one (59 fell to 51 when the turning
 // check came in)

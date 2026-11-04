@@ -459,9 +459,12 @@ ok('a wedge: the strips park more where the land widens (a bay of their own leng
   assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(o.quantities.totals.units >= 150, 'units ' + o.quantities.totals.units);
   const aisles = o.elements.filter(e => e.kind === 'drive' && e.bayGroup); for (const a of aisles) assert.ok(o.elements.some(r => r.kind === 'parking' && r.bayGroup === a.bayGroup), 'an extra bay\'s aisle keeps its rows');
 });
-ok('a wedge: bars along more than one lot line, each squared to its own, beating the one-frame rows', () => {
+ok('a wedge: the densest passing layout, every building drawn to the mid-rise template (none estimated from floor area)', () => {
   const site = { ...RECT, ring: [[0, 0], [1100, 0], [0, 420]] }, r = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', site)), o = r.options[0];
-  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.ok(r.options.some(x => /^Along the edges/.test(x.name) && x.validation.status === 'pass'), 'the along-the-edges layout offered and passing: ' + r.options.map(x => x.name + ' ' + x.quantities.totals.units).join(' | ')); // (the top may be denser rows found by the upward probe)
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  // (strips along the edges are offered where template-sized bars, 200 ft and up, fit along them; on this thin
+  // triangle they don't: the 96- and 111-home layouts it once showed were 110-125 ft buildings no template fits)
+  for (const x of r.options) assert.ok(x.elements.filter(e => e.kind === 'building' && e.use === 'multifamily').every(e => e.template && !e.tplMiss), x.name + ': a building no template fits');
   const B0 = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'), angles = new Set(B0.map(e => Math.round(((e.rot || 0) % 180 + 180) % 180)));
   assert.ok(angles.size >= 1 && o.quantities.totals.units >= 90, 'units ' + o.quantities.totals.units);
   assert.equal(RUN.replayRun(r).identical, true);

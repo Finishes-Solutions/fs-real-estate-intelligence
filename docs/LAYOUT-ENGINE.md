@@ -206,12 +206,23 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    the words ("regional detention", "detention handled off site", "drains to the regional pond", "underground detention",
    "no pond") or the plan's Settings storm mode, mapped to the engine's storm mode ('offsite' -> none: no pond, no vault);
    the detention check's note says it's an assumption to confirm with the civil engineer and the drainage district.
-5b. Done Nov 4: as many as fit (one templated apartment use) is probed upward after the search (lib/layoutrun.mjs
-   probeUp): exact counts on a ladder (1.08-1.5 x the best found) run as an exact request runs, and every layout that
-   passes the request as asked with more homes joins the options; two rungs that find nothing end it. P35 with detention
-   off the surface: 304 -> 356 (exactly 355 passes). The cause is in the search (which counts come out depends on the
-   count asked, not smoothly: 330 and 341 short where 350 and 355 pass); the ladder works round it at about 2-3 s more
-   a request, and can still miss a passing count between rungs. Not applied to "at least N" (met at N) or mixed uses.
+5b. Done Nov 4 (root cause, replacing the probe ladder): which counts passed jumped with the count asked (P35 with
+   detention off the surface: 330 and 341 short where 350 and 355 passed; as many as fit 304). Three causes, fixed in
+   the engine: (1) the generator (lib/sitegen.mjs generate) sat out when no count was asked (an `edgesOnly` mode that
+   returned nothing on a whole lot, and a "too few of the count" rule that rejected every layout against an infinite
+   target), so as many as fit only saw the search's layouts; it now runs its rows (the amenity by the entry, every side
+   cut, one or two entrances; courtyards and loops left to the arrangements that ask for them), each drawn full and
+   parked down, and a row layout well under the best so far isn't finished (its landscape is the costly part); (2) the
+   generator's bars ignored the template's building sizes the run sets (depth, whole modules, the smallest reviewed
+   building), so its denser layouts were 60 ft deep, 110-150 ft long buildings no template fits, their units estimated
+   from floor area: exactly 355 on P35 and the wedge's 96 / 111 were such layouts. They are now drawn to the template, and
+   the validator warns (program.template) on any apartment building no template fits; (3) as many as fit ranks the
+   search's stacks by a rough estimate (parkable footprint at the frame's average width), so on a skewed lot (under 80%
+   of its frame's box) 6 stacks are laid out, not 3 (P36's 128-home stack ranked 4th). With the template honoured P35's
+   most is 320 (exactly 320 passes, 336 doesn't; as many as fit 320 in ~0.6 s, was 6.5 s with the ladder); P36 128.
+   The exact-count ladder (probeUp) is gone. The generator's rows still draw square aisle corners and a plain entry (the
+   run adds curb returns where a turn needs them), and a generated layout re-fits from its recipe (moved pieces go
+   back); it sits out when Settings choose U or L buildings.
 6. Done Nov 4: tuck-under (6e, from E053), cross-dock (6c) and vertical mixed use (6d), each with its own geometry and tests.
 6c. Done Nov 4 (cross-dock, partial). "A cross-dock warehouse" (form ind-cross-dock; the engine program's `crossDock`)
    draws lib/sitegencom.mjs crossDock: a deep building running back from the street (400-600 ft across, its length the
