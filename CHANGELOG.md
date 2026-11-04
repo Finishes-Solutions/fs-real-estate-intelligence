@@ -5,6 +5,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 2:03 AM CT: Tuck-under, cross-dock, vertical mixed use, for-sale townhomes, turning paths, off-site detention, and a check against real projects (6427f76, ec376d8, 1fd11ef, ced222a, c72e2ad, 449f7df, 5a51bdf, 99786b9, d507b26, 4a303e3)
+- **New building types:**
+  - **Tuck-under apartments:** each home over its own garage, rows back to back across garage courts (sizes from the reviewed Portland Road townhomes).
+  - **Cross-dock warehouses:** dock doors and a truck court on both long sides, trailer stalls counted, trucks on their own drives away from the car parking.
+  - **Vertical mixed use:** shops on the ground floor, apartments above, each use parked at its own ratio.
+  - **A courtyard on a parking podium ("5 over 2")** for small urban lots.
+- **For-sale townhomes on their own lots** ("fee simple", "for-sale", "with garages"), including a front-load row with a one-car garage and driveway; exact townhome counts now land in rows of 6 or fewer (they could collapse into 11-home buildings before).
+- **Turning paths:** the check tests drive corners against a car, a fire truck, a service truck and a semitrailer, plus fire-lane width and dead ends over 150 ft; corners too tight get a curb return. Garages show their ramp (slope and length) and clear heights. Planning-level, not swept-path software.
+- **Detention handled off site:** "regional detention" or "detention off site" leaves out the pond (the check notes it needs the civil engineer's confirmation).
+- **"As many as fit" no longer stops short:** it now tries larger counts and keeps any that pass. The biggest requests take longer (Hockley mid-rise about 22 s, was 10).
+- **Odd-shaped lots:** buildings can line more than one lot line on a wedge-shaped site.
+- **A check against real projects:** the engine now runs on four built projects held back for testing (Sierra Vista WB-30 / WB-32, Anderson, Lake Shore) and reports where it falls short. Sierra Vista WB-30: 356 units with off-site detention (355 built); Anderson as a courtyard on a podium: 172 of 172.
+- Options show a variety of arrangements; "Future development" labels stay off ponds and buildings. All 20 test sites pass every check; the full test suite passes.
+
 ### 12:23 AM CT: Wrap buildings, drawn podium garages, emergency access lanes, parking trimmed to the need (b3f2ea6, 5aa3b7f, aa100f2, 8f407e9, 9508e44, fa70020, 135ce87, 84ced54, e4734be, 84ba9e8, 1fdb711, 1b42551, 7a0a252, b121882, 1bf5c20)
 - **Wrap buildings:** "a wrap building with 300 apartments" now lays out a 5-story apartment building on three sides of a parking garage that holds nearly all the parking, with the pool in a courtyard (300 units, 488 spaces for 480 needed). Before, wraps weren't supported.
 - **Podium garages are drawn:** a tower's podium shows its garage (stall rows, ramp, stair and elevator cores, the lobby on the street side, an arrow at the way in, which a drive always reaches), and the spaces are counted from that drawing.

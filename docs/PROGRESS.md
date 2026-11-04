@@ -240,3 +240,10 @@ Branch `matthew/build-through-run-engine` (PR #76, open, not merged). PR #75 (Ha
 - Hockley stress test (8 requests): all pass.
 - Next: reviewed templates for courtyard / wrap / podium (none in the dev partition); garage engineering; tuck-under,
   cross-dock and vertical mixed use.
+
+### Update (2026-11-04, night): new forms, turning, holdout evaluation
+- Bench (20 cases): all pass every hard check, all replay identical. New: tuck-under, cross-dock, vertical mixed use,
+  fee-simple townhome lots, wedge site. Holdout evaluation (scripts/refs/holdout-eval.mjs) in npm test.
+- Next: the search's count sensitivity in lib/sitelayout.mjs (the upward probe works round it at a runtime cost);
+  P36 wedge still 128 of 192; podium courtyard over-parks with two full levels; reviewed templates for courtyard /
+  wrap / podium / vertical mixed use (none in the dev partition).
