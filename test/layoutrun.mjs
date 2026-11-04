@@ -230,5 +230,12 @@ ok('a courtyard building: its wings one building, shared corners once, the pool 
   assert.ok(wings.every(e => !e.poly), 'wings stay rectangles (3D facades and plan sets read them)');
   assert.ok(SP.planFeatures({ ...RECT, elements: o.elements, program: o.program }, null).features.filter(f => f.properties.k === 'fac').length > 100, 'the 3D facades are drawn (a joined outline had none)');
 });
+ok('two ways in far enough apart: the top option meets the spacing, the bigger one stays an option', () => {
+  const a = 0.4, R = ([x, y]) => [+(x * Math.cos(a) - y * Math.sin(a)).toFixed(2), +(x * Math.sin(a) + y * Math.cos(a)).toFixed(2)];
+  const site = { ...RECT, ring: [[0, 0], [1000, 0], [1000, 700], [0, 700]].map(R) }, r = RUN.runBrief(B.briefFromRequest('at least 200 garden apartments', site));
+  const rem = o => o.validation.checks.find(c => c.id === 'access.remote');
+  assert.equal(r.options[0].validation.status, 'pass'); assert.equal(rem(r.options[0]).status, 'pass', JSON.stringify(rem(r.options[0])));
+  assert.ok(r.options[0].quantities.totals.units >= 200);
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
