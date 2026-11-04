@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-03
 
+### 6:16 PM CT: The independent check asks for a second way in, and shows detention against the rule of thumb (this push)
+- **A second way in where the fire code asks for one** (over 200 apartments or 30 homes, IFC Appendix D where adopted): a plan without one fails the check; how far apart the two are (at least half the site's diagonal) is shown as its own line. Plans that will need two now plan for them from the start.
+- **Detention is measured:** the pond against the rule-of-thumb area for the site (Hockley: about 70%), saying what the rest needs; still never shown as passing, since it isn't a drainage design.
+- **A walking trail through a building, a parking row or along a drive** is flagged.
+- **Program lines are named by zone** ("Garden apartments", "Studio apartment buildings").
+- Tested in the real editor on 23737 FM 2920, Hockley: the request, Build, the layouts, the check panel and the 3D massing (garden and studio breezeway buildings, townhome rows) all work with no page errors.
+
 ### 5:26 PM CT: Build lays out through the new engine; studio buildings; no more empty apartment blocks (this push)
 - **Build now runs the reproducible engine.** The same request on the same site gives the same layouts; apartment buildings come from the reviewed building templates; each option carries its independent check and the saved run behind it. The re-solve after a settings change and the AI's revised program go the same way. If a run can't be made, Build falls back to the engine as before.
 - **"Garden apartments, townhomes and studio apartment buildings, as many as fits" on 23737 FM 2920, Hockley (29 ac):** before, 348 apartments with about 4 acres of the apartment block left empty and the studios drawn as the same buildings; the words alone gave 18 units. Now 144 garden apartments, 270 studio apartments and 109 townhomes, every option passing the independent check.

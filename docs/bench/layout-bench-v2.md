@@ -3,9 +3,9 @@
 | MF-garden-exact | multifamily | feasible | pass · 120 units · parking 284/192 | — | 4 | identical | n/a |
 | MF-garden-max | multifamily | feasible | pass · 180 units · parking 309/288 | — | 4 | identical | n/a |
 | MF-garden-rot | multifamily | feasible | pass · 372 units · parking 621/596 | — | 4 | identical | n/a |
-| MF-courtyard | multifamily | no-feasible-found | fail · 132 units · parking 277/212 | overlap.level-aware, access.buildings, program.u1 | 4 | identical | n/a |
+| MF-courtyard | multifamily | no-feasible-found | fail · 149 units · parking 246/239 | overlap.level-aware, separation.buildings, access.buildings, program.u1 | 4 | identical | n/a |
 | MF-midrise | multifamily | feasible | pass · 288 units · parking 481/461 | — | 4 | identical | n/a |
-| MF-townhomes | multifamily | feasible | pass · 57 units · parking 132/129 | — | 4 | identical | n/a |
+| MF-townhomes | multifamily | feasible | pass · 45 units · parking 102/102 | — | 4 | identical | n/a |
 | MF-duplex | multifamily | feasible | pass · 44 units · parking 88/88 | — | 4 | identical | n/a |
 | MF-tower | multifamily | no-feasible-found | fail · 199 units · parking 486/319 | program.u1 | 4 | identical | n/a |
 | MF-wrap | multifamily | unsupported | Wrap (apartments round a garage): No wrap geometry: a garage zone besi | — | — | identical | n/a |

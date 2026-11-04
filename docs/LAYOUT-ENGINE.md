@@ -65,6 +65,9 @@ required, units, tolerance, affected pieces. Missing evidence is unknown, never 
 | access.entrance | a drive meeting an allowed street edge; none across a neighbour's line |
 | access.connectivity | one paved network from the legal entrance (graph of touching pieces) |
 | access.buildings | every building within the stated distance of connected circulation |
+| access.second | a second way in past 200 apartments or 30 homes (IFC Appendix D, where adopted; an assumption) |
+| access.remote | the two ways in at least half the site's diagonal apart (warning, not hard: the fire official may accept emergency-only access) |
+| site.trail | a walking trail through a building or parking row, or along a drive (warning) |
 | parking.count | required (brief rules, else use defaults labelled assumptions) vs provided (stalls counted from the drawing, garages, driveways); garage estimates make it unknown; accessible count per 2010 ADA 208.2 reported, placement unchecked |
 | parking.geometry | each drawn stall inside its row, the site, and clear of buildings |
 | program.<use> | the measured quantity against the brief's meaning (a use absent from the plan is 0) |
@@ -167,3 +170,4 @@ selection; placement edits only reorder zones of a mixed plan.
 5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
 6. Wrap, tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
 7. Turning movements with a declared design vehicle; detention from topography (needs engineering inputs).
+8. Main entry off-centre when two remote ways in are needed (on a 900 ft frontage a centred entry can't be 515 ft from another); the pond kept off the street frontage (Hockley's pond wedge took the corner a second entry needed); mirrored options with the same numbers.

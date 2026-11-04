@@ -202,7 +202,7 @@ ok('studio apartment buildings are their own zone, in words', () => {
 ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre square (23737 FM 2920, Hockley)', () => {
   // the parcel's outline in plan feet (1,187 x 1,065 ft, the street on the north edge); before: 18 apartments ("Simple
   // layout") from the engine alone, or empty parking bays once templated
-  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [], setbacks: { ...SP.SETBACKS }, elements: [] };
+  const site = { origin: [-95.7967, 30.0652], ring: [[586, 544], [-601, 521], [-584, -544], [598, -523]], front: 0, streets: [1], setbacks: { ...SP.SETBACKS }, elements: [] }; // FM 2920 on the north, Becker Road on the west
   const ask = 'Garden apartments, townhomes, and studio apartment buildings, as many as fits', r = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
   assert.equal(r.outcome, 'feasible'); assert.ok(r.options.length >= 3);
   const top = r.options[0], by = k => top.elements.filter(e => e.kind === 'building' && (e.template === k || e.use === k)).reduce((t, e) => t + (e.units || 0), 0);
@@ -212,6 +212,10 @@ ok('the editor’s Build as a run: garden, studio and townhomes on a 29-acre squ
   assert.ok(top.recipe && top.run.brief && top.run.inputHash, 'the editor gets its recipe and the run');
   const again = RUN.runPlan({ ...site, params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
   assert.deepEqual(again.options.map(o => o.run.geometryHash), r.options.map(o => o.run.geometryHash));
+  // over 200 apartments need a second way in, half the site's diagonal from the first: without Becker Road there is no
+  // room for one, and the check says so instead of passing
+  const lone = RUN.runPlan({ ...site, streets: [], params: {} }, SP.guessProgram(ask), { deeper: true }, { ask });
+  assert.ok(lone.options.every(o => o.check.failed.includes('access.second')), lone.options.map(o => o.check.failed.join()).join(' | '));
 });
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
