@@ -868,7 +868,20 @@ export function initSitePlan(ctx) {
   // Build's layouts as runs (lib/layoutrun.mjs runPlan): the same engine inside a saved, replayable run (seeded, so the
   // same request on the same site gives the same layouts), apartment buildings from the reviewed templates, each option
   // with its independent check. The plain engine when the run can't be made.
+  // the design storm's rainfall at the site (api/rainfall: NOAA Atlas 14, else a regional figure), asked once per place
+  // and handed to the run on the plan's settings, so its detention estimate (lib/hydrology.mjs) uses the point figure
+  // and the saved run records it; the live plan keeps it too (its check panel and notes read the same number)
+  const rains = new Map();
+  async function withRain(plan) {
+    const st = plan?.params?.storm && typeof plan.params.storm === 'object' ? plan.params.storm : {}; if (st.rain || !Array.isArray(plan?.origin)) return plan;
+    const [lon, lat] = plan.origin, key = lat.toFixed(2) + ',' + lon.toFixed(2);
+    if (!rains.has(key)) rains.set(key, fetch('api/rainfall?lat=' + lat + '&lon=' + lon).then(r => r.ok ? r.json() : null).then(d => d?.rain || null).catch(() => null));
+    const rain = await rains.get(key); if (!rain) { rains.delete(key); return plan; }
+    const params = { ...(plan.params || {}), storm: { ...st, rain } }, live = PL(); if (live && live.id === plan.id && !live.params?.storm?.rain) live.params = { ...(live.params || {}), storm: { ...(typeof live.params?.storm === 'object' ? live.params.storm : {}), rain } };
+    return { ...plan, params };
+  }
   async function laidRun(plan, prog, opts, ask) {
+    try { plan = await withRain(plan); } catch (e) { console.warn('rainfall', e); }
     try { const r = await laid('run', plan, prog, opts, { ask }); if (r?.options?.length) return r.options; } catch (e) { console.warn('layout run', e); }
     return laid('options', plan, prog, opts);
   }

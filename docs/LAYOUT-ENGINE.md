@@ -381,3 +381,16 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    Deeper bars don't raise the count here because the bay keeps its homes a floor; the as-built 64-plexes are about 30 ft
    a home across, wider than the reviewed 25 ft bay (a wider-unit corridor bay needs dev evidence too).
 
+
+18. Done Nov 4 (detention estimate). With the design storm's rainfall known, detention is a planning-level hydrologic
+   estimate (lib/hydrology.mjs detentionTR55): NRCS TR-55 chapter 6 storage, the post-development runoff volume by curve
+   number (TR-55 Table 2-2a: impervious 98, open space and meadow by soil group, C assumed) times Vs/Vr from qo/qi (Table
+   6-1, type III), qo/qi approximated by the rational coefficients before and after. The impervious share is the drawn
+   plan's own (roofs, paving, pools over the land less ponds and land held for later), else the use's typical one. Rainfall:
+   NOAA Atlas 14's point estimate (api/rainfall.js, PFDS, cached; the app and the MCP site_plan tool record it on the plan's
+   params.storm.rain, so a run and its replay use the same number), else a regional Atlas 14 Vol. 11 figure (upper Texas
+   coast 15 in, central / east Texas 11.5 in, 100-year 24-hour), else the rule of thumb as before. A rule sheet's ac-ft an
+   acre, or a region's district minimum (Harris County about 0.55, an assumption), is a floor. eng.detention now passes or
+   fails the pond against it (never hard), its note naming the method, storm, CN and C values and the source; a
+   deeper-pond option is judged at the depth it assumes. Still an estimate: no time of concentration, outfall or
+   tailwater, and the pond depth is not yet read from the terrain.
