@@ -532,4 +532,20 @@ ok('no room for a pond: detention goes underground, said as an assumption', () =
   assert.notEqual(d.status, 'fail', JSON.stringify(d).slice(0, 300));
   if (!o.elements.some(e => e.kind === 'pond')) { assert.equal(o.program.storm, 'underground'); assert.ok((o.tplNotes || o.notes || []).some(t => /underground/i.test(t)) || /underground/i.test(d.note || ''), 'said'); }
 });
+ok('drawing polish: an entrance\'s name inside the site, "1 space", a trail that follows its pond, held land shut in by the work is open space', () => {
+  // the entrance's name where its drive meets the street stays inside the lot line (it ran across it: "AIN ENTRY")
+  const site = { ...RECT, elements: [{ id: 'm', kind: 'drive', name: 'Main entry', entry: true, x: 450, y: 22, w: 24, d: 46 }, { id: 'a', kind: 'drive', x: 450, y: 57, w: 400, d: 24 }] };
+  const svg = planSVG(site, { px: 1040, pad: 18 }).svg, t = /<text x="([\d.]+)" y="([\d.]+)"[^>]*>(?:<tspan[^>]*>)?MAIN ENTRY/.exec(svg); assert.ok(t, 'the entry is named');
+  const k = 1040 / 936, fy = 518 - +t[2] / k; // (the label's middle in plan feet: the drawing runs 18 ft past the site each side)
+  assert.ok(fy > 0, 'the name sits inside the site, not across its street line: ' + fy.toFixed(1) + ' ft');
+  // one stall reads "1 space"
+  assert.equal(SP.labelOf({ kind: 'parking', x: 100, y: 100, w: 9, d: 18, row: 1 }).size, '1 space');
+  // a pond moved beside the work takes its walking loop with it
+  const pond = { id: 'p', kind: 'pond', x: 800, y: 420, w: 120, d: 80 }, trail = { id: 't', kind: 'trail', closed: true, path: SP.grow(SP.corners(pond), 15) }, bld = { id: 'b', kind: 'building', use: 'retail', x: 200, y: 120, w: 160, d: 80 }, drv = { id: 'd', kind: 'drive', x: 200, y: 40, w: 300, d: 24, entry: true };
+  const moved = RUN.pondBesideWork(RECT, { elements: [pond, trail, bld, drv] }), p2 = moved.elements.find(e => e.id === 'p'), t2 = moved.elements.find(e => e.id === 't');
+  assert.notEqual(p2.x, 800, 'the pond moved'); assert.ok(!t2 || t2.path.every(q => SP.inRing(q, SP.grow(SP.corners(p2), 40))), 'its trail went with it, or went (never left round the old spot)');
+  // a scrap of held land shut in by drives is open space; a piece held for a purpose stays
+  const scrap = { id: 's', kind: 'green', future: true, name: 'Future development', poly: [[300, 200], [400, 200], [400, 260], [300, 260]] }, pad = { id: 'f', kind: 'green', future: true, name: 'Future pad site', poly: [[500, 200], [600, 200], [600, 260], [500, 260]] };
+  const r = RUN.shutInFuture(RECT, { elements: [scrap, pad] }); assert.equal(r.elements.find(e => e.id === 's').name, 'Open space'); assert.ok(!r.elements.find(e => e.id === 's').future); assert.ok(r.elements.find(e => e.id === 'f').future);
+});
 console.log('layoutrun: ' + n + ' passed');
