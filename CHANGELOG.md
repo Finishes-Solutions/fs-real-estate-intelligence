@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 7:34 AM CT: Detention sized from rainfall, garages checked for ventilation, deeper buildings on request (5aac4cc, d12d0e5, 70ea2a7)
+- **Detention is estimated from the storm, not a rule of thumb:** NOAA Atlas 14 rainfall for the site (a regional figure when the service can't be reached) and the plan's own roofs and paving, by the NRCS TR-55 method; the pond is sized to it and the check passes or fails it (still an estimate for the civil engineer). A site with no room for a pond plans underground storage, and says so.
+- **Garages checked for ventilation:** each garage is tested against the building code's open-garage rule (openings on at least two sides, 20% of the wall area); one that isn't open is flagged as needing mechanical ventilation and sprinklers. The wrap, podium and podium-courtyard garages drawn now are all open.
+- **Deeper corridor buildings when you ask** ("83 ft deep corridor buildings"), marked as deeper than any reviewed building.
+- **Fixes:** mid-rise bars are shortened a whole bay at a time (288 apartments on the test site, Hockley mid-rise 960, was 896); a walking trail no longer runs through parking; a corner townhome gives way for a fire truck's turn only as far as an exact count allows. Hockley garden apartments stay at 756 with their detention now met. All 20 test sites pass with no warnings; the full test suite passes.
+
 ### 5:54 AM CT: Reviewed evidence for building sizes and podiums, a short median, faster courtyards (43386bf, 1ab709a, 67914fb, aada1a6, 500ef5f, 90bacc5)
 - **More numbers come from your reviewed projects instead of estimates:** the floor area a home for corridor buildings (courtyards, wraps, podiums, vertical mixed use) from three reviewed buildings, and how much of a podium the tower covers (Hawthorn and 2000 Clarendon). Three more projects were read into the library (Pleasant Grove, 10th & Irving, 2000 Clarendon). A one-level podium entered from the road draws no ramp.
 - **A short median** where a full boulevard doesn't fit: the entry widens to two fire lanes round a planted island, instead of no median at all.
