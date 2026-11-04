@@ -1,0 +1,369 @@
+// Site plan drawings: the plan as SVG (for the PDF sheet and previews) and the whole sheet as a printable HTML page:
+// the plan to scale with north arrow and scale bar, title block, site data and land use, program and parking,
+// parcels, notes from the site facts, legend and a conceptual-only disclaimer. Shared by the browser and the tests.
+import * as S from './siteplan.mjs';
+import { rulesLine } from './rulesheet.mjs';
+import * as G from './guardrails.mjs'; // a Waller plan: its numbers under the guardrails, the concept label and the land-use sheet
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const f0 = v => Math.round(v).toLocaleString('en-US');
+export const PALETTE = {
+  lot: '#fbfbf8', lawn: '#dde9d1', paving: '#d7d9d6', curb: '#9fa29d', ada: '#2f6db5', trash: '#a59f92', stripe: '#ffffff', walk: '#efefea', green: '#cfe3bf', tree: '#7fae5f', treeLine: '#55803c', pond: '#9cc7e8', bank: '#d9c9a3',
+  court: '#5a87a8', pool: '#8fd3ec', play: '#e8d3a8', plaza: '#e6d6bd', keepout: '#9b3b32', boundary: '#c0392b', setback: '#9aa0a2', text: '#1b1e1f',
+  use: { retail: '#c8673d', restaurant: '#c8673d', office: '#b5553c', medical: '#b5553c', hotel: '#a8583f', church: '#9e6448', venue: '#7fb5c9', other: '#b0603f', industrial: '#a2775b', storage: '#5d8a8c', fuel: '#b5443a', multifamily: '#d8b16a', townhomes: '#b8865b', duplex: '#d9a77c', foodtrucks: '#9c4f6b', amenity: '#8a6fb3' }, fence: '#2b3033', gate: '#e07b24', foodtruck: '#e9b44c', canopy: '#dfe7f1', tanks: '#e6c45c', sign: '#8b8073'
+};
+export const LEGEND = [['Retail / commercial building', 'retail'], ['Event / wedding venue', 'venue'], ['Apartments', 'multifamily'], ['Townhomes', 'townhomes'], ['Duplexes / cottages', 'duplex'], ['Industrial', 'industrial'], ['Self storage', 'storage'], ['Food truck park: pavilion, restrooms, bar', 'foodtrucks'], ['Food truck stall (power + water)', 'foodtruck'], ['Gas station / c-store', 'fuel'], ['Community / amenity building', 'amenity'],
+  ['Asphalt / concrete paving', 'paving'], ['Detention / amenity lake', 'pond'], ['Landscape / open space', 'green'], ['Accessible (ADA) stall', 'ada'], ['Trash enclosure', 'trash'], ['Monument sign', 'sign'], ['Tennis / pickleball courts', 'court'], ['Fence and gate', 'fence'], ['Fuel canopy and pumps', 'canopy'], ['Fuel tanks (keep clear)', 'tanks'], ['Canopy tree (proposed)', 'tree'], ['Easement / no-build (drawn, not surveyed)', 'keepout'], ['Boundary', 'boundary'], ['Building setback', 'setback']];
+
+// the angle (degrees) to turn a plan so its street side is at the bottom of the sheet, as site plans are drawn
+export function streetDown(plan) {
+  const r = plan.ring || []; if (r.length < 3) return 0;
+  const n = S.outwardOf(r, plan.front != null && plan.front < r.length ? plan.front : S.longestEdge(r)); return Math.atan2(n[1], n[0]) * 180 / Math.PI + 90;
+}
+// the plan turned by `deg` (counter-clockwise turns the drawing clockwise): every point and piece
+export function turned(plan, deg) {
+  if (!deg) return plan; const t = p => S.rotPt(p, -deg);
+  return { ...plan, ring: (plan.ring || []).map(t), zones: (plan.zones || []).map(z => ({ ...z, ring: (z.ring || []).map(t) })), elements: (plan.elements || []).map(e => { const c = t([e.x, e.y]); return { ...e, x: c[0], y: c[1], rot: (e.rot || 0) - deg, ...(e.path ? { path: e.path.map(t) } : {}), ...(e.poly ? { poly: e.poly.map(t) } : {}), ...(e.mouth ? { mouth: t(e.mouth) } : {}), ...(e.cl ? { cl: e.cl.map(t) } : {}), ...(e.stallAng != null ? { stallAng: +e.stallAng - deg } : {}) }; }) }; // (an entrance's way in turns with it: its throat and stop bar are drawn from it; a custom parking outline's rows too)
+}
+
+// the plan in feet. opts: { px (width), pad (ft), labels, lines (stall stripes), turn (degrees; default: street down) }.
+// Returns { svg, scale (px per ft), box, height, turn }
+export function planSVG(plan0, opts = {}) {
+  const turn = opts.turn ?? streetDown(plan0), plan = turned(plan0, turn);
+  const ring = plan.ring || [], els = plan.elements || [], prog = S.normalizeProgram(plan.program), P = PALETTE;
+  if (ring.length < 3) return { svg: '<svg xmlns="http://www.w3.org/2000/svg"/>', scale: 1, box: [0, 0, 1, 1] };
+  const pad = opts.pad ?? 40, xs = ring.map(p => p[0]), ys = ring.map(p => p[1]), box = [Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad];
+  const W = box[2] - box[0], H = box[3] - box[1], k = opts.k || (opts.px || 1000) / W, px = +(W * k).toFixed(1), X = x => ((x - box[0]) * k).toFixed(1), Y = y => ((box[3] - y) * k).toFixed(1);
+  const pts = r => r.map(p => X(p[0]) + ',' + Y(p[1])).join(' '), poly = (r, a) => '<polygon points="' + pts(r) + '" ' + a + '/>', o = [];
+  const lw = v => (v * Math.max(0.6, Math.min(1.6, k * 2.5))).toFixed(2), fs = v => (v * Math.max(0.7, Math.min(1.4, k * 3))).toFixed(1);
+  const d = S.details(plan), rules = S.edgeRules(ring, plan.front, plan.setbacks, plan.streets);
+  o.push(poly(ring, 'fill="' + P.lawn + '" stroke="none"')); // the whole site is landscape under everything built on it: no lawn shapes with ragged edges
+  for (const z of plan.zones || []) if (z.ring?.length >= 3 && (plan.zones.length > 1)) o.push(poly(z.ring, 'fill="none" stroke="#b9bdb5" stroke-width="' + lw(0.8) + '" stroke-dasharray="6 4"'));
+  const order = ['green', 'trail', 'plaza', 'field', 'drive', 'truck', 'parking', 'pond', 'court', 'pool', 'play']; // (a parking field first: the rows and aisles on it draw over it)
+  const paved = els.filter(x => (S.PAVED.includes(x.kind) || x.kind === 'canopy' || x.kind === 'tanks') && !x.island && !x.emergency); let curbed = false; /* (the paving runs on under a fuel canopy) */ const clip = 'site' + Math.random().toString(36).slice(2, 8);
+  for (const kind of order.concat(['island'])) for (const e of els.filter(x => kind === 'island' ? x.island : x.kind === kind && !x.island)) {
+    // paving is one surface: every paved piece stroked as curb first, then all the fills on top, so the curb shows only
+    // round the outside of the whole and never where a drive meets a parking row
+    if (S.PAVED.includes(kind) && !curbed && (curbed = true)) o.push('<clipPath id="' + clip + '">' + poly(ring, '') + '</clipPath><g clip-path="url(#' + clip + ')">' + paved.map(q => poly(S.outline(q), 'fill="' + P.curb + '" stroke="' + P.curb + '" stroke-width="' + lw(2.2) + '" stroke-linejoin="round"')).join('') + '</g>'); // (no curb across a driveway where it meets the street)
+    if (kind === 'island') { o.push(poly(S.outline(e), 'fill="' + P.green + '" stroke="#a9c79a" stroke-width="' + lw(0.5) + '"')); continue; }
+    if (kind === 'drive' && e.emergency) { o.push(poly(S.outline(e), 'fill="#cfdcae" stroke="#c0392b" stroke-width="' + lw(0.8) + '" stroke-dasharray="6 4"')); continue; } // an emergency access lane: grass pavers, gated, outlined in fire-lane red
+    if (kind === 'pond') { o.push(poly(e.poly ? S.grow(e.poly, 10) : S.outline({ ...e, w: e.w + 20, d: e.d + 20 }), 'fill="' + P.bank + '" stroke="none"')); o.push(poly(S.outline(e), 'fill="' + P.pond + '" stroke="#6ea3cc" stroke-width="' + lw(0.8) + '"')); continue; }
+    const fill = { green: P.green, trail: '#e4d6b8', plaza: P.plaza, field: P.paving, drive: P.paving, truck: P.paving, parking: P.paving, court: P.court, pool: P.pool, play: P.play }[kind];
+    if (kind === 'green' && !e.name) continue; // plain lawn is the background already
+    if (kind === 'green') { o.push(poly(S.outline(e), 'fill="' + (e.future ? P.lawn : fill) + '" stroke="' + (e.future ? '#8fae7f' : '#a9c79a') + '" stroke-width="' + lw(0.8) + '"' + (e.future ? ' stroke-dasharray="8 5"' : ''))); continue; }
+    o.push(poly(S.outline(e), 'fill="' + fill + '" stroke="' + (kind === 'green' ? '#a9c79a' : kind === 'court' ? '#ffffff' : 'none') + '" stroke-width="' + lw(0.6) + '"'));
+    if (kind === 'parking' && opts.lines !== false) for (const l of S.stallLines(e)) o.push('<line x1="' + X(l[0][0]) + '" y1="' + Y(l[0][1]) + '" x2="' + X(l[1][0]) + '" y2="' + Y(l[1][1]) + '" stroke="' + P.stripe + '" stroke-width="' + lw(0.5) + '"/>');
+    if (kind === 'drive' && e.path && (e.width || 0) >= 24) { const c = S.fillet(e.path, e.r ?? 30, e.closed); o.push('<polyline points="' + pts(e.closed ? c.concat([c[0]]) : c) + '" fill="none" stroke="#f4f4f0" stroke-width="' + lw(0.6) + '" stroke-dasharray="8 6"/>'); }
+    if (kind === 'drive' && !S.isFree(e) && e.d >= 24 && e.w >= 24 && e.name) { const a = (e.rot || 0) * Math.PI / 180, L = Math.max(e.w, e.d) / 2 - 8, along = e.w >= e.d ? [Math.cos(a), Math.sin(a)] : [-Math.sin(a), Math.cos(a)];
+      o.push('<line x1="' + X(e.x - along[0] * L) + '" y1="' + Y(e.y - along[1] * L) + '" x2="' + X(e.x + along[0] * L) + '" y2="' + Y(e.y + along[1] * L) + '" stroke="#f4f4f0" stroke-width="' + lw(0.6) + '" stroke-dasharray="8 6"/>'); }
+  }
+  for (const e of els.filter(x => x.kind === 'tanks' || x.kind === 'canopy')) o.push(poly(S.outline(e), 'fill="' + P.paving + '" stroke="none"'), poly(S.outline(e), 'fill="' + P[e.kind] + '" fill-opacity="' + (e.kind === 'tanks' ? 0.9 : 0.75) + '" stroke="' + (e.kind === 'tanks' ? '#8a6d1f' : '#3c5a80') + '" stroke-width="' + lw(0.9) + '" stroke-dasharray="5 3"')); // a fuel canopy (a light roof over the paving) and the tank pad
+  for (const q of d.pumps || []) o.push(poly(S.corners(q), 'fill="#2c3e50" stroke="none"')); // the pump islands under it
+  for (const e of els.filter(x => x.kind === 'fence' && x.path?.length > 1)) o.push('<polyline points="' + pts(e.path) + '" fill="none" stroke="' + (e.gate ? P.gate : P.fence) + '" stroke-width="' + lw(e.gate ? 3 : 1.4) + '"' + (e.gate ? ' stroke-dasharray="4 3"' : '') + ' stroke-linejoin="round"/>'); // a security fence, its gates dashed
+  // a drive-thru lane: arrows the way it runs, its order point and its pickup window (lib/siteplan.mjs driveThruMarks)
+  for (const e of els.filter(x => x.kind === 'drive' && x.note === 'Drive-thru lane' && x.path?.length > 1)) {
+    let d0 = 0; for (let i = 0; i + 1 < e.path.length; i++) { const a = e.path[i], b = e.path[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) continue; const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], n = [-u[1], u[0]];
+      for (let t = (45 - d0 % 45) % 45 + 20; t < L - 15; t += 45) { const p = [a[0] + u[0] * t, a[1] + u[1] * t]; o.push('<polyline points="' + pts([[p[0] - u[0] * 3 + n[0] * 3, p[1] - u[1] * 3 + n[1] * 3], [p[0] + u[0] * 3, p[1] + u[1] * 3], [p[0] - u[0] * 3 - n[0] * 3, p[1] - u[1] * 3 - n[1] * 3]]) + '" fill="none" stroke="#f4f4f0" stroke-width="' + lw(0.9) + '"/>'); }
+      d0 += L; }
+  }
+  // markings: accessible stalls (blue, with the wheelchair symbol), their striped aisles, and the entry's stop bar and centre line
+  const ln = (l, col, w) => '<line x1="' + X(l[0][0]) + '" y1="' + Y(l[0][1]) + '" x2="' + X(l[1][0]) + '" y2="' + Y(l[1][1]) + '" stroke="' + col + '" stroke-width="' + w + '"/>';
+  if (opts.lines !== false) {
+    const A = S.accessible(plan);
+    for (const a of A.aisles) { o.push(poly(a.poly, 'fill="none" stroke="' + P.ada + '" stroke-width="' + lw(0.5) + '"')); for (const l of a.lines) o.push(ln(l, P.ada, lw(0.5))); }
+    for (const a of A.stalls) { o.push(poly(a.poly, 'fill="' + P.ada + '" fill-opacity=".85" stroke="#ffffff" stroke-width="' + lw(0.5) + '"')); const r = Math.max(1.2, 2.6 * k); o.push('<circle cx="' + X(a.sym[0]) + '" cy="' + Y(a.sym[1]) + '" r="' + r.toFixed(1) + '" fill="none" stroke="#ffffff" stroke-width="' + (r * 0.35).toFixed(2) + '"/>'); }
+    for (const m of [...S.entryMarks(plan), ...S.loopMarks(plan)]) o.push(ln(m.line, m.color, Math.max(0.6, m.w * k).toFixed(2))); // (and a drop-off loop's one-way arrows)
+  }
+  for (const e of els.filter(x => x.kind === 'lot')) o.push(poly(S.outline(e), 'fill="none" stroke="#9aa38f" stroke-width="' + lw(0.5) + '" stroke-dasharray="3 2"'));
+  for (const i of d.islands) o.push(poly(S.outline(i), 'fill="' + P.green + '" stroke="#a9c79a" stroke-width="' + lw(0.4) + '"'));
+  for (const w of d.walks) o.push(poly(w.poly || S.corners(w), 'fill="' + P.walk + '" stroke="#d8d8d0" stroke-width="' + lw(0.4) + '"'));
+  for (const q of d.patios) { o.push(poly(q.poly, 'fill="#e6dcc8" stroke="none"')); for (const l of q.walls) o.push('<line x1="' + X(l[0][0]) + '" y1="' + Y(l[0][1]) + '" x2="' + X(l[1][0]) + '" y2="' + Y(l[1][1]) + '" stroke="#8a7a62" stroke-width="' + lw(0.6) + '"/>'); } // private patios, fenced
+  for (const t of els.filter(x => x.kind === 'truck' && +x.trailers > 0 && !x.poly)) { // trailer stalls: a stripe every stall across the band (its long side the row)
+    const at = q => S.garageToPlan(t, q), long = t.d >= t.w, L = long ? t.d : t.w, D2 = (long ? t.w : t.d) / 2, sw = +t.trailerW || 12, n = Math.min(+t.trailers, Math.floor(L / sw)), s0 = -n * sw / 2;
+    for (let k = 0; k <= n; k++) { const s1 = s0 + k * sw, A = at(long ? [-D2, s1] : [s1, -D2]), B2 = at(long ? [D2, s1] : [s1, D2]); o.push('<line x1="' + X(A[0]) + '" y1="' + Y(A[1]) + '" x2="' + X(B2[0]) + '" y2="' + Y(B2[1]) + '" stroke="#ffffff" stroke-opacity=".85" stroke-width="' + lw(0.35) + '"/>'); } }
+  for (const e of els.filter(x => x.kind === 'building')) {
+    const use = S.USES[e.use] ? e.use : prog.use;
+    o.push(poly(S.outline(e), 'fill="' + (P.use[use] || P.use.other) + '"' + (e.phase === 2 ? ' fill-opacity=".55" stroke-dasharray="6 3"' : '') + ' stroke="#4a3a2c" stroke-width="' + lw(0.9) + '"')); // Phase 2: lighter, dashed
+    if (e.docks?.perFace > 0) { // a cross-dock's dock doors: a short dark mark at each door along its dock walls (local -x / +x faces)
+      const at = q => S.garageToPlan(e, q), n = e.docks.perFace, sp = e.docks.spacing || 12, run = Math.min(e.d - 30, n * sp), v0 = -run / 2 + sp / 2;
+      for (const f of e.docks.faces || []) { const sx = f === '-x' ? -1 : 1, u = sx * e.w / 2; for (let k = 0; k < n; k++) { const v = v0 + k * sp, a = at([u, v - 4.5]), b = at([u + sx * 5, v - 4.5]), c = at([u + sx * 5, v + 4.5]), d2 = at([u, v + 4.5]); o.push(poly([a, b, c, d2], 'fill="#3d3127" stroke="none"')); } } }
+    if (S.groundOf(e) && plan.ring?.length >= 3) { // vertical mixed use: the shops' storefronts along the face nearest the street, in the shops' colour
+      const c = S.outline(e), fr = plan.front ?? 0, A = plan.ring[fr], B2 = plan.ring[(fr + 1) % plan.ring.length], mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      let bi = 0, bd = Infinity; for (let i = 0; i < c.length; i++) { const d = S.segDist(mid(c[i], c[(i + 1) % c.length]), A, B2); if (d < bd) { bd = d; bi = i; } }
+      const p0 = c[bi], p1 = c[(bi + 1) % c.length], cen = S.centroid(c), m = mid(p0, p1), L = Math.hypot(cen[0] - m[0], cen[1] - m[1]) || 1, t = Math.min(16, L), u = [(cen[0] - m[0]) / L * t, (cen[1] - m[1]) / L * t];
+      o.push(poly([p0, p1, [p1[0] + u[0], p1[1] + u[1]], [p0[0] + u[0], p0[1] + u[1]]], 'fill="' + (P.use.retail || P.use.other) + '" stroke="#4a3a2c" stroke-width="' + lw(0.5) + '"')); }
+    if (e.form === 'tower' && +e.parkLevels > 0 && e.podium > 0 && (e.floors || 1) > e.podium) { // the podium garage's ground level, drawn from its plan (the count is the plan's): stalls, the ramp, cores, columns, the lobby and the way in
+      const g = S.garagePlan(e), at = q => S.garageToPlan(e, q), box = (r, a) => poly([at([r.u0, r.v0]), at([r.u1, r.v0]), at([r.u1, r.v1]), at([r.u0, r.v1])], a), seg = (p, q, a) => { const A = at(p), B2 = at(q); return '<line x1="' + X(A[0]) + '" y1="' + Y(A[1]) + '" x2="' + X(B2[0]) + '" y2="' + Y(B2[1]) + '" ' + a + '/>'; };
+      const ink = 'stroke="#7d6b58" stroke-width="' + lw(0.3) + '"';
+      for (const r of g.rows) { for (const q of r.slots) if (!q.use && q.ground !== 'lobby') o.push(box({ u0: q.u0, u1: q.u1, v0: r.v0, v1: r.v1 }, 'fill="none" ' + ink)); }
+      if (g.ramp) { o.push(box(g.ramp, 'fill="#8d7c69" fill-opacity=".35" ' + ink)); const vm = (g.ramp.v0 + g.ramp.v1) / 2; o.push(seg([g.ramp.u0 + 6, vm], [g.ramp.u1 - 6, vm], 'stroke="#5c4b3a" stroke-width="' + lw(0.5) + '"'));
+        const rs = g.rampSpec; if (rs && +e.parkLevels >= 2 && opts.labels !== false) { const c = at([(g.ramp.u0 + g.ramp.u1) / 2, vm + 4]); o.push('<text x="' + X(c[0]) + '" y="' + Y(c[1]) + '" font-size="' + fs(3.2) + '" text-anchor="middle" dominant-baseline="hanging" fill="#4a3a2c" font-family="Arial, Helvetica, sans-serif">RAMP UP ' + Math.round(rs.slope * 100) + '% · ' + Math.round(rs.need) + ' FT · ' + g.heights.ground.f2f + '′ F-F</text>'); } } // (the ramp's slope and length, schematic)
+      for (const c of g.cores) o.push(box(c, 'fill="#5c4b3a" fill-opacity=".75" stroke="none"'));
+      if (g.lobby) o.push(box(g.lobby, 'fill="#efe6d6" stroke="#7d6b58" stroke-width="' + lw(0.5) + '"'));
+      for (const c of g.cols) { const p = at(c); o.push('<rect x="' + (X(p[0]) - lw(0.8) / 2).toFixed(1) + '" y="' + (Y(p[1]) - lw(0.8) / 2).toFixed(1) + '" width="' + lw(0.8) + '" height="' + lw(0.8) + '" fill="#4a3a2c"/>'); }
+      const E = g.entry, o2 = E.out, ein = [E.at[0] - o2[0] * 14, E.at[1] - o2[1] * 14], side = [-o2[1] * 5, o2[0] * 5]; // the way in: an arrow through the opening
+      o.push('<polyline points="' + pts([[ein[0] + o2[0] * 8 + side[0], ein[1] + o2[1] * 8 + side[1]], ein, [ein[0] + o2[0] * 8 - side[0], ein[1] + o2[1] * 8 - side[1]]].map(at)) + '" fill="none" stroke="#2c3e50" stroke-width="' + lw(0.9) + '"/>');
+    }
+    if (+e.tuck > 0 && +e.units > 0) { // a tuck-under row: a party wall between the homes, a garage door at each home on the court side
+      const along = e.w >= e.d, Lg = along ? e.w : e.d, Dg = along ? e.d : e.w, n = +e.units, bw = Lg / n, sg = (e.doors || 1) * 1, at = (a, b) => S.garageToPlan(e, along ? [a, b] : [b, a]), ink = 'stroke="#4a3a2c" stroke-width="' + lw(0.4) + '"';
+      for (let i = 1; i < n; i++) { const A = at(-Lg / 2 + i * bw, -Dg / 2), B2 = at(-Lg / 2 + i * bw, Dg / 2); o.push('<line x1="' + X(A[0]) + '" y1="' + Y(A[1]) + '" x2="' + X(B2[0]) + '" y2="' + Y(B2[1]) + '" ' + ink + '/>'); }
+      const gw = Math.min(9, bw - 4); for (let i = 0; i < Math.min(n, +e.tuck); i++) { const u0 = -Lg / 2 + i * bw + (bw - gw) / 2; o.push(poly([at(u0, sg * Dg / 2), at(u0 + gw, sg * Dg / 2), at(u0 + gw, sg * (Dg / 2 - 3)), at(u0, sg * (Dg / 2 - 3))], 'fill="#f2efe8" ' + ink)); }
+    }
+    if (e.stacked?.bays > 1) { // stacked townhomes: a party wall between the bays, and a door mark at each home on both long sides (the lower home's on one, the upper's stair on the other)
+      const along = e.w >= e.d, Lg = along ? e.w : e.d, Dg = along ? e.d : e.w, n = +e.stacked.bays, bw = Lg / n, at = (a, b) => S.garageToPlan(e, along ? [a, b] : [b, a]), ink = 'stroke="#4a3a2c" stroke-width="' + lw(0.4) + '"';
+      for (let i = 1; i < n; i++) { const A = at(-Lg / 2 + i * bw, -Dg / 2), B2 = at(-Lg / 2 + i * bw, Dg / 2); o.push('<line x1="' + X(A[0]) + '" y1="' + Y(A[1]) + '" x2="' + X(B2[0]) + '" y2="' + Y(B2[1]) + '" ' + ink + '/>'); }
+      for (let i = 0; i < n; i++) for (const sg of [-1, 1]) { const u0 = -Lg / 2 + i * bw + bw / 2 - 2; o.push(poly([at(u0, sg * Dg / 2), at(u0 + 4, sg * Dg / 2), at(u0 + 4, sg * (Dg / 2 - 2.5)), at(u0, sg * (Dg / 2 - 2.5))], 'fill="#f2efe8" ' + ink)); }
+    }
+    if (e.form === 'tower' && e.podium > 0 && (e.floors || 1) > e.podium) o.push(poly(S.towerOutline(e), 'fill="#000" fill-opacity=".10" stroke="#4a3a2c" stroke-width="' + lw(0.7) + '" stroke-dasharray="5 2"')); // the tower above its podium
+    if ((use === 'townhomes' || e.unitW) && e.units > 1) for (let u = 1; u < e.units; u++) { const a = (e.rot || 0) * Math.PI / 180, x = -e.w / 2 + e.w * u / e.units, p1 = [e.x + x * Math.cos(a) + e.d / 2 * Math.sin(a), e.y + x * Math.sin(a) - e.d / 2 * Math.cos(a)], p2 = [e.x + x * Math.cos(a) - e.d / 2 * Math.sin(a), e.y + x * Math.sin(a) + e.d / 2 * Math.cos(a)];
+      o.push('<line x1="' + X(p1[0]) + '" y1="' + Y(p1[1]) + '" x2="' + X(p2[0]) + '" y2="' + Y(p2[1]) + '" stroke="#4a3a2c" stroke-width="' + lw(0.4) + '"/>'); }
+  }
+  // detail inside amenity pieces: a playground's equipment, a patio's tables, a garage's ramps
+  const loc = (e, u, v) => { const q = S.rotPt([u, v], e.rot || 0); return [e.x + q[0], e.y + q[1]]; }, rect = (e, u0, v0, u1, v1, a) => poly([loc(e, u0, v0), loc(e, u1, v0), loc(e, u1, v1), loc(e, u0, v1)], a);
+  for (const e of els.filter(x => x.kind === 'play' && !S.isFree(x) && x.shape !== 'circle')) { // rubber surface, a play structure with decks and a slide, swings, a bench
+    const W = e.w / 2, D = e.d / 2, ink = 'stroke="#7a5a3a" stroke-width="' + lw(0.5) + '"';
+    o.push(rect(e, -W + 3, -D + 3, W - 3, D - 3, 'fill="#d9a46a" fill-opacity=".55" stroke="#b78350" stroke-width="' + lw(0.5) + '"'));
+    o.push(rect(e, -W * 0.7, -D * 0.45, -W * 0.25, D * 0.15, 'fill="#3d8bd0" ' + ink), rect(e, -W * 0.25, -D * 0.25, W * 0.05, D * 0.35, 'fill="#e05d44" ' + ink), rect(e, W * 0.05, -D * 0.05, W * 0.45, D * 0.07, 'fill="#f2c94c" ' + ink)); // decks and the slide
+    const s0 = loc(e, W * 0.25, D * 0.62), s1 = loc(e, W * 0.85, D * 0.62); o.push('<line x1="' + X(s0[0]) + '" y1="' + Y(s0[1]) + '" x2="' + X(s1[0]) + '" y2="' + Y(s1[1]) + '" stroke="#5b4636" stroke-width="' + lw(1.4) + '"/>');
+    for (const t of [0.35, 0.55, 0.75]) o.push(rect(e, W * t - 1.5, D * 0.5, W * t + 1.5, D * 0.74, 'fill="#5b4636"'));
+    o.push(rect(e, -W * 0.8, -D * 0.85, -W * 0.45, -D * 0.72, 'fill="#8a6a4a"'));
+  }
+  for (const e of els.filter(x => x.kind === 'court')) { // each court: its sport's surround, the playing surface, white lines and the net
+    const q = S.courtLines(e), SP = S.SPORTS[S.courtSport(e)], seg = (l, c, w) => '<line x1="' + X(l[0][0]) + '" y1="' + Y(l[0][1]) + '" x2="' + X(l[1][0]) + '" y2="' + Y(l[1][1]) + '" stroke="' + c + '" stroke-width="' + lw(w) + '"/>';
+    if (q.areas.length) o.push(poly(S.outline(e), 'fill="' + SP.surf + '" stroke="#ffffff" stroke-width="' + lw(0.6) + '"'));
+    for (const r of q.areas) o.push(poly(r, 'fill="' + SP.play + '" stroke="none"'));
+    for (const l of q.lines) o.push(seg(l, '#ffffff', 0.45));
+    for (const l of q.nets) o.push(seg(l, '#1b1e1f', 0.9));
+  }
+  for (const e of els.filter(x => x.kind === 'patio' && !S.isFree(x))) { // pavers and round tables with chairs
+    o.push(rect(e, -e.w / 2, -e.d / 2, e.w / 2, e.d / 2, 'fill="#e8d9bd" stroke="#b9a37c" stroke-width="' + lw(0.5) + '"'));
+    const nx = Math.max(1, Math.floor(e.w / 9)), ny = Math.max(1, Math.floor(e.d / 9));
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { const c = loc(e, -e.w / 2 + (i + 0.5) * e.w / nx, -e.d / 2 + (j + 0.5) * e.d / ny); o.push('<circle cx="' + X(c[0]) + '" cy="' + Y(c[1]) + '" r="' + Math.max(0.8, 1.6 * k).toFixed(1) + '" fill="#ffffff" stroke="#8f7a55" stroke-width="' + lw(0.4) + '"/>'); }
+  }
+  for (const e of els.filter(x => x.kind === 'garage')) { // a parking structure: concrete, ramps drawn as a pair of diagonals
+    o.push(poly(S.outline(e), 'fill="#b9bec0" stroke="#5d6366" stroke-width="' + lw(0.9) + '"'));
+    for (const t of [-0.25, 0.25]) { const a = loc(e, -e.w / 2 + 12, -e.d * 0.3 + t * e.d), b = loc(e, e.w / 2 - 12, e.d * 0.3 + t * e.d * 0.1); o.push('<line x1="' + X(a[0]) + '" y1="' + Y(a[1]) + '" x2="' + X(b[0]) + '" y2="' + Y(b[1]) + '" stroke="#8a9093" stroke-width="' + lw(0.8) + '"/>'); }
+  }
+  for (const e of els.filter(x => x.kind === 'foodtruck')) { const q = S.truckParts(e); // the pad, the truck on it, its serving window toward the seating and the pedestal
+    o.push(poly(S.outline(e), 'fill="' + P.foodtruck + '" stroke="#b07f22" stroke-width="' + lw(0.6) + '"'), poly(q.body, 'fill="#fbfaf6" stroke="#4d4a44" stroke-width="' + lw(0.6) + '"'), poly(q.pedestal, 'fill="#2b3033"'));
+    o.push('<line x1="' + X(q.window[0][0]) + '" y1="' + Y(q.window[0][1]) + '" x2="' + X(q.window[1][0]) + '" y2="' + Y(q.window[1][1]) + '" stroke="#e07b24" stroke-width="' + lw(1.6) + '"/>'); }
+  for (const e of els.filter(x => x.kind === 'trash')) { o.push(poly(S.outline(e), 'fill="' + P.trash + '" stroke="#4d4a44" stroke-width="' + lw(0.8) + '"')); const c = S.corners(e); o.push('<line x1="' + X(c[2][0]) + '" y1="' + Y(c[2][1]) + '" x2="' + X(c[3][0]) + '" y2="' + Y(c[3][1]) + '" stroke="#f4f4f0" stroke-width="' + lw(1.2) + '" stroke-dasharray="3 2"/>'); } // the gate side, dashed
+  // monument signs: a stone pad, the community's name beside the first (small capitals)
+  const cm = prog.community; els.filter(x => x.kind === 'sign').forEach((e, i) => { o.push(poly(S.outline(e), 'fill="' + P.sign + '" stroke="#4d4136" stroke-width="' + lw(0.8) + '"'));
+    const lp = S.signLabelAt(e); if (cm && !i && opts.labels !== false) o.push('<text x="' + X(lp[0]) + '" y="' + Y(lp[1]) + '" dominant-baseline="middle" font-size="' + fs(5.5) + '" text-anchor="middle" fill="#4d4136" font-family="Arial, Helvetica, sans-serif" font-variant="small-caps" letter-spacing=".08em">' + esc(cm) + '</text>'); });
+  for (const [x, y, r] of d.trees) { // shadow, scalloped canopy, a lighter crown and a dark centre: reads as a tree, not a dot
+    const T = S.treeShape(x, y, r), sh = T.canopy.map(([a, b]) => [a + T.R * 0.18, b - T.R * 0.18]), hi = T.canopy.map(([a, b]) => [x - T.R * 0.12 + (a - x) * 0.6, y + T.R * 0.12 + (b - y) * 0.6]);
+    o.push(poly(sh, 'fill="#2f3b28" fill-opacity=".18" stroke="none"') + poly(T.canopy, 'fill="' + T.colors[0] + '" stroke="' + T.colors[1] + '" stroke-width="' + lw(0.5) + '"') + poly(hi, 'fill="' + T.colors[2] + '" fill-opacity=".55" stroke="none"') +
+      '<circle cx="' + X(x) + '" cy="' + Y(y) + '" r="' + Math.max(0.6, T.R * 0.08 * k).toFixed(1) + '" fill="' + T.colors[1] + '"/>');
+  }
+  // easements drawn as no-build areas: hatched in red-brown with a dashed edge, so they can't be read as a setback
+  const kos = els.filter(x => x.kind === 'keepout'); if (kos.length) { const hid = 'ko' + clip, hs = Math.max(5, 9 * k).toFixed(1);
+    o.push('<defs><pattern id="' + hid + '" patternUnits="userSpaceOnUse" width="' + hs + '" height="' + hs + '" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="' + hs + '" stroke="' + P.keepout + '" stroke-width="' + lw(0.6) + '" stroke-opacity=".7"/></pattern></defs>');
+    for (const e of kos) o.push(poly(S.outline(e), 'fill="url(#' + hid + ')" stroke="' + P.keepout + '" stroke-width="' + lw(1) + '" stroke-dasharray="6 3"')); }
+  o.push(poly(S.insetRing(ring, rules.map(r => r.build)), 'fill="none" stroke="' + P.setback + '" stroke-width="' + lw(0.7) + '" stroke-dasharray="5 4"'));
+  o.push(poly(ring, 'fill="none" stroke="' + P.boundary + '" stroke-width="' + lw(1.8) + '" stroke-dasharray="14 4 2 4"'));
+  // a drive-thru's pickup window and order point, over the building's walk (lib/siteplan.mjs driveThruMarks)
+  for (const m of S.driveThruMarks(els)) o.push(m.line ? '<line x1="' + X(m.line[0][0]) + '" y1="' + Y(m.line[0][1]) + '" x2="' + X(m.line[1][0]) + '" y2="' + Y(m.line[1][1]) + '" stroke="#1b1e1f" stroke-width="' + lw(2.4) + '"/>'
+    : '<text x="' + X(m.at[0]) + '" y="' + Y(m.at[1]) + '" font-size="' + fs(5) + '" text-anchor="middle" dominant-baseline="middle" fill="' + P.text + '" font-family="Arial, Helvetica, sans-serif">' + m.t + '</text>');
+  // each part's name, big and faint over its zone (a mixed plan's parts; a single-use plan's own name, else the community's)
+  const av = S.labelSpots(plan); if (opts.labels !== false) for (const p of S.partsOf(plan, false)) { const t = p.show || (!prog.zones ? cm : null); if (!t || !p.ring) continue;
+    const zx = p.ring.map(q => q[0]), wz = (Math.max(...zx) - Math.min(...zx)) * k, size = Math.max(8, Math.min(30, wz * 0.8 / (t.length * 0.9))), c = S.labelPoint(p.ring, av, t.length * size * 0.9 / 2 / k); // (the whole name inside its zone: about 0.9 em a letter, spaced out)
+    o.push('<text x="' + X(c[0]) + '" y="' + Y(c[1]) + '" font-size="' + size.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" fill="' + P.text + '" fill-opacity=".3" font-weight="700" letter-spacing=".22em" font-family="Arial, Helvetica, sans-serif">' + esc(t.toUpperCase()) + '</text>'); }
+  if (opts.labels !== false) for (const z of S.sectionLabels(plan)) { // a part's other pods: their sections, smaller
+    const zx = z.ring.map(q => q[0]), size = Math.max(6, Math.min(18, (Math.max(...zx) - Math.min(...zx)) * k * 0.8 / (z.t.length * 0.9)) * 0.6), c = S.labelPoint(z.ring, av, z.t.length * size * 0.9 / 2 / k);
+    o.push('<text x="' + X(c[0]) + '" y="' + Y(c[1]) + '" font-size="' + size.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" fill="' + P.text + '" fill-opacity=".3" font-weight="700" letter-spacing=".22em" font-family="Arial, Helvetica, sans-serif">' + esc(z.t.toUpperCase()) + '</text>'); }
+  // labels: biggest pieces first; lines that don't fit inside the piece are dropped, and a label never overlaps another
+  if (opts.labels !== false) {
+    const placed = [], cw = 0.6, order = els.slice().sort((a, b) => (b.kind === 'building') - (a.kind === 'building') || b.w * b.d - a.w * a.d), quiet = S.namedOnce(els, !!plan.params?.streetNames?.on);
+    // one type size for the buildings of a use (the rows of a townhome block all read alike): the size most of them can
+    // take with their name and one line more, a building whose lines don't fit at it keeping fewer lines, not a bigger name
+    const bigLines = (e, L) => { const sz = L.size.toUpperCase(), seen = new Set(sz.split(' · ')); return [L.name.toUpperCase(), L.what.toUpperCase().split(' · ').filter(t => t && !seen.has(t)).join(' · '), sz].filter(Boolean); }; // (what the size line already says, once)
+    const geo = e => { const ca = Math.abs(Math.cos((e.rot || 0) * Math.PI / 180)) >= Math.SQRT1_2, vert = e.w >= e.d ? !ca : ca, pxW = ca ? e.w : e.d, pxH = ca ? e.d : e.w; return { vert, along: (vert ? pxH : pxW) * k, across: (vert ? pxW : pxH) * k }; };
+    const groupSize = new Map();
+    { const by = new Map(); for (const e of els.filter(x => x.kind === 'building' && !x.poly)) { const L = S.labelOf(e, plan.program); if (!L.name) continue; const g = geo(e), all = bigLines(e, L), fz = ln => Math.min(11, g.across / (ln.length * 1.25 + 0.6), ...ln.map(t => g.along * 0.92 / (t.length * cw))), z2 = fz(all.length > 2 ? [all[0], all[all.length - 1]] : all), z = z2 >= 5 ? z2 : fz([all[0]]); /* its name and numbers, else its name alone */ const key = (e.use || '') + '|' + (e.form || ''); if (!by.has(key)) by.set(key, []); by.get(key).push(z); }
+      for (const [key, zs] of by) { const ok = zs.filter(z => z >= 5).sort((a, b) => a - b); if (ok.length < 2) continue; groupSize.set(key, ok[0]); } } // (the smallest that still reads: every one of the group at it)
+    for (const e of order) {
+      const L = S.labelOf(e, plan.program); if (!L.name && !L.size) continue; if (e.kind === 'drive' && (!e.name || quiet.has(e.id)) || e.kind === 'sign') continue; // (a sign says the community beside it; a street in pieces is named on its longest)
+      const ca = Math.abs(Math.cos((e.rot || 0) * Math.PI / 180)) >= Math.SQRT1_2, vert = e.w >= e.d ? !ca : ca; // the piece's long side runs up the page
+      const big = e.kind === 'building', isl = S.isRing(e) ? 2 * S.ringOf(e).Ri * k : 0, pxW = ca ? e.w : e.d, pxH = ca ? e.d : e.w, along = isl || (vert ? pxH : pxW) * k, across = isl || (vert ? pxW : pxH) * k; // (the piece's extent across and up the page, as turned: a bar turned 90° runs its width up the page) // (a roundabout's name inside its island)
+      let lines = big ? bigLines(e, L) : [L.name.toUpperCase(), L.size.toUpperCase()].filter(Boolean), size = big ? 10 : 8;
+      const gz = big && !e.poly ? groupSize.get((e.use || '') + '|' + (e.form || '')) : null; if (gz && lines.length > 2) lines = [lines[0], lines[lines.length - 1]]; // (a group's buildings: the name and the numbers, alike)
+      const fit = () => { size = Math.min(gz ?? (big ? 11 : 9), across / (lines.length * 1.25 + 0.6), ...lines.map(t => along * 0.92 / (t.length * cw))); return size >= (gz && lines.length > 1 ? Math.max(5, gz * 0.85) : 5); }; // (about the use's size, never bigger: lines that would shrink well below it are left off, so a block's rows read alike)
+      while (lines.length && !fit()) lines = lines.length > 2 ? [lines[0], lines[lines.length - 1]] : gz && lines.length === 2 && lines[1].includes(' · ') ? [lines[0], lines[1].split(' · ')[0]] : lines.slice(0, -1); // (a short one of a group: its name and its count)
+      if (!lines.length) continue;
+      const tw = Math.max(...lines.map(t => t.length)) * size * cw, th = lines.length * size * 1.2; let cx = +X(e.x), cy = +Y(e.y);
+      // an outline that isn't a box (land left for later wrapped round the work): the label where the whole of it fits inside
+      // the piece, not at the box's middle (it ran off the site's edge, "JRE DEVELOPMENT"); and never off the drawing
+      if (e.poly && !big && !vert) { try { const ring = S.outline(e), lb = [Math.min(...ring.map(q => q[0])), Math.min(...ring.map(q => q[1])), Math.max(...ring.map(q => q[0])), Math.max(...ring.map(q => q[1]))];
+        const sit = els.filter(x => x !== e && ['pond', 'building', 'pool', 'garage', 'play'].includes(x.kind)).flatMap(x => { const r = S.shapeOf(x); return r.concat([S.centroid(r)]); }).filter(q => q[0] >= lb[0] && q[0] <= lb[2] && q[1] >= lb[1] && q[1] <= lb[3]); // (a pond or building drawn over the land: the label kept off it)
+        let c = S.labelPoint(ring, sit, tw / 2 / k + 4); if (sit.length && els.some(x => x !== e && ['pond', 'building', 'pool', 'garage', 'play'].includes(x.kind) && S.inRing(c, S.shapeOf(x)))) { const ok = []; for (let i = 1; i < 12; i++) for (let j = 1; j < 12; j++) { const q = [lb[0] + (lb[2] - lb[0]) * i / 12, lb[1] + (lb[3] - lb[1]) * j / 12]; if (S.inRing(q, ring) && S.inRing([q[0] - tw / 2 / k, q[1]], ring) && S.inRing([q[0] + tw / 2 / k, q[1]], ring) && !els.some(x => x !== e && ['pond', 'building', 'pool', 'garage', 'play', 'parking', 'drive'].includes(x.kind) && [[q[0] - tw / 2 / k, q[1]], q, [q[0] + tw / 2 / k, q[1]]].some(z => S.inRing(z, S.shapeOf(x))))) ok.push(q); } if (ok.length) c = ok.sort((a, b) => Math.hypot(a[0] - c[0], a[1] - c[1]) - Math.hypot(b[0] - c[0], b[1] - c[1]))[0]; }
+        cx = +X(c[0]); cy = +Y(c[1]); } catch { /* the box's middle */ } }
+      if (!vert) cx = Math.max(tw / 2 + 2, Math.min(px - tw / 2 - 2, cx));
+      if (e.kind === 'play' && !vert) cy = +(+Y(Math.min(...S.shapeOf(e).map(q => q[1]))) + size * 0.9 + 3).toFixed(1); // (a playground's name under it: over it, it covered the play structure drawn there)
+      const box2 = (x, y) => vert ? [x - th / 2, y - tw / 2, x + th / 2, y + tw / 2] : [x - tw / 2, y - th / 2, x + tw / 2, y + th / 2];
+      // a label that would run over the lot line (an entrance's name where its drive meets the street: "AIN ENTRY") moves in
+      // along its piece, then up or down the page, to the nearest spot where the whole of it is inside the site
+      if (!big && ring.length >= 3) { const rp = ring.map(q => [+X(q[0]), +Y(q[1])]), inside = b => [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].every(q => S.inRing(q, rp));
+        if (!inside(box2(cx, cy))) { const sc = S.centroid(rp), sx = Math.sign(sc[0] - cx) || 1, sy = Math.sign(sc[1] - cy) || 1; let got = null;
+          for (let d = 2; d <= Math.max(tw, th) + 40 && !got; d += 2) for (const [dx, dy] of vert ? [[0, sy * d], [sx * d, 0]] : [[sx * d, 0], [0, sy * d]]) if (inside(box2(cx + dx, cy + dy))) { got = [cx + dx, cy + dy]; break; }
+          if (got) { cx = +got[0].toFixed(1); cy = +got[1].toFixed(1); } } }
+      const bb = box2(cx, cy);
+      if (placed.some(q => bb[0] < q[2] && q[0] < bb[2] && bb[1] < q[3] && q[1] < bb[3])) continue; placed.push(bb);
+      const ink = e.kind === 'pond' || e.kind === 'court' ? '#173a55' : P.text;
+      o.push('<text x="' + cx + '" y="' + cy + '" font-size="' + size.toFixed(1) + '" text-anchor="middle" fill="' + ink + '" font-family="Arial, Helvetica, sans-serif" letter-spacing=".03em"' + (vert ? ' transform="rotate(-90 ' + cx + ' ' + cy + ')"' : '') + '>' +
+        lines.map((t, i) => '<tspan x="' + cx + '" dy="' + (i ? '1.2em' : (-(lines.length - 1) * 0.6 + 0.35) + 'em') + '"' + (i === 0 && big ? ' font-weight="700"' : '') + '>' + esc(t) + '</tspan>').join('') + '</text>');
+    }
+    // the street names (when they're on): each along its street at the middle, turned with it and kept upright, sized to its
+    // pavement (6 to 9 pt), left off where it would cover another label
+    for (const x of S.streetLabels(plan)) { const Q = x.path, c = [0]; for (let i = 1; i < Q.length; i++) c.push(c[i - 1] + Math.hypot(Q[i][0] - Q[i - 1][0], Q[i][1] - Q[i - 1][1])); const L = c[c.length - 1]; let i = 1; while (i < Q.length - 1 && c[i] < L / 2) i++;
+      const a = Q[i - 1], b = Q[i], t = (L / 2 - c[i - 1]) / ((c[i] - c[i - 1]) || 1), m = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], w = els.find(e => e.kind === 'drive' && e.street === x.t)?.width || 28;
+      let deg = -Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI; if (deg > 90) deg -= 180; if (deg < -90) deg += 180; // (svg y runs down: upright)
+      const size = Math.max(6, Math.min(9, w * k * 0.6)), tw = x.t.length * size * cw, cx = +X(m[0]), cy = +Y(m[1]); if (tw > L * k * 0.95) continue;
+      const r = deg * Math.PI / 180, hw = Math.abs(Math.cos(r)) * tw / 2 + Math.abs(Math.sin(r)) * size / 2, hh = Math.abs(Math.sin(r)) * tw / 2 + Math.abs(Math.cos(r)) * size / 2, bb = [cx - hw, cy - hh, cx + hw, cy + hh];
+      if (placed.some(q => bb[0] < q[2] && q[0] < bb[2] && bb[1] < q[3] && q[1] < bb[3])) continue; placed.push(bb);
+      o.push('<text x="' + cx + '" y="' + cy + '" font-size="' + size.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" fill="' + P.text + '" font-family="Arial, Helvetica, sans-serif" font-style="italic" letter-spacing=".04em" transform="rotate(' + deg.toFixed(1) + ' ' + cx + ' ' + cy + ')">' + esc(x.t) + '</text>'); }
+  }
+  // an emergency access lane is often too short to hold its name: a red callout beside it, inside the site, and a gate
+  // bar where it meets the lot line
+  for (const e of els.filter(x => x.kind === 'drive' && x.emergency)) { const r = S.outline(e), c = S.centroid(r), sc = S.centroid(ring), dx = sc[0] - c[0], dy = sc[1] - c[1], L = Math.hypot(dx, dy) || 1, at = [c[0] + dx / L * 45, c[1] + dy / L * 45];
+    const edge = r.filter(q => ring.some((a, i) => S.segDist(q, a, ring[(i + 1) % ring.length]) < 1)); if (edge.length >= 2) o.push('<line x1="' + X(edge[0][0]) + '" y1="' + Y(edge[0][1]) + '" x2="' + X(edge[1][0]) + '" y2="' + Y(edge[1][1]) + '" stroke="#c0392b" stroke-width="' + lw(2) + '"/>');
+    { const lx = Math.min(Math.max(+X(at[0]), 62), px - 62), ly = +Y(at[1]); if (Math.hypot(lx - +X(c[0]), ly - +Y(c[1])) > 10) o.push('<line x1="' + X(c[0]) + '" y1="' + Y(c[1]) + '" x2="' + lx.toFixed(1) + '" y2="' + (ly + (ly > +Y(c[1]) ? -4 : 4)).toFixed(1) + '" stroke="#c0392b" stroke-width="' + lw(0.6) + '"/>'); } // (a leader from the callout to its lane: the callout moves in from the edge and away from it)
+    o.push('<text x="' + Math.min(Math.max(+X(at[0]), 62), px - 62).toFixed(1) + '" y="' + Y(at[1]) + '" font-size="7" text-anchor="middle" dominant-baseline="middle" fill="#c0392b" font-weight="700" font-family="Arial, Helvetica, sans-serif" paint-order="stroke" stroke="#ffffff" stroke-width="2">EMERGENCY ACCESS (GATED)</text>'); }
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + px + ' ' + (H * k).toFixed(0) + '" width="' + px + '" height="' + (H * k).toFixed(0) + '">' + o.join('') + '</svg>';
+  return { svg, scale: k, box, height: H * k, turn };
+}
+
+// ---------- the sheet ----------
+export const SCALES = [10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 600, 800, 1000];
+const SIZES = { tabloid: { w: 16.5, h: 10.5, label: '11" × 17"' }, archd: { w: 35.5, h: 23.5, label: '24" × 36" (ARCH D)' } };
+const DPI = 96;
+
+// rows for the tables: land use, program and parking
+export function sheetData(plan) {
+  const m = G.metrics(plan), prog = S.normalizeProgram(plan.program), els = G.effective(plan).elements || [], ac = v => (v / 43560).toFixed(2);
+  const land = [['Gross site area', m.acres.toFixed(2) + ' ac', f0(m.siteSf) + ' sf']];
+  const parts = S.partsOf(plan, false), named = parts.some(p => p.name), nameOf = z => (z.zone != null ? parts.find(p => p.i === z.zone) : null)?.name; // (a zone with a name of its own goes by it)
+  const row = (t, a) => [t, a.toFixed(2) + ' ac', (a * 43560 / m.siteSf * 100).toFixed(1) + '%'], Zs = plan.zones || [], done = new Set();
+  for (const z of Zs) if (Zs.length > 1 && !done.has(z)) { const sec = z.section ? Zs.filter(q => q.section && q.zone === z.zone) : [z]; sec.forEach(q => done.add(q)); const t = q => nameOf(q) ? nameOf(q) + ' — ' + (S.PART_WORD[q.use] || q.name) : q.name;
+    if (sec.length > 1) land.push(row(t(z).replace(/ · Section \d+$/, '') + ' — ' + sec.length + ' sections', sec.reduce((a, q) => a + q.acres, 0)), ...sec.sort((a, b) => a.section - b.section).map(q => row('  · Section ' + q.section, q.acres))); else land.push(row(t(z), z.acres)); } // (a part in several pods: its total, then each section)
+  land.push(['Building footprint (all uses)', f0(m.footprint) + ' sf', (m.coverage * 100).toFixed(1) + '%'], ['Impervious (buildings + paving)', ac(m.impervious * m.siteSf) + ' ac', (m.impervious * 100).toFixed(1) + '%']);
+  const flood = els.filter(e => e.guard === 'flood').reduce((t, e) => t + S.elArea(e), 0), ease = m.keepout - flood; // (a Waller conservative case's flood reserve is its own line)
+  if (ease > 0.5) land.push(['Easement / no-build (drawn)', ac(ease) + ' ac', (ease / m.siteSf * 100).toFixed(1) + '%']);
+  if (flood) land.push(['Flood reserve (conservative case)', ac(flood) + ' ac', (flood / m.siteSf * 100).toFixed(1) + '%']);
+  if (m.pond) land.push(['Detention / pond', ac(m.pond) + ' ac', (m.pond / m.siteSf * 100).toFixed(1) + '%']);
+  land.push(['Landscape / open space', ac(m.green * m.siteSf) + ' ac', (m.green * 100).toFixed(1) + '%'], ['Floor area / FAR', f0(m.gfa) + ' sf', m.far.toFixed(2)]);
+  if (m.units) land.push(['Dwelling units / gross density', m.units + ' du', (m.units / m.acres).toFixed(1) + ' du/ac']);
+  // program: buildings grouped by use (and by part, when the parts have names: "Beacon Hill Market — Retail — 2 bldgs")
+  const groups = new Map(), po = named ? S.partOfPiece(plan, parts) : null, zoneOf = e => po ? po(e) : null; // (as Numbers counts them: a pad with the shops it stands among)
+  for (const e of els.filter(x => x.kind === 'building')) {
+    const use = S.USES[e.use] ? e.use : prog.use, pt = zoneOf(e)?.name || (named && !prog.zones ? parts[0].name : '') || '', key = pt + '|' + use, g = groups.get(key) || { use, pt, n: 0, sf: 0, floors: new Set(), units: 0, names: [] };
+    g.n++; g.sf += S.gfaOf(e); g.floors.add(e.floors || 1); g.names.push(e.name || ''); g.units += e.units ?? (use === 'multifamily' ? Math.floor(S.gfaOf(e) * 0.85 / prog.unitSf) : 0); groups.set(key, g);
+  }
+  const program = [...groups.values()].map(g => [(g.pt ? g.pt + ' — ' : '') + S.useLabel(g.use, prog) + (g.n > 1 ? ' — ' + g.n + ' bldgs' : g.names[0] ? ' — ' + g.names[0] : ''), (g.units ? g.units + ' du · ' : '') + f0(g.sf) + ' sf', [...g.floors].join('/') ]);
+  const parking = [['Surface stalls (counted on plan)', f0(m.stalls)], ...(m.garages ? [['Garage spaces', f0(m.garages)]] : []), ...(m.deck ? [[(els.some(e => e.kind === 'garage') ? 'Parking garage' : 'Podium parking') + ' spaces', f0(m.deck)]] : []), ...(m.ada ? [['Accessible (ADA) stalls, in the total', m.ada + ' (' + Math.ceil(m.ada / 6) + ' van)']] : []), ['Total provided', f0(m.spaces)], ['Needed at the ratios used', f0(m.required)]];
+  return { m, land, program, parking };
+}
+
+// north arrow (pointing to true north on a drawing turned by `turn` degrees) and a scale bar for 1" = s feet
+export function northArrow(turn, size = 46) { // the drawing is turned `turn` degrees, so north is too
+  return '<svg width="' + size + '" height="' + size + '" viewBox="-25 -25 50 50"><g transform="rotate(' + turn.toFixed(1) + ')"><circle r="21" fill="#fff" stroke="#1b1e1f" stroke-width="1.2"/><path d="M0 -19 L7 9 L0 4 L-7 9 Z" fill="#1b1e1f"/><text y="-23" text-anchor="middle" font-size="9" font-weight="700" font-family="Arial">N</text></g></svg>';
+}
+export function scaleBar(s) {
+  const segs = [0, s / 2, s, 2 * s], w = 2 * DPI; // 2 inches = 2s feet
+  return '<svg width="' + (w + 30) + '" height="30" viewBox="0 0 ' + (w + 30) + ' 30">' + segs.slice(0, -1).map((v, i) => { const x0 = v / (2 * s) * w, x1 = segs[i + 1] / (2 * s) * w; return '<rect x="' + (5 + x0) + '" y="6" width="' + (x1 - x0) + '" height="6" fill="' + (i % 2 ? '#fff' : '#1b1e1f') + '" stroke="#1b1e1f" stroke-width=".8"/>'; }).join('') +
+    segs.map(v => '<text x="' + (5 + v / (2 * s) * w) + '" y="24" font-size="8" text-anchor="middle" font-family="Arial">' + f0(v) + "'</text>").join('') + '</svg>';
+}
+
+// the legend's rows for what's on the plan (a swatch and a label each), and the uses its buildings have
+export function legendHTML(plan, m = S.metrics(plan)) {
+  const usedUses = new Set((plan.elements || []).filter(e => e.kind === 'building').map(e => S.USES[e.use] ? e.use : S.normalizeProgram(plan.program).use));
+  const html = LEGEND.filter(([, k]) => k === 'trash' || k === 'sign' || k === 'court' || k === 'keepout' || k === 'fence' || k === 'foodtruck' || k === 'canopy' || k === 'tanks' ? (plan.elements || []).some(e => e.kind === k) : k === 'ada' ? m.ada > 0 : PALETTE.use[k] ? usedUses.has(k) || (k === 'retail' && ['restaurant', 'office', 'medical', 'hotel', 'church', 'other'].some(x => usedUses.has(x))) : true).map(([label, k]) => {
+    const sw = k === 'tree' ? '<svg width="16" height="12"><circle cx="8" cy="6" r="5" fill="' + PALETTE.tree + '" stroke="' + PALETTE.treeLine + '"/></svg>' : k === 'boundary' ? '<svg width="16" height="12"><line x1="0" y1="6" x2="16" y2="6" stroke="' + PALETTE.boundary + '" stroke-width="2" stroke-dasharray="6 2 1 2"/></svg>' : k === 'setback' ? '<svg width="16" height="12"><line x1="0" y1="6" x2="16" y2="6" stroke="' + PALETTE.setback + '" stroke-width="1.2" stroke-dasharray="3 2"/></svg>' :
+      k === 'fence' ? '<svg width="16" height="12"><line x1="0" y1="6" x2="16" y2="6" stroke="' + PALETTE.fence + '" stroke-width="1.6"/></svg>' : k === 'keepout' ? '<svg width="16" height="12"><rect x=".5" y=".5" width="15" height="11" fill="none" stroke="' + PALETTE.keepout + '" stroke-dasharray="3 1.5"/><path d="M0 12L12 0M4 12L16 0M-4 8L4 0" stroke="' + PALETTE.keepout + '" stroke-width=".8"/></svg>' :
+      '<i style="background:' + (PALETTE.use[k] || { canopy: PALETTE.canopy, tanks: PALETTE.tanks, paving: PALETTE.paving, pond: PALETTE.pond, green: PALETTE.green, trash: PALETTE.trash, ada: PALETTE.ada, foodtruck: PALETTE.foodtruck, sign: PALETTE.sign, court: S.SPORTS.tennis.surf }[k]) + '"></i>';
+    return '<div class="lg">' + sw + '<span>' + esc(label) + '</span></div>'; }).join('');
+  return { html, usedUses };
+}
+
+// the whole sheet as an HTML document, sized for the PDF renderer (api/pdf, sheet: 'tabloid' | 'archd').
+// d: { plan, project, parcels: [{ label, owner, propId, acres }], facts: [note strings], vicinity (HTML), address, county,
+//      date, size, preparedFor }
+export function sheetHTML(d) {
+  const size = SIZES[d.size] ? d.size : 'tabloid', Z = SIZES[size], big = size === 'archd', u = big ? 2 : 1;
+  const plan = d.plan, project = d.project || {}, { m, land, program, parking } = sheetData(plan);
+  // the drawing area and the largest standard scale it fits at
+  const side = 3.4 * u, bottom = 2.25 * u, areaW = (Z.w - side - 0.15) * DPI, areaH = (Z.h - bottom - 0.15) * DPI;
+  const turn = streetDown(plan), t = turned(plan, turn), xs = t.ring.map(p => p[0]), ys = t.ring.map(p => p[1]), wf = Math.max(...xs) - Math.min(...xs) + 120, hf = Math.max(...ys) - Math.min(...ys) + 120;
+  const scale = SCALES.find(s => wf * DPI / s <= areaW && hf * DPI / s <= areaH) || Math.ceil(Math.max(wf * DPI / areaW, hf * DPI / areaH) / 100) * 100;
+  const drawing = planSVG(G.effective(plan), { k: DPI / scale, pad: 60, turn }), guard = d.guard && G.isOn(plan) ? d.guard : null; // (the scenario's setback lines and reserves)
+  const tbl = (title, head, rows, cls = '') => '<div class="tb ' + cls + '"><div class="th">' + esc(title) + '</div><table>' + (head ? '<tr>' + head.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr>' : '') + rows.map(r => '<tr>' + r.map((c, i) => '<td' + (i ? ' class="r"' : '') + '>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</table></div>';
+  const { html: legend, usedUses } = legendHTML(plan, m);
+  const glance = [[f0(m.gfa) + ' SF', 'Building floor area'], ...(m.fuel?.mpds ? [[f0(m.fuel.positions) + ' Positions', m.fuel.mpds + ' pumps · ' + f0(m.fuel.canopySf) + ' sf canopy']] : []), ...(m.storage ? [[f0(m.storage.nrsf) + ' NRSF', 'Rentable storage · ~' + f0(m.storage.units) + ' units']] : []), ...(m.foodtrucks?.trucks ? [[m.foodtrucks.trucks + ' Trucks', 'Food truck stalls · ~' + f0(m.foodtrucks.seats) + ' seats']] : []), ...(m.units ? [[m.units + (S.normalizeProgram(plan.program).homeKind ? ' Homes' : ' Units'), S.normalizeProgram(plan.program).homeKind ? 'Home lots' : 'Homes']] : []), [f0(m.spaces) + ' Spaces', 'Parking' + (m.garages ? ' incl. ' + m.garages + ' garages' : '') + (m.driveways ? (m.garages ? ', ' : ' incl. ') + m.driveways + ' driveways' : '')], [m.acres.toFixed(2) + ' AC', 'Site']];
+  const code = plan.params?.code, own = plan.params?.streetRules && Object.keys(plan.params.streetRules).length, said = (d.notes || []).find(n => /^Street rules:/.test(n));
+  const rl = code ? [rulesLine(code) + (own ? ' Some values as set for this plan.' : '')] : said ? [said] : plan.recipe?.net ? [own ? 'Street rules: as set for this plan; no rule sheet for this place yet.' : rulesLine(null)] : [], notes = rl.concat((d.facts || []).concat(d.notes || []).filter(n => !/^Street rules:/.test(n))).slice(0, 12); // (which street rules the plan follows: a place's rule sheet, never a compliance claim)
+  const uses = [...usedUses].map(x => S.useLabel(x, plan.program)).join(' · ');
+  const cm = S.normalizeProgram(plan.program).community; // the community's name: on the title block and the page's title
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc((cm ? cm + ' · ' : '') + (project.name || 'Site plan')) + ' — Conceptual site plan</title><style>' +
+    '@page{size:' + (Z.w + 0.5) + 'in ' + (Z.h + 0.5) + 'in;margin:0.25in}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#1b1e1f;font-size:' + (7 * u) + 'pt}' +
+    '.sheet{width:' + Z.w + 'in;height:' + Z.h + 'in;border:' + (1.5 * u) + 'px solid #1b1e1f;display:grid;grid-template-columns:1fr ' + side + 'in;grid-template-rows:1fr ' + bottom + 'in}' +
+    '.sheet{overflow:hidden}.draw{grid-column:1;grid-row:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;border-right:1px solid #1b1e1f;border-bottom:1px solid #1b1e1f}' +
+    '.draw .na{position:absolute;top:' + (0.15 * u) + 'in;left:' + (0.15 * u) + 'in;text-align:center;font-size:' + (7 * u) + 'pt;font-weight:700}.draw .sc{position:absolute;bottom:' + (0.1 * u) + 'in;right:' + (0.15 * u) + 'in;text-align:right;font-size:' + (6.5 * u) + 'pt}' +
+    '.side{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;overflow:hidden}.box{border-bottom:1px solid #1b1e1f;padding:' + (0.08 * u) + 'in ' + (0.1 * u) + 'in}.k{font-size:' + (5.5 * u) + 'pt;letter-spacing:.18em;text-transform:uppercase;color:#4d5457;margin-bottom:2px}' +
+    '.pn{font-size:' + (15 * u) + 'pt;font-weight:800;letter-spacing:.02em;text-transform:uppercase;line-height:1.05}.st{font-size:' + (12 * u) + 'pt;font-weight:800;text-transform:uppercase}.sm{font-size:' + (6.5 * u) + 'pt;line-height:1.35}' +
+    '.gl{display:grid;gap:' + (3 * u) + 'px}.gl b{display:block;font-size:' + (12 * u) + 'pt;color:#0b7a5f}.gl span{font-size:' + (5.5 * u) + 'pt;text-transform:uppercase;letter-spacing:.1em;color:#4d5457}' +
+    '.warn{border:1px solid #c0392b;color:#c0392b;padding:' + (4 * u) + 'px;font-size:' + (6 * u) + 'pt;line-height:1.3}.vic{height:' + (1.9 * u) + 'in;overflow:hidden}.vic svg,.vic img{max-width:100%}' +
+    '.bottom{grid-column:1;grid-row:2;overflow:hidden;display:grid;grid-template-columns:1.1fr 1.1fr 1fr 1.25fr .9fr;gap:0;border-right:1px solid #1b1e1f}.tb{padding:' + (0.06 * u) + 'in ' + (0.08 * u) + 'in;border-right:1px solid #1b1e1f;overflow:hidden}.tb:last-child{border-right:0}' +
+    '.th{font-weight:800;font-size:' + (6.5 * u) + 'pt;letter-spacing:.14em;text-transform:uppercase;background:#1b1e1f;color:#fff;padding:2px 4px;margin-bottom:3px}table{width:100%;border-collapse:collapse;font-size:' + (6 * u) + 'pt}td,th{padding:1px 3px;border-bottom:.5px solid #c9ccc9;text-align:left;vertical-align:top}th{font-size:' + (5.5 * u) + 'pt;color:#4d5457}.r{text-align:right;white-space:nowrap}' +
+    'ol{margin:0;padding-left:' + (12 * u) + 'px;font-size:' + (6 * u) + 'pt;line-height:1.3}.lg{display:flex;align-items:center;gap:5px;font-size:' + (6 * u) + 'pt;margin:1px 0}.lg i{display:inline-block;width:16px;height:10px;border:.5px solid #4a3a2c}' +
+    '.sn{font-size:' + (26 * u) + 'pt;font-weight:800;text-align:right}.cm{font-size:' + (13 * u) + 'pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}' + (guard ? '.draw .glab{position:absolute;top:' + (0.12 * u) + 'in;left:50%;transform:translateX(-50%);max-width:70%;text-align:center;border:' + (1.2 * u) + 'px solid #c0392b;background:#fff;color:#c0392b;font-weight:800;font-size:' + (7 * u) + 'pt;letter-spacing:.04em;padding:' + (3 * u) + 'px ' + (8 * u) + 'px}' : '') + '</style></head><body><div class="sheet">' +
+    '<div class="draw">' + drawing.svg + (guard ? '<div class="glab">' + esc(G.GRAPHIC_LABEL) + '</div>' : '') + '<div class="na">' + northArrow(turn, 54 * u) + '</div><div class="sc">' + scaleBar(scale) + '<div>SCALE: 1" = ' + scale + "' ON " + Z.label + '</div></div></div>' +
+    '<div class="side">' +
+      (d.vicinity ? '<div class="box"><div class="k">Vicinity map</div><div class="vic">' + d.vicinity + '</div></div>' : '') +
+      '<div class="box"><div class="k">Project</div><div class="pn">' + esc(project.name || 'Site plan') + '</div><div class="sm">' + esc(uses) + '<br>' + m.acres.toFixed(2) + ' acres' + (d.address ? ' · ' + esc(d.address) : '') + (d.county ? '<br>' + esc(d.county) : '') + ((d.parcels || []).length ? '<br>' + (d.parcels.length > 1 ? d.parcels.length + ' parcels' : 'Parcel ' + esc(d.parcels[0].propId || '')) : '') + '</div></div>' +
+      '<div class="box"><div class="k">Sheet title</div>' + (cm ? '<div class="cm">' + esc(cm) + '</div>' : '') + '<div class="st">Conceptual site plan</div><div class="sm">' + esc(d.planName || '') + ' · Land use · Circulation · Program</div></div>' +
+      '<div class="box"><div class="k">Program at a glance</div><div class="gl">' + glance.map(([a, b]) => '<div><b>' + esc(a) + '</b><span>' + esc(b) + '</span></div>').join('') + '</div></div>' +
+      '<div class="box"><div class="k">Basis of design</div><div class="sm">Boundary from ' + esc(d.boundarySource || 'county appraisal district parcel outlines') + '. Building sizes, unit and stall counts measured from this plan. Areas computed from plan geometry.</div></div>' +
+      '<div class="box"><div class="warn">' + (guard ? '<b>' + esc(G.LABEL) + '</b>' : '<b>CONCEPTUAL — FOR FEASIBILITY ONLY.</b> Not for construction, permitting, platting or regulatory submittal. Not prepared or sealed by a licensed engineer, architect or surveyor. Drainage, utilities, traffic, environmental and title matters are not resolved and may change yield and layout.') + '</div></div>' +
+      '<div class="box sm">Prepared for ' + esc(d.preparedFor || '______________________') + '<br>Prepared by ' + esc(d.preparedBy || 'Real Estate Intelligence') + '<br>Date ' + esc(d.date || '') + '</div>' +
+      '<div class="box" style="flex:1;display:flex;align-items:flex-end;justify-content:flex-end;border-bottom:0"><div class="sn">SP-1</div></div>' +
+    '</div>' +
+    '<div class="bottom">' +
+      tbl('Site data & land use', null, land) +
+      tbl('Development program & parking', ['Use', 'Size', 'Floors'], program.concat([['', '', '']]).concat(parking.map(([a, b]) => [a, b, '']))) +
+      tbl('Parcels', ['Address', 'Owner', 'Acres'], (d.parcels || []).slice(0, 12).map(p => [p.label || '', p.owner || '', p.acres ? p.acres.toFixed(2) : ''])) +
+      '<div class="tb"><div class="th">Notes — constraints & due diligence</div>' + (notes.length ? '<ol>' + notes.map(n => '<li>' + esc(n) + '</li>').join('') + '</ol>' : '<div class="sm">No site facts were available.</div>') + '</div>' +
+      '<div class="tb"><div class="th">Legend</div>' + legend + '</div>' +
+    '</div></div>' + (guard ? guardPage(plan, guard, Z, u, project, d) : '') + renderPages(d.renders, Z, u) + '</body></html>';
+}
+// a Waller plan's second sheet (SP-1A): the concept label, the scenarios as a range, the land-use reconciliation with each
+// row's basis and classification, the unresolved risks and the section 10 checklist. g: { scen: { A, B, C } } (yields)
+export function guardPage(plan, g, Z, u, project = {}, d = {}) {
+  const T = G.landTable(plan), R = G.risks(plan), C = G.checklist(plan), st = G.settingsOf(plan), sc = g.scen || {}, ks = ['A', 'B', 'C'], yl = ks.map(k => sc[k]).filter(Boolean);
+  const cell = (y, k, f) => y ? f(y[k], y) : '—', ac = v => v ? (v / 43560).toFixed(2) + ' ac' : '—', n = v => v ? f0(v) : '—';
+  const th = t => '<div class="th">' + esc(t) + '</div>', tag = c => '<span class="cl">' + esc(c) + '</span>';
+  const land = '<table><tr><th>Metric</th><th class="r">Acres</th><th class="r">%</th><th>Basis / status</th><th>Classification</th></tr>' + T.rows.map(r => '<tr' + (r.total || r.key === 'gross' ? ' class="tot"' : '') + '><td>' + esc(r.label) + '</td><td class="r">' + Math.abs(r.acres).toFixed(2) + '</td><td class="r">' + (Math.abs(r.pct) * 100).toFixed(1) + '%</td><td>' + esc(r.basis) + '</td><td>' + tag(r.cls) + '</td></tr>').join('') +
+    T.qty.map(q => '<tr><td>' + esc(q.label) + '</td><td class="r" colspan="2">' + esc(q.qty) + '</td><td>' + esc(q.basis) + '</td><td>' + tag(q.cls) + '</td></tr>').join('') + '</table>';
+  const scen = '<table><tr><th></th>' + ks.map(k => '<th class="r">' + k + ' · ' + esc(G.SCENARIOS[k].name) + (k === st.scenario ? ' (drawn)' : '') + '</th>').join('') + '</tr>' +
+    [['Building sf', 'buildingSf', n], ['Leasable sf', 'leasableSf', n], ['Units', 'units', n], ['Lots', 'lots', n], ['Parking required', 'parkingRequired', n], ['Parking provided', 'parkingProvided', n], ['Impervious', 'imperviousPct', v => v.toFixed(1) + '%'], ['Detention', 'detentionAcFt', v => v ? v.toFixed(2) + ' ac-ft' : '—'], ['Pond footprint', 'detentionFootprintSf', ac]]
+      .map(([l, k, f]) => '<tr><td>' + l + '</td>' + ks.map(x => '<td class="r">' + cell(sc[x], k, f) + '</td>').join('') + '</tr>').join('') + '</table>' +
+    '<p class="sm"><b>Leasable ' + esc(G.rangeText(G.range(yl, 'leasableSf'), ' sf')) + '</b> across the scenarios: a range, not one yield, while survey, title, flood, outfall, utility and access items are unresolved. A: ' + esc(G.SCENARIOS.A.what) + ' B: ' + esc(G.SCENARIOS.B.what) + ' C: ' + esc(G.SCENARIOS.C.what) + '</p>';
+  const risks = '<ol>' + R.map(r => '<li><b>' + esc(r.title) + '</b>' + (r.stop ? ' <b class="stop">STOP CONDITION</b>' : '') + ' — ' + esc(r.why) + ' <span class="cl">' + esc(r.cls) + '</span></li>').join('') + '</ol>';
+  const list = '<table><tr><th>Required plan content</th><th>Status</th><th>Note</th></tr>' + C.map(c => '<tr><td>' + esc(c.item) + '</td><td class="' + c.status + '">' + (c.status === 'na' ? 'N/A' : c.status === 'shown' ? 'Shown' : 'UNRESOLVED') + '</td><td>' + esc(c.note) + '</td></tr>').join('') + '</table>';
+  return '<style>.gpage{page-break-before:always;break-before:page;width:' + Z.w + 'in;height:' + Z.h + 'in;border:' + (1.5 * u) + 'px solid #1b1e1f;display:grid;grid-template-columns:1.25fr 1fr;grid-template-rows:auto 1fr auto;gap:0;overflow:hidden;font-size:' + (6.5 * u) + 'pt}' +
+    '.gpage .gh{grid-column:1 / span 2;border-bottom:1px solid #1b1e1f;padding:' + (0.08 * u) + 'in ' + (0.12 * u) + 'in;display:flex;justify-content:space-between;gap:' + (12 * u) + 'pt;align-items:center}.gpage .gh .lab{max-width:55%;border:' + (1.2 * u) + 'px solid #c0392b;color:#c0392b;font-weight:800;padding:' + (4 * u) + 'px ' + (8 * u) + 'px;font-size:' + (7 * u) + 'pt;line-height:1.3}' +
+    '.gpage .gc{padding:' + (0.08 * u) + 'in ' + (0.12 * u) + 'in;overflow:hidden;border-right:1px solid #1b1e1f}.gpage .gc:last-child{border-right:0}.gpage .gf{grid-column:1 / span 2;border-top:1px solid #1b1e1f;padding:' + (0.06 * u) + 'in ' + (0.12 * u) + 'in;display:flex;justify-content:space-between;align-items:flex-end;gap:' + (12 * u) + 'pt}' +
+    '.gpage .th{margin-top:' + (5 * u) + 'px}.gpage tr.tot td{font-weight:800;border-top:1px solid #1b1e1f}.gpage .cl{font-size:' + (5 * u) + 'pt;letter-spacing:.06em;color:#4d5457;white-space:nowrap}.gpage .stop{color:#c0392b}.gpage td.unresolved{color:#c0392b;font-weight:700}.gpage ol li{margin-bottom:2px}.gpage .sm{line-height:1.35}</style>' +
+    '<div class="gpage"><div class="gh"><div><div class="k">Waller guardrails · ' + esc(G.WALLER.name) + ' · v' + esc(G.WALLER.version) + '</div><div class="pn">' + esc(project.name || 'Site plan') + '</div><div class="sm">' + esc(d.planName || '') + ' · laid out as ' + esc(st.scenario + ' (' + G.SCENARIOS[st.scenario].name + ')') + ' · ' + esc(plan.jur?.reason || '') + '</div></div><div class="lab">' + esc(G.LABEL) + '</div></div>' +
+    '<div class="gc">' + th('Land-use reconciliation') + land + th('Yield scenarios') + scen + '</div>' +
+    '<div class="gc">' + th('Unresolved risks') + risks + th('Required plan content (section 10)') + list + '</div>' +
+    '<div class="gf"><div class="sm">Classifications: VERIFIED REQUIREMENT (current ordinance, adopted criterion, written agency direction or approval) · OWNER GUARDRAIL (the owner’s standard, more conservative than the minimum) · ENGINEERING ASSUMPTION (to be validated by the responsible licensed professional) · UNVERIFIED (unknown or awaiting confirmation; no compliance is claimed).<br>Prepared by ' + esc(d.preparedBy || 'Real Estate Intelligence') + ' · ' + esc(d.date || '') + '</div><div class="sn">SP-1A</div></div></div>';
+}
+// d.renders: [{ src (data URL), caption }], each on a sheet of its own after the plan: the picture as large as the sheet
+// allows, its caption, and the same conceptual-only line, since the AI invented the details
+export function renderPages(renders, Z, u) {
+  const list = (Array.isArray(renders) ? renders : []).filter(r => typeof r?.src === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(r.src)).slice(0, 4);
+  if (!list.length) return '';
+  return '<style>.rpage{page-break-before:always;break-before:page;width:' + Z.w + 'in;height:' + Z.h + 'in;border:' + (1.5 * u) + 'px solid #1b1e1f;display:flex;flex-direction:column;overflow:hidden}.rpage .rimg{flex:1;min-height:0;position:relative;background:#111}.rpage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}' +
+    '.rpage .rcap{display:flex;justify-content:space-between;align-items:baseline;gap:' + (12 * u) + 'pt;padding:' + (6 * u) + 'pt ' + (10 * u) + 'pt;border-top:' + u + 'px solid #1b1e1f;font-size:' + (8 * u) + 'pt}.rpage .rcap b{font-size:' + (10 * u) + 'pt}.rpage .rcap i{color:#6b7174;font-style:normal}.rpage .rcap .sn{font-size:' + (18 * u) + 'pt}</style>' +
+    list.map((r, i) => '<div class="rpage"><div class="rimg"><img src="' + r.src + '" alt="Rendering"></div><div class="rcap"><div><b>Conceptual rendering' + (r.caption ? ' — ' + esc(r.caption) : '') + '</b><br><i>AI-generated concept illustration from the plan’s massing: building placement, shapes and heights follow the plan; materials, windows, landscaping, vehicles and surroundings are illustrative and not a design. Not for construction, permitting or regulatory submittal.</i></div><div class="sn">SP-' + (i + 2) + '</div></div></div>').join('');
+}
