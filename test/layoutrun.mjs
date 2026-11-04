@@ -80,7 +80,8 @@ ok('a clean layout passes what it can measure, and says what it cannot', () => {
   for (const id of ['geometry.valid', 'site.containment', 'site.setbacks.buildings', 'overlap.level-aware', 'access.entrance', 'access.connectivity', 'access.buildings', 'parking.count', 'parking.geometry', 'program.u1']) assert.equal(st(r, id), 'pass', id + ' ' + JSON.stringify(r.checks.find(c => c.id === id)));
   assert.equal(r.quantities.parking.surface, 26); assert.equal(r.quantities.parking.required, 24); // 6,000 sf at 4 a 1,000
   assert.equal(r.quantities.totals.gfa, 6000);
-  for (const id of ['eng.detention', 'eng.turning', 'eng.fire-route']) assert.equal(st(r, id), 'unknown'); // never passed
+  for (const id of ['eng.detention', 'eng.fire-route']) assert.equal(st(r, id), 'unknown'); // never passed
+  for (const id of ['eng.turning.car', 'access.fire-width', 'access.dead-end']) assert.ok(['pass', 'n/a'].includes(st(r, id)), id + ' ' + JSON.stringify(r.checks.find(c => c.id === id))); // measured on the drawing
   assert.equal(r.status, 'pass'); assert.ok(r.restsOnAssumptions.includes('parking.count'));
 });
 ok('a building past the property line fails containment (concave site: inside the box, outside the L)', () => {

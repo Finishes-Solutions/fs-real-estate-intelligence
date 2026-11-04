@@ -264,7 +264,27 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    the garage plan (lib/layoutcheck.mjs podiumGrid) from the declared levels and the drawn tower outline. Bench MF-tower:
    300 units, 490 / 480 spaces (327 podium, 163 surface). Still: ramp slope and clear heights, structure and ventilation
    aren't designed, and the generator's courtyard / loop layouts are not offered for towers.
-7. Turning movements with a declared design vehicle; detention from topography (needs engineering inputs).
+7. Done Nov 4 (turning, planning level): the brief declares `designVehicles` (assumptions with sources: P, SU-30 and
+   WB-67 from the AASHTO Green Book 2018 Table 2-2a, the fire apparatus at 30 ft inside / 50 ft outside, 20 ft clear,
+   IFC 503.2.1 / 503.2.4 / D103). lib/turning.mjs finds the turn sites on the drawing (every bend of a drive along a
+   path, every inside corner where two square drives meet at right angles; a turn and its reverse are one site) and a
+   turn passes when some centre lets the vehicle's band Ri..Ro, swept through the turn, stay on the paving as drawn
+   (within 1 ft), the band developing over the first and last quarter of the turn (the inner wheels and a trailer cut in
+   gradually, roughly as AASHTO's templates do); the near 24 ft of the street beside a street edge counts as paving. The
+   validator (lib/layoutcheck.mjs): `access.fire-width` (hard: every two-way drive 20 ft clear; a one-way drive-thru lane
+   isn't a fire lane), `access.dead-end` (hard: a dead end over 150 ft on the fire route without a turnaround, IFC
+   503.2.5 / D103.4; the network includes the aisles, but a parking aisle stopping at a row's end isn't reported),
+   `eng.turning.fire` (the fire route: drives that aren't parking aisles or one-way lanes; n/a where every building is
+   within 150 ft of a street), `eng.turning.car` (every turn), `eng.turning.service` (SU-30 on service drives) and
+   `eng.turning.truck` (WB-67 on the truck court and the drives into it), all non-hard. The run rounds a too-tight
+   corner with a curb return (lib/layoutrun.mjs curbReturns: radius 25-60 ft, out to the street where it meets one;
+   a parking row in the way gives up whole stalls at its end, never a third of it, and only while every check holds).
+   Garages (lib/siteplan.mjs garagePlan rampSpec, GARAGE_H): 8 ft 2 in clear on the ground level (2010 ADA 502.5), 7 ft
+   above, floor to floor 11 / 10 ft; the ramp a speed ramp at up to 16% with 12 ft transitions at 8% (or a parking ramp
+   at 6.67% where long enough), its length from the rise; `eng.garage-ramp` (non-hard) checks it fits, and the sheet
+   labels the ramp. Still: no swept-path software (a multi-point turn is never assumed), fire route distance
+   (`eng.fire-route`) not measured, garage structure / ventilation / drainage not designed, detention from topography
+   needs engineering inputs.
 8. Done Nov 3 (two ways in apart). With two ways in needed (`program.entrances` 2: over 200 apartments or 30 homes,
    "at least N" counted at what the land holds), the search lays a second driveway with the layout at the far end of
    the first aisle (lib/sitelayout.mjs attempt, `entry.two`), and also tries the main entry near either end (0.18 / 0.82
