@@ -174,8 +174,8 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
 
 ## 9. Next tasks (in order)
 
-1. Done for Build (Nov 3). Still: "More layouts", scenarios and the MCP `site_plan` tool through `runPlan`; the
-   quantity-meaning choice in Build; options that differ only by mirroring (the Hockley run's first two).
+1. Done (Nov 3): Build, "More layouts", the scenario layouts and the MCP `site_plan` tool all go through `runPlan`
+   (falling back to the plain engine when a run can't be made). Still: the quantity-meaning choice in Build.
 2. After trimming to an exact count, re-fit the parking (refit with the kept buildings pinned) so no empty bay is left.
 3. Mid-rise: let shorter bars take fewer bays (min 3) or join bars; score over-parking as land waste.
 4. (Done Nov 3.) Courtyard: one continuous building (lib/sitegen.mjs courtyard1), in two shapes the grid tries — a
@@ -200,4 +200,14 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    300 units, 491 / 480 spaces (354 podium, 137 surface). Still: no drawn garage plan (ramps, columns, cores), and the
    generator's courtyard / loop layouts are not offered for towers.
 7. Turning movements with a declared design vehicle; detention from topography (needs engineering inputs).
-8. (Partly done: a third way in at the far end.) Main entry off-centre when two remote ways in are needed (on a 900 ft frontage a centred entry can't be 515 ft from another); the pond kept off the street frontage (Hockley's pond wedge took the corner a second entry needed); mirrored options with the same numbers.
+8. Done Nov 3 (two ways in apart). With two ways in needed (`program.entrances` 2: over 200 apartments or 30 homes,
+   "at least N" counted at what the land holds), the search lays a second driveway with the layout at the far end of
+   the first aisle (lib/sitelayout.mjs attempt, `entry.two`), and also tries the main entry near either end (0.18 / 0.82
+   of the frontage); one of the options keeps an off-centre entry that leaves a spot half the site's diagonal away. The
+   validator ranks the option that meets the spacing first (bench MF-garden-rot: 336 units passing, 372 with the warning
+   as option 2). Still: a 330 ft frontage can't meet it from one street (MF-townhomes) and the mixed-use pods don't try.
+9. A pond left in the land held for later (a compact first phase) moves beside the work it drains
+   (lib/layoutrun.mjs pondBesideWork), its old outline given back to the land round it.
+10. Exact floor areas: shop, office and warehouse boxes record the area drawn before their sides are stored at 0.01 ft;
+   the validator takes it while the outline agrees. The drawing's label still rounds the stored outline (250,001 sf).
+11. Anchored centers: the anchor at the size asked (validator `program.u1.anchor`) and the rest in shops.

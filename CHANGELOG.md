@@ -5,6 +5,16 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-03
 
+### 10:28 PM CT: Courtyards as one building, towers on parking podiums, anchored centres, two ways in far enough apart (74eef75, 3a68803, a0aff95, a089dd7, 17ac205, db23c2d, 9a0c02c, 477a3b5)
+- **Courtyard apartments are one continuous building**, a closed ring or a U open to the street, round a planted court with the pool; the clubhouse sits at the gateway and all the parking is outside. Before, they were loose bars with small stub buildings and a parking row inside the court. Hockley, 200 courtyard units: one ring, exactly 200, 320 spaces for 320 needed.
+- **A tower on a podium parks on its podium:** "tower on a podium, 8 stories, 300 apartments" now fits all 300, with the podium's parking floors counted stall by stall (491 spaces for 480 needed); before, it fit 194 because it planned surface parking for every apartment. The tower's outline shows dashed over its podium.
+- **Anchored shopping centres:** "a 40,000 sf anchor, 80,000 sf total" draws the anchor and 40,000 sf of shops beside it, not one 80,000 sf box; the check now fails a plan whose anchor isn't the size asked.
+- **Exact floor areas:** a 250,000 sf warehouse totals 250,000, not 250,001.
+- **Two ways in far enough apart:** where the fire code wants two entrances half the site's diagonal apart, the second is planned with the layout and the main entry moves off centre when needed; a layout that meets it goes first, with a bigger one that doesn't still offered (the rotated test site: 336 units passing, 372 with the warning).
+- **Ponds beside the buildings they drain**, not out in the land held for later.
+- **More layouts, scenario layouts and the agents' site plans** now come from the same engine and checks as Build.
+- Test sites: 14 of 15 now pass every check (was 13); only the wrap building remains unsupported. Full test suite passes.
+
 ### 7:09 PM CT: Cleaner layouts: exact counts without empty bays, ponds without spikes, a second way in found, courtyards as one building (this push)
 - **A number you give is exactly that, unless you've set Leftover land yourself.** "200 courtyard apartments" builds 200 and leaves the rest as future development; "as many as fit" still fills the site; choosing Fill under Settings › Leftover land still fills it.
 - **No empty paved blocks after an exact count:** the layout is drawn for the count first (exactly 120 garden apartments: 204 spaces for 192 needed, was 284; about a quarter less paving), and parking rows nothing uses are taken out.

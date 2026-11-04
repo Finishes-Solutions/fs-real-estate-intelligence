@@ -221,3 +221,13 @@ Branch `matthew/build-through-run-engine` (PR #76, open, not merged). PR #75 (Ha
 - **Done:** the editor's Build, re-solve and AI-revised layouts run through `runPlan` in the worker; studio apartment buildings (estimate template); a bare number in Build is exact unless Leftover land was chosen; validator checks for a second way in (hard), their spacing (warning), detention against the rule of thumb (always unknown), trail conflicts; run-layer repairs (courtyard wings joined, one amenity centre per 400 units, amenities nudged off buildings, exact counts by unit size for untemplated forms, pond spikes trimmed, unused parking pruned, a second/third way in found with the pond cut back); courtyards in two rows (lib/sitegen.mjs); options that differ.
 - **Evidence:** benchmark 13/15 (docs/bench/layout-bench-v2.md, .png); the full `npm test` passed (114/114 commands) on commit 0bc4541; the Hockley parcel (23737 FM 2920) driven through the real editor in Chrome (Build, layouts, Independent check, 3D massing) with no page errors.
 - **Next:** podium parking in the layout search (docs/LAYOUT-ENGINE.md §9 6b), wrap, the main entry off-centre for fire-code spacing on one frontage, a continuous courtyard building form, "More layouts" and scenarios through runPlan, the MCP site_plan tool through runPlan.
+
+### Update (2026-11-03, night): courtyards, podium towers, anchored centres, two ways in apart
+- Bench (scripts/layout-bench-v2.mjs): 14 of 15 top options pass every hard check (was 13), all replay identical. Only
+  the wrap building is unsupported.
+- Done: courtyard as one continuous building (ring or U); tower-on-podium parks on its podium (300 / 300 units);
+  anchored centre = anchor + shops (validator checks the anchor); exact floor areas land exactly; two ways in planned
+  with the layout, main entry off centre where needed; ponds in held land moved beside the work; More layouts,
+  scenarios and MCP site_plan through runPlan.
+- Next (docs/LAYOUT-ENGINE.md §9): wrap form; a narrow frontage's second way in (emergency access); garage plans for
+  podiums; mid-rise shorter bars; courtyard units from a reviewed template.
