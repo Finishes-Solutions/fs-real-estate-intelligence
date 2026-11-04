@@ -58,14 +58,14 @@ function usable(plan, o, what) {
     const lawn = o.elements.filter(e => e.kind === 'green' && e.name === 'Open lawn').reduce((s, e) => s + S.elArea(e), 0);
     assert.ok(lawn < 0.15 * m.siteSf, o.name + ': ' + Math.round(lawn / m.siteSf * 100) + '% open lawn');
     // curved where it should be (drives on arcs, an entry with curb returns), square where it reads cleaner (ponds), staggered buildings
-    if (!o.recipe?.gen) assert.ok(o.elements.some(e => e.kind === 'drive' && e.path && e.r > 0), o.name + ': curved drives'); // (the search's layouts; the generator's rows (recipe.gen) draw square aisle corners, as they do for an exact count)
-    if (!o.recipe?.gen) assert.ok(o.elements.some(e => e.name === 'Main entry' && e.poly?.length > 12), 'curb returns'); // (the generator's entry is a plain drive, as for an exact count; the run adds curb returns where a turn needs them)
+    assert.ok(o.elements.some(e => e.kind === 'drive' && e.path && e.r > 0), o.name + ': curved drives');
+    assert.ok(o.elements.some(e => e.name === 'Main entry' && e.poly?.length > 12), 'curb returns');
     assert.ok(o.elements.filter(e => e.kind === 'pond').every(e => !e.poly || e.poly.length <= 30), 'clean straight-edged ponds, no blobs (the default)');
-    if (!o.recipe?.gen) assert.ok(o.elements.some(e => e.kind === 'building' && e.jog), 'staggered buildings'); // (the search's buildings; the generator's rows are straight)
+    assert.ok(o.elements.some(e => e.kind === 'building' && e.jog), 'staggered buildings');
   }
   assert.ok(opts.some(o => o.elements.some(e => e.name === 'Clubhouse')), 'a clubhouse');
   // a curved piece moves as a whole and stays valid
-  const o = opts.find(x => !x.recipe?.gen), pd = o.elements.find(e => e.name === 'Main entry'), before = S.ringArea(pd.poly); // (a search layout: its entry is a curved outline)
+  const o = opts[0], pd = o.elements.find(e => e.name === 'Main entry'), before = S.ringArea(pd.poly);
   const moved = S.moveBy({ ...pd }, 3, -2); assert.ok(Math.abs(S.ringArea(moved.poly) - before) < 1 && Math.abs(moved.poly[0][0] - pd.poly[0][0] - 3) < 0.01);
   // drawings: plan SVG with curved drives' centre lines, the sheet, the DXF
   const p = { ...plan, elements: o.elements, zones: o.zones, program: o.program }, svg = G.planSVG(p, { px: 900 }).svg;
@@ -151,7 +151,7 @@ function usable(plan, o, what) {
 // ---- edits: move a building, make the pond bigger; the plan re-fits around them ----
 {
   const plan = { ...siteOf(fm362, true), program: { use: 'multifamily' } }, opts = L.layoutOptions(plan, plan.program);
-  for (const [k, o] of opts.entries()) { if (o.recipe?.gen) continue; // (a generated layout is drawn again from its recipe, pieces moved by hand going back: said in its note)
+  for (const [k, o] of opts.entries()) {
     const P = { ...plan, elements: JSON.parse(JSON.stringify(o.elements)), recipe: JSON.parse(JSON.stringify(o.recipe)) }, b = P.elements.find(e => e.use === 'multifamily');
     const a = (b.rot || 0) * Math.PI / 180, step = k === 1 ? 30 : -30; S.moveBy(b, step * Math.cos(a), step * Math.sin(a)); b.pinned = true; // slid along its row
     const t0 = Date.now(), r = L.refit(P); assert.ok(r && Date.now() - t0 < 6000, 'refit took ' + (Date.now() - t0) + ' ms');

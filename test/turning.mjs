@@ -38,7 +38,7 @@ ok('the check: a two-way drive under 20 ft fails (hard); a one-way drive-thru la
 ok('the run rounds the entry\'s corners so a fire truck turns in (exactly 120 garden apartments)', () => {
   const o = RUN.runBrief(B.briefFromRequest('exactly 120 garden apartments, 3 stories', RECT)).options[0], c = id => o.validation.checks.find(k => k.id === id);
   assert.equal(o.validation.status, 'pass'); assert.equal(c('eng.turning.fire').status, 'pass', JSON.stringify(c('eng.turning.fire')));
-  assert.ok(o.elements.some(e => e.curb), 'curb returns drawn'); assert.equal(c('access.dead-end').status, 'pass'); assert.equal(c('access.fire-width').status, 'pass');
+  assert.ok(o.elements.some(e => e.curb) || o.elements.some(e => e.kind === 'drive' && e.path && e.r >= 30), 'curb returns drawn, or the corners drawn round (the generator\'s layouts)'); assert.equal(c('access.dead-end').status, 'pass'); assert.equal(c('access.fire-width').status, 'pass');
 });
 ok('a garage ramp: long enough for the rise on a 240 ft podium, too short on a 120 ft one; heights stated', () => {
   const big = S.garagePlan({ w: 240, d: 128 }).rampSpec, small = S.garagePlan({ w: 120, d: 128 }).rampSpec;
