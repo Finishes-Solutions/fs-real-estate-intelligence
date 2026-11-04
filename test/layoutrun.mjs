@@ -266,5 +266,17 @@ ok('an exact floor area lands exactly: a 250,000 sf warehouse reads 250,000, not
   const w = o.elements.find(e => e.kind === 'building'), moved = { ...B.toEngine(r.brief).plan, elements: [{ ...w, w: w.w + 50 }] };
   assert.equal(V.quantities(moved, r.brief).byUse.industrial.gfa, Math.round((w.w + 50) * w.d));
 });
+ok('a tower on a parking podium: the podium parks the tower, exactly the units asked, modest surface rows', () => {
+  const r = RUN.runBrief(B.briefFromRequest('tower on a podium, 8 stories, 300 apartments', RECT)), o = r.options[0];
+  assert.equal(r.outcome, 'feasible'); assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  assert.equal(o.quantities.totals.units, 300);
+  const T = o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily'); assert.ok(T.length && T.every(e => e.form === 'tower' && Number.isInteger(e.parkLevels) && e.parkLevels >= 1), 'every tower declares its parking levels');
+  const pk = o.quantities.parking; assert.ok(pk.podium > pk.surface, 'most spaces on the podium: ' + pk.podium + ' vs ' + pk.surface + ' surface');
+  assert.ok(pk.provided >= pk.required && pk.provided <= pk.required * 1.08, 'parked without over-parking: ' + pk.provided + ' / ' + pk.required);
+  assert.equal(SP.metrics({ ...RECT, elements: o.elements, program: o.program }).spaces, SP.metrics({ ...RECT, elements: o.elements, program: o.program }).stalls + SP.metrics({ ...RECT, elements: o.elements, program: o.program }).deck, 'the plan counts podium spaces as deck');
+  // the podium grid: a 240 x 128 ft podium holds 4 rows of 20 less a 12-stall ramp a level, 85% of it on the ground level
+  assert.equal(SP.podiumLevelStalls(240, 128), 68); assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2, parkLevels: 2 }), 57 + 68);
+  assert.equal(SP.podiumStalls({ kind: 'building', w: 240, d: 128, floors: 8, form: 'tower', podium: 2 }), 0, 'a tower with no parking levels declared parks nothing on its podium (as before)');
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');

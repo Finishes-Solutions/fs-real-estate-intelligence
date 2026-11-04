@@ -188,12 +188,16 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    area estimate (no reviewed courtyard template); corner units, stairs and the gateway's arch over the walk aren't drawn.
 5. Reconstruct a holdout family (Sierra Vista 64-plex site) as an evaluation case on its real parcel.
 6. Wrap, tuck-under, cross-dock and vertical mixed use, each with its own geometry and tests.
-6b. Podium parking: the tower-on-podium form plans surface parking for every unit (194 of 300 on 10 ac); its podium
-   levels should hold structured parking. Tried Nov 3 and reverted: marking the podium floors as parking (residential
-   floor area = tower outline x floors above the podium; podium spaces ~ footprint x levels / 330 in lib/siteplan.mjs
-   metrics, lib/sitelayout.mjs tally and lib/layoutcheck.mjs) over-parked (344-561 podium spaces for 196-284 needed) and
-   lowered the yield, because the layout search (lib/sitelayout.mjs buildingsIn, lib/sitegen.mjs) still sizes buildings
-   and lays surface rows for a surface-parked program. Needs: the search told the podium's spaces up front (fewer surface
-   rows, bigger or more towers), and the tower share of the podium (60%) as a template value.
+6b. Done Nov 3 (podium parking). A tower on a podium (form "tower", 4+ floors of apartments) parks on its podium:
+   podiums are 128 ft deep (two double-loaded 60 ft modules inside 4 ft walls, lib/siteplan.mjs PODIUM) and 150-340 ft
+   long; their stalls are counted on that grid (9 ft stalls, a 24 ft turning aisle at each end of a row, 12 stalls a
+   level for the ramp, 85% of the ground level), not by area. The fewest podium levels that park the tower's homes are
+   parking (`parkLevels`, written on each building by the run, lib/layoutrun.mjs podiumLevels), the rest homes; the
+   tower is 60% of the podium (PODIUM.towerShare, an estimate: no podium project in the reviewed library). The search
+   is told up front: the program's footprint is the podiums' (wantFoot / towerAf) and a footprint's surface need is net
+   of its podium (mfPer), so it lays only the surface rows the podiums leave short. The validator counts the podium on
+   its own grid (lib/layoutcheck.mjs podiumGrid) from the declared levels and the drawn tower outline. Bench MF-tower:
+   300 units, 491 / 480 spaces (354 podium, 137 surface). Still: no drawn garage plan (ramps, columns, cores), and the
+   generator's courtyard / loop layouts are not offered for towers.
 7. Turning movements with a declared design vehicle; detention from topography (needs engineering inputs).
 8. (Partly done: a third way in at the far end.) Main entry off-centre when two remote ways in are needed (on a 900 ft frontage a centred entry can't be 515 ft from another); the pond kept off the street frontage (Hockley's pond wedge took the corner a second entry needed); mirrored options with the same numbers.
