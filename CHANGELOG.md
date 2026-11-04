@@ -11,6 +11,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **A second way in is found** where the fire code asks for one, cutting the pond back if it took the only free stretch of street (Hockley: every option now has two), and a third at the far end when two are too close together.
 - **Ponds without spikes:** a pond's thin wedge into a corner is trimmed (it showed as a grey triangle along FM 2920), and a walking trail split round a new entrance no longer draws a tan wedge across the site.
 - **Courtyard buildings** are one building: wings that meet or stand a breezeway apart round one court; shared corners counted once; the clubhouse in the court is reached through it; a pool that ran into a wing moves (or gets a little smaller) to fit the court. Courtyard requests show courtyard layouts first among the ones that pass.
+- **Courtyards in two rows** when one row of courts can't hold the program (Hockley: 200 or 350 courtyard units as 4 courts in 2 rows), with **one clubhouse and pool for the community** (one per 400 units) instead of one per court, and the outer parking rows nothing needs taken out (466 spaces for 320 needed became 364).
 - **Options differ:** layouts with the same numbers as one already shown, or far below the best, are left out; capped requests ("up to 150") aim for the cap (144, was 24).
 
 ### 6:16 PM CT: The independent check asks for a second way in, and shows detention against the rule of thumb (this push)

@@ -163,10 +163,11 @@ selection; placement edits only reorder zones of a mixed plan.
 ## 8b. Layout repair passes in the run (Nov 3, later)
 
 Each runs after the engine and is kept only when no hard check gets worse (`keepIfNoWorse`):
-joinCourtyard (wings within 15 ft round one court tagged as one building, corner overlaps trimmed) → nudgeAmenities
+joinCourtyard (wings within 25 ft round one court tagged as one building, corner overlaps trimmed) → oneAmenityCentre
+(one clubhouse and pool per 400 units) → nudgeAmenities
 (pools / courts / play / trash off buildings and paving; a pool may shrink to 75%) → exactByUnitSize (untemplated exact
 counts: homes 750–1,400 gross sf) → templates → trimHomes → fitParking → tidyPonds (corners under 35° cut, ≥ 90% of area)
-→ pruneSurplus (unused parking rows and dead-end drives) → addSecondAccess (pond set aside and cut back; a third way in
+→ pruneSurplus (unused parking rows and dead-end drives; then outer ring rows, keeping 5% spare) → addSecondAccess (pond set aside and cut back; a third way in
 for fire-code spacing) → tidyPonds again. Exact counts ask the engine for the count first and retry with more only when
 short. A bare number in Build is exact unless Leftover land was set by the user or the words.
 

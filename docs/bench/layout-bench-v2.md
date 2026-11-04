@@ -14,4 +14,4 @@
 | RE-pad | retail | feasible | pass · 2,500 sf · parking 32/25 | — | 4 | identical | n/a |
 | IN-warehouse | industrial | feasible | pass · 250,001 sf · parking 163/150 | — | 4 | identical | n/a |
 | FL-flex | flex | feasible | pass · 60,000 sf · parking 39/36 | — | 4 | identical | n/a |
-| MX-horizontal | mixed_use | feasible | pass · 320 units · parking 772/644 | — | 4 | identical | n/a |
+| MX-horizontal | mixed_use | feasible | pass · 320 units · parking 698/644 | — | 4 | identical | n/a |
