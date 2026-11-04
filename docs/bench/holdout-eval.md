@@ -24,8 +24,8 @@ are engine vs reference. **Evaluation only:** these projects never drive the eng
 | | 172 apartments, tower on a podium, 7 stories, underground detention | feasible · pass | 172 (+0%) | 210 (1.22), 210 podium, 210 required | 1 (+0%) | 57,962 (+50%) | 71.2% (+50%) | 92 (+0%) | Courtyard on a podium · 5 floors round an amenity deck over a 2-level podium |
 | | a wrap building with 172 apartments, underground detention | no-feasible-found · fail (program.u1) | 80 (-53%) | 100 (1.25), 98 required | 2 (+100%) | 17,258 (-55%) | 21.2% (-55%) | 42.8 (-53%) | Rows facing the street |
 | **P18 Lake Shore Town Homes / Beach Club** (reference) | 6.15 ac · a rectangle of the net land for lots and roads (15.75 ac less 9.6 ac of open space = 6.15 ac); the lakefront outline isn’t traced | as built | 82 | —, 164 required | — | — | — | 13.3 | fee-simple townhome rows of 4, 5 and 6 (front-load garages), 2-4 fl, garage + driveway |
-| | exactly 82 townhomes | no-feasible-found · fail (program.u1) | 51 (-38%) | 104 (2.04), 102 required | 14 | 48,960 | 18.3% | 8.3 (-38%) | Rows running back · pond at the entry |
-| | townhomes, as many as fit | feasible · pass | 51 (-38%) | 104 (2.04), 102 required | 14 | 48,960 | 18.3% | 8.3 (-38%) | Rows running back · pond at the entry |
+| | exactly 82 townhomes | no-feasible-found · fail (program.u1) | 58 (-29%) | 117 (2.02), 116 required | 15 | 55,680 | 20.8% | 9.4 (-29%) | Rows facing the street · pond at the back |
+| | townhomes, as many as fit | feasible · pass | 58 (-29%) | 117 (2.02), 116 required | 15 | 55,680 | 20.8% | 9.4 (-29%) | Rows facing the street · pond at the back |
 
 ## Sites
 

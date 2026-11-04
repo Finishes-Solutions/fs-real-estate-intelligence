@@ -25,3 +25,8 @@ console.log('holdout-eval ok: P35 with detention off the surface ' + r.units + '
 const f = evalRun(p35, p35.runs.find(x => x.key === 'fill-ug'));
 assert.equal(f.status, 'pass', f.failed?.join()); assert.ok(f.units >= r.units, 'as many as fit ' + f.units + ' vs exactly ' + r.units);
 console.log('holdout-eval ok: P35 as many as fit ' + f.units);
+// townhomes as many as fit keep their count when a fire truck's turn is tight at a lane T: the corner home gives way
+// for a curb return (one home and its lot), not the whole layout for a smaller one (59 fell to 51 when the turning
+// check came in)
+{ const p18 = cases.find(c => c.id === 'P18'), t = evalRun(p18, p18.runs.find(x => x.key === 'fill'));
+  assert.equal(t.status, 'pass', t.failed?.join()); assert.ok(t.units >= 57, 'townhomes ' + t.units); console.log('holdout-eval ok: P18 townhomes as many as fit ' + t.units); }
