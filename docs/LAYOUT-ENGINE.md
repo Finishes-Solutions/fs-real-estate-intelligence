@@ -311,3 +311,13 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    clubhouse by the entry; one home a bay, so counts are exact. The validator counts the garages a row states, capped at
    what fits along it (11 ft each). Bench MF-tuckunder: 120 units, 198 / 192 (120 garages). Still: 3 floors and rows of
    5-6 homes are estimates (the reference row is 4 homes, 2 floors); aprons aren't counted; 3D shows plain massing.
+15. Done Nov 4 (townhomes): an exact townhome count lands in rows of at most 6 on lots of their own; a count more than
+   the lots hold gives the most that fit, on lots, unless a shared rental court holds more homes and parks them (the
+   court no longer takes the generator's bars, which ran 11 homes long). The validator flags a row over the brief's
+   `townhomeRowMax` (default 6, an assumption) as `program.rowlength`. A home trimmed off a row (to the count, or for a
+   guest bay) takes its lot and driveway with it. For-sale words ("fee simple", "for-sale", "townhome lots", "with
+   garages") keep townhomes on lots, never the court; "front-load" / "driveways" draws the E053 Portland Road row
+   (lib/reftemplates.mjs th-frontload-row-2s, dev evidence: 20 x 42 ft homes, 2 floors, a one-car garage, a 20 ft
+   driveway apron each, rows of 3 to 6), parked one in the garage and one on the driveway (`garagePer`, counted alike
+   by the app and the validator). Holdout P18 (evaluation only): exactly 82 was 33 homes in 11-home bars, now 59 on
+   lots in rows of at most 6 (82 don't fit the 6.15 ac rectangle with the engine's pond and guest parking).

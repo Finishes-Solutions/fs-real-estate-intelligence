@@ -32,6 +32,7 @@ const CASES = [
   { id: 'MF-courtyard', family: 'multifamily', site: 'rect10', ask: 'courtyard apartments, 150 units' },
   { id: 'MF-midrise', family: 'multifamily', site: 'rect10', ask: 'mid-rise apartments, 4 stories, as many as fit' },
   { id: 'MF-townhomes', family: 'multifamily', site: 'deep6', ask: 'townhomes, as many as fit' },
+  { id: 'MF-townhome-lots', family: 'multifamily', site: 'rect10', ask: 'fee simple townhomes with garages, as many as fit' },
   { id: 'MF-duplex', family: 'multifamily', site: 'wedge9', ask: 'duplexes, as many as fit' },
   { id: 'MF-tower', family: 'multifamily', site: 'rect10', ask: 'tower on a podium, 8 stories, 300 apartments' },
   { id: 'MF-wrap', family: 'multifamily', site: 'rect10', ask: 'a wrap building with 300 apartments' },

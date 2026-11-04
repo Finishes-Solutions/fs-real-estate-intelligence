@@ -430,5 +430,29 @@ ok('stormwater handled off site: the words or the typed brief, no pond drawn, th
   assert.ok(!o.elements.some(e => e.kind === 'pond'), 'no pond on the site'); assert.match(o.validation.checks.find(c => c.id === 'eng.detention').note, /off site/);
   const bad = B.briefFromRequest('exactly 120 garden apartments', RECT); bad.site.stormwater = 'lake'; assert.equal(B.validateBrief(bad).ok, false);
 });
+ok('townhomes: an exact count lands in rows of at most 6, each home on its lot; more than fit gives the most that do, never 11-home bars', () => {
+  const th = o => o.elements.filter(e => e.kind === 'building' && ['townhomes', 'multifamily'].includes(e.use));
+  const fifty = RUN.runBrief(B.briefFromRequest('exactly 50 townhomes', RECT)).options[0];
+  assert.equal(fifty.validation.status, 'pass', fifty.validation.failed.join()); assert.equal(fifty.quantities.totals.units, 50);
+  assert.equal(fifty.elements.filter(e => e.kind === 'lot').length, 50, 'a lot for every home, none left empty by the trim');
+  const fill = RUN.runBrief(B.briefFromRequest('townhomes, as many as fit', RECT)).options[0].quantities.totals.units;
+  const many = RUN.runBrief(B.briefFromRequest('exactly 200 townhomes', RECT)).options[0];
+  assert.ok(th(many).every(e => (e.units || 1) <= 6), 'rows of at most 6: ' + th(many).map(e => e.units).join());
+  assert.ok(many.quantities.totals.units >= fill * 0.9, 'the most that fit (' + many.quantities.totals.units + ' vs ' + fill + ' as many as fit)');
+  assert.equal(many.validation.checks.find(c => c.id === 'program.rowlength').status, 'pass');
+  const bar = { ...RECT, elements: [{ id: 't1', kind: 'building', use: 'townhomes', x: 450, y: 250, w: 264, d: 40, units: 11, floors: 2 }] };
+  assert.equal(V.validateLayout(bar, B.canonicalBrief(B.briefFromRequest('exactly 11 townhomes', RECT))).checks.find(c => c.id === 'program.rowlength').status, 'fail', 'an 11-home row is flagged');
+});
+ok('front-load townhomes from the reviewed row (E053): a one-car garage and a driveway a home, on lots of their own', () => {
+  const b = B.briefFromRequest('front-load townhomes, as many as fit', RECT), r = RUN.runBrief(b), o = r.options[0];
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join());
+  const T = o.elements.filter(e => e.kind === 'building' && e.use === 'townhomes'), n = T.reduce((t, e) => t + e.units, 0);
+  assert.ok(n >= 60, n + ' homes'); assert.ok(T.every(e => e.garagePer === 1 && /front-load/.test(e.note) && e.template === 'th-frontload-row-2s' && e.units <= 6));
+  assert.equal(o.elements.filter(e => e.kind === 'lot').length, n); assert.equal(o.elements.filter(e => e.note === 'Driveway').length, n);
+  const m = SP.metrics({ ...RECT, elements: o.elements, program: o.program }); assert.equal(o.quantities.parking.provided, m.spaces, 'the check and the app count the same spaces');
+  assert.ok(o.quantities.parking.privateGarages === n && o.quantities.parking.driveways === n, 'a garage and a driveway a home');
+  assert.equal(RUN.replayRun(r).identical, true);
+  assert.equal(SP.normalizeProgram(SP.guessProgram('fee simple townhomes with garages')).product, 'lots', 'for-sale words: lots, never the rental court');
+});
 ok('live mode is unchanged outside a run (fresh random ids)', () => { const a = CX.rid(), b = CX.rid(); assert.notEqual(a, b); });
 console.log('layoutrun: ' + n + ' passed');
