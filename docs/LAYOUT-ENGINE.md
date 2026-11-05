@@ -1249,3 +1249,54 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    Engine version rei-layout/2026.11.05.8. Tests: test/layoutrun.mjs (the ring on an L and a wedge with no overlapping homes,
    lots or streets; townhomes and duplexes round a lake, a count capped; the rectangle ring unchanged; the porte-cochère and
    drop-off on tight lots; a school or daycare beside homes as a zone).
+
+38. Done Nov 5 (parking, round 5). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 88-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base 5043727), then fixed, most valuable first:
+   (a) A wedge's strip left with no bar redrawn (lib/sitegen.mjs alongEdges p.skip, tryOne). The strips along an odd lot's
+   edges park only what their bays hold, so a bar gives way (the smallest: "a bar left out to park the rest"); where that
+   was the only bar of its strip (the street strip of WEDGE-tri-midrise) its bays stayed at the street, about 300 ft from
+   the bars they parked, with the pond on the land between. Now the layout is drawn again without that strip (its line
+   skipped; one strip is enough then): the other strip's further bays run on beside its bars and the pond takes the
+   street strip's land. Kept only where the redrawn layout holds as many homes, parks them, and its 90th-percentile walk
+   (genWalk90: stall to the nearest home's wall) is over 10 ft shorter. WEDGE-tri-midrise: walk p90 255 -> 179 ft, max
+   340 -> 197, bare row ends 15 -> 1, landscape 4.0 -> 5.8% (now meets the standard), the same 160 homes, the pond 0.57
+   -> 0.50 ac (what the site needs).
+   (b) The way in clear of drives (lib/sitegen.mjs alongEdges p.entThr, edgeTry). The strips' main entry went square in
+   from the street to the nearest aisle at the spot nearest the street's middle, even where a bay's end drive crossed it
+   a few feet in (WEDGE-trap 15 ft). A spot whose first drive across is inside the stacking length (p.thr, else 50 ft)
+   now costs 10 a foot short; the result is kept where it costs no homes and parks as well (as item 31's throat pass).
+   WEDGE-trap-midrise and WEDGE-trap-1pk: first drive across 15 -> 100 ft, no stall in the throat; the price is a few end
+   islands on the land the entry now crosses (WEDGE-trap-midrise landscape 4.7 -> 3.2%, bare ends 9 -> 14). WEDGE-tri's
+   entry (29 ft) is unchanged: its aisles run slanted to the street and only their ends meet it square.
+   (c) Planting to the landscape standard from stalls to spare (lib/layoutrun.mjs landStandard, lotArea, plantSpare,
+   plantToStandard, last in the run; lib/siteplan.mjs isleOf, e.isle). The standard the metrics measure (item 36 d: 5% of
+   the lot planted and a tree every 10 stalls, lots of 20 stalls or more) is now measured in the run exactly as the script
+   does (the lot on a 2 ft grid: rows, lot paving, and drives within 26 ft of a row; caps and islands planted). A lot
+   still short of it after the end-island passes spends its stalls to spare: planted ends on rows without them, then an
+   island every 10th stall instead of every 13th (e.isle, 8-13; the count, the drawn stalls, the islands and the editor
+   all follow it), longest rows first, never below what's required. Standard met 49 -> 54 of 76 lots (IN-warehouse,
+   MF-wrap, TY-cold, TY-hotel-full, WEDGE-tri-midrise). Tried and taken out: trimming fewer stalls off the far ends to pay
+   for the planting (pruneSurplus down to what planting costs, with or without the 3% it keeps to spare, the planting
+   before or after it). It met the standard on 56 of 76, but took the spare the later passes need (MF-garden-max's
+   second way in became a gated lane and its 204-home layout lost its rank to a 168-home one), or the far stalls kept
+   lengthened walks (MF-tower p90 47 -> 62 ft) and put stalls in an entrance's throat (MF-courtyard, TY-student). Most
+   lots still short have no stalls to spare (the wedges' strips, the townhome guest pockets of parallel stalls, the data
+   centre).
+   Bench (88 cases, top option; base 5043727 -> after): all passing, no warnings, replay identical, no case lost homes or
+   floor area, parking met everywhere; 74 identical element for element. Landscape standard 49 -> 54 of 76 lots,
+   landscape share summed 405.9 -> 410.4 points; 90th-percentile walk summed 7,077 -> 7,001 ft, max walk 9,112 -> 8,969;
+   bare row ends 207 -> 200; stalls inside an entrance's stacking length 17 -> 14; first stall / first drive across an
+   entry summed 9,516 -> 9,672 / 6,719 -> 6,888 ft; dead ends 6 -> 6; stalls 13,521 -> 13,505 (spare stalls planted);
+   sf a stall summed 32,697 -> 32,736 (an island where a spare stall was, on the same paving). Holdouts unchanged (P18
+   fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version rei-layout/2026.11.05.9. Tests:
+   test/parkingquality.mjs (the island rhythm's count and drawing agree; the run's landscape measure agrees with the
+   metrics'; a lot with spare stalls planted to the standard, none without; the wedge triangle's walk under 200 ft with
+   its 160 homes; the trapezoid's way in clear of drives for 50 ft).
+   Still (next worst): paving on loop drives and small lots (MF-tower 376, TY-assisted 478 sf a stall: not worked on);
+   short entries where the aisles meet the street slanted (WEDGE-tri 29 ft) and the 30 ft first cross drive of the field
+   engine's small lots (TY-datacenter, TY-pad-village, TY-daycare-dropoff, MX-angled; TY-daycare itself is now 62 ft);
+   bare ends where nothing is free and nothing spare (200; WEDGE-hyp-midrise 14, WEDGE-trap-midrise 14, LOT-curved-apt
+   12); WEDGE-trap-midrise's field at the far end (p90 179 ft); 22 lots short of the landscape standard with no stalls to
+   spare.

@@ -222,4 +222,35 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
     assert.ok(Math.min(...t.map(x => x.cross)) >= need - 1, ask + ': first drive across the entry ' + t.map(x => x.cross).join(','));
   }
 }
+// item 38: a row's island rhythm (e.isle): the count, the drawn stalls and the islands agree
+{
+  const r = { kind: 'parking', x: 0, y: 0, w: 360, d: 18, rot: 0, row: 1, lock: true, islands: true, isle: 10 };
+  assert.equal(S.stalls(r).count, 36); assert.equal(S.stallCentres(r).length, 36); assert.equal(S.islandsOf(r).length, 4);
+  assert.equal(S.stalls({ ...r, isle: undefined }).count, 40 - 3, 'every 13th by default'); assert.equal(S.stalls({ ...r, isle: 4 }).count, 37, 'out of range: every 13th');
+  const c = { ...r, caps: 'square' }; assert.equal(S.stalls(c).count, S.stallCentres(c).length);
+}
+// item 38: the landscape standard (a tree every 10 stalls, 5% of the lot planted, scripts/parking-metrics.mjs landStd):
+// the run's measure agrees with the metrics', and the stalls to spare are planted last in the run
+{
+  const t = oneAisle(60, 880, { rowTo: 880, per1000: 4 }), m0 = PM.parkingMetrics({ ...t.plan, elements: t.els }), st0 = RUN.landStandard(t.els);
+  assert.equal(m0.landStd, 0); assert.equal(st0.meets, false); assert.ok(Math.abs(st0.total - (m0.lotSf + m0.landSf)) < 0.02 * st0.total, 'the lot measured as the metrics do');
+  const o = RUN.plantToStandard(t.plan, { elements: t.els, program: { use: 'retail' } }, t.brief), m1 = PM.parkingMetrics({ ...t.plan, elements: o.elements }), p1 = pk(t.plan, o.elements, t.brief);
+  assert.equal(m1.landStd, 1, 'planted to the standard: ' + m1.landPct + '% , ' + m1.perTree + ' a tree'); assert.ok(p1.provided >= p1.required);
+  assert.ok((o.tplNotes || []).some(n => /landscape standard/.test(n)));
+  // no stalls to spare: nothing planted
+  const tight = oneAisle(60, 880, { rowTo: 880, per1000: 5.2 }), p0 = pk(tight.plan, tight.els, tight.brief); assert.ok(p0.provided - p0.required <= 1);
+  const o2 = RUN.plantToStandard(tight.plan, { elements: tight.els, program: { use: 'retail' } }, tight.brief); assert.ok(!(o2.tplNotes || []).some(n => /landscape standard/.test(n)));
+}
+// item 38: wedge lots (realistic, the bench's sites): the strip whose only bar is left out to park the rest gives its land
+// to the pond and its bays go beside the bars (WEDGE-tri-midrise: 90th-percentile walk 255 -> 179 ft); the way in
+// clear of drives for its stacking length where a spot along the street allows (WEDGE-trap-midrise: 15 -> 100 ft)
+{
+  const SBb = { front: 25, side: 10, rear: 20, paving: 10 }, site = ring => ({ origin: [-96.42, 30.38], ring, front: 0, streets: [], setbacks: { ...SBb }, elements: [] });
+  const tri = site([[0, 0], [760, 0], [0, 700]]), o = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', tri)).options[0];
+  assert.equal(o.validation.status, 'pass'); assert.ok(o.quantities.totals.units >= 160, 'homes ' + o.quantities.totals.units);
+  assert.ok(RUN.walkP90(o.elements) < 200, 'tri walk ' + RUN.walkP90(o.elements));
+  const trap = site([[0, 0], [900, 0], [900, 60], [0, 420]]), o2 = RUN.runBrief(B.briefFromRequest('mid-rise apartments, 4 stories, as many as fit', trap)).options[0];
+  assert.equal(o2.validation.status, 'pass'); assert.ok(o2.quantities.totals.units >= 128);
+  const th = RUN.entryThroats(trap, o2.elements, 50).filter(x => !x.e.emergency); assert.ok(th.length && Math.min(...th.map(x => x.cross)) >= 50, 'trap throat ' + th.map(x => x.cross));
+}
 console.log('parking quality: ok');

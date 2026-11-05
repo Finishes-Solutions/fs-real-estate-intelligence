@@ -1806,7 +1806,7 @@ function angStalls(e) {
   if (e.row) { if (D >= S.d - 0.01) { rows.push(e.row > 0 ? [D / 2 - S.d, D / 2] : [-D / 2, -D / 2 + S.d]); aisleAt.push(e.row > 0 ? 1 : -1); flows.push(f0); } }
   else { let y = -D / 2, j = 0; while (D / 2 - y >= 2 * S.d + S.aisle - 0.01) { const f = j % 2 ? -f0 : f0; rows.push([y, y + S.d], [y + S.d + S.aisle, y + 2 * S.d + S.aisle]); aisleAt.push(1, -1); flows.push(f, f); y += 2 * S.d + S.aisle; j++; }
     if (D / 2 - y >= S.d + S.aisle - 0.01) { rows.push([y, y + S.d]); aisleAt.push(1); flows.push(j % 2 ? -f0 : f0); } }
-  const skip = new Set(); if (e.islands) for (let k = 12; k < n; k += 13) skip.add(k);
+  const skip = new Set(); if (e.islands) for (let k = isleOf(e) - 1; k < n; k += isleOf(e)) skip.add(k);
   return { count: rows.length * Math.max(0, n - skip.size), rows, n, W, swap: false, ang, pitch, off, x0: -(n * pitch + off) / 2, aisleAt, flows, skip, S };
 }
 // stall i of row r of an angled piece: its parallelogram (aisle edge first), in the piece's own frame (u along w)
@@ -1824,10 +1824,13 @@ export function angledStallPolys(e) {
 // the stalls a square row of n stall widths holds: an island every 13th (islands) and both end stalls planted (caps, on
 // a row of 6 or more). Where the 13th falls on the end cap (a row of 13, 26, ... with caps) it is the cap, counted once:
 // as stallCentres draws them (an island slot k = 12, 25, ... short of the last stall when capped).
-export function rowStallCount(n, islands, caps) {
+export function rowStallCount(n, islands, caps, every = 13) {
   if (!(n > 0)) return 0; const c = caps && n >= 6 ? 1 : 0;
-  return Math.max(0, n - (islands ? Math.floor((n - (caps ? 1 : 0)) / 13) : 0) - 2 * c);
+  return Math.max(0, n - (islands ? Math.floor((n - (caps ? 1 : 0)) / every) : 0) - 2 * c);
 }
+// a row's island rhythm: an island every 13th stall, or e.isle (8-13: closer, where the landscape standard asks for a tree
+// every 10 stalls and the parking can spare them; lib/layoutrun.mjs plantSurplus)
+export const isleOf = e => { const k = Math.round(+e?.isle); return k >= 8 && k <= 13 ? k : 13; };
 export function stalls(e, S0 = STALL) {
   if (stallAng(e)) return angStalls(e);
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0; // a plan's own stall size
@@ -1835,10 +1838,10 @@ export function stalls(e, S0 = STALL) {
   const lay = (W, D) => {
     const n = Math.floor((W + 0.01) / S.w), rows = []; let y = -D / 2;
     if (n < 1) return { count: 0, rows, n, W };
-    if (e.row) { if (D >= S.d - 0.01) rows.push(e.row > 0 ? [D / 2 - S.d, D / 2] : [-D / 2, -D / 2 + S.d]); return { count: rows.length * rowStallCount(n, e.islands, e.caps), rows, n, W }; }
+    if (e.row) { if (D >= S.d - 0.01) rows.push(e.row > 0 ? [D / 2 - S.d, D / 2] : [-D / 2, -D / 2 + S.d]); return { count: rows.length * rowStallCount(n, e.islands, e.caps, isleOf(e)), rows, n, W }; }
     while (D / 2 - y >= 2 * S.d + S.aisle - 0.01) { rows.push([y, y + S.d], [y + S.d + S.aisle, y + 2 * S.d + S.aisle]); y += 2 * S.d + S.aisle; }
     if (D / 2 - y >= S.d + S.aisle - 0.01) rows.push([y, y + S.d]);
-    return { count: rows.length * rowStallCount(n, e.islands, e.caps), rows, n, W };
+    return { count: rows.length * rowStallCount(n, e.islands, e.caps, isleOf(e)), rows, n, W };
   };
   if (e.stallRot != null && Number.isFinite(+e.stallRot)) return Math.round(+e.stallRot / 90) % 2 ? { ...lay(e.d, e.w), swap: true } : { ...lay(e.w, e.d), swap: false }; // turned by hand
   if (e.lock) return { ...lay(e.w, e.d), swap: false }; // laid out by the generator: rows run along its length
@@ -1852,7 +1855,7 @@ export function islandsOf(e, S0 = STALL) {
   if (!e.islands || e.poly || stallAng(e)) return []; // (an angled row's islands are slanted: capsOf draws them)
   const st = stalls(e, S), x0 = -st.n * S.w / 2, out = [];
   const put = (u, v) => { const p = st.swap ? [v, -u] : [u, v], q = rot(p, e.rot || 0); return [e.x + q[0], e.y + q[1]]; };
-  for (const [y0, y1] of st.rows) for (let k = 12; k < st.n - (e.caps ? 1 : 0); k += 13) out.push(put(x0 + (k + 0.5) * S.w, (y0 + y1) / 2));
+  for (const [y0, y1] of st.rows) for (let k = isleOf(e) - 1; k < st.n - (e.caps ? 1 : 0); k += isleOf(e)) out.push(put(x0 + (k + 0.5) * S.w, (y0 + y1) / 2));
   return out;
 }
 // an angled row's planted ends and islands: the triangle each end stripe leaves at the row's end, and the island
@@ -2546,7 +2549,7 @@ export function stallCentres(e, S0 = STALL) {
   if (stallAng(e)) return angledStallPolys(e).map(({ poly: q }) => [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4]);
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0, st = stalls(e, S), x0 = -st.n * S.w / 2, out = [];
   if (e.poly) return STL.centresOf(st.fill);
-  const skip = new Set(); if (e.islands) for (let k = 12; k < st.n - (e.caps ? 1 : 0); k += 13) skip.add(k); if (e.caps && st.n >= 6) { skip.add(0); skip.add(st.n - 1); }
+  const skip = new Set(); if (e.islands) for (let k = isleOf(e) - 1; k < st.n - (e.caps ? 1 : 0); k += isleOf(e)) skip.add(k); if (e.caps && st.n >= 6) { skip.add(0); skip.add(st.n - 1); }
   for (const [y0, y1] of st.rows) for (let i = 0; i < st.n; i++) if (!skip.has(i)) { const u = x0 + (i + 0.5) * S.w, v = (y0 + y1) / 2, q = rot(st.swap ? [v, -u] : [u, v], e.rot || 0); out.push([e.x + q[0], e.y + q[1]]); }
   return out;
 }
@@ -3442,7 +3445,7 @@ export function accessible(plan) {
     }
     const S = e.sw ? { w: e.sw, d: e.sd || STALL.d } : STALL, st = stalls(e, e.sw ? { w: e.sw, d: e.sd || STALL.d, aisle: e.sa || STALL.aisle } : STALL), x0 = -st.n * S.w / 2;
     const put = (u, v) => { const q = rot(st.swap ? [v, -u] : [u, v], e.rot || 0); return [+(e.x + q[0]).toFixed(2), +(e.y + q[1]).toFixed(2)]; };
-    const skip = new Set(); if (e.islands) for (let k = 12; k < st.n - (e.caps ? 1 : 0); k += 13) skip.add(k); if (e.caps && st.n >= 6) { skip.add(0); skip.add(st.n - 1); }
+    const skip = new Set(); if (e.islands) for (let k = isleOf(e) - 1; k < st.n - (e.caps ? 1 : 0); k += isleOf(e)) skip.add(k); if (e.caps && st.n >= 6) { skip.add(0); skip.add(st.n - 1); }
     const box = (i, y0, y1) => [put(x0 + i * S.w, y0), put(x0 + (i + 1) * S.w, y0), put(x0 + (i + 1) * S.w, y1), put(x0 + i * S.w, y1)];
     st.rows.forEach(([y0, y1], r) => { for (let i = 0; i + 1 < st.n; i++) if (!skip.has(i) && !skip.has(i + 1) && !skip.has(i - 1)) {
       const c = put(x0 + (i + 1) * S.w, (y0 + y1) / 2), three = i + 2 < st.n && !skip.has(i + 2) && !skip.has(i + 3);
