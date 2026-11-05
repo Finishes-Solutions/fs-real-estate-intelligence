@@ -1352,3 +1352,55 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    asked; the three word cases; the daycare option's name). Still: a 3-story T or L for an exact count comes up short with
    land left (whole buildings, no trim to the count); a point tower's amenities could stand in its podium on a small lot; a
    big box's parking field keeps the stacking-distance strip across the whole frontage.
+40. Done Nov 5 (parking, round 6). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 88-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base 4aae79d), then fixed, most valuable first:
+   (a) Dead lot paving trimmed (lib/layoutrun.mjs trimDeadPaving, after pruneSurplus in the run's last passes). A parking
+   field's paving (kind 'field') is drawn as the field's box when it is laid out; rows trimmed to what's required, or
+   bands never filled, left paving under no stall and no drive (the metrics' surplus: 22% of PK-street-retail's paving,
+   12% of TY-unknown's, 11% of TY-hotel-full's). Each piece of a field nothing stands on (no row, drive, truck court,
+   plaza, pad or building), 300 sf or more and wide enough to plant (area over perimeter at least 2.5), goes back to lawn;
+   slivers and turnaround pads stay; kept only where no check fails. The area taken out (o.deadSf) is added back where
+   the run ranks layouts by paving, so trimming tidies the layout the run picks and doesn't change which one it picks.
+   Tried and taken out: ranking on the trimmed paving. Layouts whose dead paving had ranked them down then won with far
+   walks or short throats (TY-hotel-retail: 90th-percentile walk 84 -> 204 ft, first drive across the entry 75 -> 57 ft;
+   TY-mob 87 -> 144 ft); a walk weight from 100 ft (each 4 ft past it 1% more paving) to hold them back reshuffled other
+   cases (WEDGE-trap-midrise's way in 100 -> 12 ft, a daycare with stalls at its entry and a turning warning).
+   sf a stall: PK-street-retail 559 -> 425 (now meets the landscape standard), TY-hotel-full 380 -> 335, TY-unknown
+   431 -> 392, TY-mob 374 -> 354, TY-hotel-retail 390 -> 367, TY-extended-stay 413 -> 391, RE-field-angled 387 -> 359,
+   PK-street-medical 368 -> 353, TY-hotel-porte 366 -> 350, TY-hotel-retail-sf 371 -> 350.
+   (b) A small lot's first aisle moved back to the stacking length (lib/sitelayout.mjs attempt). The zone layouts stack
+   their rows and aisles from the front: with no building at the street the first aisle sat at the paving setback and
+   the way in met it 30 ft off the street (TY-datacenter, TY-pad-village, TY-daycare-dropoff, MX-angled, TY-mix-hotel;
+   IN-warehouse 33 ft). The stack now moves back into its spare depth until the first aisle is the stacking length in
+   (50 / 75 / 100 ft for under 200 / 500 / more spaces, as throatNeed), as far as the slack goes, and no stall stands
+   beside the way in for that length (the entry's throat zone grows to match). Nothing is lost: the same blocks, rows
+   and buildings, the front left as lawn. Not where homes line the street (their own entry depth rule), on a podium, or
+   where a daycare's lot is under 3 ac: there the spare depth is its drop-off lane's, and taking it lost TY-daycare's
+   drop-off lane. First drive across the entry: TY-datacenter, TY-pad-village, TY-daycare-dropoff, MX-angled,
+   TY-mix-hotel 30 -> 50 ft, IN-warehouse 33 -> 50, MX-guard-hotel25 34 -> 50, MX-guard-angled 36 -> 52 (stalls in the
+   throat 4 -> 1); TY-daycare-dropoff 501 -> 387 sf a stall, 90th-percentile walk 82 -> 66 ft. TY-school's layout moved
+   too: first drive across 60 -> 50 ft (still the 50 ft asked), one stall inside it (0 before), 397 -> 381 sf a stall.
+   (c) The main drive measured (scripts/parking-metrics.mjs mainStalls): on lots of 200 stalls or more, stalls backing
+   into the way in within 200 ft of the street (the entry's width and 34 ft either side). Base 437 summed over 27 lots
+   (LOT-curved-apt 58, RE-anchored 55, RE-grocery-angled 35, IN-crossdock 33, MF-garden-max 32, TY-mob 30): measured,
+   not yet worked on.
+   Bench (88 cases, top option; base 4aae79d -> after): all passing, no warnings, replay identical, no case lost homes or
+   floor area, parking met everywhere; 34 identical element for element (most of the rest differ only in lawn outlines
+   and ids). sf a stall summed 32,736 -> 32,248; cases whose first drive across the entry is inside the stacking length
+   25 -> 21, first drive across summed 6,888 -> 7,048 ft; stalls inside an entrance's stacking length 14 -> 11;
+   landscape standard 54 -> 55 of 76 lots, share summed 410.4 -> 415.5 points; bare row ends 200 -> 198;
+   90th-percentile walk summed 7,001 -> 6,923 ft (TY-bigbox 186 -> 126), max 8,969 -> 8,890; dead ends 6 -> 7
+   (TY-daycare-dropoff's front aisle; dead ends past 150 ft 0 -> 0); stalls 13,505 -> 13,506; main-drive stalls
+   437 -> 433. Prompt corpus (offline, words path) 119 of 120, types 26 of 33, as before. Holdouts unchanged (P18 fill
+   77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version rei-layout/2026.11.05.11. Tests:
+   test/parkingquality.mjs (dead lot paving trimmed, a turnaround and slivers kept, nothing dead left alone; a daycare's
+   and a pad village's way in clear of drives for 50 ft).
+   Still (next worst): paving on loop drives (MF-tower 376, TY-assisted 478 sf a stall): neither has dead paving; their
+   rows sit single-loaded on the loop legs, and moving stalls across a drive saves no real paving unless a drive piece
+   can go (MF-tower's top-left stub with its turnaround: folding its 27 stalls onto the free rear side of the top drive
+   and cutting the stub back is the next try; not done). WEDGE-tri's slanted entry (29 ft, lib/sitegen.mjs) and
+   MX-guard-hotel13 (36 ft) unchanged. WEDGE-trap-midrise's far field (p90 179 ft), bare ends where nothing is free and
+   nothing spare (198; WEDGE-hyp-midrise 14, WEDGE-trap-midrise 14, LOT-curved-apt 12) and the 21 lots short of the
+   landscape standard: not worked on this round. Main-drive stalls measured only.

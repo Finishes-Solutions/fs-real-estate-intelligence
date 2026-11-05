@@ -17,6 +17,7 @@
 //                   building's door is somewhere on its walls, so this is the least walk; real walks are longer)
 //   walkBld90       walk per building: each building's share of the stalls (by floor area: footprint x floors), the
 //                   nearest that many; the worst building's 90th percentile, and how many buildings pass 200 ft (walkBld200)
+//   mainStalls      lots of 200 stalls or more: stalls backing into the way in within 200 ft of the street (the main drive)
 //   throat          the shortest entrance throat: ft in from the street before a stall backs into the entry drive
 //                   (throatX: before a drive crosses it; lib/layoutrun.mjs entryThroats), against throatNeed (50 / 75 / 100 ft for a lot
 //                   of under 200 / under 500 / 500 or more stalls), and entryStalls: stalls inside that length
@@ -36,7 +37,7 @@ const RAD = Math.PI / 180;
 // a typical parking-lot landscape standard (planning yardstick; local codes vary): lots of LAND_MIN stalls or more plant
 // LAND_PCT % of the lot's interior and a shade tree every LAND_PER_TREE stalls (e.g. Redmond, WA RZC 21.32: 5% for 20-150
 // stalls, 7% past 150; Chardon, OH ch. 1159: a shade tree every 10 spaces; many codes start at 20 spaces)
-export const LAND_MIN = 20, LAND_PCT = 5, LAND_PER_TREE = 10;
+export const LAND_MIN = 20, LAND_PCT = 5, LAND_PER_TREE = 10, MAIN_MIN = 200, MAIN_FT = 200;
 const pct = (a, p) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1) + 0.5))]; };
 const distTo = (p, r) => r.reduce((m, a, i) => Math.min(m, S.segDist(p, a, r[(i + 1) % r.length])), Infinity);
 const bbox = r => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of r) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return [x0, y0, x1, y1]; };
@@ -120,6 +121,10 @@ export function parkingMetrics(plan) {
   // the length asked for the lot's size (lib/layoutrun.mjs throatNeed), and the stalls inside that length
   { const need = throatNeed(n); let th = []; try { th = entryThroats(plan, els, need); } catch { th = []; }
     Object.assign(out, { throatNeed: need, throat: th.length ? Math.min(...th.map(t => t.first)) : null, throatX: th.length ? Math.min(...th.map(t => t.cross)) : null, entryStalls: th.reduce((t, x) => t + x.stalls.length, 0) }); }
+  // the main drive (docs/LAYOUT-ENGINE.md item 40): on a lot of MAIN_MIN stalls or more, stalls backing into the way in within
+  // MAIN_FT of the street (the entry's width and 34 ft either side, as the throat's zone): the first stretch of the drive
+  // from the entrance toward the buildings, where cars arriving meet cars backing out
+  if (n >= MAIN_MIN) { let tm = []; try { tm = entryThroats(plan, els, MAIN_FT); } catch { tm = []; } out.mainStalls = tm.reduce((t, x) => t + x.stalls.length, 0); }
   // stray rows: tiny, skewed, orphaned
   const tiny = rows.filter(e => !e.parallel && cen.get(e).length > 0 && cen.get(e).length <= 4).length;
   const wt = new Map(); for (const e of ninety) { const k = Math.round(axisOf(e).deg % 90); wt.set(k, (wt.get(k) || 0) + cen.get(e).length); }
@@ -132,7 +137,7 @@ export function parkingMetrics(plan) {
   return out;
 }
 
-const COLS = [['stalls', 'Stalls'], ['sfStall', 'sf/stall'], ['surplusPct', 'Surplus %'], ['landPct', 'Land %'], ['perTree', 'Stalls/tree'],['maxRun', 'Max run'], ['long', 'Runs >15'], ['bareEnds', 'Bare ends'], ['deadEnds', 'Dead ends'], ['deadEnd150', 'DE >150'], ['deadEndMax', 'DE max ft'], ['walkMed', 'Walk med'], ['walk90', 'Walk p90'], ['walkMax', 'Walk max'], ['walkBld90', 'Bldg p90'], ['walkBld200', 'Bldgs p90>200'], ['throat', 'Throat ft'], ['throatX', 'Throat x-drive'], ['throatNeed', 'Throat req'], ['entryStalls', 'Entry stalls'], ['adaPlaced', 'ADA'], ['adaNeed', 'ADA req'], ['adaExtra', 'ADA +ft'], ['tiny', 'Tiny rows'], ['skew', 'Skew rows'], ['orphan', 'Orphan rows']];
+const COLS = [['stalls', 'Stalls'], ['sfStall', 'sf/stall'], ['surplusPct', 'Surplus %'], ['landPct', 'Land %'], ['perTree', 'Stalls/tree'],['maxRun', 'Max run'], ['long', 'Runs >15'], ['bareEnds', 'Bare ends'], ['deadEnds', 'Dead ends'], ['deadEnd150', 'DE >150'], ['deadEndMax', 'DE max ft'], ['walkMed', 'Walk med'], ['walk90', 'Walk p90'], ['walkMax', 'Walk max'], ['walkBld90', 'Bldg p90'], ['walkBld200', 'Bldgs p90>200'], ['throat', 'Throat ft'], ['throatX', 'Throat x-drive'], ['throatNeed', 'Throat req'], ['entryStalls', 'Entry stalls'], ['mainStalls', 'Main-drive stalls'], ['adaPlaced', 'ADA'], ['adaNeed', 'ADA req'], ['adaExtra', 'ADA +ft'], ['tiny', 'Tiny rows'], ['skew', 'Skew rows'], ['orphan', 'Orphan rows']];
 export function metricsTable(res) {
   const head = '| Case | ' + COLS.map(c => c[1]).join(' | ') + ' |', sep = '|---|' + COLS.map(() => '---:').join('|') + '|';
   return [head, sep, ...res.map(r => '| ' + r.id + ' | ' + COLS.map(([k]) => r.m[k] ?? '—').join(' | ') + ' |')].join('\n');
