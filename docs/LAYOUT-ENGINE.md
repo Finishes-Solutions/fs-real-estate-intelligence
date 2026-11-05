@@ -785,8 +785,7 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    with their colours, adding BT.presetBuilding at its usual size; the 3D map shows the block coloured by type with its
    parapet and floor lines. Bench: 74 cases, 74 pass, no warnings, replay identical; the 44 earlier non-type cases
    identical element for element; TY-fourplex (fourplexes of their own), TY-datacenter (its yard), TY-carwash (moved to
-   2.3 ac: lanes, exit and vacuum stalls drawn) changed as intended; TY-student came out as the mirror image of the same
-   layout (200 units, 361/360: the tagged buildings' new count fields change the tie order of equal options); 9 new
+   2.3 ac: lanes, exit and vacuum stalls drawn) changed as intended; every other earlier case identical element for element on the folded branch (on parking round 2 and the request reading; engine version rei-layout/2026.11.05.1); 9 new
    cases (TY-T-apts, TY-point-tower, TY-triplex, TY-hotel-full, TY-hotel-retail, TY-garage, TY-pad-village, TY-mix-hotel,
    TY-mix-pads). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Still: a school's
    bus loop and parent drop-off, a daycare's drop-off lane, a hotel's porte-cochère and a gas station's queue at the

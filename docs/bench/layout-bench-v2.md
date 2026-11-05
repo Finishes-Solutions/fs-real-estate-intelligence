@@ -1,6 +1,6 @@
 | Case | Family | Outcome | Top option | Fails | Unknown | Replay | Before (same validator) |
 |---|---|---|---|---|---|---|---|
-| MF-garden-exact | multifamily | feasible | pass · 120 units · parking 193/192 | — | 2 | identical | n/a |
+| MF-garden-exact | multifamily | feasible | pass · 120 units · parking 194/192 | — | 2 | identical | n/a |
 | MF-garden-max | multifamily | feasible | pass · 204 units · parking 328/327 | — | 2 | identical | n/a |
 | MF-garden-rot | multifamily | feasible | pass · 396 units · parking 634/634 | — | 2 | identical | n/a |
 | MF-courtyard | multifamily | feasible | pass · 150 units · parking 240/240 | — | 2 | identical | n/a |
@@ -10,7 +10,7 @@
 | MF-duplex | multifamily | feasible | pass · 52 units · parking 104/104 | — | 2 | identical | n/a |
 | MF-wedge-midrise | multifamily | feasible | pass · 144 units · parking 232/231 | — | 2 | identical | n/a |
 | MF-tower | multifamily | feasible | pass · 300 units · parking 480/480 | — | 2 | identical | n/a |
-| MF-wrap | multifamily | feasible | pass · 300 units · parking 481/480 | — | 2 | identical | n/a |
+| MF-wrap | multifamily | feasible | pass · 300 units · parking 485/480 | — | 2 | identical | n/a |
 | MF-tuckunder | multifamily | feasible | pass · 120 units · parking 192/192 | — | 2 | identical | n/a |
 | MF-stacked | multifamily | feasible | pass · 120 units · parking 193/192 | — | 2 | identical | n/a |
 | MF-btr | multifamily | feasible | pass · 68 units · parking 136/102 | — | 2 | identical | n/a |
@@ -19,9 +19,9 @@
 | RE-pad | retail | feasible | pass · 2,500 sf · parking 26/25 | — | 2 | identical | n/a |
 | IN-warehouse | industrial | feasible | pass · 250,000 sf · parking 151/150 | — | 2 | identical | n/a |
 | IN-crossdock | industrial | feasible | pass · 400,000 sf · parking 241/240 | — | 2 | identical | n/a |
-| FL-flex | flex | feasible | pass · 60,000 sf · parking 36/36 | — | 2 | identical | n/a |
-| MX-horizontal | mixed_use | feasible | pass · 320 units · parking 645/644 | — | 2 | identical | n/a |
-| MX-vertical | mixed_use | feasible | pass · 200 units · parking 401/400 | — | 2 | identical | n/a |
+| FL-flex | flex | feasible | pass · 60,000 sf · parking 38/36 | — | 2 | identical | n/a |
+| MX-horizontal | mixed_use | feasible | pass · 320 units · parking 658/644 | — | 2 | identical | n/a |
+| MX-vertical | mixed_use | feasible | pass · 200 units · parking 403/400 | — | 2 | identical | n/a |
 | LOT-flag-th | multifamily | feasible | pass · 166 units · parking 386/374 | — | 2 | identical | n/a |
 | LOT-flag-retail | retail | feasible | pass · 30,000 sf · parking 120/120 | — | 2 | identical | n/a |
 | LOT-easement-apt | multifamily | feasible | pass · 180 units · parking 289/288 | — | 2 | identical | n/a |
@@ -35,7 +35,7 @@
 | WEDGE-tri-garden | multifamily | feasible | pass · 120 units · parking 192/192 | — | 2 | identical | n/a |
 | WEDGE-tri-1pk | multifamily | feasible | pass · 192 units · parking 193/192 | — | 2 | identical | n/a |
 | WEDGE-arc-1pk | multifamily | feasible | pass · 160 units · parking 161/160 | — | 2 | identical | n/a |
-| WEDGE-trap-1pk | multifamily | feasible | pass · 160 units · parking 163/160 | — | 2 | identical | n/a |
+| WEDGE-trap-1pk | multifamily | feasible | pass · 160 units · parking 161/160 | — | 2 | identical | n/a |
 | WEDGE-hyp-1pk | multifamily | feasible | pass · 144 units · parking 145/144 | — | 2 | identical | n/a |
 | TH-sub5 | multifamily | feasible | pass · 68 units · parking 155/153 | — | 2 | identical | n/a |
 | TH-sub8 | multifamily | feasible | pass · 123 units · parking 281/277 | — | 2 | identical | n/a |
@@ -47,25 +47,25 @@
 | TY-hotel-keys | types | feasible | pass · 66,000 sf · parking 125/121 | — | 2 | identical | n/a |
 | TY-extended-stay | types | feasible | pass · 71,500 sf · parking 115/111 | — | 2 | identical | n/a |
 | TY-storage-3s | types | feasible | pass · 90,000 sf · parking 10/9 | — | 2 | identical | n/a |
-| TY-mob | types | feasible | pass · 40,000 sf · parking 205/200 | — | 2 | identical | n/a |
-| TY-clinic-custom | types | feasible | pass · 12,000 sf · parking 62/60 | — | 2 | identical | n/a |
+| TY-mob | types | feasible | pass · 40,000 sf · parking 201/200 | — | 2 | identical | n/a |
+| TY-clinic-custom | types | feasible | pass · 12,001 sf · parking 62/60 | — | 2 | identical | n/a |
 | TY-daycare | types | feasible | pass · 7,442 sf · parking 31/30 | — | 2 | identical | n/a |
 | TY-assisted | types | feasible | pass · 120 units · parking 61/60 | — | 2 | identical | n/a |
 | TY-student | types | feasible | pass · 200 units · parking 361/360 | — | 2 | identical | n/a |
 | TY-fourplex | types | feasible | pass · 48 units · parking 96/96 | — | 2 | identical | n/a |
 | TY-livework | types | feasible | pass · 24 units · parking 56/54 | — | 2 | identical | n/a |
-| TY-flex-mezz | types | feasible | pass · 60,000 sf · parking 36/36 | — | 2 | identical | n/a |
-| TY-cold | types | feasible | pass · 200,000 sf · parking 60/60 | — | 2 | identical | n/a |
+| TY-flex-mezz | types | feasible | pass · 60,000 sf · parking 38/36 | — | 2 | identical | n/a |
+| TY-cold | types | feasible | pass · 200,000 sf · parking 62/60 | — | 2 | identical | n/a |
 | TY-datacenter | types | feasible | pass · 99,997 sf · parking 23/20 | — | 2 | identical | n/a |
 | TY-carwash | types | feasible | pass · 4,160 sf · parking 23/20 | — | 2 | identical | n/a |
 | TY-bank | types | feasible | pass · 3,500 sf · parking 15/14 | — | 2 | identical | n/a |
 | TY-fitness | types | feasible | pass · 40,000 sf · parking 200/200 | — | 2 | identical | n/a |
 | TY-bigbox | types | feasible | pass · 120,000 sf · parking 491/480 | — | 2 | identical | n/a |
-| TY-school | types | feasible | pass · 75,078 sf · parking 72/72 | — | 2 | identical | n/a |
-| TY-L-apts | types | feasible | pass · 150 units · parking 244/240 | — | 2 | identical | n/a |
+| TY-school | types | feasible | pass · 75,078 sf · parking 74/72 | — | 2 | identical | n/a |
+| TY-L-apts | types | feasible | pass · 150 units · parking 241/240 | — | 2 | identical | n/a |
 | TY-U-pool | types | feasible | pass · 120 units · parking 193/192 | — | 2 | identical | n/a |
 | TY-unknown | types | feasible | pass · 30,000 sf · parking 93/90 | — | 2 | identical | n/a |
-| TY-T-apts | types | feasible | pass · 150 units · parking 244/240 | — | 2 | identical | n/a |
+| TY-T-apts | types | feasible | pass · 150 units · parking 241/240 | — | 2 | identical | n/a |
 | TY-point-tower | types | feasible | pass · 200 units · parking 321/320 | — | 2 | identical | n/a |
 | TY-triplex | types | feasible | pass · 48 units · parking 96/96 | — | 2 | identical | n/a |
 | TY-hotel-full | types | feasible | pass · 250,000 sf · parking 303/300 | — | 2 | identical | n/a |
@@ -73,4 +73,4 @@
 | TY-garage | types | feasible | pass · 236,592 sf · parking 405/0 | — | 2 | identical | n/a |
 | TY-pad-village | types | feasible | pass · 23,850 sf · parking 145/144 | — | 2 | identical | n/a |
 | TY-mix-hotel | types | feasible | pass · 86,000 sf · parking 201/201 | — | 2 | identical | n/a |
-| TY-mix-pads | types | feasible | pass · 60 units · parking 197/193 | — | 2 | identical | n/a |
+| TY-mix-pads | types | feasible | pass · 60 units · parking 199/193 | — | 2 | identical | n/a |
