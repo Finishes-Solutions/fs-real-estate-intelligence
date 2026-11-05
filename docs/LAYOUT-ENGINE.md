@@ -736,7 +736,7 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    requirement everywhere): bare row ends 364 -> 168 (MF-garden-rot 46 -> 2, LOT-curved-apt 54 -> 13, LOT-wetland-apt
    30 -> 8, MX-horizontal 18 -> 0); stalls in an entrance's throat 50 -> 11 (LOT-curved-apt 18 -> 3, MF-midrise 8 -> 0,
    MF-courtyard 4 -> 0); 90th percentile walk summed over the cases 3575 -> 3431 ft (WEDGE-tri-midrise 279 -> 255, max
-   377 -> 340; MF-wedge-midrise 179 -> 137; WEDGE-tri-1pk 119 -> 77); dead ends (any length, engine's rule) 10 -> 6;
+   377 -> 340; MF-wedge-midrise 179 -> 137; WEDGE-tri-1pk 119 -> 77); dead ends (any length, the engine's rule) 8 -> 4;
    paving a stall unchanged in total (17,105 -> 17,104 sf summed). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36
    fill 128, E054 podium-urban 172). Tests:
    test/parkingquality.mjs (round-2 cases with merged rows, blocked ends and a throat). Tried and taken out: shifting a
