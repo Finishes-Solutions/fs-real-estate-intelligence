@@ -33,7 +33,7 @@ import * as SITE from './btsite.mjs';
 import { restripeAngled } from './siteparking.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.05.12'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.13'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -777,6 +777,38 @@ export function entryThroats(plan, els, need) {
   }
   return out;
 }
+// new 90° rows along the free sides of the two-way drives in els (docs/LAYOUT-ENGINE.md items 28 and 43): square to the
+// drive, 18 ft deep, a planted island each end and one every 13th, inside the paving setback (inner), clear of buildings
+// (6 ft), every other piece but lawn, each other and the zones given (entrances' throats), each stall where near(c)
+function driveSideRows(els0, inner, zones, near, cap) {
+  const sw = S.STALL.w, SD = S.STALL.d, lawn = x => x.kind === 'green' && !S.isPark(x);
+  const solids = els0.filter(x => !x.future && !lawn(x) && !['lot', 'zone'].includes(x.kind)).map(x => ({ x, s: x.kind === 'building' ? S.grow(S.shapeOf(x), 6) : S.shapeOf(x) }));
+  const add = [];
+  for (const d of els0) {
+    if (d.kind !== 'drive' || d.future || d.path || d.poly || d.entry || d.turn || d.emergency || d.oneWay || d.garageEntry || S.isEntrance(d) || TURN.oneWayLane(d) || /^Garage entry|drive-?thru/i.test((d.name || '') + ' ' + (d.note || '')) || !(+d.w > 0 && +d.d > 0)) continue;
+    const long = +d.w >= +d.d, L = long ? +d.w : +d.d, W = long ? +d.d : +d.w; if (L < (DRIVE_ROW_MIN + 2) * sw || W < 22 || W > 30) continue;
+    const rot = (d.rot || 0) + (long ? 0 : 90), r = rot * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]];
+    const at = (t, s) => [d.x + u[0] * t + v[0] * s, d.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
+    for (const sg of [-1, 1]) {
+      const s0 = sg > 0 ? W / 2 : -W / 2 - SD, s1 = s0 + SD, nSlots = Math.floor(L / sw), t00 = -nSlots * sw / 2;
+      const ok = []; for (let k = 0; k < nSlots; k++) { const b = box(t00 + k * sw, t00 + (k + 1) * sw, s0, s1), c = at(t00 + (k + 0.5) * sw, (s0 + s1) / 2);
+        ok.push(b.every(pt => S.inRing(pt, inner)) && !solids.some(z => z.x !== d && S.rectsOverlap({ poly: S.grow(b, -0.3) }, { poly: z.s }, 0)) && !add.some(z => S.rectsOverlap({ poly: S.grow(b, -0.3) }, { poly: S.shapeOf(z) }, 0)) && !zones.some(z => S.rectsOverlap({ poly: b }, { poly: z }, 0)) && near(c)); }
+      for (let k = 0; k < nSlots;) { if (!ok[k]) { k++; continue; } let j = k; while (j < nSlots && ok[j]) j++;
+        const n = j - k, cnt = S.rowStallCount(n, true, cap);
+        if (n >= 8 && cnt >= DRIVE_ROW_MIN) { const c = at(t00 + (k + j) / 2 * sw, (s0 + s1) / 2);
+          add.push({ id: (d.id || 'd') + (sg > 0 ? '-rowL' : '-rowR') + k, kind: 'parking', x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(n * sw).toFixed(2), d: SD, rot: +rot.toFixed(4), row: sg > 0 ? -1 : 1, lock: true, islands: true, caps: cap, note: 'Stalls along the drive' }); }
+        k = j; }
+    }
+  }
+  return add;
+}
+// the lawn under new rows gives way: els with the lawn cut round the rows added, and the rows
+function lawnGivesWay(els0, add) {
+  const lawn = x => x.kind === 'green' && !S.isPark(x), cl = r => { const q2 = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q2.concat([q2[0]]); }, pads = add.map(a => cl(S.shapeOf(a)));
+  return els0.flatMap(x => { if (!lawn(x) || !x.poly || !pads.some(pd => S.rectsOverlap({ poly: x.poly }, { poly: pd.slice(0, -1) }, 0))) return [x];
+    let left; try { left = polyclip.difference([cl(x.poly)], ...pads.map(pd => [pd])); } catch { return [x]; }
+    return left.map(pp => pp[0].slice(0, -1)).filter(rg => S.ringArea(rg) > 400).map((rg, i) => ({ ...x, ...(i ? { id: (x.id || 'g') + 'r' + i } : {}), poly: rg.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) })); }).concat(add);
+}
 // Stalls near the doors (docs/LAYOUT-ENGINE.md item 28). The drives the layout already paves often run with no stalls
 // along them (the cross drives at a field's ends, a loop's legs), while rows on their own aisle sit beyond a pond or
 // at the far end of the land. New 90° rows go along the free sides of the two-way drives (square to the drive, 18 ft
@@ -801,32 +833,11 @@ export function rowsAlongDrives(plan, o, brief) {
   const throats = entryThroats(plan, els0, throatNeed(p0.provided)).map(t => t.zone), inZone = c => throats.some(z => S.inRing(c, z));
   const entry = list => list.filter(e => e.kind === 'parking' && !e.future && !e.rv && !e.vac).flatMap(e => { try { return S.stallCentres(e); } catch { return []; } }).filter(inZone).length, ent0 = entry(els0);
   if (far0 <= FAR_FT && !ent0) return o; // (the stalls are already by the doors and clear of the entrances)
-  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true, sw = S.STALL.w, SD = S.STALL.d;
-  const lawn = x => x.kind === 'green' && !S.isPark(x);
-  const solids = els0.filter(x => !x.future && !lawn(x) && !['lot', 'zone'].includes(x.kind)).map(x => ({ x, s: x.kind === 'building' ? S.grow(S.shapeOf(x), 6) : S.shapeOf(x) }));
-  const add = [];
-  for (const d of els0) {
-    if (d.kind !== 'drive' || d.future || d.path || d.poly || d.entry || d.turn || d.emergency || d.oneWay || d.garageEntry || S.isEntrance(d) || TURN.oneWayLane(d) || /^Garage entry|drive-?thru/i.test((d.name || '') + ' ' + (d.note || '')) || !(+d.w > 0 && +d.d > 0)) continue;
-    const long = +d.w >= +d.d, L = long ? +d.w : +d.d, W = long ? +d.d : +d.w; if (L < (DRIVE_ROW_MIN + 2) * sw || W < 22 || W > 30) continue;
-    const rot = (d.rot || 0) + (long ? 0 : 90), r = rot * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]];
-    const at = (t, s) => [d.x + u[0] * t + v[0] * s, d.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
-    for (const sg of [-1, 1]) {
-      const s0 = sg > 0 ? W / 2 : -W / 2 - SD, s1 = s0 + SD, nSlots = Math.floor(L / sw), t00 = -nSlots * sw / 2;
-      const ok = []; for (let k = 0; k < nSlots; k++) { const b = box(t00 + k * sw, t00 + (k + 1) * sw, s0, s1), c = at(t00 + (k + 0.5) * sw, (s0 + s1) / 2);
-        ok.push(b.every(pt => S.inRing(pt, inner)) && !solids.some(z => z.x !== d && S.rectsOverlap({ poly: S.grow(b, -0.3) }, { poly: z.s }, 0)) && !add.some(z => S.rectsOverlap({ poly: S.grow(b, -0.3) }, { poly: S.shapeOf(z) }, 0)) && !throats.some(z => S.rectsOverlap({ poly: b }, { poly: z }, 0)) && walk(c) <= reach); }
-      for (let k = 0; k < nSlots;) { if (!ok[k]) { k++; continue; } let j = k; while (j < nSlots && ok[j]) j++;
-        const n = j - k, cnt = S.rowStallCount(n, true, cap);
-        if (n >= 8 && cnt >= DRIVE_ROW_MIN) { const c = at(t00 + (k + j) / 2 * sw, (s0 + s1) / 2);
-          add.push({ id: (d.id || 'd') + (sg > 0 ? '-rowL' : '-rowR') + k, kind: 'parking', x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(n * sw).toFixed(2), d: SD, rot: +rot.toFixed(4), row: sg > 0 ? -1 : 1, lock: true, islands: true, caps: cap, note: 'Stalls along the drive' }); }
-        k = j; }
-    }
-  }
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true;
+  const add = driveSideRows(els0, inner, throats, c => walk(c) <= reach, cap);
   if (!add.length && !ent0) return o;
   // the lawn under the new rows gives way
-  const cl = r => { const q2 = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q2.concat([q2[0]]); }, pads = add.map(a => cl(S.shapeOf(a)));
-  const els = els0.flatMap(x => { if (!lawn(x) || !x.poly || !pads.some(pd => S.rectsOverlap({ poly: x.poly }, { poly: pd.slice(0, -1) }, 0))) return [x];
-    let left; try { left = polyclip.difference([cl(x.poly)], ...pads.map(pd => [pd])); } catch { return [x]; }
-    return left.map(pp => pp[0].slice(0, -1)).filter(rg => S.ringArea(rg) > 400).map((rg, i) => ({ ...x, ...(i ? { id: (x.id || 'g') + 'r' + i } : {}), poly: rg.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) })); }).concat(add);
+  const cl = r => { const q2 = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q2.concat([q2[0]]); }, els = lawnGivesWay(els0, add);
   // then stalls out, one at a time off a row's end: first those in an entrance's throat (while the parking still meets
   // what's required), then the farthest from a building, back down to the count the plan had; a row left with fewer
   // than MIN_ROW stalls goes whole
@@ -912,6 +923,145 @@ export function rowEndIslands(plan, o, brief) {
   if (!done) return o;
   return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), done + ' parking row' + (done > 1 ? 's' : '') + ' end in planted islands (stalls to spare): ' + p.provided + ' for ' + p.required + ' required.'] };
 }
+// one stall width more on a donor row's free end (docs/LAYOUT-ENGINE.md items 36 and 43): the row as it would be, or
+// null. Only where the new stall fronts the aisle, inside the paving setback (inner), clear of everything but lawn, and
+// no farther from a building (B: outlines) than that row's farthest stall nor past the plan's 90th-percentile walk (w90).
+// els is read as it stands at each call.
+function rowGrower(els, inner, B, w90) {
+  const lawn = x => x.kind === 'green' && !S.isPark(x), free = ['lot', 'zone'];
+  const walk = p0 => Math.min(...B.map(b => b.reduce((m, a, i) => Math.min(m, S.segDist(p0, a, b[(i + 1) % b.length])), Infinity)));
+  const agree = c => S.stalls(c).count === S.stallCentres(c).length;
+  return e => { if (!(+e.d <= 19) || S.stalls(e).swap || !(S.stalls(e).n >= 6)) return null; const sw = S.stallPitch(e), r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]], W = +e.w, D = +e.d;
+    const at = (t, s) => [e.x + u[0] * t + v[0] * s, e.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
+    const others = els.filter(x => x !== e && !x.future && !lawn(x) && !free.includes(x.kind)).map(x => x.kind === 'building' ? S.grow(S.shapeOf(x), 5) : S.shapeOf(x));
+    const clear = pd => pd.every(pt => S.inRing(pt, inner)) && !others.some(z => S.rectsOverlap({ poly: S.grow(pd, -0.3) }, { poly: z }, 0));
+    const aisle = e.row ? Math.sign(e.row) : 0, net = els.filter(x => (x.kind === 'drive' || x.kind === 'field') && !x.future).map(x => S.shapeOf(x));
+    const fronts = (t0, t1) => aisle && [[t0 + 1, D / 2 + 2], [(t0 + t1) / 2, D / 2 + 3], [t1 - 1, D / 2 + 2]].every(([t, s]) => { const pt = at(t, aisle * s); return net.some(z => S.inRing(pt, z)); });
+    const far = Math.max(...S.stallCentres(e).map(walk));
+    for (const sg of [1, -1]) { const t0 = sg > 0 ? W / 2 : -W / 2 - sw; if (!clear(box(t0, t0 + sw, -D / 2, D / 2)) || !fronts(sg > 0 ? t0 - sw : t0, sg > 0 ? t0 + sw : t0 + 2 * sw)) continue;
+      const c = at(sg * sw / 2, 0), e2 = { ...e, x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(W + sw).toFixed(2) };
+      const endC = S.stallCentres(e2).reduce((m, q) => { const t = sg * ((q[0] - e.x) * u[0] + (q[1] - e.y) * u[1]); return !m || t > m.t ? { q, t } : m; }, null)?.q; /* (the stall at the grown end: within the plan's 90th-percentile walk, so the walk doesn't lengthen) */
+      if (S.stalls(e2).count !== S.stalls(e).count + 1 || !agree(e2) || Math.max(...S.stallCentres(e2).map(walk)) > far + 1 || !endC || walk(endC) > w90) continue;
+      return e2; }
+    return null; };
+}
+// The main drive clear of stalls (docs/LAYOUT-ENGINE.md item 43). On a lot of MAIN_MIN stalls or more, the first MAIN_FT
+// in from the street along the way in is its main drive (scripts/parking-metrics.mjs mainStalls: the entry's width and
+// 34 ft either side, as the throat's zone): cars arriving there shouldn't meet cars backing out. Larger lots commonly run
+// a landscaped entry drive with no head-in stalls for its first stretch. The stalls there come out of their rows (a row
+// is cut at the zone and keeps its ends that still hold 3 stalls; the paving under the gap goes back to lawn), paid for
+// first from the stalls to spare and then by other rows growing a stall at a time onto free land at their ends (as
+// fundEndIslands' donors: fronting their aisle, no farther from a building than their farthest stall). Kept only where
+// the parking is still met, no dead end and no stall in an entrance's stacking length is added, and the 90th-percentile
+// walk doesn't lengthen. Before the surplus is pruned, so the spare the layout drew pays first.
+export const MAIN_MIN = 200, MAIN_FT = 200;
+export const mainDriveStalls = (plan, els) => { try { return entryThroats(plan, els, MAIN_FT).reduce((t, x) => t + x.stalls.length, 0); } catch { return 0; } };
+const drawnStalls = els => els.reduce((t, e) => { if (e.kind !== 'parking' || e.future || e.rv || e.vac) return t; try { return t + S.stallCentres(e).length; } catch { return t; } }, 0);
+export function clearMainDrive(plan, o, brief) {
+  const ring = plan.ring || []; if (!o?.elements?.length || ring.length < 3) return o;
+  if (drawnStalls(o.elements) < MAIN_MIN) return o;
+  let zones; try { zones = entryThroats(plan, o.elements, MAIN_FT).filter(z => z.stalls.length); } catch { return o; }
+  if (!zones.length) return o;
+  let inner; try { inner = S.insetRing(ring, S.edgeRules(ring, plan.front, { ...S.SETBACKS, ...(plan.setbacks || {}) }, plan.streets).map(r => Math.max(0.5, r.pave) - 0.5)); } catch { return o; }
+  if (!inner || inner.length < 3) return o;
+  const els = o.elements.slice(), pk = () => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking;
+  const p0 = pk(); if (p0.required == null || p0.provided < p0.required) return o;
+  const dead = () => { try { return S.deadEnds(els, 1).length; } catch { return 0; } }, d0 = dead();
+  const inThroat = () => { try { return entryThroats(plan, els, throatNeed(p0.provided)).reduce((t, x) => t + x.stalls.length, 0); } catch { return 0; } }, th0 = inThroat();
+  const ws0 = walkStats(els), ls0 = landStandard(els).meets, pave = list => V.quantities({ ...plan, elements: list, program: o.program || {} }, brief).pavedSfGross, pv0 = pave(els);
+  const w0 = walkP90(els), avoid = zones.map(z => z.zone).concat((() => { try { return entryThroats(plan, els, throatNeed(p0.provided)).map(z => z.zone); } catch { return []; } })());
+  const Bs = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), Bsv = Bs.filter(e => e.use !== 'amenity'), B = (Bsv.length ? Bsv : Bs).map(e => S.outline(e)); if (!B.length) return o;
+  const walk = c => Math.min(...B.map(b => b.reduce((m, a, i) => Math.min(m, S.segDist(c, a, b[(i + 1) % b.length])), Infinity)));
+  const inZone = q => zones.some(z => S.inRing(q, z.zone)), depth = q => Math.min(...zones.filter(z => S.inRing(q, z.zone)).map(z => { const [a, b, , d] = z.zone, L = Math.hypot(d[0] - a[0], d[1] - a[1]) || 1; return ((q[0] - (a[0] + b[0]) / 2) * (d[0] - a[0]) + (q[1] - (a[1] + b[1]) / 2) * (d[1] - a[1])) / L; }));
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true;
+  const sq = e => e.kind === 'parking' && !e.parallel && !e.rv && !e.vac && !e.poly && !e.future && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null && +e.w > 0;
+  // the rows with stalls in a zone, nearest the street first
+  const hits = els.filter(e => e.kind === 'parking' && !e.future && !e.rv && !e.vac).map(e => { let cs = []; try { cs = S.stallCentres(e); } catch { cs = []; } const h = cs.filter(inZone); return { e, h, t: h.length ? Math.min(...h.map(depth)) : 0 }; }).filter(x => x.h.length).sort((a, b) => a.t - b.t || String(a.e.id).localeCompare(String(b.e.id)));
+  // one row cut at the zone: its ends kept where they hold 3 stalls or more and none in a zone; the land taken out
+  const cutOne = (e, hit, gone) => {
+    if (e.poly || e.path || !(+e.w > 0) || S.stalls(e).swap || e.stallRot != null) return false; /* (a row this can't cut) */
+    const sw = S.stallPitch(e), us = hit.map(q => S.toLocal(e, q)[0]), lo = Math.min(...us) - sw / 2, hi = Math.max(...us) + sw / 2, pieces = [];
+    for (const [a0, b0, sg] of [[-e.w / 2, lo, -1], [hi, e.w / 2, 1]]) {
+      let a = a0, b = b0;
+      for (let k = 0; k < 4 && b - a >= 3 * sw; k++) { const c = (a + b) / 2, q = S.rotPt([c, 0], e.rot || 0), pc = { ...e, id: e.id + (sg < 0 ? '-m1' : '-m2'), x: +(e.x + q[0]).toFixed(2), y: +(e.y + q[1]).toFixed(2), w: +(b - a).toFixed(2) };
+        const pcs = S.stallCentres(pc); if (!pcs.some(inZone)) { if (pcs.length >= 3 && S.stalls(pc).count === pcs.length) pieces.push(pc); break; }
+        if (sg < 0) b -= sw; else a += sw; }
+    }
+    els.splice(els.indexOf(e), 1, ...pieces);
+    const left = pieces.map(pc => { const c = S.toLocal(e, [pc.x, pc.y])[0]; return [c - pc.w / 2, c + pc.w / 2]; }).sort((x, y) => x[0] - y[0]);
+    let t = -e.w / 2; for (const [a, b] of left.concat([[e.w / 2, e.w / 2]])) { if (a - t > 1) { const c = (t + a) / 2, q = S.rotPt([c, 0], e.rot || 0); gone.push(S.shapeOf({ ...e, id: undefined, w: a - t, x: e.x + q[0], y: e.y + q[1] })); } t = Math.max(t, b); }
+    return true;
+  };
+  // paid for: the spare first, then new rows along drives with none (as rowsAlongDrives: no farther from a building than
+  // the stalls taken out or the 90th-percentile walk, clear of the throats and the main drives; nearest the buildings
+  // first), then donor rows grown a stall at a time onto free land at their free ends; pruneSurplus after takes any excess
+  // back off the far ends
+  const pay = (reach, cutIds) => { let p = pk(), added = 0, grown = 0;
+    if (p.provided < p.required) {
+      const cand = driveSideRows(els, inner, avoid, c => walk(c) <= reach, cap).map(r => ({ r, w: walk([r.x, r.y]) })).sort((a, b) => a.w - b.w || String(a.r.id).localeCompare(String(b.r.id))).map(x => x.r);
+      const use = []; for (const r of cand) { if (p.provided + added >= p.required) break; use.push(r); added += S.stallCentres(r).length; }
+      const lr = use[use.length - 1]; /* (the last row: no longer than the stalls still owed, kept at DRIVE_ROW_MIN; its end farther from a building goes first) */
+      if (lr) { const sw = S.stallPitch(lr), r0 = (lr.rot || 0) * Math.PI / 180, u = [Math.cos(r0), Math.sin(r0)], ends = [1, -1].map(g => walk([lr.x + u[0] * g * lr.w / 2, lr.y + u[1] * g * lr.w / 2])), g = ends[0] >= ends[1] ? 1 : -1; let r1 = lr;
+        for (;;) { const r2 = { ...r1, w: +(r1.w - sw).toFixed(2), x: +(r1.x - u[0] * g * sw / 2).toFixed(2), y: +(r1.y - u[1] * g * sw / 2).toFixed(2) }, n2 = S.stallCentres(r2).length; if (n2 < DRIVE_ROW_MIN || S.stalls(r2).count !== n2 || p.provided + added - S.stallCentres(r1).length + n2 < p.required) break; added += n2 - S.stallCentres(r1).length; r1 = r2; }
+        use[use.length - 1] = r1; }
+      if (use.length) { const next = lawnGivesWay(els, use); els.length = 0; els.push(...next); p = pk(); }
+    }
+    const grow1 = rowGrower(els, inner, B, w0);
+    while (p.provided < p.required) { let hit = false;
+      for (let k = 0; k < els.length; k++) { const e = els[k]; if (!sq(e) || cutIds.has(String(e.id).replace(/-m[12]$/, ''))) continue; const e2 = grow1(e); if (!e2) continue; els[k] = e2;
+        if (dead() > d0 || inThroat() > th0) { els[k] = e; continue; } hit = true; grown++; break; }
+      if (!hit) break; p = pk(); }
+    return { p, added, grown };
+  };
+  const gone = [], cutIds = new Set(), outPts = []; let cutN = 0, added = 0, grown = 0, p = p0;
+  for (const { e, h } of hits) {
+    if (!els.includes(e)) continue;
+    const snap = els.slice(), g0 = gone.length;
+    if (!cutOne(e, h, gone)) continue; cutIds.add(e.id);
+    const r = pay(Math.max(w0, ...outPts.concat(h).map(walk)), cutIds);
+    if (r.p.provided < r.p.required || dead() > d0 || inThroat() > th0 || walkP90(els) > w0 + 0.5 || ls0 && !landStandard(els).meets || (ws => ws.max > ws0.max + 10 || ws.bld > ws0.bld + 5)(walkStats(els))) { els.length = 0; els.push(...snap); gone.length = g0; cutIds.delete(e.id); continue; }
+    outPts.push(...h); cutN += h.length; added += r.added; grown += r.grown; p = r.p;
+  }
+  if (!cutN) return o;
+  const { all } = afterCut(els, gone, 0, () => els.filter(x => x.kind === 'building' && !x.future));
+  return { ...o, elements: all, deadSf: Math.round((+o.deadSf || 0) + pv0 - pave(all)), rankWalk: o.rankWalk ?? w0, tplNotes: [...(o.tplNotes || []), cutN + ' stall' + (cutN > 1 ? 's' : '') + ' taken off the main drive’s first ' + MAIN_FT + ' ft (left as landscape' + (added ? '; ' + added + ' in new rows along drives' : '') + (grown ? '; ' + grown + ' added where other rows had free land at their ends' : '') + '): ' + p.provided + ' for ' + p.required + ' required.'] };
+}
+// the walks a pass must not lengthen (docs/LAYOUT-ENGINE.md item 43; as scripts/parking-metrics.mjs measures them): the
+// farthest stall from a building's wall, and the worst building's 90th percentile over its share of the stalls (by floor
+// area, its nearest that many)
+export function walkStats(els) {
+  const B0 = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), sv = B0.filter(e => e.use !== 'amenity'), Bs = sv.length ? sv : B0; if (!Bs.length) return { max: 0, bld: 0 };
+  const bl = Bs.map(e => S.outline(e)), pts = els.filter(e => e.kind === 'parking' && !e.rv && !e.vac && !e.future).flatMap(e => { try { return S.stallCentres(e); } catch { return []; } }); if (!pts.length) return { max: 0, bld: 0 };
+  const dist = (p, r) => r.reduce((m, a, i) => Math.min(m, S.segDist(p, a, r[(i + 1) % r.length])), Infinity), D = bl.map(r => pts.map(p => dist(p, r)));
+  const max = Math.max(...pts.map((p, i) => Math.min(...D.map(d => d[i])))), wt = Bs.map(e => S.ringArea(S.outline(e)) * (+e.floors || 1)), tw = wt.reduce((t, x) => t + x, 0) || 1;
+  const bld = Math.max(...D.map((d, j) => { const k = Math.max(1, Math.round(pts.length * wt[j] / tw)), ds = d.slice().sort((x, y) => x - y); return ds[Math.min(ds.length - 1, Math.ceil(0.9 * k) - 1)]; }));
+  return { max, bld };
+}
+// The main drive cleared early (docs/LAYOUT-ENGINE.md item 43). Cleared last (clearMainDrive at the end of the run's
+// passes), only the stalls left to spare pay for it, after the end islands and planting have had theirs; cleared before
+// the surplus is trimmed, the layout's own spare pays, and the passes after plant what's left. The run finishes both ways
+// where the main drive has stalls, and keeps the early one (b) over the plain one (a) only where it leaves fewer stalls on
+// the main drive and is no worse on anything else measured: the same homes and floor area, the parking met, no check
+// failing that doesn't in a, no gated lane where a has a real second way in, the landscape standard as met and as much
+// planted, no more dead ends or stalls in an entrance's stacking length, no longer a 90th-percentile walk, and no more
+// than 2% more paving a stall. Its rank stays a's (a's paving and walk kept for rankKey): it tidies the layout the run
+// picks, it doesn't change which one it picks.
+export function mainEarlier(plan, a, b, brief) {
+  if (!b?.elements?.length || b === a) return a;
+  const m = o => mainDriveStalls(plan, o.elements); if (!(m(b) < m(a))) return a;
+  const val = o => V.validateLayout({ ...plan, elements: o.elements, program: o.program || {} }, brief), va = val(a), vb = val(b);
+  const fails = v => v.checks.filter(c => c.status === 'fail').map(c => c.id), fa = fails(va); if (fails(vb).some(id => !fa.includes(id))) return a;
+  const qa = va.quantities, qb = vb.quantities;
+  if ((qb.totals.units || 0) < (qa.totals.units || 0) || (qb.totals.gfa || 0) < (qa.totals.gfa || 0) - 1 || !(qb.parking.provided >= qb.parking.required)) return a;
+  if (b.elements.some(e => e.emergency) && !a.elements.some(e => e.emergency)) return a;
+  const la = landStandard(a.elements), lb = landStandard(b.elements); if (la.meets && !lb.meets || lb.sf < la.sf - 1) return a;
+  const dead = els => { try { return S.deadEnds(els, 1).length + longDeadAisles(els).length; } catch { return 0; } }; if (dead(b.elements) > dead(a.elements)) return a;
+  const thr = (o, q) => { try { return entryThroats(plan, o.elements, throatNeed(q.parking.provided)).reduce((t, x) => t + x.stalls.length, 0); } catch { return 0; } }; if (thr(b, qb) > thr(a, qa)) return a;
+  const wa = walkP90(a.elements); if (walkP90(b.elements) > wa + 0.5) return a;
+  const sa = walkStats(a.elements), sb = walkStats(b.elements); if (sb.max > sa.max + 10 || sb.bld > sa.bld + 5) return a;
+  if (qb.pavedSfGross / Math.max(1, lb.n) > 1.02 * qa.pavedSfGross / Math.max(1, la.n)) return a;
+  return { ...b, deadSf: Math.round((+a.deadSf || 0) + qa.pavedSfGross - qb.pavedSfGross), rankWalk: a.rankWalk ?? wa };
+}
 // Bare row ends paid for elsewhere (docs/LAYOUT-ENGINE.md item 36). Where the parking is exactly met, a row that meets a
 // cross drive end to end can't grow onto free land (growEndIslands) and there are no stalls to spare (rowEndIslands). But
 // another row may have free land past its end: it grows a stall width at a time there (only where the new stall fronts
@@ -926,28 +1076,12 @@ export function fundEndIslands(plan, o, brief) {
   let p = pk(); if (p.required == null) return o;
   const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true, dead = () => { try { return S.deadEnds(els, 1).length; } catch { return 0; } }, d0 = dead();
   const inThroat = () => { try { return entryThroats(plan, els, throatNeed(p.provided)).reduce((t, x) => t + x.stalls.length, 0); } catch { return 0; } }, th0 = inThroat(); /* (never a stall more inside an entrance's stacking length) */
-  const lawn = x => x.kind === 'green' && !S.isPark(x), free = ['lot', 'zone'];
   const Bs = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), Bsv = Bs.filter(e => e.use !== 'amenity'), B = (Bsv.length ? Bsv : Bs).map(e => S.outline(e)); if (!B.length) return o;
-  const walk = p0 => Math.min(...B.map(b => b.reduce((m, a, i) => Math.min(m, S.segDist(p0, a, b[(i + 1) % b.length])), Infinity)));
   const sq = e => e.kind === 'parking' && !e.parallel && !e.rv && !e.vac && !e.poly && !e.future && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null && +e.w > 0;
   const agree = c => S.stalls(c).count === S.stallCentres(c).length;
   const takers = els.filter(e => sq(e) && !e.caps && S.stalls(e).n >= 8 && agree({ ...e, caps: cap })).sort((a, b) => S.stalls(b).n - S.stalls(a).n || String(a.id).localeCompare(String(b.id)));
   if (!takers.length) return o;
-  const w90 = walkP90(els);
-  // one stall width more on a donor row's free end: the row as it would be, or null
-  const grow1 = e => { if (!(+e.d <= 19) || S.stalls(e).swap || !(S.stalls(e).n >= 6)) return null; const sw = S.stallPitch(e), r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]], W = +e.w, D = +e.d;
-    const at = (t, s) => [e.x + u[0] * t + v[0] * s, e.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
-    const others = els.filter(x => x !== e && !x.future && !lawn(x) && !free.includes(x.kind)).map(x => x.kind === 'building' ? S.grow(S.shapeOf(x), 5) : S.shapeOf(x));
-    const clear = pd => pd.every(pt => S.inRing(pt, inner)) && !others.some(z => S.rectsOverlap({ poly: S.grow(pd, -0.3) }, { poly: z }, 0));
-    const aisle = e.row ? Math.sign(e.row) : 0, net = els.filter(x => (x.kind === 'drive' || x.kind === 'field') && !x.future).map(x => S.shapeOf(x));
-    const fronts = (t0, t1) => aisle && [[t0 + 1, D / 2 + 2], [(t0 + t1) / 2, D / 2 + 3], [t1 - 1, D / 2 + 2]].every(([t, s]) => { const pt = at(t, aisle * s); return net.some(z => S.inRing(pt, z)); });
-    const far = Math.max(...S.stallCentres(e).map(walk));
-    for (const sg of [1, -1]) { const t0 = sg > 0 ? W / 2 : -W / 2 - sw; if (!clear(box(t0, t0 + sw, -D / 2, D / 2)) || !fronts(sg > 0 ? t0 - sw : t0, sg > 0 ? t0 + sw : t0 + 2 * sw)) continue;
-      const c = at(sg * sw / 2, 0), e2 = { ...e, x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(W + sw).toFixed(2) };
-      const endC = S.stallCentres(e2).reduce((m, q) => { const t = sg * ((q[0] - e.x) * u[0] + (q[1] - e.y) * u[1]); return !m || t > m.t ? { q, t } : m; }, null)?.q; /* (the stall at the grown end: within the plan's 90th-percentile walk, so the walk doesn't lengthen) */
-      if (S.stalls(e2).count !== S.stalls(e).count + 1 || !agree(e2) || Math.max(...S.stallCentres(e2).map(walk)) > far + 1 || !endC || walk(endC) > w90) continue;
-      return e2; }
-    return null; };
+  const w90 = walkP90(els), grow1 = rowGrower(els, inner, B, w90);
   let done = 0, grown = 0;
   for (const t of takers) {
     const i0 = els.indexOf(t); if (i0 < 0 || els[i0].caps) continue;
@@ -1197,7 +1331,7 @@ function rankKey(o, brief) {
   const yieldV = maxi.reduce((s, u) => s + (u.quantity.unit === 'units' ? o.quantities.byUse[u.use]?.units || 0 : o.quantities.byUse[u.use]?.gfa || 0), 0);
   const typeLanes = o.elements.filter(e => e.kind === 'drive' && SITE.QUEUE_TYPES[e.queue] && Array.isArray(e.path)).reduce((s, e) => s + (+e.width || 12) * e.path.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - e.path[i][0], p[1] - e.path[i][1]), 0), 0); /* (a building type's own lanes, lib/btsite.mjs: what the type needs, not paving that ranks a layout down) */
   const paving0 = (o.quantities.pavedSfGross + (+o.deadSf || 0) - typeLanes) / Math.max(1, o.quantities.totals.units || o.quantities.totals.gfa / 1000 || 1);
-  const paving = paving0 * (1 + Math.max(0, walkP90(o.elements) - WALK_FAR) / 200); /* (stalls far from the doors: each 2 ft the 90th-percentile walk runs past 200 ft weighs as 1% more paving, so of layouts holding the same, the one with the field by the buildings wins unless it paves much more; item 36) */
+  const paving = paving0 * (1 + Math.max(0, (o.rankWalk ?? walkP90(o.elements)) - WALK_FAR) / 200); /* (stalls far from the doors: each 2 ft the 90th-percentile walk runs past 200 ft weighs as 1% more paving, so of layouts holding the same, the one with the field by the buildings wins unless it paves much more; item 36) */
   // the form asked for, delivered: a courtyard request ranks its courtyard layouts above plain bars (other forms are
   // drawn by their own engine path and always are what was asked)
   const formMiss = brief.program.uses.filter(u => u.form === 'mf-cottage-btr' && o.elements.filter(e => e.cottage).length >= 12 && !o.elements.some(e => e.kind === 'building' && e.use === 'amenity') || u.form === 'mf-courtyard' && !o.elements.some(e => e.court) || u.form === 'mf-wrap' && !o.elements.some(e => e.wrap && e.kind === 'garage') || u.form === 'mf-tuck-under' && !o.elements.some(e => +e.tuck > 0) || u.form === 'ind-cross-dock' && !o.elements.some(e => e.kind === 'building' && e.crossDock) || u.form === 'mf-podium-courtyard' && !o.elements.some(e => e.upper === 'U') || u.form === 'ret-drive-through' && !o.elements.some(e => e.kind === 'drive' && (e.windowAt || /drive-thru/i.test(e.name || '')))).length; // (the form asked for: a courtyard's wings, a drive-thru's lane)
@@ -1265,7 +1399,7 @@ export function runBrief(briefIn, { now = null } = {}) {
   const { value: raw, stats } = CX.deterministic({ seed: brief.solver.seed, tickMs: brief.solver.tickMs }, () => {
     const wrapNote = 'No wrap fits this site: the garage a wrap needs (about 130 ft across and 120 ft deep inside the wings, with its ramp and cores) doesn’t fit with the wings round it, so these are the nearest layouts; on a small lot a courtyard on a parking podium ("courtyard on a podium") holds more.';
     const noWrap = o => brief.program.uses.some(u => u.form === 'mf-wrap') && !o.elements?.some(e => e.wrap && e.kind === 'garage') ? { ...o, tplNotes: [...(o.tplNotes || []), wrapNote] } : o; // (a wrap asked for that the site can't hold: said, not swapped silently)
-    const fit = (Ex, out, br = brief, pre = null) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br); const last = t1x => { const t2s = keepIfNoWorse(Ex.plan, t1x, pruneSurplus(Ex.plan, t1x, br), br), t2 = keepIfNoWorse(Ex.plan, t2s, trimDeadPaving(Ex.plan, t2s), br); const t2g = garageEntries(Ex.plan, t2, Ex.program), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br), t10f = keepIfNoWorse(Ex.plan, t10, fundEndIslands(Ex.plan, t10, br), br), t10l = keepIfNoWorse(Ex.plan, t10f, plantToStandard(Ex.plan, t10f, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10l), br); }; return angleMixed(Ex.plan, pre ? pre(t1) : t1, br, last); }); // (angled parking asked on a mixed plan: tried here, each try finished by the passes after) // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
+    const fit = (Ex, out, br = brief, pre = null) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br); const last = t1x => { const a = chain(t1x); return a.elements && mainDriveStalls(Ex.plan, a.elements) > 0 ? mainEarlier(Ex.plan, a, chain(keepIfNoWorse(Ex.plan, t1x, clearMainDrive(Ex.plan, t1x, br), br)), br) : a; }; /* (the main drive cleared before the surplus is trimmed too, kept where that's better, item 43) */ const chain = t1x => { const t2s = keepIfNoWorse(Ex.plan, t1x, pruneSurplus(Ex.plan, t1x, br), br), t2 = keepIfNoWorse(Ex.plan, t2s, trimDeadPaving(Ex.plan, t2s), br); const t2g = garageEntries(Ex.plan, t2, Ex.program), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br), t10f = keepIfNoWorse(Ex.plan, t10, fundEndIslands(Ex.plan, t10, br), br), t10l = keepIfNoWorse(Ex.plan, t10f, plantToStandard(Ex.plan, t10f, br), br); const t10m = keepIfNoWorse(Ex.plan, t10l, clearMainDrive(Ex.plan, t10l, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10m), br); }; return angleMixed(Ex.plan, pre ? pre(t1) : t1, br, last); }); // (angled parking asked on a mixed plan: tried here, each try finished by the passes after) // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
     let got = fit(E, lay1(E));
     if (capped && short(got)) { const E2 = B.toEngine(brief); E2.opts = { ...E2.opts, deeper: false }; got = got.concat(fit(E2, lay1(E2))); } // (the retry looks for a fuller layout: no deeper-pond copies of it)
     // a building type's lanes the layouts left no room for (a hotel's porte-cochère, a daycare's drop-off): laid out again

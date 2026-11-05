@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 5:58 PM CT: Parking round 7: main entry drives cleared of parking (`0c58cfc`)
+- **No parking spaces backing into the first 200 ft of the main entry drive** where it costs nothing: the spaces move to spare room, to the free side of an existing drive or to the ends of rows, and only if walks stay as short, entrances stay clear and the landscape standard still holds. On the test sites such spaces went from 460 to 378 (e.g. a mixed-use lot 18 → 0, a big box 24 → 4).
+- Fuller lots with no spare room keep their spaces, rather than take a longer walk.
+- 88 test sites pass with no warnings; the full test suite passes.
+
 ### 5:00 PM CT: Robustness: flag lots, empty answers, venues, podiums tested across 320 lot and type combinations (59ea59d, b9b5e85)
 - **A sweep of 320 layouts** across 22 lot shapes (rectangles, L, T, U, wedges, flag lots, curved frontages, easements, wetlands, corner lots, real parcels) and every building type now runs as a check; 149 come out clean (was 139), hard check failures 50 → 34, and no layout comes back empty without saying why (was 6).
 - **Flag lots:** the entry drive stays on the lot and joins the strip to the street (flag-lot failures 12 → 0).

@@ -1456,3 +1456,56 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    (site.exclusions 4); stranded townhome rows (live-work on an L) and a few long dead ends; self-storage yard aisles fail
    the fire-truck turn at every T (eng.turning.fire on 8 of 9 storage runs); a school's car queue short of 50 cars on
    non-rectangular lots; towers on a podium on 3-4 ac wedges and skews well under the count (said).
+
+43. Done Nov 5 (parking, round 7). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 88-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base 1cd688a = main with round 6), then fixed:
+   (a) The main drive clear of stalls (lib/layoutrun.mjs clearMainDrive, mainDriveStalls, mainEarlier; MAIN_MIN 200,
+   MAIN_FT 200, as the metrics' mainStalls). On a lot of 200 stalls or more, larger lots commonly run a landscaped entry
+   drive with no head-in stalls for its first stretch. Each row with stalls in the main drive's zone (the entry's width
+   and 34 ft either side, 200 ft in from the street), nearest the street first, is cut at the zone: its ends kept where
+   they still hold 3 stalls (a row with planted ends keeps them, now at the gap too), the gap and the paving under it back
+   to lawn. Paid for first by the stalls to spare, then by new rows on the free sides of the two-way drives (as
+   rowsAlongDrives: lib/layoutrun.mjs driveSideRows and lawnGivesWay, now shared; no farther from a building than the
+   stalls taken out or the 90th-percentile walk, clear of the throats and main drives, nearest the buildings first, the
+   last row no longer than needed), then by donor rows grown a stall at a time onto free land at their ends (rowGrower,
+   now shared with fundEndIslands). A row that can't be paid for stays as drawn and the next is tried. Kept only where the
+   parking is still met with no new dead end and no stall in an entrance's stacking length, the landscape standard stays
+   met, the 90th-percentile walk is no longer, each building's 90th percentile no more than 5 ft longer and the farthest
+   stall no more than 10 ft farther (walkStats, as the metrics measure them). It runs last in the run, on the stalls the
+   end islands and planting left; the run also finishes each layout with the main drive cleared before the surplus is
+   trimmed (the layout's own spare paying) and keeps that finish only where it has fewer main-drive stalls and is no worse
+   on anything measured (the same homes and floor area, no check failing that didn't, no gated lane in place of a second
+   way in, the landscape standard and planted area, dead ends, throat stalls, the walks, at most 2% more paving a stall).
+   The paving and walk before it are kept for the ranking (deadSf, rankWalk), so it tidies the layout the run picks and
+   doesn't change which one it picks (a mirror-image twin can swap in on a tie: TY-mob's pond now on the other side).
+   Main-drive stalls: MX-angled 18 -> 0, TY-bigbox 24 -> 4, MF-garden-max 32 -> 24, LOT-easement-apt 7 -> 0, TY-hotel-full
+   6 -> 0, TY-L-apts and TY-T-apts 4 -> 0, TY-mob 30 -> 26, TY-mix-hotel 19 -> 16, MF-garden-rot 17 -> 13, MX-vertical
+   9 -> 6. Tried and taken out: clearing only before the surplus is trimmed (main-drive stalls 460 -> 274, but it took the
+   spare the end islands and a second way in needed: MF-midrise's 288-home layout got a gated lane and lost its rank to a
+   256-home one, landscape standard 55 -> 51, bare ends 204 -> 233, MF-wedge-midrise's walk p90 137 -> 179 ft); paying
+   only from the spare and donors (460 -> 428, the rest unpaid). Not reached: LOT-curved-apt 58, RE-anchored 55 (cleared to
+   36 early, but its farthest stall went 131 -> 152 ft), RE-grocery-angled 35, IN-crossdock 33 (cleared to 6 early, with
+   less paving and the landscape standard met, but its walk p90 went 134 -> 141 ft), MF-midrise 29, TY-fitness 30: their
+   fields are full to the setbacks, with no spare and no free drive side within the walk.
+   (b) A drive's dead-end stretch folded onto the free sides of the drives kept (MF-tower's top drive past Bldg 1's garage
+   entry, its 20 stalls onto the free rear side, the stretch cut back to the garage entry): tried and taken out. On
+   MF-tower it saved 6% of the paving a stall and kept the walk p90 under 80 ft (47 -> 56), but Bldg 1's own 90th
+   percentile went 63 -> 82 ft, past the 80 ft the engine counts as by the doors; no other bench case qualified.
+   Bench (88 cases, top option; base 1cd688a -> after): all passing, no warnings, replay identical, no case lost homes or
+   floor area, parking met everywhere; 75 identical element for element. Main-drive stalls 460 -> 378; sf a stall summed
+   32,289 -> 32,260; landscape standard 55 -> 55 of 76 lots, share summed 415.6 -> 419.9 points; bare row ends 204 -> 203;
+   90th-percentile walk summed 7,002 -> 6,973 ft, max 9,014 -> 8,997, worst building's 9,891 -> 9,867; dead ends 6 -> 6,
+   none past 150 ft; stalls in an entrance's stacking length 10 -> 9; first drive across the entry summed 7,064 -> 7,082
+   ft (21 short of the stacking length, as before); stalls 13,506 -> 13,494. Per case the paving a stall rose where rows
+   gave way to the main drive (MX-angled 338 -> 353, MF-garden-max 313 -> 320) and fell elsewhere (TY-mob 354 -> 336,
+   LOT-easement-apt 321 -> 310). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172).
+   Engine version rei-layout/2026.11.05.13. Tests: test/parkingquality.mjs (a way in meeting a first aisle at a T with
+   rows across it: the main drive cleared, the rows' ends kept, the parking met; with nothing to spare, paid for by rows
+   on free drive sides or left as drawn, never short and never a longer walk).
+   Still (next worst): main-drive stalls on full lots (LOT-curved-apt 58, RE-anchored 55, RE-grocery-angled 35,
+   IN-crossdock 33, TY-fitness 30, MF-midrise 29: an entry placed where the field has room for a spine, in the
+   generators, is the next try); paving on loop drives (MF-tower 376, TY-assisted 478 sf a stall); WEDGE-trap-midrise's
+   far field (p90 179 ft); bare ends (203) and the 21 lots short of the landscape standard; short entries (WEDGE-tri 29
+   ft slanted, lib/sitegen.mjs; MX-guard-hotel13 36 ft): not worked on this round.
