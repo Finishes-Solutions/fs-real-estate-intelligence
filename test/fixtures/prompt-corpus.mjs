@@ -195,7 +195,18 @@ export const TYPES = [
   { id: 'TY33', cat: 'types', site: 'W20', ask: 'hotel at the front with 110 rooms, apartments behind, 200 units', want: { uses: ['hotel', 'multifamily'], btZones: ['hotel-limited'], place: [['hotel', 'front']] }, out: [['btype', 'hotel-limited'], ['count', 'keys', 'exact', 110], ['units', 'exact', 200], ['nearer', 'hotel', 'multifamily', 'front']] }
 ];
 // Building-type requests written after the AI's program step was tuned to TYPES (item 34), scored once (--fresh3)
-export const FRESH3 = [];
+export const FRESH3 = [
+  { id: 'FT01', cat: 'types', site: 'R5', ask: 'a 95-room select service hotel, 5 stories', want: { uses: ['hotel'], btype: 'hotel-limited', floors: { hotel: 5 } }, out: [['btype', 'hotel-limited'], ['count', 'keys', 'exact', 95]] },
+  { id: 'FT02', cat: 'types', site: 'R10', ask: 'memory care facility with 64 beds', want: { uses: ['multifamily'], btype: 'senior-al' }, out: [['btype', 'senior-al'], ['count', 'beds', 'exact', 64]] },
+  { id: 'FT03', cat: 'types', site: 'P1', ask: 'a drive-thru bank on the corner', want: { usesAny: [['restaurant'], ['retail'], ['office']], btype: 'bank' }, out: [['btype', 'bank'], ['queue', 4]] },
+  { id: 'FT04', cat: 'types', site: 'W20', ask: 'an elementary school, 500 kids', want: { uses: ['other'], btype: 'school' }, out: [['btype', 'school'], ['count', 'students', 'exact', 500]] },
+  { id: 'FT05', cat: 'types', site: 'B40', ask: 'colocation data center 150,000 sf', want: { uses: ['industrial'], btype: 'data-center', q: { industrial: ['exact', 150000] } }, out: [['btype', 'data-center'], ['has', 'equipment yard']] },
+  { id: 'FT06', cat: 'types', site: 'R10', ask: 'triplexes, 45 units', want: { uses: ['duplex'], btype: 'plex', q: { duplex: ['exact', 45] } }, out: [['btype', 'plex'], ['shape', 'plex3'], ['units', 'exact', 45]] },
+  { id: 'FT07', cat: 'types', site: 'T2', ask: 'a tunnel car wash', want: { uses: ['other'], btype: 'car-wash' }, out: [['btype', 'car-wash'], ['queue', 10]] },
+  { id: 'FT08', cat: 'types', site: 'R5', ask: 'a 30,000 sf health club', want: { uses: ['retail'], btype: 'fitness', q: { retail: ['exact', 30000] } }, out: [['btype', 'fitness'], ['gfa', 'retail', 'exact', 30000]] },
+  { id: 'FT09', cat: 'types', site: 'W20', ask: 'a dorm with 400 beds and 20,000 sf of shops in front', want: { uses: ['multifamily', 'retail'], btZones: ['student'] }, out: [['btype', 'student'], ['count', 'beds', 'exact', 400], ['gfa', 'retail', 'exact', 20000]] },
+  { id: 'FT10', cat: 'types', site: 'R10', ask: 'a T-shaped mid-rise apartment building, 120 units', want: { uses: ['multifamily'], btype: 'mf-t' }, out: [['shape', 'T'], ['units', 'exact', 120]] }
+];
 // written after the parser was tuned to CASES and scored once, untuned (node scripts/prompt-corpus.mjs --fresh): how
 // well the reading carries to requests it never saw
 export const FRESH = [

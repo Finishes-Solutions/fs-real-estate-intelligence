@@ -131,6 +131,13 @@ function SITE_E() { return [[0, 0], [500, 0], [500, 900], [0, 900]]; }
   assert.equal(R.kart.program.btype, undefined); assert.equal(R.kart.program.custom.name, 'Indoor go-kart track'); assert.ok(/No building-type preset matches/.test(R.kart.note));
   // the model naming no preset where the words name one: the words' preset (as the words path would)
   { const d = { ...TYPE_REPLIES.cold[1], ...{ buildingType: { preset: null, count: null, bedsPerUnit: null, mezzanine: null, variant: null } } }; const p = run(['cold storage warehouse 200,000 sf', { ...d, gfa: 200000 }]).program; assert.equal(p.btype, 'cold-storage'); assert.equal(p.gfa, 200000); }
+  // live misreadings fixed: a courtyard building the model called mf-u keeps the engine's courtyard form; a big box the
+  // model cut to 120,000 sf "to fit" keeps the 125,000 asked (the engine fits the most that works and says so); a count
+  // the model picked inside the range asked stays the range
+  { const d = { ...TYPE_REPLIES.ell[1], units: 160, floors: 4, form: 'U', buildingType: { ...TYPE_REPLIES.ell[1].buildingType, preset: 'mf-u' } }, p = run(['courtyard building, 4 stories, 160 units', d]).program;
+    assert.equal(p.btype, undefined); assert.equal(B.briefFromProgram(p, planOf('R10'), { text: 'courtyard building, 4 stories, 160 units', parser: 'ai' }).program.uses[0].form, 'mf-courtyard'); }
+  assert.equal(run(['a 125,000 sf home improvement store', { ...TYPE_REPLIES.cold[1], ...{ buildingType: { preset: 'big-box', count: null, bedsPerUnit: null, mezzanine: null, variant: null } }, use: 'retail', gfa: 120000, ratio: 4, truck: null }]).program.gfa, 125000);
+  assert.deepEqual(B.briefFromProgram(programFrom({ ...REPLIES.M04, units: 220, perUnit: null }, 'between 200 and 240 apartments'), planOf('R10'), { text: 'between 200 and 240 apartments', parser: 'ai' }).program.uses[0].quantity, { mode: 'range', min: 200, max: 240, unit: 'units' });
   // an unknown preset id is ignored
   assert.equal(run(['apartments in an L, 140 units', { ...TYPE_REPLIES.ell[1], buildingType: { ...TYPE_REPLIES.ell[1].buildingType, preset: 'spaceport' } }]).program.btype, undefined, 'an id that names no preset: none (the words name none either)');
   // laid out: realistic sites, the buildings tagged as the preset with what they count (as the app runs the AI's program: raw, not re-normalized)

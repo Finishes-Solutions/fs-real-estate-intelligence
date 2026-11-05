@@ -249,7 +249,9 @@ export function typedFrom(d, p, prompt) {
   const id = AI_PRESET_IDS.includes(bt.preset) ? bt.preset : AI_PRESET_IDS.includes(g0.btype) && !(g0.zones?.length > 1) ? g0.btype : null;
   if (!id) return p;
   const base = { ...p }; delete base.custom;
-  if (numbersOf(wordsToDigits(words)).floors == null) delete base.floors; /* (the preset's usual floors, or the engine's for its use) */
+  const W = numbersOf(wordsToDigits(words));
+  if (W.floors == null) delete base.floors; /* (the preset's usual floors, or the engine's for its use) */
+  if (+W.sf > 0 && !['storage-multi', 'storage-single', 'hotel-over-retail'].includes(id)) base.gfa = W.sf; /* (the size the words give, not the model's cut to what it thinks fits: the engine fits the most that works and says so) */
   const q = applyPreset(base, id, words, { count: bt.count, bedsPerUnit: bt.bedsPerUnit, mezzanine: bt.mezzanine, variant: bt.variant });
   if (!q?.btype) return p;
   for (const k of RECIPE_KEEP) if (p[k] != null && q[k] == null) q[k] = p[k]; /* (a recipe preset's program is made afresh: what was said about the site kept) */
