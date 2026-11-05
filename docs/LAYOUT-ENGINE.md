@@ -426,3 +426,21 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    LOT-flag-th 122 -> 139; front-load on 10 ac 98 -> 130; other cases unchanged. Holdout check: P18 fill 58 -> 66,
    exact 58 -> 71; P35, P36, E054 unchanged. Still: no rows facing the loop's outer legs, guest parking only in row
    gaps (no parallel stalls along a lane), and 3-home rows remain where a stretch is short.
+
+21. Done Nov 4 (townhome outer rows). The three gaps item 20 left, measured on the same synthetic bench cases (holdouts
+   only as a non-regression check): (a) guest parking: parallel stalls (8 x 22 ft) along the cross drives' sides, where
+   only row ends face (the inner side at a loop's corner, past the curve; clear of the entry's throat; rows 5 ft off),
+   each counted toward the guests owed, so rows stop giving homes to 90° bays between them; accessible stalls still go to
+   a 90° row where there is one (lib/sitelayout.mjs layoutStack 7b, lib/siteplan.mjs accessible); (b) rows outside the
+   loop's legs: where the strip between a leg and the lot line holds the apron, a 40 ft row and the setback, rows turned a
+   quarter face the leg along its straight run (legRows); every try is also laid out with the legs pulled in that far
+   from the lot lines (spec.legInset; no row then runs past a leg's outer edge, where its garages would face lawn) and
+   kept as a try of its own where it holds more homes; (c) a lot packed to its side and rear lines left no straight way in
+   for the emergency lane: as with the second entrance, the smallest row near a lot line gives way for it
+   (lib/layoutrun.mjs rowGivesWayForLane). 3-home rows mostly went with the 90° bays. Bench (top option, all passing, no
+   warnings): TH-sub5 62 -> 68, TH-sub8 104 -> 113, TH-deep4 44 -> 53, TH-corner6 77 -> 83, MF-townhomes 74 -> 79,
+   MF-townhome-lots 136 -> 151, LOT-flag-th 139 -> 147; other cases unchanged. Holdouts: P18 fill 66 -> 77; P35, P36,
+   E054 unchanged. Tried and taken out: parallel stalls along lane edges no home fronts (with the bays between rows
+   dropped) and choosing the number of cross drives by how whole rows fill the blocks between them: both moved second
+   entrances onto the pond and cost more homes than they gained. Still: the densest tries often fall short of the validator's
+   detention check and rank below (TH-sub8 125, LOT-flag-th 167).

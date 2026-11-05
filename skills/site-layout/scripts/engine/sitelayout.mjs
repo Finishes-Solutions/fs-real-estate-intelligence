@@ -155,6 +155,17 @@ export function layoutStack(F, spec) {
   const rowsBelow = i => B[i].rowsUp ? ROW : 0, rowsAbove = i => B[i + 1].rowsDown ? ROW : 0; // stall rows on aisle i's sides
   // 1. aisle runs: where the aisle itself fits on the paving side of the buffer (long pieces only)
   const runs = A.map((a, i) => spans(F, a.y - a.w / 2, a.y + a.w / 2, F.deep ? 'paveF' : 'pave', runRes).filter(([p, q]) => q - p >= 90).map(([p, q]) => ({ i, a: F.wave ? p + 8 : p, b: F.deep && a.kind === 'street' ? q - 1.5 : F.wave ? q - 8 : q }))); // (streets running back: a foot and a half shy of the rear buffer, which the end's curve and rounding grazed; bent streets: 4 ft shy at both ends, since a sloping end cap's corners reach past the end)
+  // (townhomes as many as fit, the legs pulled in (spec.legInset, a try of its own): an aisle that runs to the lot line
+  // stops a row's depth, its apron and the setback behind it short of the line, so the loop's leg there has a row of homes
+  // outside it, legRows)
+  const legIn = spec.legInset && spec.prog?.use === 'townhomes' && !(spec.prog?.units > 0) && spec.prog?.load !== 'front' && !F.wave;
+  if (legIn) for (const rs of runs) for (const r of rs) {
+    const a = A[r.i], base = spans(F, a.y - a.w / 2, a.y + a.w / 2, F.deep ? 'paveF' : 'pave'), bld = spans(F, a.y - a.w / 2, a.y + a.w / 2, 'build');
+    const sL = base.find(([p]) => Math.abs(p - r.a) < 3), sR = base.find(([, q]) => Math.abs(q - r.b) < 3);
+    if (sL) { const b0 = bld.find(([, q]) => q > sL[0]); r.a += Math.max(0, (b0?.[0] ?? sL[0]) - sL[0]) + 45; }
+    if (sR) { const b1 = bld.slice().reverse().find(([p]) => p < sR[1]); r.b -= Math.max(0, sR[1] - (b1?.[1] ?? sR[1])) + 45; }
+  }
+  if (legIn) for (let k = 0; k < runs.length; k++) runs[k] = runs[k].filter(r => r.b - r.a >= 90);
   // 2. connections between neighbouring aisles: at both ends of where they overlap, the spine, and bays between
   const cons = [];
   const conOK = (x, y0, y1, w) => covers(spans(F, x - w / 2, x + w / 2, F.deep ? 'paveF' : 'pave', reserve, true), y0, y1);
@@ -309,6 +320,26 @@ export function layoutStack(F, spec) {
         els.push({ kind: 'parking', ...rectL(x0, y0, x0 + k * W0, y1), row: up > 0 ? -1 : 1, lock: true, islands: false, sw: W0, sd: D0, sa: a.w, rv: true, name: '', note: 'RV / boat · ' + W0 + ' × ' + D0 + ' ft' });
       } }
   }
+  // 7b. townhomes as many as fit: guest parking as parallel stalls (8 x 22 ft) along the cross drives' sides, where no home
+  // fronts (the rows' ends face them), clear of the lanes' corners and the entry's throat; each stall counted toward the
+  // guests owed, so the rows no longer give a home or two to a 90° bay between them. The rows keep 5 ft off the stalls.
+  const parOb = [], fillTH = spec.prog?.use === 'townhomes' && !(spec.prog?.units > 0) && spec.parallelGuest !== false;
+  if (fillTH) {
+    const PW = 22, PD = 8, pOb = rowOb.filter(o => !conOb.includes(o)).concat(driveOb.filter(o => o.d.con && o.d.path).map(o => ({ p: o.p, g: 2, d: o.d })));
+    for (const c of cons) {
+      if (B[c.i + 1]?.fill !== 'homes' || c.bay) continue;
+      const dr = drives.find(d => d.con === c), P = dr?.path, lowH = P ? Math.sign(P[0][0] - c.x) : 0, upH = P ? Math.sign(P[P.length - 1][0] - c.x) : 0, hook = lowH || upH;
+      const lo0 = A[c.i].y + A[c.i].w / 2, hi0 = A[c.i + 1].y - A[c.i + 1].w / 2;
+      for (const side of hook ? [hook] : [-1, 1]) { // (a loop's corner: the inner side only, the outer side is the site's edge)
+        const xa = side < 0 ? c.x - c.w / 2 - PD : c.x + c.w / 2, xb = xa + PD, lo = lowH ? A[c.i].y + R + 2 : lo0 + 8, hi = upH ? A[c.i + 1].y - R - 2 : hi0 - 8;
+        for (const [p, q] of spans(F, xa, xb, 'pave', pOb.filter(o => o.d !== dr), true).map(([p, q]) => [Math.max(p, lo), Math.min(q, hi)]).filter(([p, q]) => q - p >= 2 * PW)) {
+          const k = Math.floor((q - p) / PW), m = (p + q) / 2, ya = m - k * PW / 2;
+          lots.push({ kind: 'parking', x: (xa + xb) / 2, y: m, w: k * PW, d: PD, rotL: 90, row: side < 0 ? -1 : 1, lock: true, islands: false, caps: false, sw: PW, sd: PD, sa: c.w, parallel: true, name: '', note: 'Guest parking · parallel' });
+          els.push(lots[lots.length - 1]); parOb.push({ p: box(xa, ya, xb, ya + k * PW), g: 5 }); guestOwed -= k;
+        }
+      }
+    }
+  }
   // 8. buildings in their bands
   // townhome rows laid out as many as fit, beside a cross drive: 12 ft from it, 14 ft at a corner of the loop (the curve's
   // own outline keeps them off its arc); they were held 32 ft off every corner, which left each block's ends and the
@@ -318,7 +349,11 @@ export function layoutStack(F, spec) {
   // the main entry (and the second) keeps townhome rows 14 ft off its sides only: across the first lane, the rows facing
   // it from the far side were held 14 ft off its end too, which emptied a stretch of that row
   const entryEls = new Set([...(entry?.els || []), ...(entry2?.els || [])]);
-  const bOb = driveOb.filter(o => !o.d.aisle && !o.d.con).map(o => entryEls.has(o.d) && spec.prog?.use === 'townhomes' ? { p: o.p, g: 0, gx: 14 } : { p: o.p, g: o.d.turn ? 6 : 14 }).concat(cons.map(c => ({ p: box(c.x - c.w / 2, A[c.i].y, c.x + c.w / 2, A[c.i + 1].y), g: spec.storage ? 4 + (c.end ? R * 0.3 : 0) : HX(c) && !(spec.prog?.units > 0) ? 12 + (c.end ? 2 : 0) : 12 + (c.end ? R * 0.5 : 0), con: true })), /* (storage: drive-up doors face the aisles, so rows run close to a cross drive) */ driveOb.filter(o => o.d.con && o.d.path).map(o => ({ p: o.p, g: 1 }))) /* aisles: the bands already keep clear; curves: their own outline */.concat(bayOb.map(o => ({ p: o.p, g: 10 })), reserve, obst);
+  // (the legs pulled in: no row runs on past a leg's outer edge, where its garages would face no drive; the strip outside
+  // the leg is legRows')
+  const legOb = !legIn ? [] : cons.filter(c => c.end).flatMap(c => { const P = drives.find(d => d.con === c)?.path, h = P ? Math.sign(P[0][0] - c.x) || Math.sign(P[P.length - 1][0] - c.x) : 0, xo = c.x - h * c.w / 2;
+    return h ? [{ p: h > 0 ? box(-1e5, -1e5, xo, 1e5) : box(xo, -1e5, 1e5, 1e5), g: 0 }] : []; });
+  const bOb = driveOb.filter(o => !o.d.aisle && !o.d.con).map(o => entryEls.has(o.d) && spec.prog?.use === 'townhomes' ? { p: o.p, g: 0, gx: 14 } : { p: o.p, g: o.d.turn ? 6 : 14 }).concat(cons.map(c => ({ p: box(c.x - c.w / 2, A[c.i].y, c.x + c.w / 2, A[c.i + 1].y), g: spec.storage ? 4 + (c.end ? R * 0.3 : 0) : HX(c) && !(spec.prog?.units > 0) ? 12 + (c.end ? 2 : 0) : 12 + (c.end ? R * 0.5 : 0), con: true })), /* (storage: drive-up doors face the aisles, so rows run close to a cross drive) */ driveOb.filter(o => o.d.con && o.d.path).map(o => ({ p: o.p, g: 1 }))) /* aisles: the bands already keep clear; curves: their own outline */.concat(bayOb.map(o => ({ p: o.p, g: 10 })), parOb, legOb, reserve, obst);
   const left = { all: spec.footLeft ?? Infinity, ...(spec.footByZone || {}) }, homesLeft = { ...(spec.unitsByZone || {}) };
   // a requested number of buildings: spread over the building rows by their length, front rows first
   const counts = spec.countByZone || (spec.count ? { all: spec.count } : null), plan8 = new Map(), keyOf = b => b.zone != null && left[b.zone] != null ? b.zone : 'all';
@@ -365,6 +400,7 @@ export function layoutStack(F, spec) {
       if (b.fill === 'commons' && (i > 0 || n > 0)) { const lo = i > 0 ? A[i - 1].y + A[i - 1].w / 2 + 15 : profile(F).b[0] + 10, hi = i < n ? A[i].y - A[i].w / 2 - 15 : profile(F).p[1] - 15; if (hi - lo > 60) { els.push(...commonsIn(F, [lo, hi], spec, bOb, b)); (spec.parkBands ||= []).push([lo - 15, hi + 15]); } } // at the back too; what's left of it is a park
     }
   }
+  if (fillTH && R > 0) els.push(...legRows(F, spec, A, B, cons, drives, entryEls, els));
   // townhome guest spaces still owed when the rows ran out: the end homes of the longest rows give way to a bay of
   // stalls on their lane, so no option is handed back short of its own parking
   for (let guard = 0; guestOwed > 0.3 && guard < 40; guard++) {
@@ -562,6 +598,48 @@ function homesIn(F, i, b, A, bOb, part, live = null) {
       while (last && last.bl.units > 3 && q - xa < n * SW + 6 && (!fill || guestOwed >= GUEST_TRIM)) { last.bl.units -= 1; last.bl.w -= unitW; last.bl.x -= unitW / 2; last.bl.note = last.bl.units + ' units · ' + unitW + '×' + D + ' · ' + load; const lot = last.lots.pop(); out.splice(out.indexOf(lot), 1); if (lot.dw) out.splice(out.indexOf(lot.dw), 1); b.max += 1; x -= unitW; xa = x - gap + 6; }
       const m = Math.min(fill ? 8 : n, Math.floor((q - xa) / SW)); if (m >= (fill ? 2 : 1)) { stallsAt(xa, m); guestOwed -= m; } }
     if (!th) while (x + unitW <= q && b.max > 0) { b.max -= 2; out.push({ kind: 'building', ...rectL(x, y0, x + unitW, y1), use: 'duplex', floors: b.floors || 2, units: 2, note: 'Front-load · private yards' }); x += unitW + gap; }
+  }
+  return out;
+}
+
+// townhomes as many as fit: rows on the OUTSIDE of the loop's legs (the cross drives at the ends of the lanes), where the
+// strip between a leg and the lot line holds a row (5 ft apron, 40 ft deep, the setback behind): the garages on the leg,
+// as along a lane. Only along the leg's straight run (to 6 ft past a corner's tangent), clear of the entries (14 ft each
+// side), the rows already laid out (the building separation), stalls and the pond's land. Rear-load rows only.
+function legRows(F, spec, A, B, cons, drives, entryEls, els) {
+  if (spec.prog?.load === 'front' || F.wave) return [];
+  const out = [], R = spec.curveR ?? 30, D = 40, apron = 5, unitW = 24, gap = +PAR.homeGap > 0 ? +PAR.homeGap : 20, cap = 6, guest = (S.USES.townhomes.guest || 0) * 1.15;
+  const legs = new Map(); // side and x of a leg: its y-ranges along the straight
+  for (const c of cons) {
+    if (!c.end || B[c.i + 1]?.fill !== 'homes') continue;
+    const dr = drives.find(d => d.con === c), P = dr?.path; if (!P) continue;
+    const lowH = Math.sign(P[0][0] - c.x), upH = Math.sign(P[P.length - 1][0] - c.x), hook = lowH || upH; if (!hook || lowH && upH && lowH !== upH) continue;
+    const key = -hook + ':' + Math.round(c.x), L = legs.get(key) || { side: -hook, c, dr: [], ys: [] }; legs.set(key, L); L.dr.push(dr);
+    L.ys.push([lowH ? A[c.i].y + R - 6 : A[c.i].y, upH ? A[c.i + 1].y - R + 6 : A[c.i + 1].y]);
+  }
+  for (const L of legs.values()) {
+    const { side, c } = L, face = side < 0 ? c.x - c.w / 2 - apron : c.x + c.w / 2 + apron, x0 = side < 0 ? face - D : face, x1 = x0 + D;
+    const ob = []; for (const e of els.concat(out)) {
+      if (L.dr.includes(e) || e.kind === 'green' || e.kind === 'tree') continue;
+      const p = outL(e), xs = p.map(q => q[0]);
+      if (e.kind === 'drive') { if (entryEls.has(e)) ob.push({ p, g: 0, gx: 14 }); else if (e.path || e.poly || Math.min(...xs) < x1 - 0.5 && Math.max(...xs) > x0 + 0.5) ob.push({ p, g: e.path ? 2 : 10 }); continue; } // (a lane that ends at the leg doesn't cross the strip)
+      ob.push({ p, g: e.kind === 'building' ? gap : e.kind === 'parking' ? 6 : 0 });
+    }
+    for (const r of spec.reserve || []) ob.push(r.p ? r : { p: r, g: 0 });
+    const ys = L.ys.sort((a, b) => a[0] - b[0]), lo = ys[0][0], hi = Math.max(...ys.map(v => v[1]));
+    if (ys.some((v, k) => k && v[0] > ys[k - 1][1] + 1)) continue; // (a leg broken between lanes)
+    for (const [p, q] of spans(F, x0, x1, 'build', ob, true).map(([p, q]) => [Math.max(p, lo), Math.min(q, hi)]).filter(([p, q]) => q - p >= 3 * unitW)) {
+      let bestU = 0, bestM = 1; for (let m = 1; m <= 12; m++) { const u = Math.min(m * cap, Math.floor((q - p - (m - 1) * gap) / unitW)); if (u < 3 * m) break; if (u > bestU) { bestU = u; bestM = m; } }
+      let y = p, left = bestU;
+      for (let j = 0; j < bestM; j++) {
+        const k = Math.ceil(left / (bestM - j)); left -= k;
+        const bl = { kind: 'building', x: (x0 + x1) / 2, y: y + k * unitW / 2, w: k * unitW, d: D, rotL: 90, use: 'townhomes', floors: B[c.i + 1]?.floors || 3, units: k, note: k + ' units · ' + unitW + '×' + D + ' · rear-load' };
+        out.push(bl);
+        const lx0 = side < 0 ? Math.max(x0 - 10, F.X0) : c.x + c.w / 2, lx1 = side < 0 ? c.x - c.w / 2 : Math.min(x1 + 10, F.X1);
+        for (let u = 0; u < k; u++) out.push({ kind: 'lot', ...rectL(lx0, y + u * unitW, lx1, y + (u + 1) * unitW), name: '', note: unitW + ' × ' + Math.round(lx1 - lx0) + ' ft townhome lot' });
+        guestOwed += k * guest; y += k * unitW + gap;
+      }
+    }
   }
   return out;
 }
@@ -1829,6 +1907,9 @@ function layoutCore(plan0, programIn, opts = {}) {
         // short, twice at most, each kept as a try of its own (the validator warns below 97% of the estimate)
         for (let k = 0, ak = a, ok = o; k < 2 && ak && prog.use === 'townhomes' && o.pondAt !== 'none' && ak.st.pondNeed > 0 && ak.st.pond < ak.st.pondNeed * 0.97; k++) { const o2 = { ...o, pondRes: Math.min(2.2, (ok.pondRes || 1) * ak.st.pondNeed / Math.max(1, ak.st.pond) * 1.05) }, a2 = attempt(plan, F, q.seq, prog, o2); if (a2) found.push(take(a2, q.seq, o2, deep, align, F0, pondAt)); ak = a2; ok = o2; } // opts.xNeed: spaces for pieces placed after (an AI-crafted type's courts)
         if (!a) continue; found.push(take(a, q.seq, o, deep, align, F0, pondAt));
+        // townhomes as many as fit: the same try with the loop's legs pulled in from the lot lines a row's depth, its apron
+        // and the setback, and a row of homes outside each (legRows); kept as a try of its own where it holds more homes
+        if (prog.use === 'townhomes' && prog.units == null && prog.load !== 'front' && !pinned.length && !opts.pod) { const oi = { ...o, spec: { ...(o.spec || {}), legInset: true } }, ai = attempt(plan, F, q.seq, prog, oi); if (ai && ai.st.units > a.st.units) found.push(take(ai, q.seq, oi, deep, align, F0, pondAt)); }
       }
     }
     }

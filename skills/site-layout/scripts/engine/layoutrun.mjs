@@ -188,6 +188,31 @@ export function pondBesideWork(plan, o) {
 // the fire official accept one; the validator counts it as such (an assumption).
 const LANE_W = 20, LANE_MAX = 420;
 export function addEmergencyAccess(plan, o, brief) {
+  const r = addEmergencyAccess0(plan, o, brief);
+  if (r !== o || !o?.elements?.length || o.elements.some(e => e.emergency)) return r;
+  return rowGivesWayForLane(plan, o, brief) || r;
+}
+// Townhomes packed to the side and rear lot lines (or a pond there) can leave no straight way in from a lot line for the
+// emergency lane, and the option is left short of its second way in. Where the count can spare homes (as many as fit, or
+// up to), one row near a lot line gives way, with its lots and driveways, and the lane is looked for again: the smallest
+// rows first, the farthest from the entrances first among equals, six at most; the first that lets a lane in is kept.
+function rowGivesWayForLane(plan, o, brief) {
+  const HOME = ['townhomes', 'duplex'], useOf = e => e.use || o.program?.use, els = o.elements;
+  if (!(brief?.program?.uses || []).some(u => HOME.includes(u.use) && u.quantity?.unit === 'units' && (u.quantity.mode === 'maximize' || u.quantity.mode === 'max'))) return null;
+  const v = V.validateLayout({ ...plan, elements: els, program: o.program || {} }, brief); if (!['access.second', 'access.remote'].some(id => v.checks.find(c => c.id === id)?.status === 'fail')) return null;
+  const ring = plan.ring, n = ring.length, ents = S.entrancesOf(els).map(e => S.centroid(S.shapeOf(e))); if (!ents.length) return null;
+  const toLine = sh => Math.min(...sh.flatMap(p => ring.map((a, k) => S.segDist(p, a, ring[(k + 1) % n]))));
+  const rows = els.filter(e => e.kind === 'building' && !e.future && HOME.includes(useOf(e)) && !e.poly).map(e => { const sh = S.shapeOf(e), c = S.centroid(sh); return { e, st: toLine(sh), far: Math.min(...ents.map(q => Math.hypot(q[0] - c[0], q[1] - c[1]))) }; })
+    .filter(r => r.st < 60).sort((a, b) => (+a.e.units || 0) - (+b.e.units || 0) || b.far - a.far || String(a.e.id).localeCompare(String(b.e.id))).slice(0, 6);
+  for (const { e } of rows) {
+    const lots = els.filter(lt => lt.kind === 'lot' && S.rectsOverlap(lt, e, 1)), drv = els.filter(x => x.kind === 'plaza' && x.note === 'Driveway' && lots.some(lt => S.inRing(S.centroid(S.shapeOf(x)), S.shapeOf(lt))));
+    const gone = new Set([e, ...lots, ...drv]), o1 = { ...o, elements: els.filter(x => !gone.has(x)) }, o2 = addEmergencyAccess0(plan, o1, brief);
+    if (o2 === o1) continue;
+    return { ...o2, tplNotes: [...(o2.tplNotes || []), (e.name || 'A row of homes') + ' (' + e.units + ' homes) gave way for the emergency access lane.'] };
+  }
+  return null;
+}
+function addEmergencyAccess0(plan, o, brief) {
   if (!o?.elements?.length || o.elements.some(e => e.emergency)) return o;
   const v = V.validateLayout({ ...plan, elements: o.elements, program: o.program || {} }, brief), chk = id => v.checks.find(x => x.id === id)?.status;
   if (chk('access.second') !== 'fail' && chk('access.remote') !== 'fail') return o;

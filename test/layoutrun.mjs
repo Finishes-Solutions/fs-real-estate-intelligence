@@ -451,6 +451,17 @@ ok('townhomes as many as fit: rows line both sides of every lane end to end at t
   assert.ok(rows.every(e => e.units >= 3 && e.units <= 6), 'rows of 3 to 6: ' + rows.map(e => e.units).join());
   assert.equal(o.validation.checks.find(c => c.id === 'separation.buildings').status, 'pass');
 });
+ok('townhomes as many as fit: guests park parallel along the cross drives, rows face the outside of a loop leg pulled in (10 ac)', () => {
+  const o = RUN.runBrief(B.briefFromRequest('fee simple townhomes with garages, as many as fit', RECT)).options[0], els = o.elements, rows = els.filter(e => e.kind === 'building' && e.use === 'townhomes');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.deepEqual(o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id), [], 'no warnings');
+  assert.ok(o.quantities.totals.units >= 145, 'packed: ' + o.quantities.totals.units + ' homes (was 136)');
+  assert.ok(rows.every(e => e.units >= 3 && e.units <= 6), 'rows of 3 to 6');
+  const par = els.filter(e => e.kind === 'parking' && e.parallel); assert.ok(par.length >= 4, 'parallel guest stalls: ' + par.length);
+  for (const p of par) { assert.equal(p.sw, 22); assert.equal(p.sd, 8); assert.ok(rows.every(b => SP.gapBetween(SP.shapeOf(p), SP.shapeOf(b)) >= 4.9), 'stalls 5 ft off the homes'); }
+  const turned = rows.filter(b => Math.abs((((b.rot - rows[0].rot) % 180) + 180) % 180 - 90) < 1); assert.ok(turned.length >= 1, 'a row outside a leg, turned a quarter');
+  const drives = els.filter(e => e.kind === 'drive');
+  for (const b of turned) assert.ok(Math.min(...drives.map(d => SP.gapBetween(SP.shapeOf(b), SP.shapeOf(d)))) <= 6, b.name + ': its garages on the leg (5 ft apron)');
+});
 ok('front-load townhomes from the reviewed row (E053): a one-car garage and a driveway a home, on lots of their own', () => {
   const b = B.briefFromRequest('front-load townhomes, as many as fit', RECT), r = RUN.runBrief(b), o = r.options[0];
   assert.equal(o.validation.status, 'pass', o.validation.failed.join());
