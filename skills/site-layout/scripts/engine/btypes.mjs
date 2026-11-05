@@ -516,7 +516,7 @@ const AI_CUES = { 'hotel-limited': 'hotel, inn or motel with N rooms or keys, se
   'cold-storage': 'cold storage, refrigerated or freezer warehouse', 'data-center': 'data center, hyperscale, colocation, server farm', fitness: 'gym, fitness center, health club', 'big-box': 'big box, supercenter, home improvement, wholesale club',
   bank: 'bank or credit union branch with drive-thru lanes', daycare: 'daycare, child care, preschool, early learning; count children', school: 'elementary, middle, high, K-8 or charter school; count students',
   'car-wash': 'an express car wash on its own; count vacuums', 'garage-standalone': 'a parking garage on its own; count spaces', 'point-tower': 'point tower, slender or slim tower', 'pad-village': 'pad-site village, cluster of pads, food hall pads; count pads',
-  'mf-l': 'L-shaped apartments', 'mf-u': 'U-shaped apartments, a building round a court or pool', 'mf-t': 'T-shaped apartments' };
+  'mf-l': 'L-shaped apartments', 'mf-u': 'U-shaped apartments, a U round a pool (a courtyard building with no U named is form U, preset null)', 'mf-t': 'T-shaped apartments' };
 // one line a preset: id, what it is, the use it lays out as, what it counts, its usual numbers and its parking rule
 export function presetTable() {
   const n = v => Math.round(v).toLocaleString('en-US');
@@ -540,7 +540,7 @@ function hintNumbers(P, h = {}) {
 export function applyPreset(p0, id, text, hint = {}) {
   if (!p0 || typeof p0 !== 'object' || p0.parcels || p0.zones?.length > 1) return p0;
   const t0 = String(text || '').toLowerCase(), sh = { 'mf-l': 'l-shaped', 'mf-u': 'u-shaped', 'mf-t': 't-shaped' }[id];
-  if (sh) { if (!['multifamily', 'other'].includes(p0.use)) return p0; const q = applyType({ ...p0, use: 'multifamily' }, SHAPE(t0) ? t0 : t0 + ' ' + sh); return q.btype ? q : p0; }
+  if (sh) { if (!['multifamily', 'other'].includes(p0.use) || MF_FORM.test(t0) && !SHAPE(t0)) return p0; /* (a form the words name, "courtyard building", is the engine's own: kept) */ const q = applyType({ ...p0, use: 'multifamily' }, SHAPE(t0) ? t0 : t0 + ' ' + sh); return q.btype ? q : p0; }
   const P = NEW.find(q => q.id === id); if (!P || P.status === 'unsupported') return p0;
   const v = VARIANT[hint.variant], t = t0 + (v && !t0.includes(v) ? ' ' + v : '') + (+hint.mezzanine > 0 && !/mezzanine/.test(t0) ? ' mezzanine' : ''), X = { ...hintNumbers(P, hint), ...numbersOf(t0) };
   let p = P.apply({ ...p0, use: P.use }, t, X, P);
