@@ -65,6 +65,9 @@ const SITES = {
      (lib/guardrails.mjs: the 5% count reserve, detention at 1 ac-ft a developed acre 4 ft deep, 26 ft fire-lane aisles) */
   wal25: [[0, 0], [1300, 0], [1300, 831], [0, 831]],
   wal13: [[0, 0], [900, 0], [900, 630], [0, 630]],
+  /* homes round a central lake on lots that aren't rectangles (docs/LAYOUT-ENGINE.md item 37): a 19.8 ac L, a 20.7 ac wedge */
+  L20: [[0, 0], [1100, 0], [1100, 560], [600, 560], [600, 1000], [0, 1000]],
+  wedge20: [[0, 0], [1200, 0], [950, 850], [150, 900]],
   ty110: [[0, 0], [800, 0], [800, 600], [0, 600]],
   ty145: [[0, 0], [900, 0], [900, 700], [0, 700]]
 };
@@ -164,7 +167,12 @@ const CASES = [
   { id: 'TY-daycare-dropoff', family: 'types', site: 'ty46', ask: 'a daycare for 150 children' },
   { id: 'TY-hotel-porte', family: 'types', site: 'ty62', ask: 'a 6-story hotel with 120 keys' },
   { id: 'TY-hotel-retail-sf', family: 'types', site: 'ty55', ask: 'a 120-key hotel over 8,000 sf of retail' },
-  { id: 'TY-gas-queue', family: 'types', site: 'ty23', ask: 'gas station with 12 pumps' }
+  { id: 'TY-gas-queue', family: 'types', site: 'ty23', ask: 'gas station with 12 pumps' },
+  // item 37: the central-lake ring on an L and a wedge, townhomes and duplexes round the lake, a daycare named beside homes
+  { id: 'RING-L-homes', family: 'multifamily', site: 'L20', ask: 'homes around a central lake' },
+  { id: 'RING-wedge-th', family: 'multifamily', site: 'wedge20', ask: 'townhomes around a central lake' },
+  { id: 'RING-L-duplex', family: 'multifamily', site: 'L20', ask: 'duplexes around a central lake' },
+  { id: 'TY-daycare-homes', family: 'types', site: 'ty145', ask: 'a daycare for 120 children beside 40 homes' }
 ];
 const plan = (id, guard = false) => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: guard ? [-95.93, 30.06] : [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })), ...(guard ? { params: { guard: { mode: 'on' } } } : {}) }; };
 // a guarded case's plan and brief, as the app makes them (lib/guardrails.mjs forLayout: the scenario's plan and program; runPlan's brief)

@@ -232,9 +232,12 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   ({ o, rec } = run('a 6-story hotel with 120 keys', 600, 450));
   assert.equal(o.validation.status, 'pass'); const pc = o.elements.find(e => e.queue === 'porte'), cn = o.elements.find(e => e.porte);
   assert.ok(pc && pc.width === 24 && cn && cn.kind === 'plaza', 'lane and canopy'); assert.equal(chk(o, 'queues.stack').status, 'pass'); assert.ok(RUN.replayRun(rec).identical);
-  // a tight lot: no room, said, nothing broken
+  // a tight lot: the run lays out the parking again with room for it (docs/LAYOUT-ENGINE.md item 37), nothing broken
   ({ o } = run('a 6-story hotel with 120 keys', 420, 300));
-  assert.equal(o.validation.status, 'pass'); assert.ok(!o.elements.some(e => e.queue === 'porte') && o.notes.some(n => /no room .* porte-cochère/.test(n)));
+  assert.equal(o.validation.status, 'pass'); assert.ok(o.elements.some(e => e.queue === 'porte') && o.quantities.totals.gfa === 66000 && o.quantities.parking.provided >= o.quantities.parking.required);
+  // too tight even for that: no room, said, nothing broken
+  ({ o } = run('a 6-story hotel with 120 keys', 300, 260));
+  assert.ok(o.elements.some(e => e.queue === 'porte') || o.notes.some(n => /no room .* porte-cochère/.test(n)));
   // a hotel over the shops asked (not the whole ground floor)
   ({ o } = run('a 120-key hotel over 8,000 sf of retail', 600, 400));
   const hr = o.elements.filter(e => e.btype === 'hotel-over-retail');
