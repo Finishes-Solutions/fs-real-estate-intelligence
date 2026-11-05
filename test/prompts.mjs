@@ -127,8 +127,10 @@ function SITE_E() { return [[0, 0], [500, 0], [500, 900], [0, 900]]; }
   assert.equal(R.ell.program.btype, 'mf-l'); assert.equal(R.ell.program.form, 'L', 'a shape the words put another way: the model’s preset');
   // a type a zone: the hotel zone sized by its 150 keys (82,500 sf, not the model's 80,000), its buildings tagged after the run
   { const p = R.hotelMix.program; assert.deepEqual(p.btZones.map(z => [z.zone, z.btype]), [[1, 'hotel-limited']]); assert.equal(p.zones[1].gfa, 150 * 550); assert.equal(p.zones[0].gfa, 25000); }
-  // no preset: the model's own recipe, and the notes say no preset matched
-  assert.equal(R.kart.program.btype, undefined); assert.equal(R.kart.program.custom.name, 'Indoor go-kart track'); assert.ok(/No building-type preset matches/.test(R.kart.note));
+  // no preset: the model's own recipe, and the model says no preset matched (its assumptions)
+  assert.equal(R.kart.program.btype, undefined); assert.equal(R.kart.program.custom.name, 'Indoor go-kart track'); assert.equal(R.kart.note, undefined); assert.ok(/Say in assumptions that no preset matched/.test(SYSTEM), 'the model says no preset matched');
+  // a recipe of the model's own with no preset named (a team's saved daycare reused) is kept, though the words name a daycare
+  { const p = run(['our daycare again, for 90 children', { ...TYPE_REPLIES.toddlers[1], buildingType: { preset: null, count: null, bedsPerUnit: null, mezzanine: null, variant: null } }]).program; assert.equal(p.btype, undefined); assert.equal(p.custom.name, 'Learning center'); }
   // the model naming no preset where the words name one: the words' preset (as the words path would)
   { const d = { ...TYPE_REPLIES.cold[1], ...{ buildingType: { preset: null, count: null, bedsPerUnit: null, mezzanine: null, variant: null } } }; const p = run(['cold storage warehouse 200,000 sf', { ...d, gfa: 200000 }]).program; assert.equal(p.btype, 'cold-storage'); assert.equal(p.gfa, 200000); }
   // live misreadings fixed: a courtyard building the model called mf-u keeps the engine's courtyard form; a big box the

@@ -1162,8 +1162,9 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    none. A preset's usual floors stand unless the words give floors (the model's guess is dropped), the words' size
    stands over a size the model cut "to fit", homes are counted from beds, and a recipe preset's own recipe (a
    daycare's play yard, a school's field) wins over the model's. A type no preset covers keeps the model's own recipe,
-   and the notes say no preset matched. The app runs the API's program as it comes (no re-normalising), so the type
-   fields reach the engine.
+   and the model says in its assumptions that no preset matched; a recipe of the model's own with no preset named (a
+   team's saved type reused) is kept even where the words name a preset. The app runs the API's program as it comes
+   (no re-normalising), so the type fields reach the engine.
    (c) Live misreadings fixed (after the first full run): a "courtyard building" the model called U-shaped keeps the
    engine's courtyard form (a shape preset only when the words name no form or name the shape); a count the model
    picked inside the range asked stays the range (lib/layoutbrief.mjs useFromProgram); apartments the model answered as
@@ -1178,7 +1179,7 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests: test/prompts.mjs (mocked replies through the mapping:
    an inn by rooms, a daycare by children over the model's recipe, a K-8 school, cold storage and a data centre over the
    model's numbers, dorms by beds, quadplexes, a slim tower, an L, a hotel zone by keys, the go-kart track's own recipe,
-   the words' preset when the model names none, the live fixes). Still missed, live and words alike (the engine, not the
+   a team's saved daycare kept, the words' preset when the model names none, the live fixes). Still missed, live and words alike (the engine, not the
    reading): a data centre on 40 ac still drawn with a truck court (TY15), a 16-story point tower holding 189 of 220,
    "U-shaped … round a central courtyard" drawn as the courtyard ring not a U, a 125,000 sf big box fitting 109,802 on
    10 ac, a 500-car garage on 2.3 ac holding 171; FT10 a T-shaped mid-rise 88 of 120.

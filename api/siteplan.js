@@ -251,7 +251,8 @@ export function typedFrom(d, p, prompt) {
     for (const Z of g0.btZones || []) if (!btZones.some(b => b.btype === Z.btype)) put(g0.zones?.[Z.zone]?.use, Z.btype, { count: Z.counts?.children || Z.counts?.students || null });
     return btZones.length ? { ...p, zones: zs, btZones } : p;
   }
-  const id = AI_PRESET_IDS.includes(bt.preset) ? bt.preset : AI_PRESET_IDS.includes(g0.btype) && !(g0.zones?.length > 1) ? g0.btype : null;
+  const ownRecipe = typeof d?.custom?.name === 'string' && d.custom.name.trim() && p.use === 'other'; /* (a recipe of the model's own, a team's saved type reused: kept unless the model names a preset) */
+  const id = AI_PRESET_IDS.includes(bt.preset) ? bt.preset : AI_PRESET_IDS.includes(g0.btype) && !(g0.zones?.length > 1) && !ownRecipe ? g0.btype : null;
   if (!id) return p;
   const base = { ...p }; delete base.custom;
   const W = numbersOf(wordsToDigits(words));
@@ -322,7 +323,7 @@ function placed(zs, words) {
 export function customFrom(d, program) {
   const raw = d?.custom, name = typeof raw?.name === 'string' ? raw.name.trim() : '';
   if (program.use !== 'other' || program.zones || !name || (program.btype && program.btype !== 'custom')) return { program }; // (a preset's own recipe: lib/btypes.mjs)
-  const r = recipeIn(raw); if (r) return { program: { ...programOf(r, program), ...(program.setbacks ? { setbacks: program.setbacks } : {}) }, note: 'No building-type preset matches “' + clip(name, 60) + '”: laid out from the AI’s own recipe (' + r.pattern + '), its sizes the AI’s estimates.' };
+  const r = recipeIn(raw); if (r) return { program: { ...programOf(r, program), ...(program.setbacks ? { setbacks: program.setbacks } : {}) } }; /* (no preset: the model says so in its assumptions, as the instructions ask) */
   return { program: { ...program, custom: undefined }, note: 'The AI’s recipe for “' + clip(name, 60) + '” didn’t make sense, so it’s laid out as a plain building (3 spaces / 1,000 sf).' };
 }
 const PROG = Object.fromEntries(Object.entries(SCHEMA.properties).filter(([k]) => !['summary', 'assumptions'].includes(k)));
