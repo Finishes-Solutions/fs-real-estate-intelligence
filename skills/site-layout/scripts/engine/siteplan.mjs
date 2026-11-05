@@ -1813,6 +1813,13 @@ export function angledStallPolys(e) {
   st.rows.forEach((_, r) => { for (let i = 0; i < st.n; i++) if (!st.skip.has(i)) out.push({ poly: angLocal(st, r, i).map(put), r, i }); });
   return out;
 }
+// the stalls a square row of n stall widths holds: an island every 13th (islands) and both end stalls planted (caps, on
+// a row of 6 or more). Where the 13th falls on the end cap (a row of 13, 26, ... with caps) it is the cap, counted once:
+// as stallCentres draws them (an island slot k = 12, 25, ... short of the last stall when capped).
+export function rowStallCount(n, islands, caps) {
+  if (!(n > 0)) return 0; const c = caps && n >= 6 ? 1 : 0;
+  return Math.max(0, n - (islands ? Math.floor((n - (caps ? 1 : 0)) / 13) : 0) - 2 * c);
+}
 export function stalls(e, S0 = STALL) {
   if (stallAng(e)) return angStalls(e);
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0; // a plan's own stall size
@@ -1820,10 +1827,10 @@ export function stalls(e, S0 = STALL) {
   const lay = (W, D) => {
     const n = Math.floor((W + 0.01) / S.w), rows = []; let y = -D / 2;
     if (n < 1) return { count: 0, rows, n, W };
-    if (e.row) { if (D >= S.d - 0.01) rows.push(e.row > 0 ? [D / 2 - S.d, D / 2] : [-D / 2, -D / 2 + S.d]); return { count: rows.length * Math.max(0, n - (e.islands ? Math.floor(n / 13) : 0) - (e.caps && n >= 6 ? 2 : 0)), rows, n, W }; }
+    if (e.row) { if (D >= S.d - 0.01) rows.push(e.row > 0 ? [D / 2 - S.d, D / 2] : [-D / 2, -D / 2 + S.d]); return { count: rows.length * rowStallCount(n, e.islands, e.caps), rows, n, W }; }
     while (D / 2 - y >= 2 * S.d + S.aisle - 0.01) { rows.push([y, y + S.d], [y + S.d + S.aisle, y + 2 * S.d + S.aisle]); y += 2 * S.d + S.aisle; }
     if (D / 2 - y >= S.d + S.aisle - 0.01) rows.push([y, y + S.d]);
-    return { count: rows.length * Math.max(0, n - (e.islands ? Math.floor(n / 13) : 0) - (e.caps && n >= 6 ? 2 : 0)), rows, n, W };
+    return { count: rows.length * rowStallCount(n, e.islands, e.caps), rows, n, W };
   };
   if (e.stallRot != null && Number.isFinite(+e.stallRot)) return Math.round(+e.stallRot / 90) % 2 ? { ...lay(e.d, e.w), swap: true } : { ...lay(e.w, e.d), swap: false }; // turned by hand
   if (e.lock) return { ...lay(e.w, e.d), swap: false }; // laid out by the generator: rows run along its length
@@ -2667,9 +2674,13 @@ export function driveThruMarks(els) {
 }
 // drive aisles with an end that goes nowhere: past the last place another drive, entrance or truck court joins it, the
 // aisle runs on between stalls and stops at a curb, so a driver who finds no space there backs out or turns in the aisle.
-// A few stalls past the last join are ordinary; 10 or more are flagged (min). An end left clear of stalls for 16 ft (a
-// hammerhead to turn in) counts as a way out. Stalls in a row that runs on past the aisle's end count too: they have
-// no aisle in front of them at all. Each: { e, end, stalls, sgn, u, L, W, tc (last join), rowEnd (where the rows stop) }
+// A few stalls past the last join are ordinary; 10 or more are flagged (min). An end left clear of stalls for HAMMER_FT
+// (a hammerhead: the stalls along the aisle's last 18 ft out on both sides, as openDeadEnds and the corner wings cut
+// them) counts as a way out here. An aisle whose stalls run more than DEAD_AISLE_FT past the last join needs a paved
+// turnaround or a drive besides (lib/layoutrun.mjs longDeadAisles / aisleTurnarounds, the validator's
+// parking.dead-end-aisle: the same 150 ft); openDeadEnds paves its hammerhead there. Stalls in a row that runs on past the aisle's end count too: they have no aisle in front of them at all.
+// Each: { e, end, stalls, sgn, u, L, W, tc (last join), rowEnd (where the rows stop) }
+export const HAMMER_FT = 18, DEAD_AISLE_FT = 150;
 export function deadEnds(els, min = 10) {
   const net = els.filter(e => (e.kind === 'drive' && e.note !== 'Drive-thru lane') || e.kind === 'truck' || e.kind === 'field'), shp = new Map(net.map(e => [e, shapeOf(e)])), rows = els.filter(e => e.kind === 'parking' && !isFree(e)), out = []; // (an aisle that runs onto a parking field has a way out there)
   for (const e of net) { if (e.kind !== 'drive' || isFree(e) || e.entry || e.turn || e.bulb || e.through || e.name === 'Main entry') continue;
@@ -2677,7 +2688,7 @@ export function deadEnds(els, min = 10) {
     const u = rot(along ? [1, 0] : [0, 1], e.rot || 0), v = [-u[1], u[0]], at = (t, s) => [e.x + u[0] * t + v[0] * s, e.y + u[1] * t + v[1] * s], tOf = p => (p[0] - e.x) * u[0] + (p[1] - e.y) * u[1], sOf = p => (p[0] - e.x) * v[0] + (p[1] - e.y) * v[1];
     const sh = shapeOf(e), g1 = grow(sh, 1);
     // the rows along it (beside it, parallel): their stretch along the aisle and stall width
-    const on = rows.filter(r => rectsOverlap({ poly: grow(shapeOf(r), 2) }, { poly: sh }, 0)).map(r => { const q = shapeOf(r).map(tOf), ss = shapeOf(r).map(sOf); return { r, a: Math.min(...q), b: Math.max(...q), side: Math.min(...ss) > -1 ? 1 : Math.max(...ss) < 1 ? -1 : 0, sw: r.sw || STALL.w }; }).filter(o => o.side && o.b - o.a > 8);
+    const on = rows.filter(r => rectsOverlap({ poly: grow(shapeOf(r), 2) }, { poly: sh }, 0)).map(r => { const q = shapeOf(r).map(tOf), ss = shapeOf(r).map(sOf), sw = r.sw || STALL.w, cap = r.caps && !r.poly && !stallAng(r) && Math.abs(Math.max(...q) - Math.min(...q) - (+r.w || 0)) < 1 && stalls(r).n >= 6 ? sw : 0; return { r, a: Math.min(...q) + cap, b: Math.max(...q) - cap, side: Math.min(...ss) > -1 ? 1 : Math.max(...ss) < 1 ? -1 : 0, sw }; }).filter(o => o.side && o.b - o.a > 8); // (a row's planted end caps are no stalls: its stalls' stretch)
     if (!on.length) continue;
     // where other drives join it (overlap its outline, not just run alongside past its end)
     // (measured along the aisle's line, past its ends too: a connector that curves on out of the aisle carries it on for a while)
@@ -2689,7 +2700,7 @@ export function deadEnds(els, min = 10) {
       if ((rowEnd - tc) * sgn <= 0) continue; // the network goes on past the last stall
       if ((end - tc) * sgn <= 4 && (rowEnd - end) * sgn <= 1) continue; // joined at its end
       const lo = Math.min(tc, rowEnd), hi = Math.max(tc, rowEnd), past = on.reduce((n, o) => n + Math.max(0, Math.min(o.b, hi) - Math.max(o.a, lo)) / o.sw, 0);
-      const hammer = (rowEnd - end) * sgn <= 1 && !on.some(o => Math.min(o.b, Math.max(end, end - sgn * 16)) - Math.max(o.a, Math.min(end, end - sgn * 16)) > 2);
+      const hammer = (rowEnd - end) * sgn <= 1 && !on.some(o => Math.min(o.b, Math.max(end, end - sgn * HAMMER_FT)) - Math.max(o.a, Math.min(end, end - sgn * HAMMER_FT)) > 0.5);
       if (hammer) continue;
       if (Math.floor(past + 0.01) >= min) out.push({ e, end: at(end, 0), stalls: Math.floor(past + 0.01), sgn, u, L, W, tc, rowEnd, on });
     }
