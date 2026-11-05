@@ -712,12 +712,14 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    whole, its drive and lot paving with it: afterCut, shared with pruneSurplus). Kept only where the 90th percentile walk
    drops 5 ft or more with paving up 1% at most, or the throat clears, or the paving drops 2% at the same walk; never more
    stalls in a throat, never a new dead end.
-   (d) one dead-end rule: lib/siteplan.mjs deadEnds takes an end clear of stalls for HAMMER_FT (18 ft, as openDeadEnds
-   and the corner wings cut them; was 16 ft, with 2 ft slack) as a way out only while the stalls run no more than
-   DEAD_AISLE_FT (150, the same constant longDeadAisles and the validator use) past the last join; past that it takes a
-   paved turnaround or a drive. Planted end caps are not stalls in either detector.
-   openDeadEnds' hammerhead (the last two stalls each side cut) is paved as a turnaround (lot paving, turn) where the
-   stalls run past DEAD_AISLE_FT, so its own fix still counts under the one rule.
+   (d) one dead-end rule: lib/siteplan.mjs deadEnds (the plan's dead-end warning, openDeadEnds) takes an end clear of
+   stalls for HAMMER_FT (18 ft, as openDeadEnds and the corner wings cut them; was 16 ft with 2 ft slack) as a way out;
+   an aisle whose stalls run more than DEAD_AISLE_FT (150, now one constant for longDeadAisles, aisleTurnarounds and the
+   engine; the validator keeps its own 150) past the last join needs a paved turnaround besides, and openDeadEnds now
+   paves its hammerhead there (lot paving marked as a turnaround) where it fits clear of buildings and the rest. Planted
+   end caps are not stalls in either detector. (Tried: deadEnds refusing an 18 ft hammerhead on a long aisle outright;
+   it broke the corner wings' unpaved hammerheads, lib/sitecorner.mjs, so the long-aisle rule stays with the turnaround
+   pass and the validator.)
    (e) the jurisdiction's parking rule governs: lib/layoutrun.mjs runPlan (the app's and the MCP site_plan path's way
    into the run) raises the brief's parking rule to the jurisdiction's where its planning guardrails are on
    (governingParking: Waller, Ord. 424, two spaces a home with the 5% count reserve, 2.1; a use's per-1,000 ratio with the

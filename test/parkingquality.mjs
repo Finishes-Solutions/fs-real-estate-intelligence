@@ -115,13 +115,13 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   // no land at either end (the paving setback and the drive): left as it was
   const tight = oneAisle(60, 880, { rowTo: 880 }); assert.equal(RUN.growEndIslands(tight.plan, { elements: tight.els.concat([{ ...blk, x: 95 }]), program: { use: 'retail' } }, tight.brief).elements.filter(e => e.caps).length, 0);
 }
-// the dead-end rule, one rule for the engine and the validator: an end clear of stalls for 18 ft (a hammerhead) is a way
-// out on a short aisle; 16 ft is not; and on an aisle whose stalls run past 150 ft only a paved turnaround or a drive is
+// the dead-end rules, shared constants for the engine and the validator: an end clear of stalls for 18 ft (a hammerhead)
+// is a way out, 16 ft is not; and an aisle whose stalls run past 150 ft needs a paved turnaround or a drive besides
 {
   const into = t => ({ ...t, els: t.els.map(e => e.id === 'entry' ? { ...e, y: 75, d: 150 } : e) }); // (the driveway into the aisle, not just to its edge)
   const h16 = into(oneAisle(60, 215, { rowTo: 199 })), h18 = into(oneAisle(60, 217, { rowTo: 199 })), lng = into(oneAisle(60, 820, { rowTo: 800 }));
   assert.equal(S.deadEnds(h16.els, 1).length, 1, '16 ft clear: still a dead end'); assert.equal(S.deadEnds(h18.els, 1).length, 0, '18 ft clear: a hammerhead');
-  assert.ok(S.deadEnds(lng.els, 1).length >= 1, 'a long aisle needs a turnaround'); assert.equal(RUN.longDeadAisles(lng.els).length, 1); assert.equal(dead(check(lng.plan, lng.els, lng.brief)).status, 'fail');
+  assert.equal(RUN.longDeadAisles(lng.els).length, 1, 'a long aisle needs a paved turnaround besides'); assert.equal(dead(check(lng.plan, lng.els, lng.brief)).status, 'fail');
   assert.equal(RUN.DEAD_AISLE, S.DEAD_AISLE_FT);
 }
 // an entrance's throat: stalls backing into the entry drive near the street are found (and the metrics count them), and
