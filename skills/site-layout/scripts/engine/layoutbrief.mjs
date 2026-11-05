@@ -157,6 +157,9 @@ export function briefFromProgram(program, plan, { text: raw = '', parser = 'stru
   if (P.btRule && !P.zones && DEFAULT_RULES.values[P.btRule.key]) brief.rules.values[P.btRule.key] = { v: P.btRule.v, cls: 'assumption', source: String(P.btRule.source).slice(0, 300) }; // (a building type's parking rule, lib/btypes.mjs: the engine and the check count the same requirement)
   { const by = typeZoneRules(P); if (by) brief.rules.values.parkingByUse = { v: by, cls: 'assumption', source: 'Each zone of a building type at its type’s own rule (lib/btypes.mjs presets): ' + Object.entries(by).map(([u, r]) => r.type + ' ' + r.per1000 + ' a 1,000 sf').join('; ') + '; the other uses at their own' }; } // (a zone of a building type parks at its type's rule, not its use's: a bank zone laid out as a restaurant pad at 4 a 1,000 sf, not 10)
   brief.site.stormwater = sm === 'underground' ? 'underground' : sm === 'none' ? 'offsite' : sm === 'detention' || sm === 'retention' ? 'onsite-pond' : null;
+  // a parking rule set on the plan (an edit's "1.5 per unit", "add 30 spaces", "5 per 1,000": lib/editread.mjs withSettings
+  // marks it parkSet) is the brief's rule, so the run parks to it; a program without the mark is read as before
+  if (P.parkSet && !many) { if (+P.perUnit > 0 && brief.rules.values.parkingPerUnit?.v == null) brief.rules.values.parkingPerUnit = { v: +P.perUnit, cls: 'verified', source: 'The plan’s parking setting (an edit asked for it)' }; if (+P.ratio > 0 && brief.rules.values.parkingPer1000?.v == null) brief.rules.values.parkingPer1000 = { v: +P.ratio, cls: 'verified', source: 'The plan’s parking setting (an edit asked for it)' }; }
   understand(brief, P, plan, text);
   return brief;
 }

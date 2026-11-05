@@ -1509,3 +1509,48 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    generators, is the next try); paving on loop drives (MF-tower 376, TY-assisted 478 sf a stall); WEDGE-trap-midrise's
    far field (p90 179 ft); bare ends (203) and the 21 lots short of the landscape standard; short entries (WEDGE-tri 29
    ft slanted, lib/sitegen.mjs; MX-guard-hotel13 36 ft): not worked on this round.
+
+41. Done Nov 5 (edit requests understood and done well). The owner: "the AI understands vague, detailed and spatial site
+   plan requests so results return what was asked and what is best" and "agents can use the MCP to drive the full system:
+   create, iterate and edit site plans". This round is the words people type AFTER a plan exists.
+   (a) Corpus first. 81 edit requests (test/fixtures/edit-corpus.mjs) on 7 base plans laid out by the engine (garden
+   apartments, the same made 4 stories with the parking short, townhomes, a retail center, mixed use, a warehouse, a hotel
+   with retail), in 9 categories: move (10), resize / count (12), swap / add / remove (11), parking (8), settings (6), vague
+   (10), messy / typos (10), several edits in one sentence (7), locked pieces (7). Each carries checks measured on the
+   edited plan's geometry by scripts/edit-corpus.mjs (its own code, not the edit's report): where things went, counts,
+   sizes, keys, stories, angled rows, stall depth from the street, setbacks, entrances, open space, what was kept
+   (unmentioned buildings at the same spot and size) and locks held exactly; a miss counts as honest when the reply says
+   so. Baselines were scored before any reading was changed.
+   (b) Found: the MCP's plan_edit never reached the AI (api/siteplan.js siteAI had no 'edit' mode, so every agent edit fell
+   back to the words); the app and the MCP read words differently (the MCP alone read settings, locks and typed adds);
+   neither read counts, sizes, keys, density, "fix the parking", compass shifts, corners, or a use's buildings moved; a
+   parking ratio set on a plan never reached the run (the engine parked at 1.6 whatever was set); a re-lay kept "as many
+   as fit" from the original request so a count asked for was ignored; a re-lay took the first layout, not the plan's own
+   arrangement; locked buildings were laid out a second time (a kept hotel came back as two hotels and no retail); making
+   townhomes 2 stories cut their homes by a third; "50,000" was split into two numbers after a setting was read.
+   (c) One reading (lib/editread.mjs, used by plan_edit in lib/mcp/plans.mjs and by Change With AI in src/siteplan.js):
+   readEdit (messy words tidied, clauses split, each read: locks, settings, the program (count, +N, size, keys, stories,
+   one use for another, denser / less dense / more open space / use more of the site), parking (+N spaces, more, behind /
+   in front, fix), places for the big pieces (the pond, a use's buildings: placements the engine steers), piece edits
+   (move to a place, a corner clear of buildings and drives, by feet in a compass direction, add, remove, swap, resize),
+   then the editor's own reading for the rest); fromAI (the AI's answer, whose schema gains `whole`, the changes across the
+   plan, and `locks`); mergeReads (the words' numbers, places and pieces win; the AI fills what the words couldn't read;
+   an AI op faking a program change by hand gives way); programChange; verifyRead (each thing asked measured on the drawing
+   and said done or not met with why). The executor: locks, then one re-lay with the program and settings (relayAsk drops
+   the original request's counts; the plan's own arrangement first, then parking met, angled rows when asked, places met,
+   the fullest when denser is asked; what locked buildings hold comes off the program), the piece edits on the plan as it
+   then stands, sizes, mix and names, then the measured report. More units than the stories hold: a story taller; more
+   keys than the hotel holds: a story taller. A parking rule set by an edit is marked (parkSet) and becomes the brief's
+   rule (lib/layoutbrief.mjs; a program without the mark reads as before).
+   Scores (docs/bench/prompt-eval.md, edit section): words path 17 -> 65 of 81 fully right (outcome checks 40% -> 88%;
+   misses said 57/64 -> 15/16); AI path, live, gpt-6-luna: 47 (with the edit mode fixed, old reading) -> 65 of 81 (69% ->
+   88%; misses said 22/34 -> 13/16). Fresh 15 written after tuning, scored once: words 12 / 15, live 13 / 15. About 175
+   live calls, about $0.37. Bench 88 cases, all passing, no warnings, replay identical (the engine path changes only for an
+   edit's marked parking rule). Request corpus 119 / 120, types 31 / 33. Holdouts unchanged (P18 fill 77, P35 fill-ug 320,
+   P36 fill 128, E054 podium-urban 172). Tests: test/editread.mjs (the reading, captured AI replies merged, the app and the
+   MCP on the same code, 11 corpus cases through plan_edit, an honest "not met", a captured reply's vague ask and lock).
+   Still missed: angled parking on the garden / townhome / retail layouts (said: those arrangements lay no angled rows);
+   parking behind the buildings of a parking-field plan; a dog park to a back corner of the mixed-use plan (no clear spot,
+   said); a pond to a named corner; shifts that would break building spacing (moved as far as allowed, said); guest parking
+   on townhomes (a higher ratio costs homes); more parking across a mix of uses (said: parked use by use). The app's
+   Change With AI lays out again through its Settings re-solve (resolve) with locked pieces held as keep-outs.
