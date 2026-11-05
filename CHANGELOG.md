@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 1:09 PM CT: Parking round 5: no parking stranded on wedge lots, clear entries, more planting (4aae79d)
+- **Parking beside the buildings on wedge lots:** where a strip of a wedge lot lost its building, its parking used to stay behind, far from the doors. The layout is now redrawn with the bays beside the remaining buildings and the pond on that land (on the 6-acre test wedge the 90th-percentile walk went from 255 to 179 ft, the longest from 340 to 197 ft).
+- **Entry drives kept clear on wedge lots:** an entrance whose first cross-drive would come too close to the street is avoided where it costs nothing (a trapezoid lot's first cross-drive went from 15 to 100 ft in).
+- **More planting:** spare spaces become planted row ends, then an island every 10th space, never below what's required. 54 of 76 test lots now meet a typical parking-lot landscape standard (5% planted and a tree per 10 spaces), was 49.
+- 88 test sites, every one passing with no warnings; the full test suite passes.
+
 ### 11:47 AM CT: The AI reads building types; lakes on any lot; room for drop-off lanes; a school beside homes (19f47ca, 6790a86, a6b4956, fcdba05)
 - **The AI now understands building types:** asked through the AI (gpt-6-luna), "an express car wash", "a 120-key hotel", "assisted living, 120 beds" and the like now come back as that type with its count, shape and lanes (28 of 33 test requests fully right, was 1). Before, the AI's answer lost the type and drew a plain box. A type no preset covers is still drawn at the size asked and the notes say so.
 - **Fixes to the AI's reading:** a courtyard building keeps its courtyard; a size you give is kept (a big box isn't shrunk "to fit"); a count inside a range you asked stays the range; a coffee shop with a drive-thru is a restaurant; apartments' own pool isn't split off as a separate zone.
