@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 7:31 PM CT: Townhomes: rows outside the loop road, parallel guest parking (e104d8a)
+- **Guest parking along the cross drives:** parallel guest spaces sit along the sides of the drives where only row ends face them, so rows no longer give up homes to parking bays between them. Accessible spaces stay in a regular bay.
+- **Rows outside the loop road:** where the strip between the loop road and the lot line is deep enough, a row of homes faces the road from the outside, on its own lots.
+- **Tight frontages:** where a narrow lot needs a gated emergency lane, the smallest row by the lot line gives way for it.
+- On the test lots: 5 acres 68 homes (was 62), 8 acres 113 (was 104), 10 acres 151 (was 136), with almost no 3-home rows left. All 41 test sites pass with no warnings; the full test suite passes.
+
 ### 6:00 PM CT: Townhome subdivisions packed much tighter (de28b72)
 - **"Townhomes, as many as fit" lines every lane:** rows now sit at the building separation in your rules (10 ft by default, was 20 ft), run close to the corners and cross drives, and line the edges of the loop road and the street, so a 5-acre test lot now holds 62 homes, up from 37 (8 acres: 104, up from 73).
 - **Guest parking fills the gaps at the ends of rows** before any home is given up for it.
