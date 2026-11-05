@@ -1393,7 +1393,10 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    25 -> 21, first drive across summed 6,888 -> 7,070 ft; stalls inside an entrance's stacking length 14 -> 10;
    landscape standard 54 -> 55 of 76 lots, share summed 410.4 -> 414.9 points; bare row ends 200 -> 200;
    90th-percentile walk summed 7,001 -> 6,924 ft (TY-bigbox 186 -> 126), max 8,969 -> 8,900; dead ends 6 -> 6, none
-   past 150 ft; stalls 13,505 -> 13,506; main-drive stalls 437 -> 433. Prompt corpus (offline, words path) 119 of 120, types 26 of 33, as before. Holdouts unchanged (P18 fill
+   past 150 ft; stalls 13,505 -> 13,506; main-drive stalls 437 -> 433. Folded onto item 39 (base 64e5be2 -> after,
+   88 cases): sf a stall summed 32,775 -> 32,289 (TY-bigbox 358 -> 331 too), throats short 24 -> 21, stalls in a throat
+   14 -> 10, landscape standard 54 -> 55, 90th-percentile walk 7,037 -> 7,002 ft, bare ends 204 -> 204, dead ends 6 -> 6;
+   all passing, no warnings, replay identical, no case lost homes or floor area. Prompt corpus (offline, words path) 119 of 120, types 26 of 33, as before. Holdouts unchanged (P18 fill
    77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version rei-layout/2026.11.05.11. Tests:
    test/parkingquality.mjs (dead lot paving trimmed, a turnaround and slivers kept, nothing dead left alone; a daycare's
    and a pad village's way in clear of drives for 50 ft).
