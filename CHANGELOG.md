@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 9:27 PM CT: Duplexes fill their blocks; the pond can take the land the homes leave (bd514a6)
+- **Duplex communities fit a third home per row at the corners** of the loop road (they were held back from the corners as townhomes were before today).
+- **The pond can go where the homes leave room:** "as many as fit" also tries laying the homes out first and putting the pond in the largest piece of land left, rather than holding a strip for it up front. A tapering 9-acre duplex lot now holds 52 homes (was 42); a curved-frontage apartment lot 456 (was 444). The detention rule is unchanged.
+- All 41 test sites pass with no warnings; the full test suite passes.
+
 ### 8:33 PM CT: Dense townhome layouts complete their detention pond (0552439)
 - **Ponds sized from the drawn plan:** a packed townhome layout covers more of the lot with roofs and paving than a typical one, so its pond is now redrawn to what the drawn plan needs (the same storm estimate the check uses) rather than a typical figure, and can take the full strip between the loop road and the lot line. The densest layouts now meet detention and win: 8 acres 123 homes (was 113), the flag lot 166 (was 147). The detention rule is unchanged.
 - All 41 test sites pass with no warnings; the full test suite passes.
