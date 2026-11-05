@@ -854,18 +854,24 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    at the back. It is now a candidate, laid out as a brief's "parking behind the buildings" is (briefRows: the street
    row, then the field, the way in beside the building), on the side (lib/enginectx.mjs aside: its own clock and random
    stream, so the search finds exactly what it did before). Asked for in words ("building up front, parking behind",
-   "retail on the street, parking in the rear": lib/layoutintent.mjs asksFor hints.parking 'back', or the use placed at
-   the front; it reaches the engine as opts.asks where the spatial-asks work is folded in, the candidates then compared
-   by lib/sitelayout.mjs askPick and the run's placements rank): every such layout that parks the program joins the
-   field options first (three at most), named "Building at the street, parking behind" and saying "as asked". Not
-   asked: offered only where it parks the program, holds as much floor area as the best layout found and outscores it
-   (on the bench it never does, so no case changed by it). A compact street row now leaves room beside the building for
-   the way in (before, the brief path failed for a 15,000 sf shop row on 4.3 ac: every candidate too narrow for the
-   entry). Checked end to end with the spatial-asks branch merged in a scratch branch: "12,000 sf retail building up
-   front with parking behind" (4.3 ac), "retail on the street, parking in the rear, 15,000 sf", "20,000 sf medical office
-   at the front with parking behind it" (5.5 ac) and "a 6,000 sf restaurant up front, parking in back" (2.9 ac) all rank
-   the street layout first, every ask met, passing with no warnings. Bench cases PK-street-retail and PK-street-medical
-   carry those asks (on this branch alone, without the asks folded in, they lay out as before and say the ask is unmet).
+   "retail on the street, parking in the rear": parking placed behind or at the back, or a shop / office / medical /
+   restaurant / hotel / church placed at the front; lib/layoutbrief.mjs toEngine sets opts.parkBack, and
+   lib/layoutintent.mjs asksFor's hints.parking 'back' is read too where the spatial-asks work is folded in): every such
+   layout that parks the program joins the field options first (three at most), named "Building at the street, parking
+   behind" and saying "as asked": the building at the front setback (the build-to line) facing the street with its walk,
+   a shallow, wide storefront preferred over a deep box (lib/siteparking.mjs value: 3 points a foot past 100 ft deep),
+   no detention pond between it and the street, the way in along its side to the lot behind, the collectors (fire
+   lanes) up both sides. Not asked: offered only where it parks the program, holds as much floor area as the best layout
+   found and outscores it (on the bench it never does, so no case changed by it). A compact street row now leaves room
+   beside the building for the way in (before, the brief path failed for a 15,000 sf shop row on 4.3 ac: every
+   candidate too narrow for the entry). The check is strict (lib/layoutintent.mjs checkPlacement frontStalls): parking
+   asked behind / at the back fails when any stall sits between a building's street face and the street within its
+   frontage (a field in front: TY-mob 101 stalls, RE-strip 59), and "at the back" passes when the lot is behind the
+   buildings with none in front. Bench cases PK-street-retail (4.3 ac, "retail on the street, parking in the rear,
+   15,000 sf") and PK-street-medical (5.5 ac, "20,000 sf medical office at the front with parking behind it"): the
+   street layout first, both asks met, passing with no warnings. Checked also with the spatial-asks branch merged in a
+   scratch branch ("12,000 sf retail building up front with parking behind", "a 6,000 sf restaurant up front, parking in
+   back": the street layout first, asks met).
    (b) Entry throats. The first drive across the main entry sat inside the stacking length (lib/layoutrun.mjs
    throatNeed: 50 / 75 / 100 ft) on 31 of 74 cases. Two causes. In the parking-field engine the field's paving ran under
    the strip beside the entry drive (no stalls there, but open paving a car could cut across, 30-57 ft in); it now stops
@@ -883,7 +889,9 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    parking was compared too. test/parkingquality.mjs's guarded run (Waller rules): its two 3-row garden layouts now
    park exactly the same and the run keeps one as twins, so its third option is a 108-home courtyard; the test now
    checks every option is judged and parked at 2.1 a home and that the top one holds the 120 and passes (it checked
-   every option for 252 stalls).
+   every option for 252 stalls). Found on the way (lib/bldgtemplates.mjs shrink, pre-existing): a module taken off a
+   templated building dropped its "estimate" note and left the stacked bays at the old count (MF-stacked, once the
+   throats moved its layout); both now follow.
    (c) Tried and taken out: a new bay by the buildings for stranded parking (a 24 ft spur aisle off a drive's free side,
    rows both sides, an 18 ft turning end, stalls within 150 ft of a building, the farthest stalls taken out for it). On
    WEDGE-tri-midrise (38 stalls beyond the pond, p90 255 ft) and TY-hotel-retail no such bay fits anywhere (no candidate
