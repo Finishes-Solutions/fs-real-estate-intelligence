@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
-### 6:00 PM CT: Townhome subdivisions packed much tighter (23fd17f)
+### 6:00 PM CT: Townhome subdivisions packed much tighter (de28b72)
 - **"Townhomes, as many as fit" lines every lane:** rows now sit at the building separation in your rules (10 ft by default, was 20 ft), run close to the corners and cross drives, and line the edges of the loop road and the street, so a 5-acre test lot now holds 62 homes, up from 37 (8 acres: 104, up from 73).
 - **Guest parking fills the gaps at the ends of rows** before any home is given up for it.
 - **A second entrance instead of a gated emergency lane:** when a full subdivision needs a second way in, the street-side row farthest from the other entrances gives way for a real entrance.
