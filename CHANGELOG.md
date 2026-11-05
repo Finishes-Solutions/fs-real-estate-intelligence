@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 11:10 PM CT: Parking: no long dead-end aisles, planted row ends (b4b0a64)
+- **No more backing out of a long dead end:** a parking aisle whose stalls run more than 150 ft past the last way out gets a turnaround pad at its end. The independent check now warns about long dead-end aisles, so layouts without them are preferred.
+- **Planted islands at row ends:** spare stalls above what's required become planted islands at the ends of rows (longest rows first), never going below the parking required.
+- On the test sites: long dead ends from 6 to none; bare row ends from 520 to 364; the 90th-percentile walk from stall to building is shorter. All 44 test sites pass with no warnings; the full test suite passes.
+
 ### 9:53 PM CT: Angled parking (60° and 45°, one-way aisles) (b625aa1)
 - **Ask for it:** "angled parking", "60 degree parking", "45° parking" or "grocery-style parking" lays the parking in angled rows on one-way aisles, with direction arrows on the plan, the map, the sheets and the CAD file. Stall and aisle sizes follow the standard parking design references (60°: 20 ft rows on a 17 ft one-way aisle; 45°: 18 ft rows on a 14 ft aisle).
 - **Chosen on its own where it does better:** every parking field is also tried at 60° and 45°, and an angled layout is offered only when it parks the program and beats every straight layout. A shallow 560 x 292 ft lot now fits all 30,000 sf of retail asked for with 60° parking, where straight rows fell short.

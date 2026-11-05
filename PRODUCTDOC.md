@@ -1155,6 +1155,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Better parking lots (Nov 4):** long dead-end parking aisles get a turnaround, and rows end in planted islands where there are spaces to spare.
 - **Angled parking (Nov 4):** say "angled parking", "60 degree parking" or "grocery-style parking" for angled stalls on one-way aisles, with arrows on the plan; the planner also picks angled parking by itself where it fits the program better than straight rows.
 - **Fuller duplex communities (Nov 4):** duplex rows reach the corners of the loop road, and the pond can go in the land the homes leave.
 - **Tighter townhome subdivisions (Nov 4):** "townhomes, as many as fit" now lines both sides of every lane and the road round the edge, with guest parking at the ends of rows; expect roughly 50–80% more homes than before on the same lot, with guest parking along the cross drives and rows facing the loop road from outside where there is room.
