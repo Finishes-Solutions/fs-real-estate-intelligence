@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 5:18 AM CT: Agents round 2: building types, city rules, settings, reports and uploads through the MCP server (5651bdd)
+- **Agents can list and use every building type** (56, with what each counts and where its sizes come from), and add one to a plan by type ("add a hotel with 120 keys at the front").
+- **Agent site plans follow the city's rules** the way the app's Build does (setbacks, parking, detention, fire lanes inside the City of Waller and its ETJ), and say what was applied.
+- **Change a plan's settings and lay it out again** (setbacks, parking ratio, parking angle, entrances), keeping locked pieces.
+- **More in the answers:** each "Asked: … done / not met" line and assumption measured on the current drawing; hotel keys, beds, children and students; parking quality (paving per space, islands, dead ends, walks, entrance drives); queue checks.
+- **Reports agents couldn't get before:** the Summary, Filing list, Activity, Area comparison and Traffic reports (PDF and CSV); agents can also upload a file to a project, read into facts for a person to confirm.
+- 76 of 85 capabilities fully available to agents (was 66 of 79); a second full agent session is in the test suite; the full test suite passes.
+
 ### 4:07 AM CT: The layout now does more of what you ask about where things go (0463866, 6a2e8e7)
 - **Now laid out as asked, not just noted:** the pond at the back, front, a side or by the entrance; parking in front of or behind the buildings; the entrance off a named street; a warehouse at the rear with its truck court facing the way asked. When an ask costs homes, the option says what it gave up (e.g. "parking behind the buildings: 204 homes, against 216 without it").
 - **"Homes around a central lake"** lays out again (it had fallen back to a simple plan).
