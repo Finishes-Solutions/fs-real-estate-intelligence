@@ -791,3 +791,49 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    bus loop and parent drop-off, a daycare's drop-off lane, a hotel's porte-cochère and a gas station's queue at the
    pumps are not drawn; a bank as a zone has no drive-thru lane; zones park at their use's rule; recipe types as zones
    are the building alone; the car wash's lanes need a drive within 90 ft of its plot's end.
+
+30. Done Nov 5 (request understanding, round 2: the places asked, honoured). Item 26 read where things go but only
+   stated several asks as "not met": the pond's place, parking in front of / behind the buildings, the clubhouse's place,
+   a way in off a named street, a single use at the front or back, the warehouse's place and its docks' direction.
+   (a) Routing (lib/layoutintent.mjs asksFor): those asks (how 'checked': not the zones' places, which the engine already
+   reads, nor the pool / playground / dog park moved after the layout) go to the engine as opts.asks: a count of the asks
+   a drawing misses (checkPlacement) and hints the generators read. lib/sitelayout.mjs askPick (the search and generator
+   picks, and the parking-field engine's): the candidates drawn that miss the fewest asks (parked, no broken rule; those
+   holding as much as the picks first) join the options handed back, beside the picks, two at most; askKept keeps the
+   generator's best two that meet more asks than its usual eight. The run ranks them as before (feasible, the program,
+   the form, then places met), so an ask is a strong preference that never costs the program; when no layout meets it
+   the notes say so and name the option that has it and what it gives up ("Option 3 has the clubhouse at the back (it
+   holds 168 homes, short of the program)"), and a top option meeting one says what that costs against a fuller one
+   ("Placed as asked …: option 2, without it, holds 216 homes to this one's 204"). Steered asks no longer say "the
+   engine has no control for this".
+   (b) Generator controls, each drawn only when asked (a request without the ask sees no new candidate): the pond along
+   the street (lib/sitegen.mjs rowsFacing cut 'front'); the clubhouse in the back row (amenity 'back'); warehouse
+   columns running back with the loading beside each building, the floor area shared between the columns and the
+   buildings against the back (lib/sitegencom.mjs flex p.rear / p.split), mirrored for docks on the left (p.flip).
+   Compass sides are turned into the frame's (front / back / left / right) from the site's street.
+   (c) Measuring honestly: a pond in several basins meets a place only with two thirds of its area there (a basin each
+   end had passed as "the pond on the north end"); a truck court faces a way for each warehouse from its own nearest
+   court (two columns each with its apron east faced east, not "west from one of them").
+   (d) "Homes around a central lake" through a run fell back to a simple layout. Cause: with the regional rain estimate
+   (TR-55) the detention need is smaller (1.6 ac against 2.6 ac on the 20 ac test site), so the lake's band reserve
+   shrank and the bands added one more pair of home streets; that pair's 25% overshoot allowance never shrank with the
+   scale (60 ft a step against a 250 ft pair), so no scale fit and every try failed. The allowance now shrinks to none
+   by scale 0.55 (lib/sitelayout.mjs mixedOptions); the run lays out 46 homes with the lake holding the detention. The
+   lake is still drawn as a band at the back, not in the middle (said in the notes: the bands have no order with homes
+   on both sides of the commons, and the pods drew it at the front).
+   (e) Reading: "retail 25k + 1 pad", "whse ~150k": a size in thousands with no unit after it is square feet when a
+   commercial use is named and no homes (never "$25k", "25k per unit"); " + 1 pad" reads as "and", not "or more".
+   "trampoline park", "an indoor water park", "bowling alley" (bare): a building of an unknown type (the closest
+   primitive), not a commons or an open request; "office park" is offices.
+   Scores (docs/bench/prompt-eval.md, words path, 120 requests): fully right 112 → 116 (spatial 30 → 34: S06, S13, S26,
+   S31; vague, detailed and messy unchanged at 25, 32, 25), outcome checks 94% → 97%. Item 26's fresh 16: 15 → 16. Ten
+   new requests written after this work, scored once (FRESH2): 8 of 10 (missed: "200,000 sf distribution building at
+   the back of the site, docks facing west": at the back, docks facing south; "pond in the southeast corner": the
+   engine's corner test passed a pond in the right third midway back, the scorer's stricter one didn't, so it wasn't
+   said as unmet). AI path, live, spatial only (gpt-6-luna, 35 calls): fully right 29 → 32 of 35 (S06, S19, S31 missed).
+   Bench: 65 cases, every option and top plan identical to 5b39f65, all passing, no warnings, replay identical.
+   Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests: test/prompts.mjs.
+   Still said, not placed: a shop / office / medical building at the front (the parking-field engine,
+   lib/siteparking.mjs, draws every building behind its parking); the lake in the middle; a way in off a side street is
+   met where the way-in step adds one, not steered (entrances are added after the candidates are compared); the corner
+   test is looser than the scorer's.

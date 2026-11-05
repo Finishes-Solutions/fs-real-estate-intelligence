@@ -142,3 +142,47 @@ Before (for comparison):
 - S31 “garden apartments, as many as fit, parking in front of the buildings”: place parking before buildings (got ); nearer parking buildings front (got 275 vs 264)
 - S32 “160 apartments, clubhouse in the middle of the site”: place clubhouse middle (got )
 - S34 “150 apartments, keep the southwest corner open for a future pad”: place open space keep southwest (got ); clear southwest 100 (got 0,0)
+
+## Round 2: the places asked, honoured (words path, 5b39f65 → this branch; LAYOUT-ENGINE.md item 30)
+
+The pond's, the parking's, the clubhouse's and the docks' place, a way in, and a single use's place are now steered:
+the engine compares the layouts it draws on them and the generators draw the places asked (the pond along the street,
+the clubhouse in the back row, warehouses at the back with their docks on the side asked).
+
+**Words path, before (5b39f65)**
+
+| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |
+|---|---|---|---|---|---|
+| vague | 25 | 100% | 100% | 25 / 25 | — |
+| detailed | 35 | 100% | 93% | 32 / 35 | — |
+| messy | 25 | 100% | 100% | 25 / 25 | — |
+| spatial | 35 | 100% | 86% | 30 / 35 | 6 / 6 |
+| all | 120 | 100% | 94% | 112 / 120 | 6 / 6 |
+
+**Words path, after**
+
+| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |
+|---|---|---|---|---|---|
+| vague | 25 | 100% | 100% | 25 / 25 | — |
+| detailed | 35 | 100% | 93% | 32 / 35 | — |
+| messy | 25 | 100% | 100% | 25 / 25 | — |
+| spatial | 35 | 100% | 98% | 34 / 35 | 1 / 1 |
+| all | 120 | 100% | 97% | 116 / 120 | 1 / 1 |
+
+Newly right: S06 (the warehouse at the rear, its truck court facing east), S13 (the pond in front), S26 (the pond on
+the north end), S31 (parking in front of the buildings, as many as fit: 204 homes, and the notes say the layout without
+it holds 216). Still missed: D02, D05, D17 (exact counts the land can't hold, as before) and S19 “homes around a central
+lake” (no longer a fallback: 46 homes, the lake holding the detention, but drawn as a band at the back; said).
+
+Item 26's fresh 16: 15 → 16 (“retial 25k + 1 pad” now 25,000 sf and a pad).
+
+Ten requests written after this round, never tuned to, scored once (`--fresh2`): 8 of 10 fully right (reading 100%,
+outcome 82%). Missed: FP4 “200,000 sf distribution building at the back of the site, docks facing west” (at the back;
+the docks of the top option face south: said as not met); FP10 “200 apartments, pond in the southeast corner” (the
+pond in the right third, midway back: the engine's corner test passed it, the scorer's stricter one didn't, so it was
+not said as unmet).
+
+AI path, live, spatial category only (gpt-6-luna through the app's program step, 35 calls, Nov 5): reading 100%,
+outcome 91%, fully right 32 / 35 (item 26's full run: 29 / 35), unmet place asks said 4 / 4. Missed: S06 (the
+warehouse midway back, docks facing west), S19 (the lake not in the middle), S31 (parking behind the buildings): the
+model's programs for S06 and S31 lay out differently from the words' (not traced yet).
