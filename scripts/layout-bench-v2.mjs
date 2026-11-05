@@ -124,14 +124,25 @@ const CASES = [
   { id: 'TY-flex-mezz', family: 'types', site: 'rect10', ask: 'flex buildings 120 ft deep with mezzanine, 60,000 sf' },
   { id: 'TY-cold', family: 'types', site: 'big40', ask: 'cold storage warehouse 200,000 sf' },
   { id: 'TY-datacenter', family: 'types', site: 'ty110', ask: 'data center 100,000 sf' },
-  { id: 'TY-carwash', family: 'types', site: 'ty15', ask: 'express car wash' },
+  { id: 'TY-carwash', family: 'types', site: 'ty23', ask: 'express car wash' }, // (Nov 5: on 2.3 ac, not 1.5: its stacking lanes, exit and vacuum stalls are drawn now, lib/btsite.mjs)
   { id: 'TY-bank', family: 'types', site: 'pad1', ask: 'bank with drive-thru' },
   { id: 'TY-fitness', family: 'types', site: 'ty62', ask: 'fitness center 40,000 sf' },
   { id: 'TY-bigbox', family: 'types', site: 'ty145', ask: 'big box retail 120,000 sf' },
   { id: 'TY-school', family: 'types', site: 'ty145', ask: 'elementary school for 600 students' },
   { id: 'TY-L-apts', family: 'types', site: 'rect10', ask: 'L-shaped 4-story apartments, 150 units' },
   { id: 'TY-U-pool', family: 'types', site: 'rect10', ask: 'U building around a pool, 120 units' },
-  { id: 'TY-unknown', family: 'types', site: 'ty55', ask: 'a 2-story trampoline park 30,000 sf' }
+  { id: 'TY-unknown', family: 'types', site: 'ty55', ask: 'a 2-story trampoline park 30,000 sf' },
+  // round 2 (Nov 5): footprints of their own (a T, a point tower, triplexes), more presets (a full-service hotel, a hotel over
+  // shops, a stand-alone garage, a cluster of pads), and a type per zone of a mixed request
+  { id: 'TY-T-apts', family: 'types', site: 'rect10', ask: 'T-shaped 4-story apartments, 150 units' },
+  { id: 'TY-point-tower', family: 'types', site: 'ty62', ask: 'a 14-story point tower with 200 apartments' },
+  { id: 'TY-triplex', family: 'types', site: 'ty62', ask: 'triplexes, as many as fit' },
+  { id: 'TY-hotel-full', family: 'types', site: 'ty84', ask: 'a full-service hotel with 250 keys' },
+  { id: 'TY-hotel-retail', family: 'types', site: 'ty55', ask: 'a 120-key hotel over retail' },
+  { id: 'TY-garage', family: 'types', site: 'ty38', ask: 'parking garage, 400 spaces' },
+  { id: 'TY-pad-village', family: 'types', site: 'ty55', ask: 'a pad-site village with 6 pads' },
+  { id: 'TY-mix-hotel', family: 'types', site: 'ty84', ask: 'a hotel with 120 keys and 20,000 sf of retail' },
+  { id: 'TY-mix-pads', family: 'types', site: 'ty84', ask: 'a daycare and a bank on pads in front of townhomes' }
 ];
 const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });

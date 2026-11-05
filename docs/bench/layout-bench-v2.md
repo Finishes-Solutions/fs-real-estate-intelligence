@@ -56,8 +56,8 @@
 | TY-livework | types | feasible | pass · 24 units · parking 56/54 | — | 2 | identical | n/a |
 | TY-flex-mezz | types | feasible | pass · 60,000 sf · parking 36/36 | — | 2 | identical | n/a |
 | TY-cold | types | feasible | pass · 200,000 sf · parking 60/60 | — | 2 | identical | n/a |
-| TY-datacenter | types | feasible | pass · 100,000 sf · parking 21/20 | — | 2 | identical | n/a |
-| TY-carwash | types | feasible | pass · 4,160 sf · parking 20/20 | — | 2 | identical | n/a |
+| TY-datacenter | types | feasible | pass · 99,997 sf · parking 23/20 | — | 2 | identical | n/a |
+| TY-carwash | types | feasible | pass · 4,160 sf · parking 23/20 | — | 2 | identical | n/a |
 | TY-bank | types | feasible | pass · 3,500 sf · parking 15/14 | — | 2 | identical | n/a |
 | TY-fitness | types | feasible | pass · 40,000 sf · parking 200/200 | — | 2 | identical | n/a |
 | TY-bigbox | types | feasible | pass · 120,000 sf · parking 491/480 | — | 2 | identical | n/a |
@@ -65,3 +65,12 @@
 | TY-L-apts | types | feasible | pass · 150 units · parking 244/240 | — | 2 | identical | n/a |
 | TY-U-pool | types | feasible | pass · 120 units · parking 193/192 | — | 2 | identical | n/a |
 | TY-unknown | types | feasible | pass · 30,000 sf · parking 93/90 | — | 2 | identical | n/a |
+| TY-T-apts | types | feasible | pass · 150 units · parking 244/240 | — | 2 | identical | n/a |
+| TY-point-tower | types | feasible | pass · 200 units · parking 321/320 | — | 2 | identical | n/a |
+| TY-triplex | types | feasible | pass · 48 units · parking 96/96 | — | 2 | identical | n/a |
+| TY-hotel-full | types | feasible | pass · 250,000 sf · parking 303/300 | — | 2 | identical | n/a |
+| TY-hotel-retail | types | feasible | pass · 82,500 sf · parking 189/186 | — | 2 | identical | n/a |
+| TY-garage | types | feasible | pass · 236,592 sf · parking 405/0 | — | 2 | identical | n/a |
+| TY-pad-village | types | feasible | pass · 23,850 sf · parking 145/144 | — | 2 | identical | n/a |
+| TY-mix-hotel | types | feasible | pass · 86,000 sf · parking 201/201 | — | 2 | identical | n/a |
+| TY-mix-pads | types | feasible | pass · 60 units · parking 197/193 | — | 2 | identical | n/a |

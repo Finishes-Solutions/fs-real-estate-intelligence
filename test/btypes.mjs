@@ -85,13 +85,13 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   p = g('bank with drive-thru'); assert.equal(p.btype, 'bank'); assert.equal(p.use, 'restaurant'); assert.ok(p.extras.includes('drivethru')); assert.equal(p.ratio, 4);
   p = g('a daycare for 150 children'); assert.equal(p.btype, 'daycare'); assert.equal(p.custom.name, 'Daycare'); assert.equal(p.btCounts.children, 150); assert.ok(p.custom.outdoor.some(o => o.key === 'play'));
   p = g('high school for 1,200 students'); assert.equal(p.btype, 'school'); assert.equal(p.custom.name, 'High school'); assert.equal(p.btCounts.students, 1200); assert.equal(p.floors, 2);
-  p = g('express car wash'); assert.equal(p.btype, 'car-wash'); assert.equal(p.custom.buildings[0].w, 130);
+  p = g('express car wash'); assert.equal(p.btype, 'car-wash'); assert.equal(p.gfa, 130 * 32, 'the tunnel’s floor area is what is asked'); assert.deepEqual([p.custom.buildings[0].w, p.custom.buildings[0].d], [186, 64], 'drawn in an envelope that holds its lanes'); assert.ok(p.btEnvelope.carve && p.btSite.kind === 'carwash');
   assert.equal(g('gas station with a car wash').btype, undefined, 'a gas station’s wash stays the gas station’s');
-  p = g('parking garage, 600 spaces'); assert.equal(p.btype, undefined); assert.match(p.btNotes[0], /not drawn yet/);
+  p = g('parking garage, 600 spaces'); assert.equal(p.btype, 'garage-standalone'); assert.equal(p.btCounts.asked, 600); assert.ok(p.btCounts.spaces >= 600 && p.btCounts.levels <= 6); assert.equal(p.ratio, 0); assert.equal(p.garage, undefined);
   p = g('a 2-story trampoline park 30,000 sf'); assert.equal(p.btype, 'custom'); assert.equal(p.use, 'other'); assert.equal(p.btName, 'Trampoline Park'); assert.match(p.btNotes[0], /No building type matches "trampoline park".*bar primitive.*30,000 sf, 2 floors/);
   assert.equal(g('a 10,000 sf building').btype, undefined, 'a plain building is no type');
   for (const a of ['a 60,000 sf shopping center with a bank pad', 'strip center with a gym, 30,000 sf', '200 apartments with a daycare', 'retail strip with a car wash pad, 20,000 sf']) assert.equal(g(a).btype, undefined, 'the main use stays: ' + a);
-  // several uses: the zones keep the engine's types
+  // several uses: no type for the whole program (each zone its own: section 6)
   assert.equal(g('a hotel with 120 keys and 20,000 sf of retail').btype, undefined);
 }
 
@@ -118,5 +118,76 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   // existing request, untouched: no type fields on its buildings
   ({ o } = run('exactly 28,000 sf retail in four buildings', 900, 500));
   assert.ok(!o.elements.some(e => e.btype || e.tc), 'an existing type’s buildings carry nothing new');
+}
+
+// ---------- 6. round 2: footprints of their own, site features and queues, a type per zone, the editor's presets ----------
+{
+  const site = (w, h) => ({ origin: [-96.42, 30.38], ring: [[0, 0], [w, 0], [w, h], [0, h]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, elements: [] });
+  const run = (ask, w, h) => { const b = B.briefFromRequest(ask, site(w, h)), rec = RUN.runBrief(b); return { b, rec, o: rec.options[0] }; };
+  const chk = (o, id) => o.validation.checks.find(c => c.id === id);
+  // a T drawn as a T: a bar along the back with its wing off the middle (8 corners), not an L
+  const T = S.outline({ kind: 'building', x: 0, y: 0, w: 240, d: 130, form: 'T', wing: 60 });
+  assert.equal(T.length, 8); assert.equal(S.footArea({ kind: 'building', x: 0, y: 0, w: 240, d: 130, form: 'T', wing: 60 }), 240 * 60 + 60 * 70);
+  let p = S.guessProgram('T-shaped 4-story apartments, 150 units'); assert.equal(p.btype, 'mf-t'); assert.equal(p.form, 'T'); assert.equal(S.normalizeProgram(p).form, 'T');
+  let { o, rec, b } = run('T-shaped 4-story apartments, 150 units', 900, 500);
+  assert.equal(o.validation.status, 'pass'); assert.ok(o.elements.filter(e => e.kind === 'building' && e.use === 'multifamily').every(e => e.form === 'T'), 'every apartment building a T');
+  // a point tower: a slim tower on its podium (the tower's plate under half the podium's footprint)
+  p = S.guessProgram('a 14-story point tower with 200 apartments'); assert.equal(p.btype, 'point-tower'); assert.equal(p.point, true); assert.equal(p.form, 'tower');
+  const pt = { kind: 'building', x: 0, y: 0, w: 240, d: 128, floors: 14, form: 'tower', podium: 2, parkLevels: 'auto' };
+  assert.ok(S.ringArea(S.towerOutline({ ...pt, point: true })) < 0.6 * S.ringArea(S.towerOutline(pt)), 'slimmer than the podium tower');
+  ({ o } = run('a 14-story point tower with 200 apartments', 600, 450));
+  assert.equal(o.validation.status, 'pass'); assert.ok(o.elements.some(e => e.point && e.btype === 'point-tower'));
+  // a fourplex and a triplex of their own, not duplexes
+  assert.equal(S.guessProgram('fourplexes, 48 units').plex, 4); assert.equal(S.guessProgram('triplexes, as many as fit').plex, 3);
+  ({ o } = run('fourplexes, 48 units', 700, 520));
+  const fx = o.elements.filter(e => e.kind === 'building' && e.use === 'duplex');
+  assert.equal(o.validation.status, 'pass'); assert.ok(fx.length === 12 && fx.every(e => e.units === 4 && e.w === S.PLEX[4].w && e.d === S.PLEX[4].d && /^Fourplex/.test(e.name)), '12 fourplexes of 4');
+  // a full-service hotel and a hotel over shops
+  p = S.guessProgram('a full-service hotel with 250 keys'); assert.equal(p.btype, 'hotel-full'); assert.equal(p.gfa, 250 * 1000);
+  p = S.guessProgram('a 120-key hotel over retail'); assert.equal(p.btype, 'hotel-over-retail'); assert.equal(p.gfa, 66000, 'the hotel’s floor area is what is asked'); assert.equal(p.floors, 5); assert.ok(p.btEnvelope.f > 1 && !p.btEnvelope.carve);
+  ({ b, o } = run('a 120-key hotel over retail', 600, 400));
+  const h = o.elements.find(e => e.btype === 'hotel-over-retail');
+  assert.equal(o.validation.status, 'pass'); assert.equal(h.ground.use, 'retail'); assert.equal(o.elements.filter(e => e.btype === 'hotel-over-retail').reduce((t, e) => t + e.keys, 0), 120);
+  assert.ok(o.quantities.byUse.retail.gfa > 0 && Math.abs(o.quantities.byUse.hotel.gfa - 66000) <= 660, 'shops on the ground floor, the hotel’s own floor area above');
+  // a stand-alone garage: the parking structure itself, its spaces on the stall grid, the program's floor area its levels
+  ({ o } = run('parking garage, 400 spaces', 500, 330));
+  const gar = o.elements.find(e => e.kind === 'garage' && e.standalone);
+  assert.equal(o.validation.status, 'pass'); assert.ok(gar && gar.grid && S.garageStalls(gar) >= 400); assert.equal(o.quantities.parking.garage, S.garageStalls(gar));
+  // a cluster of pads
+  ({ o } = run('a pad-site village with 6 pads', 600, 400));
+  assert.equal(o.validation.status, 'pass'); assert.equal(o.elements.filter(e => e.btype === 'pad-village' && e.tc === 'pads').length, 6);
+  // an express car wash: its tunnel, two stacking lanes from a drive, an exit; the queue clear of the drives and 12+ cars
+  ({ o, rec } = run('express car wash', 330, 300));
+  const lanes = o.elements.filter(e => e.queue === 'carwash'), tun = o.elements.find(e => e.btype === 'car-wash');
+  assert.equal(o.validation.status, 'pass'); assert.equal(lanes.length, 2); assert.equal(tun.w * tun.d, 130 * 32);
+  assert.equal(chk(o, 'queues.clear').status, 'pass'); assert.equal(chk(o, 'queues.stack').status, 'pass'); assert.ok(chk(o, 'queues.stack').measured >= 12);
+  assert.ok(o.elements.some(e => e.note === 'Car wash exit')); assert.ok(RUN.replayRun(rec).identical);
+  // the independent check catches a queue across a parking row (a row laid over the outer lane's middle)
+  const q1 = lanes.find(e => e.name === 'Stacking lane 1'), mp = q1.path[Math.floor(q1.path.length / 2)];
+  const V = await import('../lib/layoutcheck.mjs'), bad = V.validateLayout({ ...site(330, 300), elements: [...o.elements, { id: 'xrow', kind: 'parking', x: mp[0], y: mp[1], w: 60, d: 60, rot: 0 }], program: o.program }, b.brief || B.briefFromRequest('express car wash', site(330, 300)));
+  assert.equal(bad.checks.find(c => c.id === 'queues.clear').status, 'fail', 'a parking row across the queue is caught');
+  // a restaurant's drive-thru (no type): its stacking checked against the engine's 8 cars
+  ({ o } = run('2,500 sf restaurant with a drive-thru', 210, 230));
+  assert.equal(chk(o, 'queues.clear').status, 'pass'); assert.equal(chk(o, 'queues.stack').status, 'pass'); assert.equal(chk(o, 'queues.stack').required, 8);
+  // a data centre: a fenced equipment yard at the back, the building the floor area asked
+  ({ o } = run('data center 100,000 sf', 800, 600));
+  const dc = o.elements.find(e => e.btype === 'data-center'), yard = o.elements.find(e => e.yard === 'equipment');
+  assert.equal(o.validation.status, 'pass'); assert.ok(yard && o.elements.some(e => e.kind === 'fence' && e.note === 'Equipment yard fence')); assert.ok(Math.abs(dc.w * dc.d - 100000) <= 1000); assert.ok(yard.y > dc.y, 'the yard on the side away from the street');
+  // a type per zone
+  p = S.guessProgram('a hotel with 120 keys and 20,000 sf of retail');
+  assert.deepEqual(p.btZones, [{ zone: 1, btype: 'hotel-limited', name: 'Hotel' }]); assert.equal(p.zones[1].gfa, 66000);
+  ({ o } = run('a hotel with 120 keys and 20,000 sf of retail', 700, 520));
+  assert.equal(o.validation.status, 'pass'); assert.equal(o.elements.filter(e => e.btype === 'hotel-limited').reduce((t, e) => t + e.keys, 0), 120); assert.ok(o.elements.some(e => e.kind === 'building' && e.use === 'retail' && !e.btype));
+  p = S.guessProgram('a daycare and a bank on pads in front of townhomes');
+  assert.deepEqual(p.zones.map(z => z.use), ['other', 'restaurant', 'townhomes']); assert.deepEqual(p.btZones.map(z => z.btype), ['daycare', 'bank']); assert.equal(p.zones[0].place.where, 'front');
+  ({ o } = run('a daycare and a bank on pads in front of townhomes', 700, 520));
+  assert.equal(o.validation.status, 'pass'); assert.ok(o.elements.some(e => e.btype === 'daycare' && e.tc === 'civic' && e.children === 150)); assert.ok(o.elements.some(e => e.btype === 'bank' && e.tc === 'bank'));
+  assert.ok(o.notes.some(n => /^Building type: Daycare/.test(n)) && o.notes.some(n => /^Building type: Bank/.test(n)));
+  for (const a of ['20,000 sf retail along the main road, 240 apartments behind and 80 townhomes', '200 apartments with a daycare', 'a 60,000 sf shopping center with a bank pad']) assert.ok(!S.guessProgram(a).btZones, 'no zone types: ' + a);
+  // the editor's presets: a block of the type at its usual size, coloured by type on the 3D map
+  const cat = BT.presetCatalog(); assert.ok(cat.length >= 50 && cat.every(c => BT.presetBuilding(c.id)?.kind === 'building'));
+  const hb = BT.presetBuilding('hotel-limited'); assert.deepEqual([hb.use, hb.keys, hb.floors], ['hotel', 120, 4]);
+  const dcb = BT.presetBuilding('daycare'), fc = S.planFeatures({ ...site(400, 300), elements: [{ ...dcb, id: 'd1', x: 200, y: 150 }] });
+  assert.ok(fc.features.some(f => f.properties.k === 'b3' && f.properties.use === 'civic' && f.properties.part === 'parapet'));
 }
 console.log('btypes ok');
