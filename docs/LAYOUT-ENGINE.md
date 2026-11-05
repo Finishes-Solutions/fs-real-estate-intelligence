@@ -920,3 +920,55 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    the street); TY-hotel-retail's one-sided field (p90 246 ft); bare row ends where rows meet a cross drive end to end
    (222); small pads' aisles meeting the entry from the side (TY-daycare 30 ft); 370-475 sf a stall on loop drives and
    small lots (MF-tower 376, TY-assisted 470).
+
+32. Done Nov 5 (filling the land, round 3: exact counts, homes round a central lake, the clubhouse at the back). The
+   owner: "keep improving how every building type and lot shape fills the land, with honest checks, no regressions".
+   Each target checked first on the corpus (`scripts/prompt-corpus.mjs`, words path) and the bench; holdouts used only
+   as a final non-regression check.
+   (a) Exact counts short when the land could hold them. D17 "200 apartments, 3 stories, … underground detention" came
+   back with 192 and D02 "240 units in 4-story mid-rise buildings" with 208. The land wasn't the limit: the generator drew
+   216 (and 256) and lib/bldgtemplates.mjs applyTemplates trimmed toward the count by taking a whole building off when
+   every building was already at its fewest modules (a 24-home bar for 16 homes over: 192). Fix: when no module can come
+   off without undershooting, every building holds more than the excess, and the excess is within a tenth of the count,
+   the excess is met by combining pairs of homes into larger ones (the existing mechanism, at most one pair a floor of a
+   stack, recorded on the building as `combined` so the validator still reconciles it), spread over the buildings, never
+   all in one. The note says it ("exactly 200 units: 16 pairs of homes combined into larger homes (whole stacks give
+   216)"). Ranking (lib/layoutrun.mjs rankKey): an option meeting the count in whole stacks ranks before one meeting it
+   by combining; an exact count met only by combining still triggers the run's fuller retry (else S02, S10 and S24 lost
+   the search's whole-stack layouts that the retry had found). D17 192 → 200, D02 208 → 240, both passing every check.
+   (b) D05 "96 duplex units on a private street": the land can't hold 48 duplexes with their lots, streets and pond on
+   10.3 ac (the densest layout found is 78). The plan now says so with the real most: a duplex count past what fits is
+   laid out as many as fit, as townhomes already were (lib/sitelayout.mjs layoutChoices), and an exact count no option
+   reaches ranks the nearest first (rankKey `off`). Notes: "96 duplex units won’t fit here …; this is about the most that
+   does: 78." (was 64, while "as many as fit" found 68).
+   (c) "Homes around a central lake" (S19) was drawn as a band of lake at the back. New arrangement, lib/sitering.mjs
+   ringPieces (wired in lib/sitelayout.mjs ringOptions, beside the mixed bands): when the words put single-family homes
+   round the commons in the middle and nothing else is built, a loop street rings the middle with lots on both sides (an
+   outer row backing onto the lot lines, an inner row backing onto the middle; tried with the inner rows on all four
+   sides, front and back only, or none), two ways in down the loop's sides (as far apart as the frontage allows), the
+   corners at the entries planted, and the middle a lake holding the detention with a walking trail round it (a pavilion
+   and playground on its front lawn where they fit within reach of the loop). The pond is sized to the drawn plan's own
+   detention estimate (S.stormOf, as the validator judges it); a try whose middle can't hold it isn't offered. With a pool
+   or clubhouse asked ("homes around a central park with a clubhouse and pool", "homes around a central pool and
+   clubhouse": the reading now makes that a commons in the middle, lib/siteplan.mjs HOMES_POOL), the middle is a park with
+   the clubhouse and pool at its centre, a drive in from the loop with a stall row each side, and the pond in two basins
+   either side. The arrangement asked for is always among the options (first unless it holds well under the bands'
+   homes). S19: 46 homes, the lake at the back → 85 homes, the lake in the middle (1.71 ac, detention passing), all
+   checks passing. Near-rectangular sites only for now (the frame's land at least 97% of its box).
+   (d) The clubhouse asked at the back held 168 of 180: in the rows running back the back building of a column gave way
+   whole to it. Now the clubhouse sits at the back end of its column and the column's buildings are as many as fit in
+   front of it (lib/sitegen.mjs rowsBack); the generator's extra candidates for an ask (askKept) count twins that differ
+   only in their ways in once and take those holding as much as the top eight first. "180 apartments with the clubhouse
+   at the back": top option 180, clubhouse at the back, every check passing (was option 3, 168, short and failing
+   detention).
+   (e) The most visible as-many-as-fit waste on the bench: duplex rows 22 ft apart (an 86 ft pitch for a 64 ft duplex).
+   As many as fit, duplexes (and triplexes / fourplexes on the duplex rows) now stand the brief's building separation
+   apart, 10 ft at the least (lib/layoutbrief.mjs passes it for duplexes as for townhomes; a count asked for keeps 22 ft).
+   Bench: MF-duplex 52 → 56, TY-triplex 48 → 54 (TY-fourplex redrawn, 48 as before).
+   Bench: 74 cases, 74 passing, no warnings, replay identical, 71 identical element for element, no case lost homes or
+   sf; parking totals unchanged (12,088 stalls, 216 bare row ends, 0 long dead ends). Engine version
+   rei-layout/2026.11.05.2. Corpus (words path, 120): 116 → 119 fully right (D02, D17, S19 newly right; D05 honestly
+   short, said). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests:
+   test/layoutrun.mjs (combined pairs from a stuck trim, D17, the clubhouse at the back, the lake ring and the park ring,
+   duplexes past what fits). Still: the ring on irregular sites, townhomes or duplexes round a lake, the clubhouse
+   ring's parking counted toward guests; "homes around a central pool" for apartments stays the resort loop.

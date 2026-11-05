@@ -186,3 +186,19 @@ AI path, live, spatial category only (gpt-6-luna through the app's program step,
 outcome 91%, fully right 32 / 35 (item 26's full run: 29 / 35), unmet place asks said 4 / 4. Missed: S06 (the
 warehouse midway back, docks facing west), S19 (the lake not in the middle), S31 (parking behind the buildings): the
 model's programs for S06 and S31 lay out differently from the words' (not traced yet).
+
+## Round 3: filling the land (words path, 2dd7617 → this branch; LAYOUT-ENGINE.md item 32)
+
+**Words path, after**
+
+| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |
+|---|---|---|---|---|---|
+| vague | 25 | 100% | 100% | 25 / 25 | — |
+| detailed | 35 | 100% | 98% | 34 / 35 | — |
+| messy | 25 | 100% | 100% | 25 / 25 | — |
+| spatial | 35 | 100% | 100% | 35 / 35 | — |
+| all | 120 | 100% | 99% | 119 / 120 | — |
+
+Newly right: D02 (240 mid-rise units, was 208), D17 (200 apartments, was 192), S19 (homes round a central lake: the
+lake in the middle, 85 homes, was 46 with the lake at the back). Still missed: D05 “96 duplex units on a private
+street”: the land holds about 78 (said in the notes as the most that fits; was 64). Fresh sets not re-scored.

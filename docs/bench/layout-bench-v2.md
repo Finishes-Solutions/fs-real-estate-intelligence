@@ -7,7 +7,7 @@
 | MF-midrise | multifamily | feasible | pass · 288 units · parking 461/461 | — | 2 | identical | n/a |
 | MF-townhomes | multifamily | feasible | pass · 80 units · parking 180/180 | — | 2 | identical | n/a |
 | MF-townhome-lots | multifamily | feasible | pass · 151 units · parking 346/340 | — | 2 | identical | n/a |
-| MF-duplex | multifamily | feasible | pass · 52 units · parking 104/104 | — | 2 | identical | n/a |
+| MF-duplex | multifamily | feasible | pass · 56 units · parking 112/112 | — | 2 | identical | n/a |
 | MF-wedge-midrise | multifamily | feasible | pass · 144 units · parking 232/231 | — | 2 | identical | n/a |
 | MF-tower | multifamily | feasible | pass · 300 units · parking 480/480 | — | 2 | identical | n/a |
 | MF-wrap | multifamily | feasible | pass · 300 units · parking 485/480 | — | 2 | identical | n/a |
@@ -67,7 +67,7 @@
 | TY-unknown | types | feasible | pass · 30,000 sf · parking 93/90 | — | 2 | identical | n/a |
 | TY-T-apts | types | feasible | pass · 150 units · parking 241/240 | — | 2 | identical | n/a |
 | TY-point-tower | types | feasible | pass · 200 units · parking 321/320 | — | 2 | identical | n/a |
-| TY-triplex | types | feasible | pass · 48 units · parking 96/96 | — | 2 | identical | n/a |
+| TY-triplex | types | feasible | pass · 54 units · parking 108/108 | — | 2 | identical | n/a |
 | TY-hotel-full | types | feasible | pass · 250,000 sf · parking 303/300 | — | 2 | identical | n/a |
 | TY-hotel-retail | types | feasible | pass · 82,500 sf · parking 189/186 | — | 2 | identical | n/a |
 | TY-garage | types | feasible | pass · 236,592 sf · parking 405/0 | — | 2 | identical | n/a |
