@@ -1508,7 +1508,7 @@ export function initSitePlan(ctx) {
       let on = false, spot = null, ghost = null, chip = null; const inPop = pop.contains(b), x0 = e0.clientX, y0 = e0.clientY;
       const start = () => { on = true; dragged = true; closeMenu();
         ghost = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); ghost.setAttribute('class', 'sp-dragghost'); ghost.innerHTML = '<polygon/>'; ghost.style.setProperty('--ac', addAccent(kind));
-        chip = document.createElement('div'); chip.className = 'sp-dragchip'; chip.style.setProperty('--ac', addAccent(kind)); chip.innerHTML = ADD_ICON[kind] + '<span>' + esc(ADD_SHORT[kind] || kind) + '</span>';
+        chip = document.createElement('div'); chip.className = 'sp-dragchip'; chip.style.setProperty('--ac', addAccent(kind)); chip.innerHTML = (ADD_ICON[kind] || ADD_ICON.parking) + '<span>' + esc(ADD_SHORT[kind] || kind) + '</span>';
         document.body.append(ghost, chip); document.documentElement.classList.add('sp-dragging'); if (inPop) pop.style.visibility = 'hidden'; };
       const place = (x, y) => {
         chip.style.transform = 'translate(' + Math.round(x + 14) + 'px,' + Math.round(y + 14) + 'px)';
@@ -2056,7 +2056,7 @@ export function initSitePlan(ctx) {
       spPfSec: () => '<div id="spPf">' + pfHtml(p, pl) + '</div>',
       spSiteSec: () => siteHtml(p, pl),
       spDrawSec: () => '<div class="bsec" id="spDrawSec"><div class="lt">Add to the plan' + infoBtn('A piece goes in the middle of the view, clear of the rest; parking under it gives way. Edit Layout turns on so you can drag it into place.', 'About adding pieces') + '</div>' + lotHtml(pl) +
-        '<div class="sp-addg">' + ADD_GROUPS.map(([g, ks]) => '<div class="sp-add-g" role="group" aria-label="' + esc(g) + '"><div class="sp-sub">' + esc(g) + '</div><div class="sp-add-r">' + ks.map(k => '<button type="button" class="sp-add" data-add="' + k + '" style="--ac:' + addAccent(k) + '" title="Add ' + esc(ADD_LABEL[k] || SP.KINDS[k]?.label || ADD_SHORT[k]) + '">' + ADD_ICON[k] + '<span>' + esc(ADD_SHORT[k]) + '</span></button>').join('') + '</div></div>').join('') + '</div>' +
+        '<div class="sp-addg">' + ADD_GROUPS.map(([g, ks]) => '<div class="sp-add-g" role="group" aria-label="' + esc(g) + '"><div class="sp-sub">' + esc(g) + '</div><div class="sp-add-r">' + ks.map(k => '<button type="button" class="sp-add" data-add="' + k + '" style="--ac:' + addAccent(k) + '" title="Add ' + esc(ADD_LABEL[k] || SP.KINDS[k]?.label || ADD_SHORT[k]) + '">' + (ADD_ICON[k] || ADD_ICON.parking) + '<span>' + esc(ADD_SHORT[k]) + '</span></button>').join('') + '</div></div>').join('') + '</div>' +
         '<label class="sp-f sp-lib"><span class="sp-fl">From the building library <small>' + (BUILDING_TYPES.length + TL.list().length) + ' types</small></span><span class="sp-libw">' + SI.find + '<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('', teamTypes()) + '</select></span></label>' + teamHtml() + '</div>',
       spParams: () => paramsHtml(pl, prog),
       spRender: () => renderHtml(p, pl),
