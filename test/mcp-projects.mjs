@@ -162,5 +162,17 @@ if (localChrome()) {
   r = await call('fetch', { id: 'nonsense' }, {}); assert.ok(r.isError && /project:<project_id>/.test(text(r)));
   r = await call('search', { query: '' }, {}); assert.ok(r.isError); }
 
+// a project's option as a plan (lib/mcp/plans.mjs): open, edit (a new plan), and back into the project as a new option
+{ const ST = await import('../lib/mcp/store.mjs'); ST.hooks.store = ST.memoryStore();
+  let t = ok(await call('plan_from_project', { project_id: sample.id }, {}), 'plan_from_project'); const pid = /Plan id: ([\w-]+)/.exec(t)[1];
+  assert.match(t, new RegExp(sample.name)); assert.match(t, /Numbers: [\d,]+ sf/);
+  t = ok(await call('plan_get', { plan_id: pid }, {}), 'plan_get'); const piece = /^- (\w+) · ([^(]+) \(building/m.exec(t); assert.ok(piece, 'pieces listed');
+  t = ok(await call('plan_edit', { plan_id: pid, edits: [{ action: 'change', target: piece[2].trim(), floors: 4 }] }, {}), 'plan_edit'); const pid2 = /Plan id: ([\w-]+)/.exec(t)[1]; assert.notEqual(pid2, pid);
+  let r = await call('save_plan_to_project', { plan_id: pid2 }, {}); assert.ok(r.isError && /off on this server/.test(text(r)), 'a write: refused without writes');
+  const n0 = docOf(sample.id).plans.length;
+  t = ok(await call('save_plan_to_project', { plan_id: pid2, make_study_option: false, by: 'Matt' }), 'save_plan_to_project'); assert.match(t, /Saved to .* as Option \w+ \(option_id/);
+  const d = docOf(sample.id); assert.equal(d.plans.length, n0 + 1, 'a new option, nothing replaced'); assert.equal(d.plans.at(-1).elements.find(e => e.id === piece[1]).floors, 4); assert.equal(d.plans.at(-1).by, 'Matt (agent)');
+  ST.hooks.store = null; }
+
 assert.ok(outbound.every(u => /tigerweb\.geo\.census\.gov/.test(u)), 'the only outbound requests were the (refused) road lines: ' + outbound.join(', '));
 console.log('mcp projects passed');

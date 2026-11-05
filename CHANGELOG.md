@@ -43,6 +43,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Anything else is drawn at the size asked:** e.g. "a 2-story trampoline park 30,000 sf" is drawn as a building of that size, and the notes say no type matched and what was assumed.
 - Sizes without a reviewed reference project are marked as estimates. Fixed the Add panel tile that showed "undefined" above Parking field. 65 test sites, every one passing with no warnings; the full test suite passes.
 
+### 12:10 AM CT: Agents can run a site plan from start to finish through the MCP server (30331ee)
+- **Connected AI agents can now do what a person does with a site plan:** look up a property and its site facts and reports, lay out a plan from words, run the independent check, open a plan and see every piece, edit it in words or with exact moves, lock pieces, pick another layout, compare up to six versions, get the numbers (unit mix, parking, coverage, detention, pro forma), export the sheet (PDF, picture, CAD, GeoJSON, BIM script) and save it back to a project as a new option.
+- Every edit keeps the earlier version. Locked pieces never change.
+- A full agent session (address to plan to edit to export) is now part of the test suite. 66 of the app's 79 capabilities are fully available to agents (was 41); the coverage list says what remains.
+
 ## 2026-11-04
 
 ### 11:10 PM CT: Parking: no long dead-end aisles, planted row ends (b4b0a64)
