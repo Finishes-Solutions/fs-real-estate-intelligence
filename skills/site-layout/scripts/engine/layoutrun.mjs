@@ -26,9 +26,14 @@ import * as S from './siteplan.mjs';
 import polyclip from './vendor/polyclip.mjs';
 import * as T from './bldgtemplates.mjs';
 import * as TURN from './turning.mjs';
+import * as BT from './btypes.mjs';
+import * as I from './layoutintent.mjs';
+import * as G from './guardrails.mjs';
+import * as SITE from './btsite.mjs';
+import { restripeAngled } from './siteparking.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.04.1'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.8'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -65,6 +70,34 @@ const FAR_FT = 80, NEAR_FT = 40;
 // (10 ft) and keeps its largest piece; the trail keeps the stretches that don't cross the drive. Kept only when no hard
 // check gets worse (keepIfNoWorse); the detention line reports what the pond now holds.
 export function addSecondAccess(plan, o, brief) {
+  const r = addSecondAccess1(plan, o, brief);
+  if (!o?.elements?.length || !accessShort(plan, r, brief)) return r;
+  return homesGiveWay(plan, o, brief) || r;
+}
+const accessShort = (plan, o, brief) => { const v = V.validateLayout({ ...plan, elements: o.elements, program: o.program || {} }, brief); return ['access.second', 'access.remote'].some(id => v.checks.find(c => c.id === id)?.status === 'fail'); };
+// Townhomes packed up to the street can leave no stretch of it for the second way in the fire code wants (or none far
+// enough from the main entry), and the run would fall back on a gated emergency lane. Where the count can spare homes
+// (as many as fit, or up to), the row nearest a street and farthest from the ways in there are gives way, with its lots
+// and driveways, and the second way in is looked for again; up to four rows are tried, one at a time, the first that
+// gives a real entrance (and the spacing) kept.
+function homesGiveWay(plan, o, brief) {
+  const HOME = ['townhomes', 'duplex'], useOf = e => e.use || o.program?.use, els = o.elements;
+  const spare = (brief?.program?.uses || []).some(u => HOME.includes(u.use) && u.quantity?.unit === 'units' && (u.quantity.mode === 'maximize' || u.quantity.mode === 'max'));
+  if (!spare) return null;
+  const ring = plan.ring, n = ring.length, edges = [plan.front, ...(plan.streets || [])].filter(k => k != null && k < n), ents = S.entrancesOf(els).map(e => S.centroid(S.shapeOf(e)));
+  if (!edges.length || !ents.length) return null;
+  const toStreet = sh => Math.min(...sh.flatMap(p => edges.map(k => S.segDist(p, ring[k], ring[(k + 1) % n]))));
+  const rows = els.filter(e => e.kind === 'building' && !e.future && HOME.includes(useOf(e)) && !e.poly).map(e => { const sh = S.shapeOf(e), c = S.centroid(sh); return { e, st: toStreet(sh), far: Math.min(...ents.map(q => Math.hypot(q[0] - c[0], q[1] - c[1]))) }; })
+    .filter(r => r.st < 110).sort((a, b) => b.far - a.far || String(a.e.id).localeCompare(String(b.e.id))).slice(0, 4);
+  for (const { e } of rows) {
+    const lots = els.filter(lt => lt.kind === 'lot' && S.rectsOverlap(lt, e, 1)), drv = els.filter(x => x.kind === 'plaza' && x.note === 'Driveway' && lots.some(lt => S.inRing(S.centroid(S.shapeOf(x)), S.shapeOf(lt))));
+    const gone = new Set([e, ...lots, ...drv]), o1 = { ...o, elements: els.filter(x => !gone.has(x)) }, o2 = addSecondAccess1(plan, o1, brief);
+    if (o2 === o1 || accessShort(plan, o2, brief)) continue;
+    return { ...o2, tplNotes: [...(o2.tplNotes || []), (e.name || 'A row of homes') + ' (' + e.units + ' homes) gave way for the second entrance.'] };
+  }
+  return null;
+}
+function addSecondAccess1(plan, o, brief) {
   if (!o?.elements?.length) return o;
   if (o.forceMore) { const { forceMore, ...rest } = o; void forceMore; return addSecondAccess0(plan, rest, brief); }
   const v = V.validateLayout({ ...plan, elements: o.elements, program: o.program || {} }, brief), c = v.checks.find(x => x.id === 'access.second'), rm = v.checks.find(x => x.id === 'access.remote');
@@ -72,10 +105,10 @@ export function addSecondAccess(plan, o, brief) {
     // two ways in, but closer than half the site's diagonal (a centred main entry on one frontage): a third at the far end
     // makes the outer two far enough apart; kept only when it does
     if (rm?.status !== 'fail') return o;
-    const o3 = addSecondAccess(plan, { ...o, forceMore: true }, brief), v3 = o3 === o ? null : V.validateLayout({ ...plan, elements: o3.elements, program: o3.program || {} }, brief);
+    const o3 = addSecondAccess1(plan, { ...o, forceMore: true }, brief), v3 = o3 === o ? null : V.validateLayout({ ...plan, elements: o3.elements, program: o3.program || {} }, brief);
     return v3 && v3.checks.find(x => x.id === 'access.remote')?.status === 'pass' ? { ...o3, forceMore: undefined, tplNotes: [...(o.tplNotes || []), 'A third way in at the far end of the street, so two are at least half the site’s diagonal apart (fire code spacing).'] } : o;
   }
-  return addSecondAccess(plan, { ...o, forceMore: true }, brief);
+  return addSecondAccess1(plan, { ...o, forceMore: true }, brief);
 }
 function addSecondAccess0(plan, o, brief) {
   const wet = o.elements.filter(e => e.kind === 'pond' || e.kind === 'trail'), rest = o.elements.filter(e => !wet.includes(e));
@@ -160,6 +193,31 @@ export function pondBesideWork(plan, o) {
 // the fire official accept one; the validator counts it as such (an assumption).
 const LANE_W = 20, LANE_MAX = 420;
 export function addEmergencyAccess(plan, o, brief) {
+  const r = addEmergencyAccess0(plan, o, brief);
+  if (r !== o || !o?.elements?.length || o.elements.some(e => e.emergency)) return r;
+  return rowGivesWayForLane(plan, o, brief) || r;
+}
+// Townhomes packed to the side and rear lot lines (or a pond there) can leave no straight way in from a lot line for the
+// emergency lane, and the option is left short of its second way in. Where the count can spare homes (as many as fit, or
+// up to), one row near a lot line gives way, with its lots and driveways, and the lane is looked for again: the smallest
+// rows first, the farthest from the entrances first among equals, six at most; the first that lets a lane in is kept.
+function rowGivesWayForLane(plan, o, brief) {
+  const HOME = ['townhomes', 'duplex'], useOf = e => e.use || o.program?.use, els = o.elements;
+  if (!(brief?.program?.uses || []).some(u => HOME.includes(u.use) && u.quantity?.unit === 'units' && (u.quantity.mode === 'maximize' || u.quantity.mode === 'max'))) return null;
+  const v = V.validateLayout({ ...plan, elements: els, program: o.program || {} }, brief); if (!['access.second', 'access.remote'].some(id => v.checks.find(c => c.id === id)?.status === 'fail')) return null;
+  const ring = plan.ring, n = ring.length, ents = S.entrancesOf(els).map(e => S.centroid(S.shapeOf(e))); if (!ents.length) return null;
+  const toLine = sh => Math.min(...sh.flatMap(p => ring.map((a, k) => S.segDist(p, a, ring[(k + 1) % n]))));
+  const rows = els.filter(e => e.kind === 'building' && !e.future && HOME.includes(useOf(e)) && !e.poly).map(e => { const sh = S.shapeOf(e), c = S.centroid(sh); return { e, st: toLine(sh), far: Math.min(...ents.map(q => Math.hypot(q[0] - c[0], q[1] - c[1]))) }; })
+    .filter(r => r.st < 60).sort((a, b) => (+a.e.units || 0) - (+b.e.units || 0) || b.far - a.far || String(a.e.id).localeCompare(String(b.e.id))).slice(0, 6);
+  for (const { e } of rows) {
+    const lots = els.filter(lt => lt.kind === 'lot' && S.rectsOverlap(lt, e, 1)), drv = els.filter(x => x.kind === 'plaza' && x.note === 'Driveway' && lots.some(lt => S.inRing(S.centroid(S.shapeOf(x)), S.shapeOf(lt))));
+    const gone = new Set([e, ...lots, ...drv]), o1 = { ...o, elements: els.filter(x => !gone.has(x)) }, o2 = addEmergencyAccess0(plan, o1, brief);
+    if (o2 === o1) continue;
+    return { ...o2, tplNotes: [...(o2.tplNotes || []), (e.name || 'A row of homes') + ' (' + e.units + ' homes) gave way for the emergency access lane.'] };
+  }
+  return null;
+}
+function addEmergencyAccess0(plan, o, brief) {
   if (!o?.elements?.length || o.elements.some(e => e.emergency)) return o;
   const v = V.validateLayout({ ...plan, elements: o.elements, program: o.program || {} }, brief), chk = id => v.checks.find(x => x.id === id)?.status;
   if (chk('access.second') !== 'fail' && chk('access.remote') !== 'fail') return o;
@@ -599,11 +657,377 @@ export function garageEntries(plan, o) {
   return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), ...notes] };
 }
 // a changed option kept only when it breaks no hard check the original passed
+// ---------- parking quality (docs/LAYOUT-ENGINE.md item 25; measured by scripts/parking-metrics.mjs) ----------
+// A long dead-end parking aisle gets a turnaround. Where an aisle's stalls run on more than DEAD_AISLE ft past the last
+// place another drive joins it (one aisle with the way in at its middle, on a narrow lot), a driver who finds no space
+// backs out the whole way. At its end: a turnaround pad TURN_PAD ft along the aisle and across the aisle and the stall
+// rows either side (a T a car turns in; not a fire apparatus turnaround: parking aisles are not taken as fire lanes),
+// past the rows' ends where the land inside the paving setback lets it (no stalls lost), else on the last two stalls of
+// each row at that end, only while the parking still meets what's required. Lawn under the pad gives way; buildings,
+// ponds, parks and other rows never do. The validator warns on the same thing (parking.dead-end-aisle).
+export const DEAD_AISLE = S.DEAD_AISLE_FT, TURN_PAD = 20;
+// the aisles whose stall rows run on more than DEAD_AISLE ft past the last piece of the network joining them (a drive,
+// a truck court, the paving under a lot; a driveway's street end is a way out, so driveways aren't judged). An aisle end
+// left clear of stalls is not taken as a turnaround here (lib/siteplan.mjs deadEnds takes an 18 ft hammerhead as one only
+// on an aisle shorter than this): a 24 ft aisle is too narrow to turn in. Each: { e, sgn, u, L, W, rowEnd, tc, on: [{ r, a, b, side }] } (along the aisle from its middle)
+export function longDeadAisles(els) {
+  const cl = r => { const q = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q.concat([q[0]]); };
+  const net = els.filter(e => (e.kind === 'drive' || e.kind === 'truck' || e.kind === 'field') && !e.future && !/drive-?thru/i.test((e.name || '') + ' ' + (e.note || '')));
+  const rows = els.filter(e => e.kind === 'parking' && !e.future && !e.rv && !e.vac), out = [];
+  for (const e of net) {
+    if (e.kind !== 'drive' || e.path || e.poly || e.entry || e.turn || S.isEntrance(e) || !(+e.w > 0 && +e.d > 0)) continue;
+    const long = +e.w >= +e.d, L = long ? +e.w : +e.d, W = long ? +e.d : +e.w; if (L < 60 || W > 40) continue;
+    const r = (e.rot || 0) * Math.PI / 180, u = long ? [Math.cos(r), Math.sin(r)] : [-Math.sin(r), Math.cos(r)], v = [-u[1], u[0]];
+    const at = (t, s) => [e.x + u[0] * t + v[0] * s, e.y + u[1] * t + v[1] * s], tOf = p => (p[0] - e.x) * u[0] + (p[1] - e.y) * u[1], sOf = p => (p[0] - e.x) * v[0] + (p[1] - e.y) * v[1];
+    const sh = S.shapeOf(e), g1 = S.grow(sh, 1);
+    const on = rows.filter(q => S.rectsOverlap({ poly: S.grow(S.shapeOf(q), 2) }, { poly: sh }, 0)).map(q => { const s = S.shapeOf(q), ts = s.map(tOf), ss = s.map(sOf), qa = (q.rot || 0) * Math.PI / 180, ax = +q.w >= +q.d ? [Math.cos(qa), Math.sin(qa)] : [-Math.sin(qa), Math.cos(qa)];
+      const cap = q.caps && !q.poly && !S.stallAng(q) && +q.w >= +q.d && S.stalls(q).n >= 6 ? S.stallPitch(q) : 0; // (planted end caps are no stalls)
+      return { r: q, a: Math.min(...ts) + cap, b: Math.max(...ts) - cap, oa: Math.min(...ts), ob: Math.max(...ts), side: Math.min(...ss) > -1 ? 1 : Math.max(...ss) < 1 ? -1 : 0, par: q.poly || Math.abs(ax[0] * u[0] + ax[1] * u[1]) > 0.9 }; }).filter(q => q.side && q.par && q.b - q.a > 8);
+    if (!on.length) continue;
+    const band = cl([at(-L / 2 - 80, -(W / 2 - 4)), at(L / 2 + 80, -(W / 2 - 4)), at(L / 2 + 80, W / 2 - 4), at(-L / 2 - 80, W / 2 - 4)]);
+    const joins = net.filter(o => o !== e && S.rectsOverlap({ poly: S.shapeOf(o) }, { poly: g1 }, 0)).map(o => { const s = S.shapeOf(o); let ps = [];
+      try { ps = polyclip.intersection([cl(s)], [band]).flatMap(pg => pg[0]); } catch { ps = []; }
+      if (!ps.length) ps = s.filter(p => S.gapBetween([[p[0] - 0.1, p[1] - 0.1], [p[0] + 0.1, p[1] - 0.1], [p[0] + 0.1, p[1] + 0.1], [p[0] - 0.1, p[1] + 0.1]], sh) <= 1.5);
+      return ps.length ? [Math.min(...ps.map(tOf)), Math.max(...ps.map(tOf))] : null; }).filter(Boolean);
+    if (!joins.length) continue;
+    for (const sgn of [-1, 1]) { const rowEnd = sgn > 0 ? Math.max(...on.map(q => q.b)) : Math.min(...on.map(q => q.a)), tc = sgn > 0 ? Math.max(...joins.map(j => j[1])) : Math.min(...joins.map(j => j[0]));
+      if ((rowEnd - tc) * sgn > DEAD_AISLE) out.push({ e, sgn, u, L, W, rowEnd, tc, on }); }
+  }
+  return out;
+}
+export function aisleTurnarounds(plan, o, brief) {
+  const ring = plan.ring || []; if (!o?.elements?.length || ring.length < 3) return o;
+  let found; try { found = longDeadAisles(o.elements); } catch { return o; }
+  if (!found.length) return o;
+  let inner; try { inner = S.insetRing(ring, S.edgeRules(ring, plan.front, { ...S.SETBACKS, ...(plan.setbacks || {}) }, plan.streets).map(r => Math.max(0.5, r.pave) - 0.5)); } catch { return o; }
+  if (!inner || inner.length < 3) return o;
+  const cl = r => { const q = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q.concat([q[0]]); };
+  const pk = list => V.quantities({ ...plan, elements: list, program: o.program || {} }, brief).parking;
+  let els = o.elements.slice(), made = 0, lost = 0;
+  const tried = new Set(); // (one end at a time, found again on the plan as it now stands: a row cut at one end is a new piece)
+  for (let guard = 0; guard < 12; guard++) {
+    const d = guard ? longDeadAisles(els).find(x => !tried.has(x.e.id + ':' + x.sgn)) : found[0]; if (!d) break; tried.add(d.e.id + ':' + d.sgn);
+    const e = d.e;
+    const { sgn, u, L, W } = d, v = [-u[1], u[0]], at = (t, s) => [+(e.x + u[0] * t + v[0] * s).toFixed(2), +(e.y + u[1] * t + v[1] * s).toFixed(2)];
+    const sOf = p => (p[0] - e.x) * v[0] + (p[1] - e.y) * v[1];
+    const reachS = s => Math.max(W / 2 + 18, ...d.on.filter(q => q.side === s && els.includes(q.r)).map(q => Math.max(...S.shapeOf(q.r).map(p => s * sOf(p))))); // (across to the rows' far edges, a stall's depth where a side has none)
+    const rowEnd = sgn > 0 ? Math.max(...d.on.map(q => q.ob)) : Math.min(...d.on.map(q => q.oa)); // (the rows' outlines, planted end caps and all)
+    const sLo = -reachS(-1), sHi = reachS(1), tEnd = sgn * L / 2, T0 = sgn > 0 ? Math.max(tEnd, rowEnd) : Math.min(tEnd, rowEnd);
+    const solid = els.filter(x => x !== e && !['drive', 'truck', 'field', 'lot', 'zone', 'sign', 'trail'].includes(x.kind) && !(x.kind === 'green' && !S.isPark(x)) && !x.future).map(x => ({ x, s: x.kind === 'building' ? S.grow(S.shapeOf(x), 6) : S.shapeOf(x) }));
+    const fits = (pads, skip) => pads.every(pd => pd.every(p => S.inRing(p, inner)) && !solid.some(q => !skip.has(q.x) && S.rectsOverlap({ poly: S.grow(pd, -0.5) }, { poly: q.s }, 0)));
+    const rect = (t0, t1, s0, s1, extra) => { const c = at((t0 + t1) / 2, (s0 + s1) / 2); return { kind: 'drive', x: c[0], y: c[1], w: +Math.abs(t1 - t0).toFixed(2), d: +(s1 - s0).toFixed(2), rot: +(Math.atan2(u[1], u[0]) * 180 / Math.PI).toFixed(4), name: '', ...extra }; };
+    const padEl = (t0, t1) => ({ ...rect(t0, t1, sLo, sHi, { id: (e.id || 'a') + (sgn > 0 ? '-turnB' : '-turnA'), note: 'Turnaround · ' + Math.round(sHi - sLo) + ' ft', turn: true }), kind: 'field' }); // (paving of the lot, as the field under a parking lot is: a car's turnaround, not a fire lane)
+    // A: past the rows' ends (the aisle run on to them first where they run past it)
+    const tA1 = T0 + sgn * TURN_PAD, padA = padEl(T0, tA1), extA = Math.abs(T0 - tEnd) > 0.5 ? rect(tEnd, T0, -W / 2, W / 2, { id: (e.id || 'a') + (sgn > 0 ? '-runB' : '-runA'), note: W + ' ft drive aisle' }) : null;
+    let next = null, cost = 0;
+    if (fits([S.shapeOf(padA), ...(extA ? [S.shapeOf(extA)] : [])], new Set())) next = els.concat(extA ? [extA, padA] : [padA]);
+    else if (Math.abs(T0 - tEnd) <= 1) { // B: on the last two stalls' length at the end (the rows reaching it give them up)
+      const live = d.on.filter(q => els.includes(q.r)), pitch = Math.max(...live.map(q => S.stallPitch(q.r)), S.STALL.w), back = T0 - sgn * 2 * pitch, ends = live.filter(q => sgn > 0 ? q.ob > back + 0.5 : q.oa < back - 0.5); // (rows already ending two stalls short of the end: nothing to cut)
+      const short = ends.map(q => { const r = q.r, ra = r.w >= r.d ? 'w' : 'd', a = (r.rot || 0) * Math.PI / 180, ax = ra === 'w' ? [Math.cos(a), Math.sin(a)] : [-Math.sin(a), Math.cos(a)], dir = (ax[0] * u[0] + ax[1] * u[1]) * sgn > 0 ? 1 : -1, cut = (sgn > 0 ? q.ob - back : back - q.oa);
+        const k = Math.ceil((cut - 0.01) / S.stallPitch(r)) * S.stallPitch(r); if (k <= 0) return [r, r]; if (r[ra] - k < 3 * S.stallPitch(r)) return [r, null];
+        return [r, { ...r, [ra]: +(r[ra] - k).toFixed(2), x: +(r.x - ax[0] * dir * k / 2).toFixed(2), y: +(r.y - ax[1] * dir * k / 2).toFixed(2) }]; });
+      const padB = padEl(back, T0);
+      if (short.every(([, r2]) => r2) && fits([S.shapeOf(padB)], new Set(ends.map(q => q.r)))) {
+        const cand = els.map(x => short.find(([r]) => r === x)?.[1] ?? x).concat([padB]), p0 = pk(els), p1 = pk(cand);
+        if (p1.required != null && p1.provided >= p1.required) { next = cand; cost = p0.provided - p1.provided; }
+      }
+    }
+    if (!next) continue;
+    // the lawn under the pad gives way (a planted strip or the land left; a named park never does)
+    const pads = next.filter(x => x.turn && !els.includes(x)).map(x => cl(S.grow(S.shapeOf(x), 1)));
+    els = next.flatMap(x => { if (x.kind !== 'green' || S.isPark(x) || !x.poly || !pads.some(pd => S.rectsOverlap({ poly: x.poly }, { poly: pd.slice(0, -1) }, 0))) return [x];
+      let left; try { left = polyclip.difference([cl(x.poly)], ...pads.map(pd => [pd])); } catch { return [x]; }
+      return left.map(pp => pp[0].slice(0, -1)).filter(r => S.ringArea(r) > 400).map((r, i) => ({ ...x, ...(i ? { id: (x.id || 'g') + 't' + i } : {}), poly: r.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) })); });
+    made++; lost += cost;
+  }
+  if (!made) return o;
+  return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), made + ' long dead-end parking aisle' + (made > 1 ? 's' : '') + ' given a turnaround at the end' + (lost ? ' (' + lost + ' stall' + (lost > 1 ? 's' : '') + ' at the end gave way; the parking still meets what’s required)' : '') + '.'] };
+}
+// An entrance's throat (docs/LAYOUT-ENGINE.md item 28): the stretch of the entry drive in from the street where no
+// stall backs into it and no drive crosses it, so cars turning in off the street don't queue back onto it. The length
+// asked grows with the parking the entrance serves; a planning yardstick in the range the access-management guidance
+// gives (TRB Access Management Manual, 2nd ed. 2014, on driveway throat length; ITE / Stover & Koepke, "Transportation
+// and Land Development", 2nd ed.): 50 ft for a lot of under 200 spaces, 75 ft to 499, 100 ft for 500 or more (local
+// access codes set the real number). A townhome or home lane (no lot) is not judged.
+export const throatNeed = stalls => stalls >= 500 ? 100 : stalls >= 200 ? 75 : 50;
+// every entrance's throat: { e, k (street edge), len (ft in from the street to the first stall centre beside it or drive
+// across it, capped at 300; first: to the first stall, cross: to the first drive), zone (the stretch the length asked covers, the entry's width and 34 ft either side: a stall's depth
+// and the curb returns), stalls (stall centres in the zone) }
+export function entryThroats(plan, els, need) {
+  const ring = plan.ring || []; if (ring.length < 3) return [];
+  let rules; try { rules = S.edgeRules(ring, plan.front, { ...S.SETBACKS, ...(plan.setbacks || {}) }, plan.streets); } catch { return []; }
+  const pts = els.filter(x => x.kind === 'parking' && !x.future && !x.rv && !x.vac).flatMap(x => { try { return S.stallCentres(x); } catch { return []; } });
+  const out = [];
+  for (const e of els.filter(x => S.isEntrance(x) && !x.emergency && !x.future)) {
+    const o = S.shapeOf(e); let k = -1, bd = Infinity;
+    for (const any of [false, true]) { if (k >= 0 && bd <= 30) break; // (the street edges first; a frontage drawn as chords may give only some of them the front's role)
+      ring.forEach((a, i) => { if (!any && rules[i].role !== 'front' && !rules[i].street) return; const d = Math.min(...o.map(p => S.segDist(p, a, ring[(i + 1) % ring.length]))); if (d < bd) { bd = d; k = i; } }); }
+    if (k < 0 || bd > 30) continue;
+    const a = ring[k], b = ring[(k + 1) % ring.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], ow = S.outwardOf(ring, k), cw = S.signedArea(ring) < 0 ? -1 : 1, nIn = [-ow[0] * cw, -ow[1] * cw]; // (outwardOf takes the ring counter-clockwise)
+    const along = p => (p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1], inn = p => (p[0] - a[0]) * nIn[0] + (p[1] - a[1]) * nIn[1];
+    const core = o.filter(p => inn(p) > 30), cp = core.length ? core : o, lo = Math.min(...cp.map(along)), hi = Math.max(...cp.map(along));
+    if (hi - lo > 90) continue; // (a frontage drive along the street, not a way in)
+    const others = els.filter(x => (x.kind === 'drive' || x.kind === 'truck' || x.kind === 'field') && x !== e && !x.future && !/drive-?thru/i.test((x.name || '') + ' ' + (x.note || ''))).map(x => S.shapeOf(x));
+    let cross = 300; for (let t = 1; t <= 300; t++) { const p = [a[0] + u[0] * (lo + hi) / 2 + nIn[0] * t, a[1] + u[1] * (lo + hi) / 2 + nIn[1] * t]; if (others.some(q => S.inRing(p, q))) { cross = t; break; } }
+    const beside = pts.filter(p => along(p) > lo - 34 && along(p) < hi + 34 && inn(p) > -5).map(inn), first = Math.max(0, Math.min(300, ...beside)); // (a stall's centre)
+    const len = Math.round(Math.min(cross, first)), zone = [[lo - 34, -5], [hi + 34, -5], [hi + 34, need], [lo - 34, need]].map(([s, t]) => [a[0] + u[0] * s + nIn[0] * t, a[1] + u[1] * s + nIn[1] * t]); // (a stall whose centre is within the length asked)
+    const stalls = pts.filter(p => S.inRing(p, zone));
+    out.push({ e, k, len, cross: Math.round(cross), first: Math.round(first), zone, stalls });
+  }
+  return out;
+}
+// Stalls near the doors (docs/LAYOUT-ENGINE.md item 28). The drives the layout already paves often run with no stalls
+// along them (the cross drives at a field's ends, a loop's legs), while rows on their own aisle sit beyond a pond or
+// at the far end of the land. New 90° rows go along the free sides of the two-way drives (square to the drive, 18 ft
+// deep, a planted island each end, one every 13th) where the land is free: inside the paving setback, clear of
+// buildings (6 ft walk), other paving, rows, ponds, pools, courts, parks and every entrance's throat, and no farther
+// from a building than the stalls' median walk now (FAR_FT at least); then the run's own surplus pruning
+// (pruneSurplus: rows no building uses first, farthest first, then their drives and the lot paving under them) takes the
+// parking back down to what's required. Kept only where the stalls end up nearer the buildings (90th percentile walk)
+// with no more paving, or as near on less paving, and the parking still meets what's required.
+const DRIVE_ROW_MIN = 6; // stalls in a new row along a drive, its islands aside
+export function rowsAlongDrives(plan, o, brief) {
+  const ring = plan.ring || []; if (!o?.elements?.length || ring.length < 3) return o;
+  let inner; try { inner = S.insetRing(ring, S.edgeRules(ring, plan.front, { ...S.SETBACKS, ...(plan.setbacks || {}) }, plan.streets).map(r => Math.max(0.5, r.pave) - 0.5)); } catch { return o; }
+  if (!inner || inner.length < 3) return o;
+  const els0 = o.elements, pk = list => V.quantities({ ...plan, elements: list, program: o.program || {} }, brief).parking;
+  const p0 = pk(els0); if (p0.required == null || !(p0.required > 0) || p0.provided < p0.required) return o;
+  const rows0 = els0.filter(e => e.kind === 'parking' && !e.future && !e.rv && !e.vac); if (!rows0.length) return o;
+  const isB = e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage', Bs = els0.filter(isB), served = Bs.filter(e => e.use !== 'amenity'), B = (served.length ? served : Bs).map(e => S.outline(e)); if (!B.length) return o;
+  const walk = p => Math.min(...B.map(b => b.reduce((m, a, i) => Math.min(m, S.segDist(p, a, b[(i + 1) % b.length])), Infinity)));
+  const walks = list => list.filter(e => e.kind === 'parking' && !e.future && !e.rv && !e.vac).flatMap(e => { try { return S.stallCentres(e); } catch { return []; } }).map(walk).sort((a, b) => a - b);
+  const q = (a, f) => a.length ? a[Math.min(a.length - 1, Math.floor(f * (a.length - 1) + 0.5))] : 0, w0 = walks(els0), reach = Math.max(FAR_FT, q(w0, 0.75)), far0 = q(w0, 0.9);
+  const throats = entryThroats(plan, els0, throatNeed(p0.provided)).map(t => t.zone), inZone = c => throats.some(z => S.inRing(c, z));
+  const entry = list => list.filter(e => e.kind === 'parking' && !e.future && !e.rv && !e.vac).flatMap(e => { try { return S.stallCentres(e); } catch { return []; } }).filter(inZone).length, ent0 = entry(els0);
+  if (far0 <= FAR_FT && !ent0) return o; // (the stalls are already by the doors and clear of the entrances)
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true, sw = S.STALL.w, SD = S.STALL.d;
+  const lawn = x => x.kind === 'green' && !S.isPark(x);
+  const solids = els0.filter(x => !x.future && !lawn(x) && !['lot', 'zone'].includes(x.kind)).map(x => ({ x, s: x.kind === 'building' ? S.grow(S.shapeOf(x), 6) : S.shapeOf(x) }));
+  const add = [];
+  for (const d of els0) {
+    if (d.kind !== 'drive' || d.future || d.path || d.poly || d.entry || d.turn || d.emergency || d.oneWay || d.garageEntry || S.isEntrance(d) || TURN.oneWayLane(d) || /^Garage entry|drive-?thru/i.test((d.name || '') + ' ' + (d.note || '')) || !(+d.w > 0 && +d.d > 0)) continue;
+    const long = +d.w >= +d.d, L = long ? +d.w : +d.d, W = long ? +d.d : +d.w; if (L < (DRIVE_ROW_MIN + 2) * sw || W < 22 || W > 30) continue;
+    const rot = (d.rot || 0) + (long ? 0 : 90), r = rot * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]];
+    const at = (t, s) => [d.x + u[0] * t + v[0] * s, d.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
+    for (const sg of [-1, 1]) {
+      const s0 = sg > 0 ? W / 2 : -W / 2 - SD, s1 = s0 + SD, nSlots = Math.floor(L / sw), t00 = -nSlots * sw / 2;
+      const ok = []; for (let k = 0; k < nSlots; k++) { const b = box(t00 + k * sw, t00 + (k + 1) * sw, s0, s1), c = at(t00 + (k + 0.5) * sw, (s0 + s1) / 2);
+        ok.push(b.every(pt => S.inRing(pt, inner)) && !solids.some(z => z.x !== d && S.rectsOverlap({ poly: S.grow(b, -0.3) }, { poly: z.s }, 0)) && !add.some(z => S.rectsOverlap({ poly: S.grow(b, -0.3) }, { poly: S.shapeOf(z) }, 0)) && !throats.some(z => S.rectsOverlap({ poly: b }, { poly: z }, 0)) && walk(c) <= reach); }
+      for (let k = 0; k < nSlots;) { if (!ok[k]) { k++; continue; } let j = k; while (j < nSlots && ok[j]) j++;
+        const n = j - k, cnt = S.rowStallCount(n, true, cap);
+        if (n >= 8 && cnt >= DRIVE_ROW_MIN) { const c = at(t00 + (k + j) / 2 * sw, (s0 + s1) / 2);
+          add.push({ id: (d.id || 'd') + (sg > 0 ? '-rowL' : '-rowR') + k, kind: 'parking', x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(n * sw).toFixed(2), d: SD, rot: +rot.toFixed(4), row: sg > 0 ? -1 : 1, lock: true, islands: true, caps: cap, note: 'Stalls along the drive' }); }
+        k = j; }
+    }
+  }
+  if (!add.length && !ent0) return o;
+  // the lawn under the new rows gives way
+  const cl = r => { const q2 = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q2.concat([q2[0]]); }, pads = add.map(a => cl(S.shapeOf(a)));
+  const els = els0.flatMap(x => { if (!lawn(x) || !x.poly || !pads.some(pd => S.rectsOverlap({ poly: x.poly }, { poly: pd.slice(0, -1) }, 0))) return [x];
+    let left; try { left = polyclip.difference([cl(x.poly)], ...pads.map(pd => [pd])); } catch { return [x]; }
+    return left.map(pp => pp[0].slice(0, -1)).filter(rg => S.ringArea(rg) > 400).map((rg, i) => ({ ...x, ...(i ? { id: (x.id || 'g') + 'r' + i } : {}), poly: rg.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) })); }).concat(add);
+  // then stalls out, one at a time off a row's end: first those in an entrance's throat (while the parking still meets
+  // what's required), then the farthest from a building, back down to the count the plan had; a row left with fewer
+  // than MIN_ROW stalls goes whole
+  let p = pk(els), cutWhole = 0; const gone = [], stuck = new Set();
+  const trimmable = e => e.kind === 'parking' && !e.future && !e.rv && !e.vac && !e.poly && !e.parallel && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null && +e.w > 0 && !S.stalls(e).swap && !stuck.has(e);
+  for (let guard = 0; guard < 400; guard++) {
+    const rowsN = els.filter(trimmable).map(e => { const r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], cs = S.stallCentres(e).map(c => ({ c, t: (c[0] - e.x) * u[0] + (c[1] - e.y) * u[1] })).sort((x, y) => x.t - y.t);
+      if (!cs.length) return null; const zs = cs.filter(x => inZone(x.c)), lo = cs[0], hi = cs[cs.length - 1];
+      const end = zs.length ? (zs.reduce((t, x) => t + x.t, 0) / zs.length > (lo.t + hi.t) / 2 ? 1 : -1) : walk(hi.c) >= walk(lo.c) ? 1 : -1;
+      return { e, u, n: cs.length, zone: zs.length, far: Math.max(walk(lo.c), walk(hi.c)), end }; }).filter(Boolean);
+    const zr = rowsN.filter(x => x.zone).sort((a, b) => b.zone - a.zone || String(a.e.id).localeCompare(String(b.e.id)))[0];
+    const pick = zr && p.provided - 1 >= p.required ? zr : p.provided > p0.provided ? rowsN.sort((a, b) => b.far - a.far || String(a.e.id).localeCompare(String(b.e.id)))[0] : null;
+    if (!pick) break;
+    const { e, u, n, end } = pick, i = els.indexOf(e), sw2 = S.stallPitch(e), excess = p.provided - (pick === zr ? p.required : p0.provided);
+    if (n - 1 < MIN_ROW) { if (n <= excess || pick === zr && n <= p.provided - p.required) { els.splice(i, 1); gone.push(S.shapeOf(e)); cutWhole++; p = pk(els); } else stuck.add(e); continue; }
+    const e2 = { ...e, w: +(e.w - sw2).toFixed(2), x: +(e.x - u[0] * end * sw2 / 2).toFixed(2), y: +(e.y - u[1] * end * sw2 / 2).toFixed(2) };
+    els[i] = e2; const p2 = pk(els); if (p2.provided < p.required) { els[i] = e; stuck.add(e); continue; }
+    const c = [e.x + u[0] * end * (e.w - sw2) / 2, e.y + u[1] * end * (e.w - sw2) / 2]; gone.push(S.shapeOf({ ...e, id: undefined, w: sw2, x: c[0], y: c[1] })); p = p2;
+  }
+  const { all } = afterCut(els, gone, cutWhole, () => els.filter(isB));
+  const p1 = pk(all); if (p1.required == null || p1.provided < p1.required) return o;
+  const w1 = walks(all), far1 = q(w1, 0.9), ent1 = entry(all), pave = list => { const sh = list.filter(e => ['parking', 'drive', 'field'].includes(e.kind) && !e.future).map(e => cl(S.shapeOf(e))); try { return polyclip.union(...sh.map(q => [q])).reduce((t, pg) => t + S.ringArea(pg[0].slice(0, -1)) - pg.slice(1).reduce((h, r) => h + S.ringArea(r.slice(0, -1)), 0), 0); } catch { return sh.reduce((t, q) => t + S.ringArea(q.slice(0, -1)), 0); } }, planted = list => list.filter(e => e.kind === 'parking' && !e.future && !e.poly).reduce((t, e) => { try { return t + S.capsOf(e).reduce((h, c) => h + S.ringArea(c.poly), 0) + S.islandsOf(e).length * S.stallPitch(e) * (e.sd || S.STALL.d); } catch { return t; } }, 0), a0 = pave(els0) - planted(els0), a1 = pave(all) - planted(all); // (the paving's union, lot paving under rows counted once; planted end caps and islands are not paving)
+  const dead = list => { try { return S.deadEnds(list, 1).length + longDeadAisles(list).length; } catch { return 0; } };
+  if (ent1 > ent0 || dead(all) > dead(els0) || !(ent1 < ent0 && far1 <= far0 + 5 && a1 <= a0 * 1.01 || far1 < far0 - 5 && a1 <= a0 * 1.01 || far1 <= far0 + 1 && a1 < a0 * 0.98)) return o;
+  const kept = add.filter(a => all.some(x => x.id === a.id));
+  return { ...o, elements: all, tplNotes: [...(o.tplNotes || []), ...(kept.length ? [kept.length + ' row' + (kept.length > 1 ? 's' : '') + ' of stalls along drives that had none, nearer the buildings; the farthest stalls taken out for them (90th percentile walk ' + Math.round(far0) + ' → ' + Math.round(far1) + ' ft).'] : []), ...(ent1 < ent0 ? [(ent0 - ent1) + ' stall' + (ent0 - ent1 > 1 ? 's' : '') + ' backing into an entry drive near the street taken out (the entrance’s throat kept clear).'] : []), p1.provided + ' spaces for ' + p1.required + ' required.'] };
+}
+// Stall rows end in planted islands at no cost in stalls where the land at a row's end is free (docs/LAYOUT-ENGINE.md
+// item 28): the row grows by a stall width at each end and both end stalls are planted (the stalls stay where they
+// were); where only one end is free, the row grows two stall widths that way and its stalls shift one along (the new
+// end stall must still front on the aisle). The land taken must be inside the paving setback and clear of buildings
+// (5 ft walk), drives, lot paving, other rows, ponds, pools, courts and parks; lawn (a landscape strip or land left)
+// is planted over. Never a stall fewer. Square single rows the engine laid out (lock / row), longest rows first.
+export function growEndIslands(plan, o, brief) {
+  const ring = plan.ring || []; if (!o?.elements?.length || ring.length < 3) return o;
+  let inner; try { inner = S.insetRing(ring, S.edgeRules(ring, plan.front, { ...S.SETBACKS, ...(plan.setbacks || {}) }, plan.streets).map(r => Math.max(0.5, r.pave) - 0.5)); } catch { return o; }
+  if (!inner || inner.length < 3) return o;
+  const els = o.elements.slice(), pk = () => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking;
+  let p = pk(); if (p.required == null) return o;
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true, dead = () => { try { return S.deadEnds(els, 1).length; } catch { return 0; } }, d0 = dead();
+  const lawn = x => x.kind === 'green' && !S.isPark(x), free = ['lot', 'zone'];
+  const Bs = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), Bsv = Bs.filter(e => e.use !== 'amenity'), B = (Bsv.length ? Bsv : Bs).map(e => S.outline(e));
+  const walk = p0 => Math.min(...B.map(b => b.reduce((m, a, i) => Math.min(m, S.segDist(p0, a, b[(i + 1) % b.length])), Infinity)));
+  const cand = els.map((e, i) => ({ e, i })).filter(({ e }) => e.kind === 'parking' && !e.caps && !e.parallel && !e.rv && !e.vac && !e.poly && !e.future && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null && +e.d <= 19 && +e.w > 0 && !S.stalls(e).swap)
+    .map(q => ({ ...q, n: S.stalls(q.e).n })).filter(q => q.n >= 6).sort((a, b) => b.n - a.n || String(a.e.id).localeCompare(String(b.e.id)));
+  let done = 0;
+  for (const q of cand) {
+    const e = els[q.i], sw = S.stallPitch(e), r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]], W = +e.w, D = +e.d;
+    const at = (t, s) => [e.x + u[0] * t + v[0] * s, e.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
+    const others = els.filter(x => x !== e && !x.future && !lawn(x) && !free.includes(x.kind)).map(x => ({ x, s: x.kind === 'building' ? S.grow(S.shapeOf(x), 5) : S.shapeOf(x) }));
+    const clear = pd => pd.every(pt => S.inRing(pt, inner)) && !others.some(z => S.rectsOverlap({ poly: S.grow(pd, -0.3) }, { poly: z.s }, 0));
+    const strip = (sg, k) => sg > 0 ? box(W / 2, W / 2 + k * sw, -D / 2, D / 2) : box(-W / 2 - k * sw, -W / 2, -D / 2, D / 2);
+    // the aisle in front of a stall slot (t0..t1 along the row): a drive or lot paving there
+    const aisle = e.row ? Math.sign(e.row) : 0, net = els.filter(x => (x.kind === 'drive' || x.kind === 'field') && !x.future).map(x => S.shapeOf(x));
+    const fronts = (t0, t1) => aisle && [[t0 + 1, D / 2 + 2], [(t0 + t1) / 2, D / 2 + 3], [t1 - 1, D / 2 + 2]].every(([t, s]) => { const pt = at(t, aisle * s); return net.some(z => S.inRing(pt, z)); });
+    let next = null;
+    if (clear(strip(1, 1)) && clear(strip(-1, 1))) next = { ...e, w: +(W + 2 * sw).toFixed(2), caps: cap };
+    else for (const sg of [1, -1]) { if (!clear(strip(sg, 2))) continue;
+      const t0 = sg > 0 ? W / 2 : -W / 2 - sw; if (!fronts(t0, t0 + sw)) continue; // (the stall shifted onto the new land still fronts the aisle)
+      const c = at(sg * sw, 0), e2 = { ...e, x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(W + 2 * sw).toFixed(2), caps: cap };
+      if (B.length && Math.max(...S.stallCentres(e2).map(walk)) > Math.max(...S.stallCentres(e).map(walk)) + 1) continue; // (not where the stalls shift away from the door)
+      next = e2; break; }
+    if (!next || S.stalls(next).count < S.stalls(e).count || S.stalls(next).count !== S.stallCentres(next).length) continue;
+    els[q.i] = next; const p2 = pk(); if (p2.provided >= p.provided && dead() <= d0) { p = p2; done++; } else els[q.i] = e;
+  }
+  if (!done) return o;
+  return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), done + ' parking row' + (done > 1 ? 's' : '') + ' end in planted islands on the free land at their ends (no stall given up).'] };
+}
+// Stall rows end in planted islands where the parking can spare it. Landscape codes commonly ask for a planted island at
+// the end of every row (and one every 10-15 stalls along it: the rows already have one every 13th). The default square
+// island style left the rows of the apartment and townhome layouts with bare ends; here, last in the run, the stalls
+// still spare above what's required go to end islands (the end stall each end of a row of 8 or more, planted), longest
+// rows first, never below what's required. Kept only when no check gets worse.
+export function rowEndIslands(plan, o, brief) {
+  if (!o?.elements?.length) return o;
+  const els = o.elements.slice(), pk = () => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking;
+  let p = pk(); if (p.required == null || p.provided - 2 < p.required) return o;
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true;
+  const cand = els.map((e, i) => ({ e, i })).filter(({ e }) => e.kind === 'parking' && !e.caps && !e.parallel && !e.rv && !e.vac && !e.poly && !e.future && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null)
+    .map(q => ({ ...q, n: S.stalls(q.e).n })).filter(q => q.n >= 8 && (c => S.stalls(c).count === S.stallCentres(c).length)({ ...q.e, caps: cap })) /* (the engine's count and the drawn marks agree: a guard; a row of 13n stalls with caps counts its last island once, lib/siteplan.mjs rowStallCount) */.sort((a, b) => b.n - a.n || String(a.e.id).localeCompare(String(b.e.id)));
+  let done = 0;
+  for (const q of cand) { if (p.provided - 2 < p.required) break; const was = els[q.i]; els[q.i] = { ...was, caps: cap }; const p2 = pk(); if (p2.provided >= p.required) { p = p2; done++; } else els[q.i] = was; }
+  if (!done) return o;
+  return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), done + ' parking row' + (done > 1 ? 's' : '') + ' end in planted islands (stalls to spare): ' + p.provided + ' for ' + p.required + ' required.'] };
+}
+// Bare row ends paid for elsewhere (docs/LAYOUT-ENGINE.md item 36). Where the parking is exactly met, a row that meets a
+// cross drive end to end can't grow onto free land (growEndIslands) and there are no stalls to spare (rowEndIslands). But
+// another row may have free land past its end: it grows a stall width at a time there (only where the new stall fronts
+// the aisle, inside the paving setback, clear as growEndIslands' land is, and no farther from a building than that row's
+// farthest stall), and each two stalls gained become the planted ends of a bare row (longest first). Never below what's
+// required, never a new dead end; all or nothing for each row planted.
+export function fundEndIslands(plan, o, brief) {
+  const ring = plan.ring || []; if (!o?.elements?.length || ring.length < 3) return o;
+  let inner; try { inner = S.insetRing(ring, S.edgeRules(ring, plan.front, { ...S.SETBACKS, ...(plan.setbacks || {}) }, plan.streets).map(r => Math.max(0.5, r.pave) - 0.5)); } catch { return o; }
+  if (!inner || inner.length < 3) return o;
+  const els = o.elements.slice(), pk = () => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking;
+  let p = pk(); if (p.required == null) return o;
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true, dead = () => { try { return S.deadEnds(els, 1).length; } catch { return 0; } }, d0 = dead();
+  const inThroat = () => { try { return entryThroats(plan, els, throatNeed(p.provided)).reduce((t, x) => t + x.stalls.length, 0); } catch { return 0; } }, th0 = inThroat(); /* (never a stall more inside an entrance's stacking length) */
+  const lawn = x => x.kind === 'green' && !S.isPark(x), free = ['lot', 'zone'];
+  const Bs = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), Bsv = Bs.filter(e => e.use !== 'amenity'), B = (Bsv.length ? Bsv : Bs).map(e => S.outline(e)); if (!B.length) return o;
+  const walk = p0 => Math.min(...B.map(b => b.reduce((m, a, i) => Math.min(m, S.segDist(p0, a, b[(i + 1) % b.length])), Infinity)));
+  const sq = e => e.kind === 'parking' && !e.parallel && !e.rv && !e.vac && !e.poly && !e.future && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null && +e.w > 0;
+  const agree = c => S.stalls(c).count === S.stallCentres(c).length;
+  const takers = els.filter(e => sq(e) && !e.caps && S.stalls(e).n >= 8 && agree({ ...e, caps: cap })).sort((a, b) => S.stalls(b).n - S.stalls(a).n || String(a.id).localeCompare(String(b.id)));
+  if (!takers.length) return o;
+  const w90 = walkP90(els);
+  // one stall width more on a donor row's free end: the row as it would be, or null
+  const grow1 = e => { if (!(+e.d <= 19) || S.stalls(e).swap || !(S.stalls(e).n >= 6)) return null; const sw = S.stallPitch(e), r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]], W = +e.w, D = +e.d;
+    const at = (t, s) => [e.x + u[0] * t + v[0] * s, e.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
+    const others = els.filter(x => x !== e && !x.future && !lawn(x) && !free.includes(x.kind)).map(x => x.kind === 'building' ? S.grow(S.shapeOf(x), 5) : S.shapeOf(x));
+    const clear = pd => pd.every(pt => S.inRing(pt, inner)) && !others.some(z => S.rectsOverlap({ poly: S.grow(pd, -0.3) }, { poly: z }, 0));
+    const aisle = e.row ? Math.sign(e.row) : 0, net = els.filter(x => (x.kind === 'drive' || x.kind === 'field') && !x.future).map(x => S.shapeOf(x));
+    const fronts = (t0, t1) => aisle && [[t0 + 1, D / 2 + 2], [(t0 + t1) / 2, D / 2 + 3], [t1 - 1, D / 2 + 2]].every(([t, s]) => { const pt = at(t, aisle * s); return net.some(z => S.inRing(pt, z)); });
+    const far = Math.max(...S.stallCentres(e).map(walk));
+    for (const sg of [1, -1]) { const t0 = sg > 0 ? W / 2 : -W / 2 - sw; if (!clear(box(t0, t0 + sw, -D / 2, D / 2)) || !fronts(sg > 0 ? t0 - sw : t0, sg > 0 ? t0 + sw : t0 + 2 * sw)) continue;
+      const c = at(sg * sw / 2, 0), e2 = { ...e, x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(W + sw).toFixed(2) };
+      const endC = S.stallCentres(e2).reduce((m, q) => { const t = sg * ((q[0] - e.x) * u[0] + (q[1] - e.y) * u[1]); return !m || t > m.t ? { q, t } : m; }, null)?.q; /* (the stall at the grown end: within the plan's 90th-percentile walk, so the walk doesn't lengthen) */
+      if (S.stalls(e2).count !== S.stalls(e).count + 1 || !agree(e2) || Math.max(...S.stallCentres(e2).map(walk)) > far + 1 || !endC || walk(endC) > w90) continue;
+      return e2; }
+    return null; };
+  let done = 0, grown = 0;
+  for (const t of takers) {
+    const i0 = els.indexOf(t); if (i0 < 0 || els[i0].caps) continue;
+    const snap = els.slice(); let g = 0;
+    // stalls to spare first, then donors, a stall width at a time, until the planted ends can be paid for
+    const capped = { ...t, caps: cap }, cost = S.stalls(t).count - S.stalls(capped).count;
+    while (p.provided - g - cost < p.required) { let hit = false;
+      for (let k = 0; k < els.length; k++) { const e = els[k]; if (e === t || !sq(e)) continue; const e2 = grow1(e); if (!e2) continue; els[k] = e2; if (dead() > d0 || inThroat() > th0) { els[k] = e; continue; } hit = true; g--; break; } // (g counts down: stalls gained)
+      if (!hit) break; }
+    els[els.indexOf(t)] = capped; const p2 = pk();
+    if (p2.provided >= p2.required && p2.provided >= p.required && dead() <= d0) { p = p2; done++; grown -= g; } else { els.length = 0; els.push(...snap); }
+  }
+  if (!done) return o;
+  return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), done + ' more parking row' + (done > 1 ? 's' : '') + ' end in planted islands' + (grown ? ', paid for by ' + grown + ' stall' + (grown > 1 ? 's' : '') + ' added where other rows had free land at their ends' : ' (the stall to spare)') + '.'] };
+}
+
 function keepIfNoWorse(plan, was, now, brief) {
   if (now === was) return was;
   const v0 = V.validateLayout({ ...plan, elements: was.elements, program: was.program || {} }, brief), v1 = V.validateLayout({ ...plan, elements: now.elements, program: now.program || {} }, brief);
   const ok = id => v1.checks.find(c => c.id === id)?.status !== 'fail';
   return v0.checks.filter(c => c.hard && c.status === 'pass').every(c => ok(c.id)) ? now : was;
+}
+// after rows (or stalls) were taken out: the drives that now reach nothing go (a leaf in the paving, one paved
+// neighbour, no row and no building near it; only where whole rows went), the lot paving (field) loses what was taken
+// out, and the lawn nearby takes the land back. els is changed; returns { all, dropped }.
+function afterCut(els, gone, cut, B) {
+  const near = (e, list, d) => { const s = S.shapeOf(e); return list.some(b => S.gapBetween(s, S.shapeOf(b)) <= d); };
+  // drives that now reach nothing: a leaf in the paving (one paved neighbour), no row and no building near it
+  const paved = () => els.filter(e => ['drive', 'parking', 'truck', 'field'].includes(e.kind)), touch = (a, b) => S.gapBetween(S.shapeOf(a), S.shapeOf(b)) <= 1;
+  let dropped = 0;
+  for (let pass = 0; pass < 12 && cut; pass++) { // (only where whole rows went: trimmed row ends leave every drive with its rows)
+    const P = paved(), leaf = els.filter(e => e.kind === 'drive' && !S.isEntrance(e) && !e.entry && !e.through && P.filter(q => q !== e && touch(e, q)).length <= 1 && !near(e, B(), FAR_FT) && !P.some(q => q.kind === 'parking' && touch(e, q)));
+    if (!leaf.length) break; for (const d of leaf) { els.splice(els.indexOf(d), 1); gone.push(S.shapeOf(d)); dropped++; }
+  }
+  // the paving under a lot (field) is redrawn from what's left
+  const kept = els.filter(e => e.kind !== 'field');
+  // the paving under the lot (field) loses what was taken out (rebuilt from scratch it closed round the buildings)
+  const cl = r => { const q = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q.concat([q[0]]); };
+  const fields = els.filter(e => e.kind === 'field').flatMap(f => { if (!f.poly || !gone.length) return [f];
+    try { const parts = polyclip.difference([cl(f.poly)], ...gone.map(g => [cl(S.grow(g, 0.5))])).map(pg => pg[0].slice(0, -1)).filter(r => r.length >= 3 && S.ringArea(r) >= 2000).sort((a, b) => S.ringArea(b) - S.ringArea(a));
+      return parts.map((r, k) => S.fieldPiece(r.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]), k ? f.id + '-' + k : f.id, { name: f.name, note: f.note })); } catch { return [f]; } });
+  const all = kept.concat(fields); for (const g of gone) giveBackLand(all, S.grow(g, 30), g, 40);
+  return { all, dropped };
+}
+// Angled parking asked for on a mixed-use plan (docs/LAYOUT-ENGINE.md item 33). The mixed layout (lib/sitelayout.mjs
+// zones) draws square rows on two-way aisles and never read the angle, so the plan came back square and said nothing.
+// Its aisles that a two-way drive joins at both ends are turned one-way with angled rows (lib/siteparking.mjs
+// restripeAngled, the field engine's machinery; the guardrails' 26 ft fire-lane aisles too), neighbouring ones running
+// opposite ways: all of them where that still parks the program and breaks no check that passed (fire reach included:
+// a one-way aisle is no fire lane), else as many as can be, else none. Whatever is drawn, the notes say how many aisles
+// turned and why the rest stay square. Before the surplus is pruned, so the angled rows have the spare stalls to give.
+export function angleMixed(plan, o, brief, finish = x => x) {
+  const want = brief?.program?.parking?.angle; if (!o?.elements?.length || !B.PARKING_ANGLES.includes(want)) return finish(o);
+  const mixed = brief.program.uses.length > 1 || o.program?.zones?.length > 1; // (single-use plans too, docs/LAYOUT-ENGINE.md item 36: the older generator's square rows, apartments' included, under the guardrails' 26 ft fire-lane aisles as well; a field engine plan that already said why it is square is left alone)
+  if (o.elements.some(e => e.kind === 'parking' && S.stallAng(e)) || !mixed && [...(o.notes || []), ...(o.tplNotes || [])].some(t => /Angled parking/.test(t))) return finish(o);
+  const chk = x => V.validateLayout({ ...plan, elements: x.elements, program: x.program || o.program || {} }, brief), pk = els => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking, p0 = pk(o.elements), passed = new Set(chk(o).checks.filter(c => c.status === 'pass').map(c => c.id));
+  const word = want === 'angled' ? 'Angled parking' : 'Angled parking at ' + want + '°', note = (x, t) => ({ ...x, tplNotes: [...(x.tplNotes || []), t] });
+  let of = 0, tries = 0, short = false, broke = false, turnable = false; const ok = [];
+  for (const ang of want === 'angled' ? [60, 45] : [want]) {
+    const all = restripeAngled(o.elements, ang, { wide: true }); of = Math.max(of, all.of); if (!all.n) continue; turnable = true;
+    // the aisles it can turn; every subset of them, the most aisles first (at most 40 tried), kept where it still parks the
+    // program and fails no check that passes now (hard or not: the fire truck's turns too)
+    const cand = o.elements.filter(e => all.els.some(x => x.oneWay && x.id === e.id));
+    for (let k = cand.length; k >= 1; k--) {
+      const subs = []; const pick = (i, acc) => { if (subs.length >= 40) return; if (acc.length === k) { subs.push(acc); return; } for (let j = i; j < cand.length; j++) pick(j + 1, acc.concat([cand[j]])); }; pick(0, []);
+      const here = [];
+      for (const sub of subs) { if (tries++ > 40) break; const ids = new Set(sub.map(e => e.id)), r = restripeAngled(o.elements, ang, { wide: true, only: a => ids.has(a.id) }); if (!r.n) continue;
+        const p = pk(r.els); if (p.required != null && p.provided < p.required) { short = true; continue; }
+        if (chk({ elements: r.els }).checks.some(c => c.status === 'fail' && passed.has(c.id))) { broke = true; continue; }
+        here.push({ now: { ...o, elements: r.els }, p: p.provided, n: r.n, ang }); }
+      ok.push(...here.sort((x, y) => y.p - x.p));
+    }
+  }
+  // each through the run's last passes (they add curb returns, rows along drives and turnarounds the angle changes), the
+  // first that fails nothing the square plan, finished the same way, passes (at most six finished)
+  let sq = null; const square = () => sq || (sq = finish(o)), sqPass = () => new Set(chk(square()).checks.filter(c => c.status === 'pass').map(c => c.id));
+  let pass0 = null, late = null;
+  for (const t of ok.slice(0, 6)) { const f = finish(t.now), lost = chk(f).checks.filter(c => c.status === 'fail' && (pass0 || (pass0 = sqPass())).has(c.id)); if (lost.length) { late = late || lost; continue; }
+    const why = short && !broke && !late ? 'as angled stalls there would leave the parking short of the ' + p0.required + ' required.' : short ? 'as angling them too would leave the parking short of the ' + p0.required + ' required or break a check that passes with them square.' : 'as turning them would break a check that passes with them square (a one-way aisle isn’t a fire lane).';
+    return note(f, 'Angled parking, as asked: ' + t.ang + '° stalls on ' + t.n + ' of the ' + of + ' parking aisles, made one-way (the arrows), neighbouring aisles running opposite ways' + (t.n < of ? '; the rest stay square on two-way aisles, ' + why : '.')); }
+  return note(square(), word + ' was asked for, but this layout keeps square stalls on two-way aisles: ' + (!turnable ? 'its parking rows have no aisle of the field’s width that a two-way drive joins at both ends (a one-way aisle must, so cars never meet a dead end).' : late ? 'with its aisles one-way it fails a check the square layout passes (' + late.map(c => c.title || c.id).slice(0, 2).join('; ') + ').' : short && !broke ? 'angled stalls take more of a row than square ones, and with them the rows here can’t park the ' + p0.required + ' spaces required.' : 'turning its aisles one-way would break a check that passes now (a one-way aisle isn’t a fire lane: a building could be left beyond the fire lane’s reach, or the fire truck without its turns)' + (short ? ', or leave the parking short of the ' + p0.required + ' required.' : '.')));
 }
 export function pruneSurplus(plan, o, brief) {
   if (!o?.elements?.length) return o;
@@ -627,7 +1051,7 @@ export function pruneSurplus(plan, o, brief) {
       .map(e => ({ e, d: Math.min(...B().map(b => S.gapBetween(S.shapeOf(e), S.shapeOf(b)))) })).sort((a, b) => b.d - a.d || String(a.e.id).localeCompare(String(b.e.id)));
     for (const { e } of cand) {
       if (p.provided <= want()) break;
-      const sw = e.sw || S.STALL.w, n = Math.floor((e.w + 0.01) / sw);
+      const sw = S.stallPitch(e), n = Math.floor((e.w - (S.stallAng(e) ? S.angledDims(S.stallAng(e)).off : 0) + 0.01) / sw); // (an angled row: its stall's length along the aisle, less its slanted ends)
       { const i0 = els.indexOf(e); els.splice(i0, 1); const p0 = pk(); if (p0.provided >= p.required && p.provided - p0.provided <= p.provided - want() + MIN_ROW) { p = p0; gone.push(S.shapeOf(e)); cut++; continue; } els.splice(i0, 0, e); } // (a short row the surplus nearly covers goes whole, not left a stub)
       if (n <= MIN_ROW) continue;
       const r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], ends = [1, -1].map(sg => [e.x + u[0] * sg * e.w / 2, e.y + u[1] * sg * e.w / 2]);
@@ -639,21 +1063,7 @@ export function pruneSurplus(plan, o, brief) {
       }
     } }
   if (!cut && !trimmed) return o;
-  // drives that now reach nothing: a leaf in the paving (one paved neighbour), no row and no building near it
-  const paved = () => els.filter(e => ['drive', 'parking', 'truck', 'field'].includes(e.kind)), touch = (a, b) => S.gapBetween(S.shapeOf(a), S.shapeOf(b)) <= 1;
-  let dropped = 0;
-  for (let pass = 0; pass < 12 && cut; pass++) { // (only where whole rows went: trimmed row ends leave every drive with its rows)
-    const P = paved(), leaf = els.filter(e => e.kind === 'drive' && !S.isEntrance(e) && !e.entry && !e.through && P.filter(q => q !== e && touch(e, q)).length <= 1 && !near(e, B(), FAR_FT) && !P.some(q => q.kind === 'parking' && touch(e, q)));
-    if (!leaf.length) break; for (const d of leaf) { els.splice(els.indexOf(d), 1); gone.push(S.shapeOf(d)); dropped++; }
-  }
-  // the paving under a lot (field) is redrawn from what's left
-  const kept = els.filter(e => e.kind !== 'field');
-  // the paving under the lot (field) loses what was taken out (rebuilt from scratch it closed round the buildings)
-  const cl = r => { const q = S.signedArea(r) >= 0 ? r : r.slice().reverse(); return q.concat([q[0]]); };
-  const fields = els.filter(e => e.kind === 'field').flatMap(f => { if (!f.poly || !gone.length) return [f];
-    try { const parts = polyclip.difference([cl(f.poly)], ...gone.map(g => [cl(S.grow(g, 0.5))])).map(pg => pg[0].slice(0, -1)).filter(r => r.length >= 3 && S.ringArea(r) >= 2000).sort((a, b) => S.ringArea(b) - S.ringArea(a));
-      return parts.map((r, k) => S.fieldPiece(r.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]), k ? f.id + '-' + k : f.id, { name: f.name, note: f.note })); } catch { return [f]; } });
-  const all = kept.concat(fields); for (const g of gone) giveBackLand(all, S.grow(g, 30), g, 40);
+  const { all, dropped } = afterCut(els, gone, cut, B);
   return { ...o, elements: all, tplNotes: [...(o.tplNotes || []), ...(cut ? [cut + ' parking row' + (cut > 1 ? 's' : '') + (dropped ? ' and ' + dropped + ' drive' + (dropped > 1 ? 's' : '') : '') + ' no building uses taken out (left as landscape): the parking left still meets what’s required.'] : []), ...(trimmed ? [trimmed + ' surplus space' + (trimmed > 1 ? 's' : '') + ' taken off the far ends of parking rows (left as landscape): ' + p.provided + ' for ' + p.required + ' required.'] : [])] };
 }
 // a lower bound on the land a program needs: the footprint alone at its most floors, against the land inside the
@@ -675,18 +1085,35 @@ function infeasibleBound(brief) {
 
 // rank: feasible first; then the program met; then fewer unknowns; then the yield the brief maximizes; then less paving;
 // then the geometry hash (a fixed, arbitrary tie-break)
+// The walk from the parking (docs/LAYOUT-ENGINE.md item 36): the 90th-percentile stall's distance to the nearest wall of
+// a building it serves (the clubhouse, garages and future pads left out; scripts/parking-metrics.mjs walk90), ft.
+export const WALK_FAR = 200;
+export function walkP90(els) {
+  const B = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), served = B.filter(e => e.use !== 'amenity'), bl = (served.length ? served : B).map(e => S.outline(e)); if (!bl.length) return 0;
+  const bb = bl.map(r => { const xs = r.map(p => p[0]), ys = r.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }), ds = [];
+  for (const e of els) { if (e.kind !== 'parking' || e.rv || e.vac || e.future) continue; let cs = []; try { cs = S.stallCentres(e); } catch { cs = []; }
+    for (const p of cs) { let m = Infinity; bl.forEach((r, i) => { const b = bb[i]; if (Math.hypot(Math.max(b[0] - p[0], 0, p[0] - b[2]), Math.max(b[1] - p[1], 0, p[1] - b[3])) >= m) return; for (let k = 0; k < r.length; k++) m = Math.min(m, S.segDist(p, r[k], r[(k + 1) % r.length])); }); ds.push(m); } }
+  if (!ds.length) return 0; ds.sort((a, b) => a - b); return ds[Math.min(ds.length - 1, Math.floor(0.9 * (ds.length - 1) + 0.5))];
+}
 function rankKey(o, brief) {
   const v = o.validation, prog = v.checks.filter(c => c.id.startsWith('program.u')), met = prog.filter(c => c.status === 'pass').length;
   const maxi = brief.program.uses.filter(u => ['maximize', 'min', 'max', 'range'].includes(u.quantity.mode)); // more is better up to any cap (a cap's excess already fails the program check)
   const yieldV = maxi.reduce((s, u) => s + (u.quantity.unit === 'units' ? o.quantities.byUse[u.use]?.units || 0 : o.quantities.byUse[u.use]?.gfa || 0), 0);
-  const paving = o.quantities.pavedSfGross / Math.max(1, o.quantities.totals.units || o.quantities.totals.gfa / 1000 || 1);
+  const typeLanes = o.elements.filter(e => e.kind === 'drive' && SITE.QUEUE_TYPES[e.queue] && Array.isArray(e.path)).reduce((s, e) => s + (+e.width || 12) * e.path.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - e.path[i][0], p[1] - e.path[i][1]), 0), 0); /* (a building type's own lanes, lib/btsite.mjs: what the type needs, not paving that ranks a layout down) */
+  const paving0 = (o.quantities.pavedSfGross - typeLanes) / Math.max(1, o.quantities.totals.units || o.quantities.totals.gfa / 1000 || 1);
+  const paving = paving0 * (1 + Math.max(0, walkP90(o.elements) - WALK_FAR) / 200); /* (stalls far from the doors: each 2 ft the 90th-percentile walk runs past 200 ft weighs as 1% more paving, so of layouts holding the same, the one with the field by the buildings wins unless it paves much more; item 36) */
   // the form asked for, delivered: a courtyard request ranks its courtyard layouts above plain bars (other forms are
   // drawn by their own engine path and always are what was asked)
   const formMiss = brief.program.uses.filter(u => u.form === 'mf-cottage-btr' && o.elements.filter(e => e.cottage).length >= 12 && !o.elements.some(e => e.kind === 'building' && e.use === 'amenity') || u.form === 'mf-courtyard' && !o.elements.some(e => e.court) || u.form === 'mf-wrap' && !o.elements.some(e => e.wrap && e.kind === 'garage') || u.form === 'mf-tuck-under' && !o.elements.some(e => +e.tuck > 0) || u.form === 'ind-cross-dock' && !o.elements.some(e => e.kind === 'building' && e.crossDock) || u.form === 'mf-podium-courtyard' && !o.elements.some(e => e.upper === 'U') || u.form === 'ret-drive-through' && !o.elements.some(e => e.kind === 'drive' && (e.windowAt || /drive-thru/i.test(e.name || '')))).length; // (the form asked for: a courtyard's wings, a drive-thru's lane)
   // a second way in that's a real entrance beats a gated emergency lane (the lane is the fire official's call, and where
   // it meets a side or rear line, an easement from the neighbour)
   const lane = o.elements.some(e => e.emergency) ? 1 : 0;
-  return [v.feasible ? 0 : 1, -met, formMiss, v.counts.fail, v.counts.unknown, lane, -yieldV, Math.round(paving), o.geometryHash];
+  const placeMiss = (o.placements || []).filter(c => c.status === 'fail').length; // (where things were asked to go: a layout meeting more of it first)
+  const paired = o.elements.reduce((t, e) => t + (e.kind === 'building' && +e.combined > 0 ? +e.combined : 0), 0); /* (an exact count met in whole stacks before one met by combining homes into larger ones, lib/bldgtemplates.mjs) */
+  const off = brief.program.uses.filter(u => u.quantity.mode === 'exact' && u.quantity.unit === 'units' && u.quantity.value > 0).reduce((t, u) => t + Math.round(Math.abs((o.quantities.byUse[u.use]?.units || 0) - u.quantity.value) / u.quantity.value * 1000), 0); /* (an exact count no layout reaches: the nearest first) */
+  const qMiss = (v.checks.find(c => c.id === 'queues.stack.types' || c.id === 'queues.stack' && c.measured && typeof c.measured === 'object')?.features || []).length; /* (a building type's queues not drawn or short, lib/btsite.mjs: a layout holding more of them first; 0 on a plan with none) */
+  const drawnQ = o.elements.filter(e => e.kind === 'drive' && SITE.QUEUE_TYPES[e.queue]).length; /* (a building type's lanes drawn: at the same yield, the layout with its porte-cochère or drop-off first, item 37) */
+  return [v.feasible ? 0 : 1, -met, off, formMiss, placeMiss, v.counts.fail, qMiss, v.counts.unknown, lane, paired, -yieldV, -drawnQ, Math.round(paving), o.geometryHash];
 }
 export const rankOf = rankKey;
 const cmp = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] < b[i]) return -1; if (a[i] > b[i]) return 1; } return 0; };
@@ -695,6 +1122,28 @@ const cmp = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] < b[i]) re
 // at the template's building sizes, so as many as fit sees the same layouts an exact count does. (Before, the generator
 // sat out when no count was asked, and its bars ignored the template's sizes, so which counts passed jumped with the
 // count asked and an exact-count ladder after the search worked round it, at 2-3 s a request; no longer needed.)
+// the reserve run (item 37): does option o lack a lane its type needs (the lanes drawn as the run draws them)?
+function lanesMissing(E, o, RES) {
+  const prog0 = BT.withType(o.program || E.program, E.program); let f; try { f = SITE.siteFeatures(E.plan, BT.tagElements(o.elements, prog0), prog0); } catch { return false; }
+  return RES.some(r => !f.els.some(e => e.kind === 'drive' && e.queue === (/^hotel/.test(r.btype) ? 'porte' : 'daycare')));
+}
+// the engine's program with the stalls each lane in place of a parking row takes laid out to spare (a single type's
+// ratio, a zone's parking factor)
+function reserveEngine(E, RES) {
+  const E3 = { ...E, program: { ...E.program }, opts: { ...E.opts } }, P = E3.program;
+  for (const r of RES) {
+    if (r.zone == null) { const cp = P.custom?.parking, ratio = +P.ratio > 0 ? +P.ratio : S.USES[P.use]?.ratio || 3, need = cp && +cp.rate > 0 && +cp.basis > 0 ? cp.rate * cp.basis : (+P.gfa || 0) / 1000 * ratio, f = 1 + r.stalls / Math.max(10, need);
+      P.ratio = +(ratio * f).toFixed(4); if (cp && +cp.rate > 0) P.custom = { ...P.custom, parking: { ...cp, rate: +(cp.rate * f).toFixed(4) } }; }
+    else { const z = (P.zones || [])[r.zone] || {}, need = (+z.gfa || 0) / 1000 * (S.USES[z.use]?.ratio || 3) * (+E.opts.parkF?.[z.use] || 1), f = 1 + r.stalls / Math.max(10, need); E3.opts.parkF = { ...(E3.opts.parkF || {}), [z.use]: +((+E3.opts.parkF?.[z.use] || 1) * f).toFixed(4) }; }
+  }
+  return E3;
+}
+// the reserve run's lanes, drawn before the parking is trimmed to the need (a lane in place of a row where none reaches a
+// drive over open ground); the run's own pass after the layout then finds them drawn
+function earlyLanes(E, o) {
+  const prog0 = BT.withType(o.program || E.program, E.program); let f; try { f = SITE.siteFeatures(E.plan, BT.tagElements(o.elements, prog0), prog0, { rowLane: true }); } catch { return o; }
+  return f.els === o.elements ? o : { ...o, elements: f.els, tplNotes: [...(o.tplNotes || []), ...f.notes.filter(n => !/\bno (?:room|open ground)\b/i.test(n))] }; // (what it couldn't draw is said by the run's own pass)
+}
 export function runBrief(briefIn, { now = null } = {}) {
   const check = B.validateBrief(briefIn), base = { schema: RUN_SCHEMA, versions: versions(), created: now, request: briefIn?.request || null };
   if (!check.ok) return { ...base, outcome: check.missing.length ? 'missing-information' : 'invalid-brief', problems: check.errors, warnings: check.warnings, options: [] };
@@ -711,25 +1160,37 @@ export function runBrief(briefIn, { now = null } = {}) {
   // Both sets are ranked together by the validator.
   const capped = brief.program.uses.some(u => u.use === 'multifamily' && ['exact', 'max', 'range'].includes(u.quantity.mode));
   const E = B.toEngine(brief, { overshoot: !capped });
-  const lay1 = Ex => { let out; try { out = layoutOptions(Ex.plan, Ex.program, Ex.opts) || []; } catch (e) { out = [{ error: String(e && e.message || e) }]; } return out; };
+  const asks = I.asksFor(brief.program.placements, E.plan), steer = new Set((asks?.list || []).map(p => p.id)); /* (where things were asked to go that the generators have no control for: the candidates compared on them, lib/layoutintent.mjs) */
+  const lay1 = Ex => { let out; try { out = layoutOptions(Ex.plan, Ex.program, asks ? { ...Ex.opts, asks } : Ex.opts) || []; } catch (e) { out = [{ error: String(e && e.message || e) }]; } return out; };
   const short = list => brief.program.uses.some(u => { if (u.use !== 'multifamily' || !['exact', 'range', 'max'].includes(u.quantity.mode)) return false; const need = u.quantity.mode === 'range' ? u.quantity.min : u.quantity.mode === 'max' ? Math.floor(u.quantity.value * 0.9) : u.quantity.value; // (at most: well under the cap is worth a second try)
     const units = o => T.templatesFor(u.form, u).length ? o.elements.filter(e => e.template && e.tplUse === u.id).reduce((t, e) => t + e.units, 0) : o.elements.filter(e => e.kind === 'building' && (e.use || o.program?.use) === 'multifamily' && (u.zone == null || e.zone == null || e.zone === u.zone)).reduce((t, e) => t + (+e.units || 0), 0);
-    return !list.some(o => !o.error && o.elements?.length && units(o) >= need); });
+    return !list.some(o => !o.error && o.elements?.length && units(o) >= need && !o.elements.some(e => +e.combined > 0)); }); /* (met only by combining homes into larger ones: the fuller retry is still looked for, lib/bldgtemplates.mjs) */
   const { value: raw, stats } = CX.deterministic({ seed: brief.solver.seed, tickMs: brief.solver.tickMs }, () => {
     const wrapNote = 'No wrap fits this site: the garage a wrap needs (about 130 ft across and 120 ft deep inside the wings, with its ramp and cores) doesn’t fit with the wings round it, so these are the nearest layouts; on a small lot a courtyard on a parking podium ("courtyard on a podium") holds more.';
     const noWrap = o => brief.program.uses.some(u => u.form === 'mf-wrap') && !o.elements?.some(e => e.wrap && e.kind === 'garage') ? { ...o, tplNotes: [...(o.tplNotes || []), wrapNote] } : o; // (a wrap asked for that the site can't hold: said, not swapped silently)
-    const fit = (Ex, out, br = brief) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br), t2 = keepIfNoWorse(Ex.plan, t1, pruneSurplus(Ex.plan, t1, br), br); const t2g = garageEntries(Ex.plan, t2), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); return vaultWhereNoPond(Ex.plan, garageVent(keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br)), br); }); // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
+    const fit = (Ex, out, br = brief, pre = null) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br); const last = t1x => { const t2 = keepIfNoWorse(Ex.plan, t1x, pruneSurplus(Ex.plan, t1x, br), br); const t2g = garageEntries(Ex.plan, t2), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br), t10f = keepIfNoWorse(Ex.plan, t10, fundEndIslands(Ex.plan, t10, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10f), br); }; return angleMixed(Ex.plan, pre ? pre(t1) : t1, br, last); }); // (angled parking asked on a mixed plan: tried here, each try finished by the passes after) // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
     let got = fit(E, lay1(E));
     if (capped && short(got)) { const E2 = B.toEngine(brief); E2.opts = { ...E2.opts, deeper: false }; got = got.concat(fit(E2, lay1(E2))); } // (the retry looks for a fuller layout: no deeper-pond copies of it)
+    // a building type's lanes the layouts left no room for (a hotel's porte-cochère, a daycare's drop-off): laid out again
+    // with the stalls a lane in place of a parking row takes to spare, the lanes drawn before the parking is trimmed to the
+    // need (docs/LAYOUT-ENGINE.md item 37); kept only where it costs the program nothing (below)
+    const RES = SITE.laneReserve(E.program);
+    if (RES.length && got.filter(o => !o.error && o.elements?.length).slice(0, 1).some(o => lanesMissing(E, o, RES))) { const E3 = reserveEngine(E, RES); got = got.concat(fit(E3, lay1(E3), brief, o => earlyLanes(E, o)).map(o => o.error ? o : { ...o, reserve: true })); }
     return got;
   });
   const err = raw.find(o => o.error);
   const options = raw.filter(o => o.elements?.length).map((o, i) => {
-    const elements = canonElements(drawnAreas(o.elements, o.program || E.program)), sp = E.plan.params?.storm && typeof E.plan.params.storm === 'object' ? E.plan.params.storm : {}, lay = { ...E.plan, ...(o.pondDepth ? { params: { ...(E.plan.params || {}), storm: { ...sp, depth: o.pondDepth } } } : {}), elements, program: o.program || E.program }; // (a deeper-pond option is judged at the depth it assumes)
+    const prog0 = BT.withType(o.program || E.program, E.program), feat = SITE.siteFeatures(E.plan, BT.tagElements(o.elements, prog0), prog0), elements = canonElements(drawnAreas(feat.els, prog0)), /* (BT.tagElements: a building type's buildings named and counted; SITE.siteFeatures: the stacking lanes or yard it needs, drawn in its envelope; no type: unchanged) */ sp = E.plan.params?.storm && typeof E.plan.params.storm === 'object' ? E.plan.params.storm : {}, lay = { ...E.plan, ...(o.pondDepth ? { params: { ...(E.plan.params || {}), storm: { ...sp, depth: o.pondDepth } } } : {}), elements, program: o.program || E.program }; // (a deeper-pond option is judged at the depth it assumes)
     const validation = V.validateLayout(lay, brief);
+    // where things were asked to go: each ask measured on the drawing and said in the notes, met or not (never dropped)
+    const asked = (brief.program.placements || []).map(p => ({ ...I.checkPlacement(lay, elements, o.program || E.program, p), how: p.how || 'checked' }));
     const { elements: _e, notes: _n, tplNotes: _t, error: _x, ...engine } = o; // the engine's own fields (score, recipe, frame…), kept for the editor
-    return { ...engine, id: 'opt-' + (i + 1), engineOrder: i, name: o.name || 'Layout ' + (i + 1), geometryHash: geometryHash(elements), elements, program: o.program || E.program, params: o.params || E.plan.params, recipe: o.recipe ?? null, zones: o.zones || [], notes: [...(o.notes || []), ...(o.tplNotes || [])], quantities: validation.quantities, validation };
+    return { ...engine, id: 'opt-' + (i + 1), engineOrder: i, name: o.name || 'Layout ' + (i + 1), geometryHash: geometryHash(elements), elements, program: o.program || E.program, params: o.params || E.plan.params, recipe: o.recipe ?? null, zones: o.zones || [], quantities: validation.quantities, validation, placements: asked,
+      notes: [...(brief.request?.assumed || []).map(a => /^(?:No (?:use|count|size)|Mixed use)/.test(a) ? 'Assumed: ' + a : a), ...asked.map(c => c.said + (c.status === 'fail' ? ' ' + (c.how === 'checked' && !steer.has(c.id) ? 'The engine has no control for this yet: it is measured and said here, not placed; move it by hand or say where else it may go.' : c.how === 'checked' ? 'The engine looked for layouts with it there; this one doesn’t have it (another option may say what having it costs).' : 'The engine was told, but this layout couldn’t fit it there; another option may.') : '')), ...BT.presetNotes(o.notes || [], prog0), ...(o.tplNotes || []), ...BT.typeNotes(prog0, elements), ...feat.notes, ...simpleShort(o, validation)] };
   });
+  { // (the reserve run's options: only those that drew a lane the type needs and cost the program nothing next to the plain ones)
+    const yieldOf = o => o.quantities.totals.units || o.quantities.totals.gfa / 1000, plain = options.filter(o => !o.reserve), pass = plain.filter(o => o.validation.status === 'pass'), top = Math.max(0, ...(pass.length ? pass : plain).map(yieldOf));
+    for (let i = options.length - 1; i >= 0; i--) { const o = options[i]; if (!o.reserve) continue; if (!o.elements.some(e => e.kind === 'drive' && /^(?:porte|daycare)$/.test(e.queue || '')) || pass.length && o.validation.status !== 'pass' || yieldOf(o) < top - 1e-6) options.splice(i, 1); } }
   options.sort((a, b) => cmp(rankKey(a, brief), rankKey(b, brief)));
   options.forEach((o, i) => { o.rank = i + 1; });
   // the options handed back differ in substance: one with the same numbers as a kept one (a mirror image, the same
@@ -744,10 +1205,33 @@ export function runBrief(briefIn, { now = null } = {}) {
   const others = o => options.some(x => x !== o && !keep.includes(x) && arr(x) !== arr(o) && ok(x) && x.validation.status === 'pass' && !seen.has(sig(x)));
   for (const o of options) { if (keep.length >= brief.solver.options) break; const k = sig(o); if (seen.has(k)) continue; if (!ok(o)) continue; if (keep.filter(x => arr(x) === arr(o)).length >= 2 && others(o)) continue; seen.add(k); keep.push(o); }
   keep.forEach((o, i) => { o.rank = i + 1; });
+  askTradeNotes(keep, brief);
   const outcome = !keep.length ? 'no-feasible-found' : keep.some(o => o.validation.status === 'pass') ? 'feasible' : keep.some(o => o.validation.feasible) ? 'needs-review' : 'no-feasible-found';
   return { ...rec, outcome, optimality: 'best found (heuristic search; not proven optimal)', engineMapping: E.mapping, partial, engineError: err?.error || null,
     solver: { seed: brief.solver.seed, tickMs: brief.solver.tickMs, evaluation: stats, candidates: options.length },
     rankingHash: hashOf(keep.map(o => [o.rank, o.geometryHash])), options: keep };
+}
+
+// a simple layout (lib/sitelayout.mjs fallback: the zone layouts didn't fit) short of the parking the brief requires: said
+// plainly, against the rule that governs (the engine's own note counts its use defaults; docs/LAYOUT-ENGINE.md item 33)
+function simpleShort(o, v) {
+  const q = v.quantities.parking, c = v.checks.find(x => x.id === 'parking.count'); if (!/^Simple layout/.test(o.name || '') || c?.status !== 'fail' || q.required == null) return [];
+  return ['A simple layout: the zone layouts don’t fit this site with what it must hold. It parks ' + q.provided + ' of the ' + q.required + ' spaces required (' + S.spacesWord(q.required - q.provided) + ' short' + (q.rule ? '; ' + String(q.rule).replace(/\.$/, '') : '') + '), so it fails the parking check: less floor area, structured parking or a bigger site would park it.'];
+}
+// where things were asked to go, across the options handed back: an option missing an ask that another option meets
+// says which one and what it gives up there (fewer homes or less floor area, a check it fails); an option meeting one
+// that a fuller option misses says what meeting it costs. Notes only: the ranking is rankKey's.
+function askTradeNotes(keep, brief) {
+  const L = brief.program.placements || []; if (!L.length || keep.length < 2) return;
+  const size = o => o.quantities.totals.units ? o.quantities.totals.units + ' homes' : Math.round(o.quantities.totals.gfa).toLocaleString('en-US') + ' sf', yieldOf = o => o.quantities.totals.units || o.quantities.totals.gfa || 0;
+  const met = (o, p) => (o.placements || []).find(c => c.id === p.id)?.status === 'pass', progMet = o => o.validation.checks.filter(c => c.id.startsWith('program.u')).every(c => c.status === 'pass');
+  for (const o of keep) for (const p of L) {
+    const name = I.describe(p).replace(/^Asked: /, '');
+    if (!met(o, p)) { const q = keep.find(x => x !== o && met(x, p)); if (!q) continue;
+      const why = !progMet(q) ? 'it holds ' + size(q) + ', short of the program' : !q.validation.feasible ? 'it fails a hard check' : yieldOf(q) < yieldOf(o) - 0.5 ? 'it holds ' + size(q) + ' to this one’s ' + size(o) : q.rank > o.rank ? 'it ranks lower on the other checks' : '';
+      o.notes.push('Option ' + q.rank + ' has ' + name + (why ? ' (' + why + ')' : '') + '.'); }
+    else if (o.rank === 1) { const q = keep.find(x => x !== o && !met(x, p) && x.validation.feasible && yieldOf(x) > yieldOf(o) + 0.5); if (q) o.notes.push('Placed as asked (' + name + '): option ' + q.rank + ', without it, holds ' + size(q) + ' to this one’s ' + size(o) + '.'); }
+  }
 }
 
 // The fields that must match on replay (the record's creation time and notes' wording may differ)
@@ -773,8 +1257,51 @@ export function summary(rec) {
 // the shape lib/sitelayout.mjs layoutOptions gives, each with its independent check (check) and run (run, with the brief
 // to replay it).
 export const ENGINE_OPT_KEYS = ['count', 'deeper', 'brief', 'parcels', 'perParcel', 'keepout', 'netEvals', 'depth', 'budgetMs', 'pod', 'podBudgetMs', 'netBudgetMs'];
-export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
+// The jurisdiction's parking rule governs (a plan inside a city or ETJ whose planning guardrails are on, lib/guardrails.mjs:
+// Waller's two spaces a home, Ord. 424, with the 5% count reserve): the brief's parking rule is raised to it, so the run
+// lays out to that count and the independent validator's parking.count judges against it (before, a run from the app or
+// the MCP site_plan path laid apartments out at the engine's 1.6 a home and passed its own check while the city's count
+// was short). A rule the brief already sets higher stands. Changes b in place.
+// Idempotent (Nov 5, item 33): the app and the MCP hand runPlan the guardrails' effective plan and program already
+// (G.forLayout: the program's ratios carry the count reserve), so a plan marked __guard is taken as it is, never factored
+// again (it was: 2.205 a home, the 5% twice), and a brief once governed is marked (rules.guarded) and left alone.
+// Mixed use is governed use by use (rules.parkingByUse; before, the program's one top-level ratio was laid on every use
+// counted by floor area: a 120-key hotel judged at the retail ratio, 362 spaces for 212): apartments at the city's two a
+// home, a hotel by its keys at its type's rule (lib/btypes.mjs perKey; one a key), shops, offices and the rest at their
+// use's ratio (the city has no verified commercial ratio: the engine's working number), each with the city's reserve.
+// Homes with garages (townhomes, duplexes, houses) keep their own rule, as the effective plan does.
+export function governingParking(b, plan, program) {
+  if (!plan || b.rules?.guarded) return b;
+  const pre = !!plan.__guard; // (already the effective plan: its program's numbers include the reserve)
+  if (!pre && !G.isOn({ ...plan, program })) return b;
+  let e; if (pre) e = { ...plan, program: program || plan.program }; else try { e = G.effective({ ...plan, program, __guard: undefined }); } catch { return b; }
+  if (!e?.program || !e.__guard) return b;
+  const R = b.rules.values, base = S.normalizeProgram(program || {}), cf = +e.__guard.cf || 1, why = 'Jurisdiction planning guardrails (' + (G.WALLER?.name || 'City of Waller') + ')', res = cf > 1 ? ', with the ' + Math.round((cf - 1) * 100) + '% count reserve' : '';
+  b.rules.guarded = { profile: e.__guard.profile || 'waller', cf };
+  const kinds = [...new Set(b.program.uses.map(u => u.use).filter(u => u !== 'amenity' && u !== 'garage'))];
+  if (kinds.length > 1) { // mixed use: each use by its own rule
+    const r4 = x => Math.round(x * 1e4) / 1e4, P = program || {}, zones = Array.isArray(P.zones) ? P.zones : [], by = {}, src = [];
+    for (const u of b.program.uses) {
+      const z = u.zone != null ? zones[u.zone] : null, bt = (P.btZones || []).find(x => x.zone === u.zone), pre0 = bt ? BT.presetOf(bt.btype) : null, U = S.USES[u.use] || {};
+      if (u.use === 'multifamily') { const v = r4(Math.max(S.normalizeProgram({ use: 'multifamily' }).perUnit, G.WALLER.mf.perUnit.value) * cf); if (!(by.multifamily?.perUnit >= v)) by.multifamily = { perUnit: v }; }
+      else if (U.garage) continue; // (homes park in their garages and driveways: their own rule, no stall reserve)
+      else if (u.use === 'hotel') { const pk = +pre0?.params?.perKey || 1, sk = +pre0?.params?.sfPerKey || (U.ratio > 0 ? 1000 / U.ratio : 550), v = { perKey: r4(pk * cf), sfPerKey: sk, per1000: r4(1000 / sk * pk * cf) }; if (!(by.hotel?.per1000 >= v.per1000)) by.hotel = v; }
+      else if (bt?.rule?.key === 'parkingPer1000' && +bt.rule.v >= 0) { const v = r4(+bt.rule.v * cf); if (!(by[u.use]?.per1000 >= v)) by[u.use] = { per1000: v, type: bt.btype }; } // (a zone of a building type at its type's rule with the city's reserve: a bank zone like a bank, not the restaurant pad it is laid out as)
+      else { const v = r4((+z?.ratio > 0 ? +z.ratio : U.ratio ?? 3) * cf); if (!(by[u.use]?.per1000 >= v)) by[u.use] = { per1000: v }; }
+    }
+    for (const [u, r] of Object.entries(by)) src.push((S.USES[u]?.label || u) + ' ' + (r.perUnit != null ? r.perUnit + ' a home' + (u === 'multifamily' ? ' (Ord. No. 424: two a dwelling unit)' : '') : r.perKey != null ? r.perKey + ' a key' : r.per1000 + ' a 1,000 sf'));
+    if (Object.keys(by).length) R.parkingByUse = { v: by, cls: Object.keys(by).every(u => u === 'multifamily') ? 'verified' : 'assumption', source: why + ', use by use' + res + ': ' + src.join('; ') + '. The city’s commercial ratios are unverified: each use’s working number.' };
+    return b;
+  }
+  const mf = kinds[0] === 'multifamily', perUnit = +e.program.perUnit, ratio = +e.program.ratio;
+  if (mf && perUnit > 0 && perUnit > (R.parkingPerUnit?.v ?? (pre ? 0 : base.perUnit) ?? 0) + 1e-9) R.parkingPerUnit = { v: perUnit, cls: 'verified', source: why + ': City of Waller Ordinance No. 424, two spaces a dwelling unit' + res };
+  if (ratio > 0 && b.program.uses.some(u => u.quantity?.unit !== 'units') && ratio > (R.parkingPer1000?.v ?? (pre ? 0 : base.ratio) ?? 0) + 1e-9) R.parkingPer1000 = { v: ratio, cls: 'assumption', source: why + ': the use’s ratio' + res };
+  return b;
+}
+// the brief runPlan runs (the app's plan, program and search settings made a brief; the bench makes guarded runs with it)
+export function briefForPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
   const b = B.briefFromProgram(program, plan, { text: ask, parser: 'app', seed });
+  governingParking(b, plan, program);
   // what a size means: the words' own meaning (a bare number exactly, "at least", "up to", "as many as fit"), unless the
   // plan's Leftover land setting was chosen (Settings: fillBy 'you') or the words asked to hold land (fillBy 'ask'); a
   // default "fill" no longer turns a stated number into fill-the-site
@@ -785,6 +1312,10 @@ export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } =
   const eo = Object.fromEntries(ENGINE_OPT_KEYS.filter(k => opts[k] !== undefined).map(k => [k, opts[k]]));
   if (eo.keepout) b.site.exclusions = []; // the app's keep-outs go to the engine as it gave them (with their road strips); the validator reads them as keep-out pieces
   b.solver.engineOpts = JSON.parse(JSON.stringify(eo)); b.solver.options = Math.min(12, Math.max(3, +opts.count || 3));
+  return b;
+}
+export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
+  const b = briefForPlan(plan, program, opts, { ask, seed }), eo = b.solver.engineOpts || {};
   const rec = runBrief(b);
   if (!rec.options?.length) return { outcome: rec.outcome, problems: rec.problems || [], options: [] };
   const keep = eo.keepout ? eo.keepout.map(e => ({ ...e })) : [];

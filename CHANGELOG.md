@@ -3,7 +3,126 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-05
+
+### 11:47 AM CT: The AI reads building types; lakes on any lot; room for drop-off lanes; a school beside homes (19f47ca, 6790a86, a6b4956, fcdba05)
+- **The AI now understands building types:** asked through the AI (gpt-6-luna), "an express car wash", "a 120-key hotel", "assisted living, 120 beds" and the like now come back as that type with its count, shape and lanes (28 of 33 test requests fully right, was 1). Before, the AI's answer lost the type and drew a plain box. A type no preset covers is still drawn at the size asked and the notes say so.
+- **Fixes to the AI's reading:** a courtyard building keeps its courtyard; a size you give is kept (a big box isn't shrunk "to fit"); a count inside a range you asked stays the range; a coffee shop with a drive-thru is a restaurant; apartments' own pool isn't split off as a separate zone.
+- **Homes round a central lake on any lot:** L-shaped, wedge and curved lots, and townhomes or duplexes as well as houses.
+- **Room for drop-off lanes:** a hotel's drop-off canopy or a daycare's drop-off lane the first layout left no room for is now fitted by laying out again, kept only when it costs no homes or floor area.
+- **"A school for 500 students and 100 townhomes"** lays out as a school zone with its lanes and grounds and the townhomes beside it. A 250-key hotel is one building, not two.
+- 88 test sites, every one passing with no warnings; requests 119 of 120 without the AI; the full test suite passes.
+
+### 10:15 AM CT: Parking round 4: shorter walks win ties, more planted row ends, angled parking says why (7f6560c)
+- **Shorter walks to the door count in choosing a layout:** among layouts with the same homes or floor area, one whose parking sits far from the doors now ranks lower. A hotel with shops: the 90th-percentile walk went from 246 to 204 ft; a guarded hotel and shops with angled parking from 244 to 142 ft.
+- **More planted row ends:** a row with free land past its end grows a space so a hemmed-in row elsewhere can end in a planted island (bare row ends on the test sites 236 → 211).
+- **Angled parking asked for on a single-use plan** is tried there too; where the stalls sit on the fire lanes or angling would leave parking short, the notes say why they stayed straight.
+- Parking lot landscaping is now measured (planted share and spaces per tree, against a typical 5% and a tree every 10 spaces).
+- 84 test sites, every one passing with no warnings; the full test suite passes.
+
+### 9:03 AM CT: Schools, daycares, hotels and gas stations get the lanes they need; each type parked by its own rule (197f92e, a45bdea)
+- **Schools:** a parent pick-up and drop-off line (winding back on itself when it's long) and a separate bus loop, kept apart, with the play yard and field (moved off the pond if it landed there). A 600-student school holds 70 cars and 6 buses.
+- **Daycares:** a fenced play yard beside the building and a drop-off lane where the lot has room.
+- **Hotels:** a drive-through drop-off canopy at the entrance where it fits; "a 120-key hotel over 8,000 sf of retail" gives exactly 8,000 sf of shops.
+- **Gas stations:** waiting room at each side of the pump islands.
+- **Mixed requests:** a bank zone gets its drive-thru, a daycare or school zone its play yard, and each zone is parked by its own type's rule (a bank at 4 per 1,000 sf, not a restaurant's 10), with the city's reserve where city rules apply.
+- New checks: queues long enough, the bus loop apart from the parents' line, no play yard on a pond. Queue lengths are estimates, with their sources cited. The pro forma's area table lists beds, children, students and storage units.
+- 84 test sites, every one passing with no warnings; the full test suite passes.
+
+### 7:24 AM CT: Mixed-use plans parked right under a city's rules (6816a6f, fe7f6b8)
+- **Each use is parked by its own rule:** under Waller's rules a 120-key hotel with 20,000 sf of shops now needs 210 spaces (126 for the keys, 84 for the shops), not 380; homes at 2.1 a home, shops and offices at their own ratio, a hotel by its keys. The independent check counts each use the same way.
+- **The city's 5% reserve is counted once** (2.1 spaces a home, was 2.205).
+- **Angled parking on mixed plans:** asking for angled parking now angles the aisles that can be one-way (each meets a two-way drive at both ends) and the notes say how many turned and why the rest stayed straight.
+- **Small sites under strict detention rules lay out properly:** a hotel and shops on 13 acres no longer falls back to a simple layout that lost the hotel's type and parked short; the pond can sit beside or deeper (the notes say what depth was assumed, for the civil engineer to confirm), and if the simple layout is ever the last resort it keeps every building's type and says if it's short of parking.
+- 80 test sites, every one passing with no warnings; the full test suite passes.
+
+### 6:34 AM CT: Homes round a central lake, exact counts met, clubhouse at the back (2b72db6, ef8639a)
+- **"Homes around a central lake"** rings a lake in the middle with a loop street and lots on both sides (85 homes on the 20-acre test lot, was 46 with the lake at the back); the lake holds the detention. "Homes around a central pool and clubhouse" puts a park with the clubhouse and pool in the middle. For now on near-rectangular lots and single-family homes.
+- **Exact counts met where the land allows:** "exactly 200 apartments" gives 200 (was 192), "240 mid-rise units" 240 (was 208). Where whole buildings overshoot, a few pairs of homes are combined into larger homes, and the notes say so; an option that meets the count with whole buildings is listed first.
+- **When a count doesn't fit,** the plan lays out about the most that does and says the number (96 duplexes on 10 acres: 78).
+- **"Clubhouse at the back"** keeps the full count (180 of 180, was 168).
+- **Duplex, triplex and fourplex rows** stand at the building separation in your rules under "as many as fit" (a duplex test lot 56 homes, was 52).
+- Request understanding 119 of 120 without the AI; 76 test sites pass with no warnings; the full test suite passes.
+
+### 5:38 AM CT: Parking round 3: the building at the street with parking behind, entry drives set back (d09e938, 61b474d, 71268bb, 201e69e)
+- **"Retail on the street, parking in the rear" / "medical office at the front with parking behind it"** now lays the building at the front setback facing the street, with the drive along its side to the lot behind and no parking or pond between the building and the street. Any space between a building and the street now counts as a miss for that ask.
+- **Entry drives set back:** the first cross-aisle sits 50–100 ft in from the street where it costs no homes, with planted edges at the entrance (23 of 74 test sites still have a short entry, was 31). Some small lots use less paving per space.
+- **Fix:** taking a module off a templated building kept its "estimate" note and the right number of stacked homes.
+- 76 test sites, every one passing with no warnings; request understanding 117 of 120 without the AI; the full test suite passes.
+
+### 4:07 AM CT: The layout now does more of what you ask about where things go (0463866, 6a2e8e7)
+- **Now laid out as asked, not just noted:** the pond at the back, front, a side or by the entrance; parking in front of or behind the buildings; the entrance off a named street; a warehouse at the rear with its truck court facing the way asked. When an ask costs homes, the option says what it gave up (e.g. "parking behind the buildings: 204 homes, against 216 without it").
+- **"Homes around a central lake"** lays out again (it had fallen back to a simple plan).
+- **"retail 25k + 1 pad"** reads as 25,000 sf and a pad; "trampoline park", "bowling alley" and "indoor water park" are read as buildings; "office park" as offices.
+- **Notes name the type you said:** "a daycare and a bank on pads in front of townhomes" reports "the bank toward the street: done" and "the daycare toward the street: done".
+- Scored on 120 test requests without the AI: 116 fully right (was 112); spatial requests 34 of 35. All 74 test sites pass with no warnings; the full test suite passes.
+
+### 3:23 AM CT: Building types round 2: real outlines, queues, garages, a type per zone, add by type (e89e640, 629e8da, 51a5a8d, d9d45a9)
+- **Their own outlines:** T-shaped buildings, slim point towers, triplexes and fourplexes, and pad-site villages ("a pad-site village with 6 pads", "food hall pads").
+- **Queues drawn and checked:** express car washes with two stacking lanes into the tunnel (about 12 cars wanted; an estimate), bank and restaurant drive-thrus, and a fenced equipment yard behind a data centre. A new check fails a queue that sits on a drive, across parking or out into the street.
+- **Stand-alone parking garages** are drawn, plus full-service hotel and hotel-over-retail types.
+- **The numbers count what each type counts:** hotel keys, beds, children and students in the Numbers panel and its export.
+- **Mixed requests give each part its type:** "a 120-key hotel and 20,000 sf of retail", "a daycare and a bank on pads in front of townhomes".
+- **Add a building by type** in the editor: a searchable list of 51 types; the 3D map colours each by its type.
+- 74 test sites, every one passing with no warnings; the full test suite passes.
+
+### 2:34 AM CT: Parking round 2: planted row ends, clear entrances, shorter walks, the city's parking rule governs (bc954ae, e69e956, f54a183, 451988e, f980f71)
+- **Planted islands at row ends without losing spaces:** where there is free land at a row's end, the row grows into it and both ends are planted. Bare row ends on the test sites went from 417 to 189.
+- **Clear entrance drives:** spaces no longer sit where cars would back out into an entrance drive near the street (50 ft for small lots, 75 ft up to 499 spaces, 100 ft above; a planning yardstick from access-management guidance). Spaces inside entrance drives on the test sites went from 60 to 12.
+- **Shorter walks:** new rows go along drives near the buildings, and the farthest spaces come off instead.
+- **The city's parking rule governs:** when a city's rules apply (for example Waller's 2 per home plus its 5% reserve), the layout plans that many spaces and the check fails anything short.
+- **Fixes:** the space count on rows of 13, 26… spaces with end islands now matches the drawing; one consistent rule for when an aisle end is a dead end; a drive-thru window stays within reach of its lane.
+- All 65 test sites pass with no warnings; the full test suite passes.
+
+### 1:30 AM CT: Site plan requests understood much better: vague, detailed, messy and spatial (733a3fb, 2275981, c1fe607)
+- **Where things go:** "retail along the main road with apartments behind", "pool in the center", "keep the west side open", "buffer the neighbors", "dog park in the corner", "townhomes at the back" are laid out that way. Any placement the layout can't make yet (the pond, parking in front or behind, the clubhouse) is listed in the notes as not met, never dropped silently; every option says "Asked: … done / not met".
+- **Vague requests** ("max density", "something that pencils") pick a use suited to the land and list what was assumed at the top of the notes.
+- **Messy wording** is read: typos and shorthand (apts, whse, pkg), "60ksf", "1.5 spaces/unit", "4 per 1,000 sf", "3-4 story", "~", "+/-". Fixed misreadings: "1 space per unit" was read as 1 home, "trailer parking" as a trailer park, "pool in the center" as a shopping centre.
+- **The AI reading of requests** uses the same placement words with worked examples.
+- Scored on 120 test requests: without the AI 112 fully right (was 45); with the AI (gpt-6-luna) 107 (was 83). A quick set of these requests is now part of the test suite; the full test suite passes.
+
+### 12:21 AM CT: Many more building types, built from flexible base shapes (16b552b, 3a7bbe2, 9107365, f1528a3)
+- **Building types are now base shapes you can adjust:** bar, L, U, courtyard, tower on podium, wrap, rows, detached homes, small multiplexes, big box, cross-dock, flex bays, storage campus, canopy and store, drive-thru pad, car-wash tunnel, a building with its grounds and a parking garage. Each takes sizes, stories, depth and parking rules from your words. Every type you could ask for before lays out exactly as it did.
+- **21 new types:** limited-service and extended-stay hotels (counted in keys), multi-story and drive-up self storage, medical office and clinics, assisted living (beds), independent senior living, student housing (beds), fourplexes, live-work townhomes, flex with a mezzanine, cold storage, data centre shell, fitness club, big-box store, bank with drive-thru, daycare with play yard, schools with play yard and field, and express car washes. Each is named, counted and coloured on the plan and the 3D map (plain blocks, as now).
+- **Shapes from words:** "L-shaped 4-story apartments", "a U building around a pool", "flex buildings 120 ft deep with mezzanine", "a 2-story clinic 12,000 sf, 5 per 1,000 parking".
+- **Anything else is drawn at the size asked:** e.g. "a 2-story trampoline park 30,000 sf" is drawn as a building of that size, and the notes say no type matched and what was assumed.
+- Sizes without a reviewed reference project are marked as estimates. Fixed the Add panel tile that showed "undefined" above Parking field. 65 test sites, every one passing with no warnings; the full test suite passes.
+
 ## 2026-11-04
+
+### 11:10 PM CT: Parking: no long dead-end aisles, planted row ends (b4b0a64)
+- **No more backing out of a long dead end:** a parking aisle whose stalls run more than 150 ft past the last way out gets a turnaround pad at its end. The independent check now warns about long dead-end aisles, so layouts without them are preferred.
+- **Planted islands at row ends:** spare stalls above what's required become planted islands at the ends of rows (longest rows first), never going below the parking required.
+- On the test sites: long dead ends from 6 to none; bare row ends from 520 to 364; the 90th-percentile walk from stall to building is shorter. All 44 test sites pass with no warnings; the full test suite passes.
+
+### 9:53 PM CT: Angled parking (60° and 45°, one-way aisles) (b625aa1)
+- **Ask for it:** "angled parking", "60 degree parking", "45° parking" or "grocery-style parking" lays the parking in angled rows on one-way aisles, with direction arrows on the plan, the map, the sheets and the CAD file. Stall and aisle sizes follow the standard parking design references (60°: 20 ft rows on a 17 ft one-way aisle; 45°: 18 ft rows on a 14 ft aisle).
+- **Chosen on its own where it does better:** every parking field is also tried at 60° and 45°, and an angled layout is offered only when it parks the program and beats every straight layout. A shallow 560 x 292 ft lot now fits all 30,000 sf of retail asked for with 60° parking, where straight rows fell short.
+- **Grocery-anchored centres** keep the storefront aisle two-way with straight stalls and the accessible spaces, and angle the aisles behind it.
+- **Traffic and fire access stay honest:** each one-way aisle meets a two-way drive at both ends and its neighbours run the other way; one-way aisles never count as fire lanes; accessible spaces stay straight with their access aisles. The independent check counts angled stalls from the drawing itself and checks the one-way circulation.
+- Three angled-parking cases added to the test sites (44 in all, every one passing with no warnings).
+
+### 9:27 PM CT: Duplexes fill their blocks; the pond can take the land the homes leave (bd514a6)
+- **Duplex communities fit a third home per row at the corners** of the loop road (they were held back from the corners as townhomes were before today).
+- **The pond can go where the homes leave room:** "as many as fit" also tries laying the homes out first and putting the pond in the largest piece of land left, rather than holding a strip for it up front. A tapering 9-acre duplex lot now holds 52 homes (was 42); a curved-frontage apartment lot 456 (was 444). The detention rule is unchanged.
+- All 41 test sites pass with no warnings; the full test suite passes.
+
+### 8:33 PM CT: Dense townhome layouts complete their detention pond (0552439)
+- **Ponds sized from the drawn plan:** a packed townhome layout covers more of the lot with roofs and paving than a typical one, so its pond is now redrawn to what the drawn plan needs (the same storm estimate the check uses) rather than a typical figure, and can take the full strip between the loop road and the lot line. The densest layouts now meet detention and win: 8 acres 123 homes (was 113), the flag lot 166 (was 147). The detention rule is unchanged.
+- All 41 test sites pass with no warnings; the full test suite passes.
+
+### 7:31 PM CT: Townhomes: rows outside the loop road, parallel guest parking (e104d8a)
+- **Guest parking along the cross drives:** parallel guest spaces sit along the sides of the drives where only row ends face them, so rows no longer give up homes to parking bays between them. Accessible spaces stay in a regular bay.
+- **Rows outside the loop road:** where the strip between the loop road and the lot line is deep enough, a row of homes faces the road from the outside, on its own lots.
+- **Tight frontages:** where a narrow lot needs a gated emergency lane, the smallest row by the lot line gives way for it.
+- On the test lots: 5 acres 68 homes (was 62), 8 acres 113 (was 104), 10 acres 151 (was 136), with almost no 3-home rows left. All 41 test sites pass with no warnings; the full test suite passes.
+
+### 6:00 PM CT: Townhome subdivisions packed much tighter (de28b72)
+- **"Townhomes, as many as fit" lines every lane:** rows now sit at the building separation in your rules (10 ft by default, was 20 ft), run close to the corners and cross drives, and line the edges of the loop road and the street, so a 5-acre test lot now holds 62 homes, up from 37 (8 acres: 104, up from 73).
+- **Guest parking fills the gaps at the ends of rows** before any home is given up for it.
+- **A second entrance instead of a gated emergency lane:** when a full subdivision needs a second way in, the street-side row farthest from the other entrances gives way for a real entrance.
+- **Ponds sized right on dense layouts:** a tight layout whose pond came up short is redrawn with more room for it.
+- Four townhome subdivision cases added to the test sites (41 in all, every one passing with no warnings). The agent skill's copy of the engine is updated to match.
 
 ### 3:53 PM CT: Wedge-shaped lots fit a third apartment building when parking allows (917b329)
 - **Wedge lots:** on a triangular or tapering lot, apartments placed along the lot lines that would end up just over 200 homes (where the fire code would want a second way in that a single street can't give) are also offered trimmed back to 200. That is one more whole building where the land allows: a 6-acre triangle at one space per home now gets 3 buildings and 192 homes, up from 2 buildings and 160.

@@ -15,6 +15,7 @@
 import * as S from './siteplan.mjs';
 import polyclip from './vendor/polyclip.mjs';
 import * as TURN from './turning.mjs';
+import { QUEUE_NEED, QUEUE_TYPES, queueWant } from './btsite.mjs';
 
 export const VALIDATOR_VERSION = 'rei.validate/1';
 export const TOL = { len: 0.5, area: 1, touch: 1.0, lock: 0.01 }; // ft, sq ft, ft (pieces meet), ft (a locked piece unmoved)
@@ -52,6 +53,34 @@ function shapesOf(e) {
     return out;
   }
   try { const s = S.shapeOf(e); return finite(s) ? [s] : []; } catch { return []; }
+}
+// angled stalls, measured from the stripes as drawn (S.stallLines: the marks the user sees) and the planted marks
+// (S.capsOf), not from the engine's count: stripes slanting 20-80 degrees to the row's long side, taken in order along
+// each line of them; two neighbouring stripes make a stall when they are parallel, a stall width apart (square to the
+// stripes), and the parallelogram between them holds the design car (ANG_CAR) and is not planted. null when the piece
+// has no slanted stripes (square stalls are counted from their marks as before). [{ c, corners }]
+export const ANG_CAR = { L: 17.3, W: 6.6, w: 9, source: 'ULI/NPA The Dimensions of Parking (5th ed.): design vehicle about 6 ft 7 in × 17 ft 4 in (an 85th-percentile car), in a 9 ft stall' };
+export function angledStalls(e, rows = shapesOf(e)) {
+  let L; try { L = S.stallLines(e); } catch { return null; } const r0 = rows[0]; if (!L?.length || !r0 || r0.length < 3) return null;
+  let ax = null, best = 0; for (let i = 0; i < r0.length; i++) { const a = r0[i], b = r0[(i + 1) % r0.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l > best) { best = l; ax = [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; } }
+  const nx = [-ax[1], ax[0]], dir = l => { const d = [l[1][0] - l[0][0], l[1][1] - l[0][1]], n = Math.hypot(d[0], d[1]) || 1; return [d[0] / n, d[1] / n, n]; };
+  const slant = L.map(l => { const [dx, dy, len] = dir(l), c = Math.abs(dx * ax[0] + dy * ax[1]), th = Math.acos(Math.min(1, c)) * 180 / Math.PI; return { l, len, th, u: [dx, dy], m: [(l[0][0] + l[1][0]) / 2, (l[0][1] + l[1][1]) / 2] }; }).filter(q => q.th >= 20 && q.th <= 80);
+  if (!slant.length) return null;
+  let planted = []; try { planted = S.capsOf(e).map(c => c.poly); } catch { planted = []; }
+  const byV = slant.map(q => ({ q, v: q.m[0] * nx[0] + q.m[1] * nx[1] })).sort((p, q) => p.v - q.v), groups = []; // (stripes of one row share their midline)
+  for (const x of byV) { const g = groups[groups.length - 1]; if (g && x.v - g.v < 1) g.list.push(x.q); else groups.push({ v: x.v, list: [x.q] }); }
+  const out = [];
+  for (const { list } of groups) {
+    list.sort((p, q) => (p.m[0] * ax[0] + p.m[1] * ax[1]) - (q.m[0] * ax[0] + q.m[1] * ax[1]));
+    for (let k = 0; k + 1 < list.length; k++) {
+      const a = list[k], b = list[k + 1]; if (Math.abs(a.u[0] * b.u[1] - a.u[1] * b.u[0]) > 0.02) continue; // (parallel)
+      const gap = Math.abs((b.l[0][0] - a.l[0][0]) * -a.u[1] + (b.l[0][1] - a.l[0][1]) * a.u[0]), th = a.th * Math.PI / 180; // (square to the stripes)
+      if (gap < ANG_CAR.w - 0.05 || Math.min(a.len, b.len) < ANG_CAR.L + ANG_CAR.W / Math.tan(th) - 0.05) continue;
+      const corners = [a.l[0], b.l[0], b.l[1], a.l[1]], c = [(a.m[0] + b.m[0]) / 2, (a.m[1] + b.m[1]) / 2];
+      if (planted.some(pq => inPoly(c, pq))) continue; out.push({ c, corners });
+    }
+  }
+  return out;
 }
 const isEntrance = e => e.kind === 'drive' && (e.entry || e.emergency || e.name === 'Main entry' || /^Entrance\b/.test(e.name || '') || e.through); // (an emergency access lane meets the lot line by design)
 function levels(e) {
@@ -229,6 +258,27 @@ export function validateLayout(layout, brief = null) {
     add({ id: 'access.buildings', title: 'Every building near connected circulation', status: far.length ? 'fail' : 'pass', measured: far.length, required: 0, units: 'buildings too far', tolerance: need + ' ft', features: far.slice(0, 40), basis: basisOf(rv), rule: rv?.source || 'Planning default 60 ft' });
   }
 
+  { // one-way parking aisles (angled parking): each end meets a two-way drive, so traffic that enters an aisle has a way
+    // on and the aisles work as a circulation (a one-way aisle is never a fire lane: access.fire-width and the fire route
+    // leave it out); the angled stalls beside an aisle lean the way its traffic runs (a driver turns in forward)
+    const isAisle1 = e => e.kind === 'drive' && !e.future && !e.path && !e.poly && +e.w > 0 && +e.d > 0 && TURN.oneWayLane(e) && !/drive-?thru|bypass/i.test((e.name || '') + ' ' + (e.note || ''));
+    const ows = els.filter(isAisle1), two = els.filter(e => (e.kind === 'drive' || e.kind === 'truck') && !e.future && !TURN.oneWayLane(e)), bad = [];
+    const angRows = els.filter(e => e.kind === 'parking' && !e.future).map(e => ({ e, st: angledStalls(e, sh.get(e)) })).filter(q => q.st?.length);
+    for (const a of ows) {
+      const r = (+a.rot || 0) * Math.PI / 180, long = +a.w >= +a.d, u = long ? [Math.cos(r), Math.sin(r)] : [-Math.sin(r), Math.cos(r)], v = [-u[1], u[0]], Lh = Math.max(+a.w, +a.d) / 2, Wh = Math.min(+a.w, +a.d) / 2;
+      const at = (t, q) => [a.x + u[0] * t + v[0] * q, a.y + u[1] * t + v[1] * q];
+      for (const sg of [-1, 1]) { const probe = [at(sg * (Lh - 3), -Wh + 2), at(sg * (Lh + 3), -Wh + 2), at(sg * (Lh + 3), Wh - 2), at(sg * (Lh - 3), Wh - 2)];
+        if (!two.some(o => o !== a && sh.get(o).some(q => polyDist(probe, q) <= TOL.touch))) bad.push(id(a) + ' ' + (sg > 0 ? '+' : '-') + 'end meets no two-way drive'); }
+      if (a.flow !== 1 && a.flow !== -1) { bad.push(id(a) + ' has no direction marked'); continue; }
+      const f = [u[0] * a.flow, u[1] * a.flow], off = p => (p[0] - a.x) * v[0] + (p[1] - a.y) * v[1], along = p => (p[0] - a.x) * u[0] + (p[1] - a.y) * u[1];
+      for (const { e, st } of angRows) for (const q of st) { const [p0, , , p1] = q.corners, d0 = Math.abs(off(p0)), d1 = Math.abs(off(p1)), near = d0 < d1 ? p0 : p1, far = d0 < d1 ? p1 : p0;
+        if (Math.min(d0, d1) > Wh + 1.5 || Math.abs(along(near)) > Lh + 1) continue; // (a stall along this aisle: its stripe starts at the aisle's edge)
+        if ((far[0] - near[0]) * f[0] + (far[1] - near[1]) * f[1] <= 0) { bad.push(id(e) + ' leans against ' + id(a) + '’s traffic'); break; } }
+    }
+    add({ id: 'access.one-way', title: 'One-way aisles work as a circulation', status: !ows.length ? 'n/a' : bad.length ? 'fail' : 'pass', measured: bad.length, required: 0, units: 'problems', features: bad.slice(0, 30), basis: 'geometry',
+      rule: 'Each one-way parking aisle (angled parking) meets a two-way drive at both ends, its direction marked, and the angled stalls beside it lean the way it runs; one-way aisles are not fire lanes', note: ows.length ? ows.length + ' one-way aisle' + (ows.length > 1 ? 's' : '') + ', ' + angRows.length + ' angled row' + (angRows.length === 1 ? '' : 's') + '.' : '' });
+  }
+
   // 10. parking: required (from the brief's rules) and provided (counted from the drawing) reported separately
   const q = quantities(layout, brief);
   {
@@ -237,6 +287,102 @@ export function validateLayout(layout, brief = null) {
       basis: q.parking.basis, rule: q.parking.rule, note: (q.parking.tucked ? q.parking.tucked + ' spaces are tuck-under garages, one under each home (counted as stated, never more than fit along a row: 11 ft a garage). ' : '') + (q.parking.podium ? q.parking.podium + ' spaces are on parking podium levels, counted from the podium\'s garage plan (9 × 18 ft stalls, 24 ft aisles, a 12-stall ramp and two stair / elevator cores a level, the lobby on the ground level); a schematic plan, not a structural design. ' : '') + (q.parking.garage ? q.parking.garage + ' spaces are in a parking garage, counted from the same schematic garage plan over its levels (ramp and cores each level). ' : '') + (q.parking.driveways ? q.parking.driveways + ' are driveway aprons in front of front-load duplex garages (tandem; local code may not count them). ' : '') + (est ? q.parking.garageEstimated + ' spaces are a garage estimate (area ÷ 330 sf a space × levels), not a counted layout. ' : '') + 'Accessible spaces needed: ' + q.parking.accessibleNeeded + ' (2010 ADA Standards 208.2); their placement and routes are not checked.' });
     const bad = q.parking.strayStalls;
     add({ id: 'parking.geometry', title: 'Drawn stalls sit on their parking rows', status: bad.length ? 'fail' : q.parking.surface ? 'pass' : 'n/a', measured: q.parking.surface, units: 'surface stalls counted', features: bad.slice(0, 30), rule: 'Each stall inside its row, inside the site and clear of buildings; stall ' + q.parking.stall.w + ' × ' + q.parking.stall.d + ' ft, aisle ' + q.parking.stall.aisle + ' ft', basis: basisOf(ruleOf('stall')) });
+  }
+
+  { // dead-end parking aisles: past the last place another drive, a turnaround or the paving under the lot meets an
+    // aisle, how far its stalls run on. A driver who finds no space there backs out the whole way; more than
+    // DEAD_AISLE ft is a warning (usability; IFC D103.4's 150 ft for a fire road is the yardstick, parking aisles are not
+    // taken as fire lanes). Stalls from the drawn marks; an aisle is a straight drive 40 ft wide or less with stalls along it.
+    const DEAD_AISLE = 150, net = els.filter(e => (e.kind === 'drive' || e.kind === 'truck' || e.kind === 'field') && !e.future && !/drive-?thru/i.test((e.name || '') + ' ' + (e.note || '')));
+    const pts = els.filter(e => e.kind === 'parking' && !e.future && !e.rv).flatMap(e => { try { return S.stallCentres(e); } catch { return []; } });
+    const long = []; let aisles = 0;
+    for (const a of net) {
+      if (a.kind !== 'drive' || a.path || a.poly || isEntrance(a) || !(+a.w > 0 && +a.d > 0)) continue; // (a driveway's street end is a way out)
+      const Lh = Math.max(+a.w, +a.d) / 2, Wh = Math.min(+a.w, +a.d) / 2; if (Lh < 30 || Wh > 20) continue;
+      const r = (+a.rot || 0) * Math.PI / 180, u = +a.w >= +a.d ? [Math.cos(r), Math.sin(r)] : [-Math.sin(r), Math.cos(r)], v = [-u[1], u[0]];
+      const at = (t, q) => [a.x + u[0] * t + v[0] * q, a.y + u[1] * t + v[1] * q], along = p => (p[0] - a.x) * u[0] + (p[1] - a.y) * u[1], off = p => Math.abs((p[0] - a.x) * v[0] + (p[1] - a.y) * v[1]);
+      const ts = pts.filter(p => off(p) >= Wh - 1 && off(p) <= Wh + 21 && Math.abs(along(p)) <= Lh + 30).map(along); if (!ts.length) continue; aisles++;
+      // where the rest of the network meets it: each piece's stretch along it inside a band down its middle (a piece
+      // that only touches it, its stretch where it touches)
+      const band = [at(-Lh - 80, -(Wh - 4)), at(Lh + 80, -(Wh - 4)), at(Lh + 80, Wh - 4), at(-Lh - 80, Wh - 4)], self = sh.get(a)[0], joins = [];
+      for (const o of net) { if (o === a || !bx.get(o) || boxGap(bx.get(o), bx.get(a)) > TOL.touch) continue;
+        for (const q of sh.get(o)) { if (polyDist(q, self) > TOL.touch) continue; let ps = [];
+          try { ps = polyclip.intersection([closed(q)], [closed(band)]).flatMap(pg => pg[0]); } catch { ps = []; }
+          if (!ps.length) ps = q.filter(p => ptPolyDist(p, self) <= TOL.touch + 0.5);
+          if (ps.length) joins.push([Math.min(...ps.map(along)), Math.max(...ps.map(along))]); } }
+      if (!joins.length) continue; // (cut off from the network: access.connectivity's to judge)
+      const lo = Math.min(...joins.map(j => j[0])), hi = Math.max(...joins.map(j => j[1])), sMin = Math.min(...ts) - 4.5, sMax = Math.max(...ts) + 4.5;
+      for (const len of [sMax - hi, lo - sMin]) if (len > DEAD_AISLE + TOL.len) long.push({ a, len: Math.round(len) });
+    }
+    add({ id: 'parking.dead-end-aisle', title: 'No long dead-end parking aisle', hard: false, status: !aisles ? 'n/a' : long.length ? 'fail' : 'pass', measured: long.length ? Math.max(...long.map(x => x.len)) : 0, required: DEAD_AISLE, units: 'ft of stalls past the last way out', tolerance: TOL.len + ' ft',
+      features: long.map(x => id(x.a) + ' ' + x.len + ' ft').slice(0, 30), basis: 'assumption', rule: 'A parking aisle\'s stalls run no more than 150 ft past the last drive, turnaround or open paving joining it (planning practice; IFC D103.4\'s length for a dead end without a turnaround)' });
+  }
+
+  // 10b. queues (drive-thru lanes, a car wash's stacking lanes): the cars waiting in them stay off the drive aisles, the
+  // parking and the street, and there are as many as the building type asks for (lib/btsite.mjs QUEUE_NEED). Measured
+  // along each lane's centre line every 2 ft where cars wait: past where it leaves its drive (half its width and 4 ft, or
+  // where the lane says its queue starts) up to its window (or its last 4 ft), no point inside another drive, a parking row
+  // or outside the property line.
+  {
+    const QL = els.filter(e => e.kind === 'drive' && e.note === 'Drive-thru lane' && Array.isArray(e.path) && e.path.length > 1 && !e.future);
+    const EP = brief?.program?.engine || layout.program || {}, dt = (EP.extras || []).includes('drivethru'), bt = EP.btype || (dt && ['retail', 'restaurant'].includes(EP.use) ? 'ret-drive-through' : null), need = QUEUE_NEED[bt] || null; // (a drive-thru asked for with no type: the restaurant's rule)
+    const wantQ = need && (bt === 'car-wash' || dt);
+    if (QL.length || wantQ) {
+      const other = els.filter(e => (e.kind === 'drive' && e.note !== 'Drive-thru lane' || e.kind === 'truck' || e.kind === 'parking') && !e.future), blocked = [];
+      for (const q of QL) {
+        const P = q.path, w = +q.width || 12, len = P.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0), pts = [];
+        let at = 0; for (let i = 0; i + 1 < P.length; i++) { const a = P[i], b = P[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let s = 0; s < L; s += 2) pts.push({ p: [a[0] + (b[0] - a[0]) * s / L, a[1] + (b[1] - a[1]) * s / L], d: at + s }); at += L; }
+        const q0 = Math.max(w / 2 + 4, +q.queueFrom || 0), q1 = Math.min(len - 4, +q.windowAt > 0 ? +q.windowAt : len), mid = pts.filter(x => x.d > q0 && x.d < q1); // (where cars wait: from where it leaves the drive, or where its queue starts as drawn, to its window)
+        const oth = q.queue === 'fuel' ? other.filter(o => !o.fuelLane) : other; /* (a pump lane stands on the forecourt's own drive lanes: judged against the parking and the street only) */ const onDrive = mid.filter(x => oth.some(o => (!bx.get(o) || (b => x.p[0] >= b[0] - 1 && x.p[0] <= b[2] + 1 && x.p[1] >= b[1] - 1 && x.p[1] <= b[3] + 1)(bx.get(o))) && sh.get(o).some(r => inPoly(x.p, r)))), off = ring?.length >= 3 ? mid.filter(x => !inPoly(x.p, ring)) : [];
+        if (onDrive.length) blocked.push(id(q) + ': ' + onDrive.length * 2 + ' ft of its queue on a drive or parking near ' + onDrive[0].p.map(v => Math.round(v)).join(', '));
+        if (off.length) blocked.push(id(q) + ': ' + off.length * 2 + ' ft of its queue outside the property line (in the street)');
+      }
+      add({ id: 'queues.clear', title: 'Queues clear of the drive aisles, the parking and the street', hard: false, status: !QL.length ? 'n/a' : blocked.length ? 'fail' : 'pass', measured: blocked.length, required: 0, units: 'queue lanes in the way', features: blocked.slice(0, 20), basis: 'geometry',
+        rule: 'Each drive-thru or stacking lane, past where it leaves its drive, runs on its own paving: none of its centre line (sampled every 2 ft) inside another drive, a parking row or outside the property line' });
+      const wash = QL.filter(e => e.queue === 'carwash'), cars = bt === 'car-wash' ? wash.reduce((t, e) => t + Math.floor(e.path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - e.path[i][0], p[1] - e.path[i][1]), 0) / 20 + 1e-6), 0) : QL.length ? Math.min(...QL.map(e => +e.stack || 0)) : 0;
+      if (wantQ) add({ id: 'queues.stack', title: 'Queue holds the cars the building type asks for', hard: false, status: !QL.length ? 'fail' : cars >= need.cars ? 'pass' : 'fail', measured: cars, required: need.cars, units: 'cars (' + need.what + ')', basis: 'assumption',
+        rule: (bt === 'car-wash' ? 'The car wash’s stacking lanes measured along their centre lines, 20 ft a car' : 'The drive-thru lane’s stacking behind its order point or window as drawn, 20 ft a car') + '; ' + need.cars + ' wanted: ' + need.src, note: !QL.length ? 'No queue lane drawn.' : '' });
+    }
+  }
+
+  // 10c. the queues a building type's site features hold (lib/btsite.mjs QUEUE_TYPES, drawn by lib/btlanes.mjs): a
+  // school's parent drop-off queue and its bus loop (apart from each other), a daycare's drop-off lane, a hotel's
+  // porte-cochere, a bank zone's drive-thru, a gas station's pump lanes. Measured on the drawing: a queue's cars along its
+  // centre line from where it leaves its drive to its window (its loading curb), a car's length each; a bus loop's buses
+  // from where it leaves its drive to the end of its curb beside the school (within 40 ft of it), 45 ft a bus; a pump lane's waiting cars in
+  // the paving past the canopy's ends. A school's queue and a bank zone's lane fail when missing; the others are judged
+  // where drawn.
+  {
+    const EP = brief?.program?.engine || layout.program || {}, zs = EP.btZones || [], cOf = id => EP.btype === id ? EP.btCounts || {} : zs.find(z => z.btype === id)?.counts || (zs.some(z => z.btype === id) ? {} : null);
+    const QT = els.filter(e => e.kind === 'drive' && e.note === 'Drive-thru lane' && QUEUE_TYPES[e.queue] && Array.isArray(e.path) && e.path.length > 1 && !e.future), of = k => QT.filter(e => e.queue === k);
+    const want = [], plen = P => P.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0);
+    if (cOf('school')) want.push({ k: 'school-car', need: queueWant('school-car', cOf('school')), must: true }, { k: 'school-bus', need: queueWant('school-bus', cOf('school')), must: true });
+    if (cOf('daycare') && of('daycare').length) want.push({ k: 'daycare', need: queueWant('daycare', cOf('daycare')) });
+    if (of('porte').length) want.push({ k: 'porte', need: queueWant('porte') });
+    if (zs.some(z => z.btype === 'bank')) want.push({ k: 'bank', need: queueWant('bank'), must: true });
+    if (of('fuel').length) want.push({ k: 'fuel', need: queueWant('fuel') });
+    if (want.length) {
+      const held = e => { const Q = QUEUE_TYPES[e.queue], len = plen(e.path), w = +e.width || 12, q0 = Math.max(w / 2 + 4, +e.queueFrom || 0), q1 = Math.min(len, +e.windowAt > 0 ? +e.windowAt : len);
+        if (e.queue === 'fuel') return Math.max(0, +e.stack || 0); // (a pump lane: the cars waiting past the canopy, as drawn)
+        if (e.queue === 'school-bus') { const S0 = els.filter(b => b.kind === 'building' && b.btype === 'school' && !b.future).map(b => sh.get(b)).flat(), P = e.path; let curb = 0; for (let i = 0; i + 1 < P.length; i++) { const m = [(P[i][0] + P[i + 1][0]) / 2, (P[i][1] + P[i + 1][1]) / 2]; if (S0.some(r => ptPolyDist(m, r) <= 40)) curb += Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]); } return curb >= QUEUE_TYPES['school-bus'].bus ? Math.floor(Math.max(0, q1 - q0) / QUEUE_TYPES['school-bus'].bus + 1e-6) : 0; } // (a loop with a curb beside the school: the buses at it and lined up behind)
+        return Math.floor(Math.max(0, q1 - q0) / Q.car + 1e-6) * (e.queue === 'school-car' ? Math.max(1, Math.floor(w / 12)) : 1); }; // (a parent queue 24 ft wide: two lanes side by side)
+      const rows = want.map(x => { const L = of(x.k), got = L.length ? (x.k === 'fuel' ? Math.min(...L.map(held)) : Math.max(...L.map(held))) : 0; return { ...x, lanes: L.length, got, ok: L.length ? got >= x.need : !x.must }; });
+      add({ id: C.some(c => c.id === 'queues.stack') ? 'queues.stack.types' : 'queues.stack', title: 'Queues hold what the building types ask for', hard: false, status: rows.every(r => r.ok) ? 'pass' : 'fail', measured: Object.fromEntries(rows.map(r => [r.k, r.lanes ? r.got : 0])), required: Object.fromEntries(rows.map(r => [r.k, r.need])), units: 'cars (buses for a bus loop; waiting cars a pump lane)', basis: 'assumption',
+        features: rows.filter(r => !r.ok).map(r => r.k + ': ' + (r.lanes ? r.got + ' of ' + r.need : 'not drawn')), rule: rows.map(r => QUEUE_TYPES[r.k].what + ': ' + r.need + ' (' + QUEUE_TYPES[r.k].src + ')').join('; ') });
+      const bus = of('school-bus'), car = of('school-car');
+      if (bus.length && car.length) { let m = Infinity; for (const a of bus) for (const b of car) for (let i = 0; i + 1 < a.path.length; i++) for (let j = 0; j + 1 < b.path.length; j++) { const P = a.path, Q = b.path, d = Math.min(segDist(P[i], Q[j], Q[j + 1]), segDist(P[i + 1], Q[j], Q[j + 1]), segDist(Q[j], P[i], P[i + 1]), segDist(Q[j + 1], P[i], P[i + 1])); if (d < m) m = d; }
+        const need = (24 + 12) / 2; add({ id: 'queues.apart', title: 'The bus loop kept apart from the parents’ cars', hard: false, status: m >= need - 0.5 ? 'pass' : 'fail', measured: Math.round(m), required: need, units: 'ft between the lanes’ centre lines', basis: 'geometry', rule: 'No point of the bus loop on the parent drop-off lane: their centre lines at least half their widths apart' }); }
+    }
+  }
+
+  // 10d. a building type's grounds (a school's play yard and field, a daycare's play yard: the outdoor pieces of a
+  // preset's recipe, lib/customtypes.mjs, or laid beside a zone's building, lib/btsite.mjs) clear of the detention ponds
+  {
+    const parts = els.filter(e => e.part && ['play', 'green', 'court', 'pool'].includes(e.part) && (e.custom || e.zone != null) && !e.future), ponds = els.filter(e => e.kind === 'pond' && !e.future);
+    if (parts.length && ponds.length) {
+      const wet = []; for (const g of parts) { const G0 = sh.get(g) || []; let hit = false; for (const r of G0) { const xs = r.map(p => p[0]), ys = r.map(p => p[1]); for (let x = Math.min(...xs) + 2; x < Math.max(...xs) && !hit; x += 5) for (let y = Math.min(...ys) + 2; y < Math.max(...ys); y += 5) if (inPoly([x, y], r) && ponds.some(p => (sh.get(p) || []).some(q => inPoly([x, y], q)))) { hit = true; break; } } if (hit) wet.push(g); }
+      add({ id: 'site.grounds-dry', title: 'Play yards and fields clear of the detention ponds', hard: false, status: wet.length ? 'fail' : 'pass', measured: wet.length, required: 0, units: 'outdoor pieces on a pond', features: wet.map(id), basis: 'geometry', rule: 'A building type’s play yard, field or court stands on dry ground, not in a detention basin' });
+    }
   }
 
   // 11. the program, by what each quantity means
@@ -400,7 +546,7 @@ function crossDockChecks(layout, els, u, add) {
 export function quantities(layout, brief = null) {
   const els = (layout.elements || []).filter(e => e && e.kind && shapesOf(e).every(finite)), P = layout.program || {}, base = P.use || 'other', R = brief?.rules?.values || {};
   const byUse = {}, byZone = {}, U = u => (byUse[u] = byUse[u] || { buildings: 0, footprint: 0, gfa: 0, units: 0, unitsEstimated: false }), Z = k => (byZone[k] = byZone[k] || { buildings: 0, footprint: 0, gfa: 0, units: 0, unitsEstimated: false });
-  const ring = layout.ring || brief?.site?.ring || [];
+  const ring = layout.ring || brief?.site?.ring || [], keysBy = {};
   for (const e of els.filter(x => x.kind === 'building' && !x.future)) {
     const u = e.use || base, s = shapesOf(e), fa = s.reduce((t, r) => t + area(r), 0), gz = e.zone != null ? Z(e.zone) : null, g = U(u); g.buildings++; g.footprint += fa;
     // a floor area the piece states (the run's, drawn at full precision before its sides were stored at 0.01 ft) is taken
@@ -408,19 +554,28 @@ export function quantities(layout, brief = null) {
     // floor); else, or when the piece was changed after, the outline's own area
     const tw = towerOf(e), gr = S.groundOf(e), gfa0 = tw && e.gfa == null ? fa * (tw.podium - tw.park) + tw.plate * tw.up : floorArea(e, u, s, fa); /* a tower on a podium: the podium floors that are not parking, and the tower plate above */
     // vertical mixed use: the ground floor's shops are their own use's floor area (and parking), the building's use the floors above
-    const grA = gr ? fa * gr.floors : 0, gfa = gfa0 - grA; g.gfa += gfa;
+    const grA = gr ? (+e.ground?.sf > 0 ? Math.min(+e.ground.sf, fa * gr.floors) : fa * gr.floors) : 0, gfa = gfa0 - grA; g.gfa += gfa; /* (ground.sf: shops on part of the ground floor only, the rest the building's own use: a hotel's lobby) */
     if (gr) { const r = U(gr.use); r.buildings++; r.gfa += grA; r.stacked = (r.stacked || 0) + 1; }
     let nU = 0, est = false; if (['multifamily', 'townhomes', 'duplex', 'sfr'].includes(u)) { if (e.units != null) nU = +e.units; else if (u === 'multifamily') { nU = Math.floor(gfa * (P.eff || 0.85) / (P.unitSf || 900)); est = true; } else nU = 1; }
+    { const k = keysBy[u] = keysBy[u] || { keys: 0, rest: 0 }; if (+e.keys > 0) k.keys += +e.keys; else k.rest += gfa; } // (keys a typed hotel states: its parking by the key where the rule is a key's)
     g.units += nU; g.unitsEstimated = g.unitsEstimated || est; if (gz) { gz.buildings++; gz.footprint += fa; gz.gfa += gfa; gz.units += nU; gz.unitsEstimated = gz.unitsEstimated || est; gz.use = u; }
   }
+  for (const e of els.filter(x => x.kind === 'garage' && x.standalone && !x.future)) { const fa = shapesOf(e).reduce((t, r) => t + area(r), 0), g = U(e.use || base); g.buildings++; g.footprint += fa; g.gfa += fa * (+e.levels || 1); } // a stand-alone parking garage that is the program (lib/btypes.mjs): its levels are its floor area; its spaces are counted below as a garage's
   for (const g of Object.values(byUse)) { g.footprint = Math.round(g.footprint); g.gfa = Math.round(g.gfa); }
   // stalls drawn: each one inside its row, inside the site and not under a building
   const stall = { ...{ w: 9, d: 18, aisle: 24 }, ...(R.stall?.v || {}) }, B = els.filter(e => e.kind === 'building' && !e.future).map(e => shapesOf(e)).flat(), stray = [];
-  let surface = 0;
+  let surface = 0, square3 = false, angledRows = 0;
   for (const e of els.filter(x => x.kind === 'parking' && !x.rv && !x.vac)) {
+    const rows = shapesOf(e), ang = angledStalls(e, rows);
+    if (ang) { // angled stripes: the stalls measured from them (angledStalls), each inside its row and the site, clear of buildings
+      angledRows++;
+      for (const q of ang) { const c = q.c, okRow = q.corners.every(p => rows.some(r => inPoly(p, r) || ptPolyDist(p, r) < 0.5)), okSite = !ring.length || inPoly(c, ring), clear = !B.some(b => inPoly(c, b)); if (okRow && okSite && clear) surface++; else stray.push((e.id || 'parking') + ' @' + c.map(v => Math.round(v)).join(',')); }
+      continue;
+    }
     let cs; try { cs = S.stallCentres(e); } catch { cs = []; }
-    const rows = shapesOf(e);
-    for (const c of cs) { const okRow = rows.some(r => inPoly(c, r) || ptPolyDist(c, r) < 0.5), okSite = !ring.length || inPoly(c, ring), clear = !B.some(b => inPoly(c, b)); if (okRow && okSite && clear) surface++; else stray.push((e.id || 'parking') + ' @' + c.map(v => Math.round(v)).join(',')); }
+    let here = 0;
+    for (const c of cs) { const okRow = rows.some(r => inPoly(c, r) || ptPolyDist(c, r) < 0.5), okSite = !ring.length || inPoly(c, ring), clear = !B.some(b => inPoly(c, b)); if (okRow && okSite && clear) { surface++; here++; } else stray.push((e.id || 'parking') + ' @' + c.map(v => Math.round(v)).join(',')); }
+    if (here >= 3 && !e.parallel) square3 = true;
   }
   // a tower's parking podium: counted on a stall grid over each parking level (podiumGrid), not drawn stall by stall
   const podium = els.filter(e => e.kind === 'building' && !e.future).reduce((s, e) => { const t = towerOf(e); return s + (t && t.park ? podiumGrid(e, t.park) : 0); }, 0);
@@ -435,19 +590,21 @@ export function quantities(layout, brief = null) {
   const driveways = homes.filter(e => ['duplex', 'townhomes'].includes(e.use || base) && /front-load/i.test(e.note || '')).reduce((s, e) => s + (+e.units || 1), 0); // a front-load duplex's driveway apron: one tandem space a home (local code may not count it)
   // required: the brief's ratios, else the engine's use defaults (stated as assumptions)
   const hk = S.HOME_KINDS[P.homeKind || (P.zones || []).find(z => z?.homeKind)?.homeKind]; // (a home community: its kind's parking, a tiny home 1, a cottage 1.5, a manufactured home 2)
-  const perUnitOf = u => R.parkingPerUnit?.v ?? (u === 'sfr' && hk ? hk.perUnit : ({ multifamily: 1.6, townhomes: 2.25, duplex: 2, sfr: 2 }[u]));
+  const BU = R.parkingByUse?.v && typeof R.parkingByUse.v === 'object' ? R.parkingByUse.v : {}; // (a mixed plan governed use by use, lib/layoutrun.mjs governingParking: each use at its own rule)
+  const perUnitOf = u => BU[u]?.perUnit ?? R.parkingPerUnit?.v ?? (u === 'sfr' && hk ? hk.perUnit : ({ multifamily: 1.6, townhomes: 2.25, duplex: 2, sfr: 2 }[u]));
   const share = u => (brief?.program?.uses || []).find(x => x.use === u && x.officeShare != null)?.officeShare;
-  const per1kOf = u => R.parkingPer1000?.v ?? (share(u) != null ? +(share(u) * 3.5 + (1 - share(u)) * 0.6).toFixed(3) : null) ?? ({ retail: 4, restaurant: 10, office: 3.5, medical: 5, hotel: 1.82, church: 10, industrial: 0.6, storage: 0.1, fuel: 4, foodtrucks: 8, amenity: 0, other: 3 }[u]);
+  const per1kOf = u => BU[u]?.per1000 ?? R.parkingPer1000?.v ?? (share(u) != null ? +(share(u) * 3.5 + (1 - share(u)) * 0.6).toFixed(3) : null) ?? ({ retail: 4, restaurant: 10, office: 3.5, medical: 5, hotel: 1.82, church: 10, industrial: 0.6, storage: 0.1, fuel: 4, foodtrucks: 8, amenity: 0, other: 3 }[u]);
   let required = 0, known = true;
-  for (const [u, g] of Object.entries(byUse)) { const pu = perUnitOf(u), pk = per1kOf(u); if (['multifamily', 'townhomes', 'duplex', 'sfr'].includes(u)) { if (pu == null) known = false; else required += g.units * pu; } else if (pk == null) known = false; else required += g.gfa / 1000 * pk; }
+  for (const [u, g] of Object.entries(byUse)) { const pu = perUnitOf(u), pk = per1kOf(u); if (['multifamily', 'townhomes', 'duplex', 'sfr'].includes(u)) { if (pu == null) known = false; else required += g.units * pu; } else if (BU[u]?.perKey != null) required += (keysBy[u]?.keys > 0 ? keysBy[u].keys + keysBy[u].rest / (+BU[u].sfPerKey || 550) : g.gfa / (+BU[u].sfPerKey || 550)) * BU[u].perKey; /* a hotel by its keys (the typed buildings' own count, else its floor area at the type's sf a key) */ else if (pk == null) known = false; else required += g.gfa / 1000 * pk; }
   required = known ? Math.ceil(required - 0.01) : null;
   const raw = surface, accessibleNeeded = raw <= 0 ? 0 : raw <= 25 ? 1 : raw <= 50 ? 2 : raw <= 75 ? 3 : raw <= 100 ? 4 : raw <= 150 ? 5 : raw <= 200 ? 6 : raw <= 300 ? 7 : raw <= 400 ? 8 : raw <= 500 ? 9 : raw <= 1000 ? Math.ceil(raw * 0.02) : 20 + Math.ceil((raw - 1000) / 100);
-  const ruled = R.parkingPerUnit?.v != null || R.parkingPer1000?.v != null, verified = R.parkingPerUnit?.cls === 'verified' || R.parkingPer1000?.cls === 'verified';
+  const ruled = R.parkingPerUnit?.v != null || R.parkingPer1000?.v != null || Object.keys(BU).length > 0, verified = R.parkingPerUnit?.cls === 'verified' || R.parkingPer1000?.cls === 'verified' || Object.keys(BU).length > 0 && R.parkingByUse?.cls === 'verified';
   // accessible stalls take their striped access aisle out of the row: each pair of them shares an aisle a stall wide
   // (the app's own count does the same, lib/siteplan.mjs metrics)
-  const accessAisles = Math.ceil(accessibleNeeded / 2);
+  // (where every row is angled, a pair and its aisle, square to the aisle, take four angled stalls: twice the cost)
+  const accessAisles = Math.ceil(accessibleNeeded / 2) * (angledRows && !square3 ? 2 : 1);
   const parking = { required, provided: surface - accessAisles + podium + garage + garageEstimated + privateGarages + tucked + driveways, surface, accessAisles, podium, garage, tucked, garageEstimated, privateGarages, driveways, accessibleNeeded, stall, strayStalls: stray,
-    basis: verified ? 'verified' : 'assumption', rule: ruled ? (R.parkingPerUnit?.source || R.parkingPer1000?.source) : 'Engine use defaults (1.6 a unit for apartments, 4 per 1,000 sf for retail, …): planning assumptions, not code' };
+    basis: verified ? 'verified' : 'assumption', rule: ruled ? (Object.keys(BU).length ? R.parkingByUse.source : R.parkingPerUnit?.source || R.parkingPer1000?.source) : 'Engine use defaults (1.6 a unit for apartments, 4 per 1,000 sf for retail, …): planning assumptions, not code' };
   const site = ring.length >= 3 ? area(ring) : 0, tot = Object.values(byUse).reduce((t, g) => ({ units: t.units + g.units, gfa: t.gfa + g.gfa, footprint: t.footprint + g.footprint, buildings: t.buildings + g.buildings }), { units: 0, gfa: 0, footprint: 0, buildings: 0 });
   const pavedSf = els.filter(e => PAVED.includes(e.kind)).reduce((s, e) => s + shapesOf(e).reduce((t, r) => t + area(r), 0), 0);
   for (const g of Object.values(byZone)) { g.footprint = Math.round(g.footprint); g.gfa = Math.round(g.gfa); }

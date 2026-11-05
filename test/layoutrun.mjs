@@ -443,6 +443,25 @@ ok('townhomes: an exact count lands in rows of at most 6, each home on its lot; 
   const bar = { ...RECT, elements: [{ id: 't1', kind: 'building', use: 'townhomes', x: 450, y: 250, w: 264, d: 40, units: 11, floors: 2 }] };
   assert.equal(V.validateLayout(bar, B.canonicalBrief(B.briefFromRequest('exactly 11 townhomes', RECT))).checks.find(c => c.id === 'program.rowlength').status, 'fail', 'an 11-home row is flagged');
 });
+ok('townhomes as many as fit: rows line both sides of every lane end to end at the separation asked, corners used (5 ac rectangle)', () => {
+  const site = { origin: [-96.42, 30.38], ring: [[0, 0], [660, 0], [660, 330], [0, 330]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 } };
+  const o = RUN.runBrief(B.briefFromRequest('townhomes, as many as fit', site)).options[0], rows = o.elements.filter(e => e.kind === 'building' && e.use === 'townhomes');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.deepEqual(o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id), [], 'no warnings');
+  assert.ok(o.quantities.totals.units >= 55, 'packed: ' + o.quantities.totals.units + ' homes (was 37 in 15 short rows)');
+  assert.ok(rows.every(e => e.units >= 3 && e.units <= 6), 'rows of 3 to 6: ' + rows.map(e => e.units).join());
+  assert.equal(o.validation.checks.find(c => c.id === 'separation.buildings').status, 'pass');
+});
+ok('townhomes as many as fit: guests park parallel along the cross drives, rows face the outside of a loop leg pulled in (10 ac)', () => {
+  const o = RUN.runBrief(B.briefFromRequest('fee simple townhomes with garages, as many as fit', RECT)).options[0], els = o.elements, rows = els.filter(e => e.kind === 'building' && e.use === 'townhomes');
+  assert.equal(o.validation.status, 'pass', o.validation.failed.join()); assert.deepEqual(o.validation.checks.filter(c => !c.hard && c.status === 'fail').map(c => c.id), [], 'no warnings');
+  assert.ok(o.quantities.totals.units >= 145, 'packed: ' + o.quantities.totals.units + ' homes (was 136)');
+  assert.ok(rows.every(e => e.units >= 3 && e.units <= 6), 'rows of 3 to 6');
+  const par = els.filter(e => e.kind === 'parking' && e.parallel); assert.ok(par.length >= 4, 'parallel guest stalls: ' + par.length);
+  for (const p of par) { assert.equal(p.sw, 22); assert.equal(p.sd, 8); assert.ok(rows.every(b => SP.gapBetween(SP.shapeOf(p), SP.shapeOf(b)) >= 4.9), 'stalls 5 ft off the homes'); }
+  const turned = rows.filter(b => Math.abs((((b.rot - rows[0].rot) % 180) + 180) % 180 - 90) < 1); assert.ok(turned.length >= 1, 'a row outside a leg, turned a quarter');
+  const drives = els.filter(e => e.kind === 'drive');
+  for (const b of turned) assert.ok(Math.min(...drives.map(d => SP.gapBetween(SP.shapeOf(b), SP.shapeOf(d)))) <= 6, b.name + ': its garages on the leg (5 ft apron)');
+});
 ok('front-load townhomes from the reviewed row (E053): a one-car garage and a driveway a home, on lots of their own', () => {
   const b = B.briefFromRequest('front-load townhomes, as many as fit', RECT), r = RUN.runBrief(b), o = r.options[0];
   assert.equal(o.validation.status, 'pass', o.validation.failed.join());
@@ -602,4 +621,73 @@ ok('drawing polish: an entrance\'s name inside the site, "1 space", a trail that
   const scrap = { id: 's', kind: 'green', future: true, name: 'Future development', poly: [[300, 200], [400, 200], [400, 260], [300, 260]] }, pad = { id: 'f', kind: 'green', future: true, name: 'Future pad site', poly: [[500, 200], [600, 200], [600, 260], [500, 260]] };
   const r = RUN.shutInFuture(RECT, { elements: [scrap, pad] }); assert.equal(r.elements.find(e => e.id === 's').name, 'Open space'); assert.ok(!r.elements.find(e => e.id === 's').future); assert.ok(r.elements.find(e => e.id === 'f').future);
 });
+// ---------- layout round Nov 5 (LAYOUT-ENGINE.md item 32) ----------
+const site = (w, h) => ({ origin: [-96.42, 30.38], ring: [[0, 0], [w, 0], [w, h], [0, h]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, elements: [] });
+ok('an exact count whole bars overshoot and a whole bar undershoots: pairs of homes combined, in the same buildings', () => {
+  // nine 24-home garden bars (216) for exactly 200: a bar off gives 192; 16 pairs combined give 200
+  const brief = B.briefFromRequest('exactly 200 garden apartments, 3 stories', site(900, 500)), bars = Array.from({ length: 9 }, (_, i) => ({ id: 'b' + i, kind: 'building', use: 'multifamily', x: 100 + (i % 3) * 200, y: 100 + Math.floor(i / 3) * 120, w: 150, d: 60, floors: 3 }));
+  const o = T.applyTemplates(site(900, 500), { elements: bars }, brief), got = o.elements.filter(e => e.template).reduce((t, e) => t + e.units, 0);
+  assert.equal(got, 200); assert.equal(o.elements.filter(e => e.template).length, 9, 'no bar taken off'); assert.equal(o.elements.reduce((t, e) => t + (e.combined || 0), 0), 16); assert.ok(o.tplNotes.some(t => /16 pairs of homes combined/.test(t)));
+});
+if (!QUICK) {
+  ok('200 apartments with underground detention: exactly 200, not 192', () => { const r = RUN.runBrief(B.briefFromRequest('200 apartments, 3 stories, surface parking, underground detention', site(900, 500))); assert.equal(r.options[0].quantities.totals.units, 200); assert.equal(r.options[0].validation.feasible, true); });
+  ok('the clubhouse asked at the back: the program kept (no building given up for it)', () => {
+    const r = RUN.runBrief(B.briefFromRequest('180 apartments with the clubhouse at the back', site(900, 500))), o = r.options[0];
+    assert.equal(o.quantities.totals.units, 180); assert.ok(o.placements.every(p => p.status === 'pass'), 'clubhouse at the back'); assert.equal(o.validation.status, 'pass');
+  });
+  ok('homes around a central lake: a loop street, lots both sides, the lake in the middle holding the detention', () => {
+    const plan = site(1000, 870), r = RUN.runBrief(B.briefFromRequest('homes around a central lake', plan)), o = r.options[0];
+    assert.match(o.name, /^Homes round a central lake/); assert.equal(o.validation.status, 'pass'); assert.ok(o.quantities.totals.units >= 70, 'homes ' + o.quantities.totals.units);
+    const pond = o.elements.filter(e => e.kind === 'pond'), c = SP.centroid(SP.shapeOf(pond[0])); assert.equal(pond.length, 1); assert.ok(c[0] > 250 && c[0] < 750 && c[1] > 217 && c[1] < 652, 'lake in the middle ' + c);
+    assert.ok(o.placements.every(p => p.status === 'pass')); assert.equal(o.validation.checks.find(x => x.id === 'eng.detention').status, 'pass');
+    const lots = o.elements.filter(e => e.kind === 'lot').map(e => SP.centroid(SP.shapeOf(e))); assert.ok(lots.some(p => Math.hypot(p[0] - 500, p[1] - 435) < 300) && lots.some(p => p[1] > 800), 'inner and outer rows');
+    const again = RUN.runBrief(B.briefFromRequest('homes around a central lake', plan)); assert.equal(again.options[0].geometryHash, o.geometryHash);
+  });
+  ok('homes around a central pool: the park in the middle with its clubhouse and pool, a drive in to it', () => {
+    const o = RUN.runBrief(B.briefFromRequest('homes around a central pool and clubhouse', site(1000, 870))).options[0];
+    assert.match(o.name, /^Homes round a central park/); assert.equal(o.validation.status, 'pass'); assert.ok(o.elements.some(e => e.kind === 'pool') && o.elements.some(e => e.name === 'Clubhouse'));
+  });
+  // item 37: the ring on any lot shape, townhomes and duplexes round the lake
+  const ringOk = (o, use) => { const homes = o.elements.filter(e => e.kind === 'building' && e.use === use), lots = o.elements.filter(e => e.kind === 'lot'), drives = o.elements.filter(e => e.kind === 'drive');
+    for (let i = 0; i < homes.length; i++) for (let j = i + 1; j < homes.length; j++) assert.ok(!SP.rectsOverlap(homes[i], homes[j], 0.5), 'homes overlap ' + homes[i].name + ' / ' + homes[j].name);
+    for (const h of homes) assert.ok(!drives.some(d => SP.rectsOverlap(h, d, 0.5)), 'a home on a street ' + h.name);
+    for (const l of lots) assert.ok(!drives.some(d => !d.entry && SP.rectsOverlap(l, d, 1)), 'a lot on a street');
+    const lake = o.elements.find(e => e.kind === 'pond'); assert.ok(lake && !homes.some(h => SP.rectsOverlap(h, lake, 0.5)), 'the lake clear of the homes'); return homes; };
+  ok('homes around a central lake on an L-shaped lot and on a wedge: the loop follows the lot lines', () => {
+    for (const ring of [[[0, 0], [1100, 0], [1100, 560], [600, 560], [600, 1000], [0, 1000]], [[0, 0], [1200, 0], [950, 850], [150, 900]]]) {
+      const plan = { ...site(1, 1), ring }, o = RUN.runBrief(B.briefFromRequest('homes around a central lake', plan)).options[0];
+      assert.match(o.name, /^Homes round a central lake · a loop street following the lot lines/); assert.equal(o.validation.status, 'pass'); assert.ok(o.quantities.totals.units >= 75, 'homes ' + o.quantities.totals.units);
+      ringOk(o, 'sfr'); assert.ok(o.placements.every(p => p.status === 'pass'));
+      assert.ok(new Set(o.elements.filter(e => e.kind === 'drive' && /^Street/.test(e.note || '')).map(e => Math.round(e.rot) % 180)).size >= (ring.length === 4 ? 3 : 2), 'legs at their own angles');
+    }
+  });
+  ok('townhomes and duplexes around a central lake: front-load rows of up to six and duplexes on their lots, parked', () => {
+    const o = RUN.runBrief(B.briefFromRequest('townhomes around a central lake', site(1000, 870))).options[0];
+    assert.match(o.name, /^Townhomes round a central lake/); assert.equal(o.validation.status, 'pass'); const rows = ringOk(o, 'townhomes'); assert.ok(rows.every(r => r.units <= 6 && /front-load/.test(r.note)));
+    assert.ok(o.quantities.totals.units >= 200, 'townhomes ' + o.quantities.totals.units); assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+    const c = RUN.runBrief(B.briefFromRequest('120 townhomes around a central lake', site(1000, 870))).options[0]; assert.match(c.name, /^Townhomes round a central lake/); assert.equal(c.quantities.totals.units, 120); assert.equal(c.validation.status, 'pass');
+    const d = RUN.runBrief(B.briefFromRequest('duplexes around a central lake', { ...site(1, 1), ring: [[0, 0], [1100, 0], [1100, 560], [600, 560], [600, 1000], [0, 1000]] })).options[0];
+    assert.match(d.name, /^Duplexes round a central lake/); assert.equal(d.validation.status, 'pass'); ringOk(d, 'duplex');
+  });
+  ok('the rectangle ring for houses is unchanged (the loop square to the frame)', () => {
+    const o = RUN.runBrief(B.briefFromRequest('homes around a central lake', site(1000, 870))).options[0]; assert.equal(o.name, 'Homes round a central lake · a loop street, lots both sides all the way round'); assert.equal(o.quantities.totals.units, 85);
+  });
+  // item 37: room for a type's lanes (the reserve run), a school or a daycare beside homes as zones
+  ok('a hotel on a tight lot gets its porte-cochère, at the same floor area and parked', () => {
+    const plan = site(420, 300), r = RUN.runBrief(B.briefFromRequest('a 6-story hotel with 120 keys', plan)), o = r.options[0];
+    assert.equal(o.validation.status, 'pass'); assert.equal(o.quantities.totals.gfa, 66000); assert.ok(o.elements.some(e => e.kind === 'drive' && e.queue === 'porte'), 'porte-cochère'); assert.ok(o.quantities.parking.provided >= o.quantities.parking.required);
+    const d = RUN.runBrief(B.briefFromRequest('a daycare for 150 children', site(330, 300))).options[0];
+    assert.equal(d.validation.status, 'pass'); assert.ok(d.elements.some(e => e.kind === 'drive' && e.queue === 'daycare'), 'drop-off lane'); assert.ok(d.quantities.parking.provided >= d.quantities.parking.required);
+  });
+  ok('a school or a daycare named beside homes is a zone of its own', () => {
+    const p = SP.guessProgram('a school for 500 students and 100 townhomes'); assert.deepEqual(p.zones.map(z => z.use), ['other', 'townhomes']); assert.equal(p.btZones[0].btype, 'school'); assert.deepEqual(p.zones[0].foot.length, 2);
+    assert.equal(SP.guessProgram('a daycare for 120 children beside 40 homes').btZones[0].btype, 'daycare'); assert.ok(!SP.guessProgram('200 apartments with a daycare').zones, 'a daycare in an apartment community stays the apartments');
+    const o = RUN.runBrief(B.briefFromRequest('a school for 500 students and 100 townhomes', site(1000, 870))).options[0];
+    assert.equal(o.quantities.byUse.townhomes.units, 100); const sch = o.elements.filter(e => e.kind === 'building' && e.btype === 'school'); assert.equal(sch.length, 1, 'one school building'); assert.ok(o.validation.feasible);
+  });
+  ok('duplexes past what fits: the nearest count first, and the plan says the most that fits', () => {
+    const r = RUN.runBrief(B.briefFromRequest('96 duplex units on a private street', site(900, 500))), u = r.options.map(o => o.quantities.totals.units);
+    assert.equal(u[0], Math.max(...u)); assert.ok(r.options[0].notes.some(t => new RegExp('about the most that does: ' + u[0]).test(t)));
+  });
+}
 console.log('layoutrun: ' + n + ' passed');

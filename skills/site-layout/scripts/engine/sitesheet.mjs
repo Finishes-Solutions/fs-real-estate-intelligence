@@ -2,6 +2,7 @@
 // the plan to scale with north arrow and scale bar, title block, site data and land use, program and parking,
 // parcels, notes from the site facts, legend and a conceptual-only disclaimer. Shared by the browser and the tests.
 import * as S from './siteplan.mjs';
+import { TYPE_COLORS, colorKey } from './btypes.mjs';
 import { rulesLine } from './rulesheet.mjs';
 import * as G from './guardrails.mjs'; // a Waller plan: its numbers under the guardrails, the concept label and the land-use sheet
 
@@ -10,7 +11,7 @@ const f0 = v => Math.round(v).toLocaleString('en-US');
 export const PALETTE = {
   lot: '#fbfbf8', lawn: '#dde9d1', paving: '#d7d9d6', curb: '#9fa29d', ada: '#2f6db5', trash: '#a59f92', stripe: '#ffffff', walk: '#efefea', green: '#cfe3bf', tree: '#7fae5f', treeLine: '#55803c', pond: '#9cc7e8', bank: '#d9c9a3',
   court: '#5a87a8', pool: '#8fd3ec', play: '#e8d3a8', plaza: '#e6d6bd', keepout: '#9b3b32', boundary: '#c0392b', setback: '#9aa0a2', text: '#1b1e1f',
-  use: { retail: '#c8673d', restaurant: '#c8673d', office: '#b5553c', medical: '#b5553c', hotel: '#a8583f', church: '#9e6448', venue: '#7fb5c9', other: '#b0603f', industrial: '#a2775b', storage: '#5d8a8c', fuel: '#b5443a', multifamily: '#d8b16a', townhomes: '#b8865b', duplex: '#d9a77c', foodtrucks: '#9c4f6b', amenity: '#8a6fb3' }, fence: '#2b3033', gate: '#e07b24', foodtruck: '#e9b44c', canopy: '#dfe7f1', tanks: '#e6c45c', sign: '#8b8073'
+  use: { retail: '#c8673d', restaurant: '#c8673d', office: '#b5553c', medical: '#b5553c', hotel: '#a8583f', church: '#9e6448', venue: '#7fb5c9', other: '#b0603f', industrial: '#a2775b', storage: '#5d8a8c', fuel: '#b5443a', multifamily: '#d8b16a', townhomes: '#b8865b', duplex: '#d9a77c', foodtrucks: '#9c4f6b', amenity: '#8a6fb3', ...TYPE_COLORS }, fence: '#2b3033', gate: '#e07b24', foodtruck: '#e9b44c', canopy: '#dfe7f1', tanks: '#e6c45c', sign: '#8b8073'
 };
 export const LEGEND = [['Retail / commercial building', 'retail'], ['Event / wedding venue', 'venue'], ['Apartments', 'multifamily'], ['Townhomes', 'townhomes'], ['Duplexes / cottages', 'duplex'], ['Industrial', 'industrial'], ['Self storage', 'storage'], ['Food truck park: pavilion, restrooms, bar', 'foodtrucks'], ['Food truck stall (power + water)', 'foodtruck'], ['Gas station / c-store', 'fuel'], ['Community / amenity building', 'amenity'],
   ['Asphalt / concrete paving', 'paving'], ['Detention / amenity lake', 'pond'], ['Landscape / open space', 'green'], ['Accessible (ADA) stall', 'ada'], ['Trash enclosure', 'trash'], ['Monument sign', 'sign'], ['Tennis / pickleball courts', 'court'], ['Fence and gate', 'fence'], ['Fuel canopy and pumps', 'canopy'], ['Fuel tanks (keep clear)', 'tanks'], ['Canopy tree (proposed)', 'tree'], ['Easement / no-build (drawn, not surveyed)', 'keepout'], ['Boundary', 'boundary'], ['Building setback', 'setback']];
@@ -72,7 +73,7 @@ export function planSVG(plan0, opts = {}) {
     const A = S.accessible(plan);
     for (const a of A.aisles) { o.push(poly(a.poly, 'fill="none" stroke="' + P.ada + '" stroke-width="' + lw(0.5) + '"')); for (const l of a.lines) o.push(ln(l, P.ada, lw(0.5))); }
     for (const a of A.stalls) { o.push(poly(a.poly, 'fill="' + P.ada + '" fill-opacity=".85" stroke="#ffffff" stroke-width="' + lw(0.5) + '"')); const r = Math.max(1.2, 2.6 * k); o.push('<circle cx="' + X(a.sym[0]) + '" cy="' + Y(a.sym[1]) + '" r="' + r.toFixed(1) + '" fill="none" stroke="#ffffff" stroke-width="' + (r * 0.35).toFixed(2) + '"/>'); }
-    for (const m of [...S.entryMarks(plan), ...S.loopMarks(plan)]) o.push(ln(m.line, m.color, Math.max(0.6, m.w * k).toFixed(2))); // (and a drop-off loop's one-way arrows)
+    for (const m of [...S.entryMarks(plan), ...S.loopMarks(plan), ...S.onewayMarks(plan)]) o.push(ln(m.line, m.color, Math.max(0.6, m.w * k).toFixed(2))); // (and a drop-off loop's one-way arrows)
   }
   for (const e of els.filter(x => x.kind === 'lot')) o.push(poly(S.outline(e), 'fill="none" stroke="#9aa38f" stroke-width="' + lw(0.5) + '" stroke-dasharray="3 2"'));
   for (const i of d.islands) o.push(poly(S.outline(i), 'fill="' + P.green + '" stroke="#a9c79a" stroke-width="' + lw(0.4) + '"'));
@@ -83,7 +84,7 @@ export function planSVG(plan0, opts = {}) {
     for (let k = 0; k <= n; k++) { const s1 = s0 + k * sw, A = at(long ? [-D2, s1] : [s1, -D2]), B2 = at(long ? [D2, s1] : [s1, D2]); o.push('<line x1="' + X(A[0]) + '" y1="' + Y(A[1]) + '" x2="' + X(B2[0]) + '" y2="' + Y(B2[1]) + '" stroke="#ffffff" stroke-opacity=".85" stroke-width="' + lw(0.35) + '"/>'); } }
   for (const e of els.filter(x => x.kind === 'building')) {
     const use = S.USES[e.use] ? e.use : prog.use;
-    o.push(poly(S.outline(e), 'fill="' + (P.use[use] || P.use.other) + '"' + (e.phase === 2 ? ' fill-opacity=".55" stroke-dasharray="6 3"' : '') + ' stroke="#4a3a2c" stroke-width="' + lw(0.9) + '"')); // Phase 2: lighter, dashed
+    o.push(poly(S.outline(e), 'fill="' + (P.use[colorKey({ tc: e.tc, use })] || P.use.other) + '"' + (e.phase === 2 ? ' fill-opacity=".55" stroke-dasharray="6 3"' : '') + ' stroke="#4a3a2c" stroke-width="' + lw(0.9) + '"')); // Phase 2: lighter, dashed
     if (e.docks?.perFace > 0) { // a cross-dock's dock doors: a short dark mark at each door along its dock walls (local -x / +x faces)
       const at = q => S.garageToPlan(e, q), n = e.docks.perFace, sp = e.docks.spacing || 12, run = Math.min(e.d - 30, n * sp), v0 = -run / 2 + sp / 2;
       for (const f of e.docks.faces || []) { const sx = f === '-x' ? -1 : 1, u = sx * e.w / 2; for (let k = 0; k < n; k++) { const v = v0 + k * sp, a = at([u, v - 4.5]), b = at([u + sx * 5, v - 4.5]), c = at([u + sx * 5, v + 4.5]), d2 = at([u, v + 4.5]); o.push(poly([a, b, c, d2], 'fill="#3d3127" stroke="none"')); } } }

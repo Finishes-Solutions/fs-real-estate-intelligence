@@ -27,6 +27,7 @@ import * as PD from './lib/plandesign.mjs';
 import * as TR from './lib/terrain.mjs';
 import { PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, pickedClaude, pickedEffort, aiPickKey, readPick } from './lib/aimodels.mjs';
 import * as CU from './lib/customtypes.mjs';
+import * as BT from './lib/btypes.mjs';
 import * as G from './lib/guardrails.mjs';
 import * as BR from './lib/planbrief.mjs';
 import * as LV from './lib/layoutcheck.mjs';
@@ -53,7 +54,7 @@ const ADD_GROUPS = [['Buildings', ['building', 'pad', 'garage']], ['Paving', ['p
 const ADD_SHORT = { building: 'Building', pad: 'Restaurant pad', garage: 'Garage', parking: 'Parking', drive: 'Drive', truck: 'Truck court', field: 'Parking field', roundabout: 'Roundabout', loop: 'Drop-off', pond: 'Detention', green: 'Landscape', play: 'Playground', court: 'Courts', pool: 'Pool', patio: 'Seating', trash: 'Trash', sign: 'Sign' };
 const SIZE = { roundabout: [100, 100], loop: [120, 70], building: [120, 100], parking: [180, 60], drive: [26, 80], truck: [200, 130], field: [200, 130], pond: [120, 80], green: [40, 40], trash: [24, 12], sign: [10, 5], pad: [44, 50], garage: [180, 120], patio: [30, 20], play: [64, 48], court: [60, 60], pool: [60, 30] };
 const PAVED = ['parking', 'drive', 'truck', 'field'];
-const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['tower', 'Tower on a podium']];
+const FORMS = [['bar', 'Bar'], ['L', 'L-shaped'], ['U', 'Courtyard (U)'], ['T', 'T-shaped'], ['tower', 'Tower on a podium']];
 const ISLANDS = [['along', 'Along the street'], ['across', 'Across the street (toward the store)']]; // which way a canopy's pump islands run
 const { COL, USE_COL } = MAP; // one palette for the map, the Plan key and the Draw buttons (lib/planmap.mjs)
 // a simple line icon for each piece you can add (24 × 24, currentColor), and its accent from the map's palette: the panel's
@@ -1508,7 +1509,7 @@ export function initSitePlan(ctx) {
       let on = false, spot = null, ghost = null, chip = null; const inPop = pop.contains(b), x0 = e0.clientX, y0 = e0.clientY;
       const start = () => { on = true; dragged = true; closeMenu();
         ghost = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); ghost.setAttribute('class', 'sp-dragghost'); ghost.innerHTML = '<polygon/>'; ghost.style.setProperty('--ac', addAccent(kind));
-        chip = document.createElement('div'); chip.className = 'sp-dragchip'; chip.style.setProperty('--ac', addAccent(kind)); chip.innerHTML = ADD_ICON[kind] + '<span>' + esc(ADD_SHORT[kind] || kind) + '</span>';
+        chip = document.createElement('div'); chip.className = 'sp-dragchip'; chip.style.setProperty('--ac', addAccent(kind)); chip.innerHTML = (ADD_ICON[kind] || ADD_ICON.parking) + '<span>' + esc(ADD_SHORT[kind] || kind) + '</span>';
         document.body.append(ghost, chip); document.documentElement.classList.add('sp-dragging'); if (inPop) pop.style.visibility = 'hidden'; };
       const place = (x, y) => {
         chip.style.transform = 'translate(' + Math.round(x + 14) + 'px,' + Math.round(y + 14) + 'px)';
@@ -2056,8 +2057,8 @@ export function initSitePlan(ctx) {
       spPfSec: () => '<div id="spPf">' + pfHtml(p, pl) + '</div>',
       spSiteSec: () => siteHtml(p, pl),
       spDrawSec: () => '<div class="bsec" id="spDrawSec"><div class="lt">Add to the plan' + infoBtn('A piece goes in the middle of the view, clear of the rest; parking under it gives way. Edit Layout turns on so you can drag it into place.', 'About adding pieces') + '</div>' + lotHtml(pl) +
-        '<div class="sp-addg">' + ADD_GROUPS.map(([g, ks]) => '<div class="sp-add-g" role="group" aria-label="' + esc(g) + '"><div class="sp-sub">' + esc(g) + '</div><div class="sp-add-r">' + ks.map(k => '<button type="button" class="sp-add" data-add="' + k + '" style="--ac:' + addAccent(k) + '" title="Add ' + esc(ADD_LABEL[k] || SP.KINDS[k]?.label || ADD_SHORT[k]) + '">' + ADD_ICON[k] + '<span>' + esc(ADD_SHORT[k]) + '</span></button>').join('') + '</div></div>').join('') + '</div>' +
-        '<label class="sp-f sp-lib"><span class="sp-fl">From the building library <small>' + (BUILDING_TYPES.length + TL.list().length) + ' types</small></span><span class="sp-libw">' + SI.find + '<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('', teamTypes()) + '</select></span></label>' + teamHtml() + '</div>',
+        '<div class="sp-addg">' + ADD_GROUPS.map(([g, ks]) => '<div class="sp-add-g" role="group" aria-label="' + esc(g) + '"><div class="sp-sub">' + esc(g) + '</div><div class="sp-add-r">' + ks.map(k => '<button type="button" class="sp-add" data-add="' + k + '" style="--ac:' + addAccent(k) + '" title="Add ' + esc(ADD_LABEL[k] || SP.KINDS[k]?.label || ADD_SHORT[k]) + '">' + (ADD_ICON[k] || ADD_ICON.parking) + '<span>' + esc(ADD_SHORT[k]) + '</span></button>').join('') + '</div></div>').join('') + '</div>' +
+        '<label class="sp-f sp-lib"><span class="sp-fl">From the building library <small>' + (BUILDING_TYPES.length + TL.list().length) + ' types</small></span><span class="sp-libw">' + SI.find + '<select id="spLib"><option value="">Pick a building type to add…</option>' + typeOptions('', teamTypes()) + '</select></span></label>' + presetHtml() + teamHtml() + '</div>',
       spParams: () => paramsHtml(pl, prog),
       spRender: () => renderHtml(p, pl),
       spExport: () => '<div class="bsec" id="spExport"><div class="lt">Export</div><div class="sp-g2 sp-exp"><button type="button" class="btn askai" id="spPdf" title="A conceptual site plan sheet: the plan to scale with title block, site data, program and parking, parcels, notes and legend">Site Plan PDF</button>' +
@@ -2112,7 +2113,7 @@ export function initSitePlan(ctx) {
     on('#spStaleRefit', () => refitNow(true)); on('#spStaleNew', () => resolve({ force: true, src: '#spStaleNew' }));
     on('#spLot', startLot);
     card.querySelectorAll('[data-add]').forEach(b => { b.onclick = () => { ed.editing = true; addEl(b.dataset.add); }; dragToAdd(b, b.dataset.add); }); // adding a piece is editing
-    const lib = $('#spLib'); if (lib) lib.onchange = () => { const t = anyType(lib.value); if (t) { ed.editing = true; addType(t); } }; wireTeam();
+    const lib = $('#spLib'); if (lib) lib.onchange = () => { const t = anyType(lib.value); if (t) { ed.editing = true; addType(t); } }; wireTeam(); wirePresets();
     on('#spEdit', () => { ed.editing = !ed.editing; draw(); panel(); });
     on('#spFront', () => { ed.mode = ed.mode === 'front' ? null : 'front'; panel(); });
     on('#spStreet', () => { ed.mode = ed.mode === 'street' ? null : 'street'; panel(); });
@@ -2880,7 +2881,7 @@ export function initSitePlan(ctx) {
     for (const [a, k] of [['pumps', 'pumps'], ['prows', 'rows']]) card.querySelector('[data-' + a + ']')?.addEventListener('change', ev => { change(() => { e[k] = +ev.target.value; e.note = (e.rows || 1) + ' row' + ((e.rows || 1) > 1 ? 's' : '') + ' of ' + Math.ceil((e.pumps || 0) / (e.rows || 1)) + ' pumps'; }); readout(e); });
     card.querySelector('[data-pisl]')?.addEventListener('change', ev => { const v = ev.target.value; // the islands turned: the canopy takes the size they need (kept centred), and the rest of the station re-fits round it
       change(() => { const c = SP.canopyOf(e.pumps || 8, e.rows || 1, v), along = e.w >= e.d; e.islands = v; e.w = along ? c.w : c.d; e.d = along ? c.d : c.w; e.pinned = true; }); readout(e); refitSoon('Turned', 'the pump islands'); });
-    card.querySelector('[data-form]')?.addEventListener('change', ev => { if (ev.target.value === 'custom') return; change(() => { const f = ev.target.value; delete e.poly; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
+    card.querySelector('[data-form]')?.addEventListener('change', ev => { if (ev.target.value === 'custom') return; change(() => { const f = ev.target.value; delete e.poly; if (f === 'bar') delete e.form; else e.form = f; if (f === 'tower') { e.podium = e.podium || 2; e.floors = Math.max(e.floors || 1, 8); } if ((f === 'L' || f === 'U' || f === 'T') && e.d < 100) e.d = Math.min(150, e.d * 2); e.pinned = true; }); panel(); refitSoon(); });
     card.querySelector('[data-name]')?.addEventListener('change', ev => change(() => { e.name = ev.target.value.trim().slice(0, 40); }, true));
     if (card.querySelector('#spRot')) card.querySelector('#spRot').onclick = () => turnEl(e);
     card.querySelector('#spLoop')?.addEventListener('click', () => loopAt(e));
@@ -3036,7 +3037,10 @@ export function initSitePlan(ctx) {
       (la && (la.nrsf || !la.keys) ? two('Leasable / rentable', x => (x === m1 ? la1 : la)?.nrsf ? f0((x === m1 ? la1 : la).nrsf) + ' sf' : '—', la.nrsf && la.gsf ? pct(la.nrsf / la.gsf) + ' of gross · ' + leasableWhy(la) : la.keys ? '' : 'nothing leased') : '') +
       (SP.lsfOf(m) > 0 ? tile('Leasable + sellable', f0(SP.lsfOf(m)) + ' sf', [m.leasable > 0 ? f0(m.leasable) + ' sf to lease' : '', m.sellable > 0 ? f0(m.sellable) + ' sf of homes to sell' : ''].filter(Boolean).join(' · ') + ' · what the layouts are ranked by') : '') + // the owner's goal (lib/siteplan.mjs lsfOf)
       (la?.keys ? tile('Hotel keys', f0(la.keys), 'about ' + f0(la.uses.hotel.gsf / la.keys) + ' gross sf a key') : '') +
-      (m.units ? two('Units' + TG('units'), x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') +
+      (la?.beds ? tile('Beds', f0(la.beds), 'as the building type counts them' + (m.units ? ' · in ' + plural(m.units, 'unit') : '')) : '') + /* (student housing, assisted living: lib/btypes.mjs) */
+      (la?.children ? tile('Children', f0(la.children), 'licensed capacity, about ' + f0((la.uses.other?.gsf || m.gfa) / la.children) + ' gross sf a child') : '') +
+      (la?.students ? tile('Students', f0(la.students), 'about ' + f0((la.uses.other?.gsf || m.gfa) / la.students) + ' gross sf a student') : '') +
+      (m.units ? two('Units' + TG('units'), x => f0(x.units || 0), m.duAc.toFixed(1) + ' per acre' + (m.beds && !la?.beds ? ' · ' + f0(m.beds) + ' beds' : '')) : '') + /* (a type that counts beds has its own Beds tile) */
       (m.fuel ? tile('Fuel', f0(m.fuel.positions) + ' positions', m.fuel.mpds + ' pumps · ' + f0(m.fuel.canopySf) + ' sf canopy · ' + f0(m.fuel.storeSf) + ' sf store' + (m.fuel.washSf ? ' · car wash' : '') + (m.fuel.vac ? ' · ' + m.fuel.vac + ' air / vac' : '')) : '') +
       (cs ? customTile(cs, tile) : '') + (m.storage && !cs ? two('Storage', x => x.storage ? f0(x.storage.nrsf) + ' sf' : '—', 'rentable · ~' + f0(m.storage.units) + ' units (' + f0(m.storage.climateUnits) + ' climate, ' + f0(m.storage.driveUnits) + ' drive-up)' + (m.storage.rv ? ' · ' + m.storage.rv + ' RV / boat' : '')) : '') +
       (m.foodtrucks ? tile('Food trucks', f0(m.foodtrucks.trucks), '~' + f0(m.foodtrucks.seats) + ' seats (covered and patio)') + tile('Park buildings', f0(m.foodtrucks.pavilionSf) + ' sf pavilion', f0(m.foodtrucks.restroomSf) + ' sf restrooms · ' + (m.foodtrucks.barSf ? f0(m.foodtrucks.barSf) + ' sf bar' + (m.foodtrucks.patioSf ? ' + ' + f0(m.foodtrucks.patioSf) + ' sf patio' : '') : 'no bar')) : '') +
@@ -3127,7 +3131,8 @@ export function initSitePlan(ctx) {
     const sch = R.sched, seg = (n, cls, t) => n > 0 ? '<i class="' + cls + '" style="flex:' + n + '" title="' + t + ': ' + n + ' months">' + n + '</i>' : '';
     const ar = R.area, rows = Object.entries(ar.byUse).filter(([, u]) => u.gross > 0), sto = R.P.uses.storage, b = R.budget;
     const areaT = '<table class="sp-mixt sp-pfarea"><tr><th>Area</th><th>Gross building sf</th><th>Leasable / rentable sf</th></tr>' + rows.map(([k, u]) => '<tr><td>' + esc(SP.USES[k]?.label || k) + '<small>' + esc(u.basis || '') + '</small></td><td>' + f0(u.gross) + '</td><td>' + (k === 'hotel' ? f0(u.keys) + ' keys' : k === 'amenity' ? '—' : f0(u.leasable)) + '</td></tr>').join('') +
-      (rows.length > 1 ? '<tr><td><b>Total</b></td><td><b>' + f0(ar.gross) + '</b></td><td><b>' + f0(ar.leasable) + '</b>' + (ar.keys ? ' + ' + f0(ar.keys) + ' keys' : '') + '</td></tr>' : '') + '</table>' +
+      (rows.length > 1 ? '<tr><td><b>Total</b></td><td><b>' + f0(ar.gross) + '</b></td><td><b>' + f0(ar.leasable) + '</b>' + (ar.keys ? ' + ' + f0(ar.keys) + ' keys' : '') + '</td></tr>' : '') +
+      [['Beds', ar.beds, 'beds'], ['Children', ar.children, 'children (daycare capacity)'], ['Students', ar.students, 'students'], ['Storage units', ar.storageUnits, 'units (about)']].filter(([, v]) => v > 0).map(([k, v, w]) => '<tr class="sp-pfcount"><td>' + k + '</td><td colspan="2">' + f0(v) + ' ' + w + '</td></tr>').join('') + '</table>' + /* (what the plan holds besides its area: the building types' counts, as the Numbers panel and the CSV list them) */
       '<div class="rnote sp-1l">Rent and the yield are on the leasable area, ' + (ar.gross ? pct(ar.leasable / ar.gross) + ' of the gross' : 'not the gross') + '.' + infoBtn('Shops lease about 97% of the building (NNN); offices and medical lease rentable sf: the usable share of the building times a load factor for the common areas; apartments the units’ net sf from the unit mix; self storage the units’ net rentable sf; a hotel runs on its keys. Change the shares under Assumptions.', 'About leasable area') + '</div>';
     return '<details class="bsec sp-pf" id="spPfSec"' + (ed.pfOpen !== false && stageNow() === 'proforma' || ed.pfOpen ? ' open' : '') + '><summary class="lt">Pro forma</summary>' +
       '<div class="sp-row"><button type="button" class="btn sm primary" id="spPfX" title="Assumptions, the one-page pro forma with live formulas, the month-by-month model and the budget">Pro Forma (Excel)</button><button type="button" class="btn sm ghost" id="spPfReset">Reset to Defaults</button></div>' +
@@ -3271,6 +3276,29 @@ export function initSitePlan(ctx) {
     const pl = PL(); if (!pl || pl.ring.length < 3) return;
     const { at, rot } = addAt(pl), e = { id: uid(), ...fromAny(t, at, rot), ...(pl.recipe ? { pinned: true } : {}) };
     let how = 'clear'; change(x => { how = placeClear(x, e); x.elements.push(e); makeRoom(e); }); ed.sel = e.id; draw(); panel(); showPiece(e); noRoom(how);
+  }
+  // Add a building by type (lib/btypes.mjs presets): a searchable list; the building goes in at the type's usual size,
+  // its engine use, floors, and its type colour and floor height (the 3D block is coloured by type), as a library type does
+  const BT_FAMILY = { multifamily: 'Homes', retail: 'Retail', office: 'Office & medical', lodging: 'Hotels', civic: 'Civic & schools', industrial: 'Industrial', flex: 'Flex', storage: 'Storage', mixed_use: 'Mixed use', parking: 'Parking' };
+  const BT_CAT = (() => { try { return BT.presetCatalog(); } catch { return []; } })();
+  const btHit = (c, q) => !q || q.split(/\s+/).every(w => c.words.includes(w) || (BT_FAMILY[c.family] || '').toLowerCase().includes(w));
+  function presetHtml() {
+    if (!BT_CAT.length) return '';
+    const q = String(ed.btQ || '').toLowerCase().trim();
+    const rows = BT_CAT.map(c => '<button type="button" class="sp-btr" role="option" data-bt="' + esc(c.id) + '"' + (btHit(c, q) ? '' : ' hidden') + ' title="Add a ' + esc(c.label.toLowerCase()) + ' at its usual size' + (c.src === 'estimate' ? ' (sizes are planning estimates)' : '') + '"><i style="background:' + esc(c.color || MAP.USE_COL[c.use] || MAP.USE_COL.other) + '"></i><span>' + esc(c.label) + '</span><small>' + esc(BT_FAMILY[c.family] || c.family) + '</small></button>').join('');
+    return '<div class="sp-f sp-bt"><label class="sp-fl" for="spBt">Add a building by type <small>' + BT_CAT.length + ' types</small></label><span class="sp-libw">' + SI.find + '<input id="spBt" type="search" autocomplete="off" placeholder="Search: hotel, daycare, storage…" value="' + esc(ed.btQ || '') + '" aria-controls="spBtList"></span>' +
+      '<div class="sp-btl" id="spBtList" role="listbox" aria-label="Building types">' + rows + '<p class="sp-btnone"' + (BT_CAT.some(c => btHit(c, q)) ? ' hidden' : '') + '>No building type matches.</p></div></div>';
+  }
+  function wirePresets() {
+    const inp = card.querySelector('#spBt'), list = card.querySelector('#spBtList'); if (!inp || !list) return;
+    inp.oninput = () => { ed.btQ = inp.value; const q = inp.value.toLowerCase().trim(); let n = 0; list.querySelectorAll('[data-bt]').forEach(b => { const c = BT_CAT.find(x => x.id === b.dataset.bt), on = !!c && btHit(c, q); b.hidden = !on; n += on; }); const none = list.querySelector('.sp-btnone'); if (none) none.hidden = n > 0; };
+    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const b = list.querySelector('[data-bt]:not([hidden])'); if (b) b.click(); } };
+    list.querySelectorAll('[data-bt]').forEach(b => { b.onclick = () => { ed.editing = true; addPreset(b.dataset.bt); }; });
+  }
+  function addPreset(id) {
+    const pl = PL(); if (!pl || pl.ring.length < 3) return; const b0 = BT.presetBuilding(id); if (!b0) return;
+    const { at, rot } = addAt(pl), e = { id: uid(), ...b0, x: +at[0].toFixed(2), y: +at[1].toFixed(2), rot, ...(pl.recipe ? { pinned: true } : {}) };
+    let how = 'clear'; change(x => { how = placeClear(x, e); x.elements.push(e); makeRoom(e); }); ed.sel = e.id; ed.multi = []; draw(); panel(); showPiece(e); noRoom(how);
   }
   // a roundabout at the junction nearest p (the middle of the view, the spot it was dropped on or clicked: near, a tighter
   // snap), or the next one along when that has no room; a drop-off loop in front of building b. Each one undo step, picked,

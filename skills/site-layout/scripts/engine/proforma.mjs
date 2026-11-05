@@ -26,6 +26,7 @@
 import * as S from './siteplan.mjs';
 import { pmt, irr } from './feasibility/finance.mjs'; // payments and IRR: the platform's shared primitives, so every engine agrees
 import { homePlanById } from './buildings.mjs';
+import { STORAGE_UNIT_SF } from './btypes.mjs';
 
 const RES = ['multifamily', 'townhomes', 'duplex', 'sfr'], COMM = ['retail', 'restaurant', 'office', 'medical', 'hotel', 'church', 'industrial', 'storage', 'fuel', 'other'];
 const NNN = ['retail', 'restaurant', 'office', 'medical', 'church', 'industrial', 'other']; // leased triple net: tenants pay their share of taxes, insurance and common-area costs
@@ -158,6 +159,7 @@ export function metricsOf(plan) {
   for (const e of els.filter(e => e.kind === 'building')) {
     const use = S.USES[e.use] ? e.use : prog.use, u = uses[use] ||= { gsf: 0, units: 0 }, gr = S.groundOf(e), g = S.gfaOf(e) - (gr?.gfa || 0);
     u.gsf += g;
+    for (const k of ['keys', 'beds', 'children', 'students']) if (+e[k] > 0) u[k] = (u[k] || 0) + Math.round(+e[k]); /* (a building type's count, lib/btypes.mjs: keys, beds, children, students) */
     if (gr) { const r = uses[gr.use] ||= { gsf: 0, units: 0 }; r.gsf += gr.gfa; } // (vertical mixed use: the shops on the ground floor leased as shops)
     if (use === 'multifamily') u.units += e.units ?? 0;
     else if (use === 'sfr' && (e.padSpaces != null || e.tiny)) { // a tiny home (a community's, or one from the library) or a community's manufactured home: its own count and living area
@@ -169,7 +171,8 @@ export function metricsOf(plan) {
     else if (use === 'amenity' && e.custom) u.pavilionSf = (u.pavilionSf || 0) + g; // an AI-crafted type's pavilion: an open structure, not a clubhouse
   }
   if (uses.multifamily) uses.multifamily.units = m.mix.reduce((s, t) => s + t.n, 0) || uses.multifamily.units;
-  if (uses.hotel) uses.hotel.keys = Math.max(1, Math.round(uses.hotel.gsf / (S.USES.hotel.roomSf || 550)));
+  if (uses.hotel) { const own = els.filter(e => e.kind === 'building' && (S.USES[e.use] ? e.use : prog.use) === 'hotel'), typed = own.filter(e => +e.keys > 0), rest = own.filter(e => !(+e.keys > 0)).reduce((s, e) => s + S.gfaOf(e) - (S.groundOf(e)?.gfa || 0), 0); /* (a hotel type's own keys, lib/btypes.mjs: an extended stay at 650 sf a key is not re-counted at 550; the rest at 550) */
+    uses.hotel.keys = typed.length ? typed.reduce((s, e) => s + Math.round(+e.keys), 0) + (rest > 0 ? Math.round(rest / (S.USES.hotel.roomSf || 550)) : 0) : Math.max(1, Math.round(uses.hotel.gsf / (S.USES.hotel.roomSf || 550))); }
   if (m.storage) { const st = uses.storage ||= { gsf: 0, units: 0 }, sp = { ...S.STORAGE, ...(prog.use === 'storage' ? prog.storage || {} : {}) }; st.rv = m.storage.rv || 0; st.eff = { climate: sp.climateEff, drive: sp.driveEff }; }
   const fut = sum(e => e.kind === 'green' && e.future), parkingSf = sum(e => e.kind === 'parking'), truckSf = sum(e => e.kind === 'truck');
   const improved = (m.footprint || 0) + m.paved + sum(e => ['court', 'pool', 'play', 'patio', 'trash', 'garage'].includes(e.kind)) + (m.pond || 0); // what's built, paved and dug
@@ -222,6 +225,8 @@ export function areaOf(M, A = {}, user = A) {
     u.nrsf = Math.max(0, Math.min(g, u.nrsf)); // leasable never exceeds gross
     u.eff = k === 'storage' ? u.eff : g ? u.nrsf / g : 0;
     out.gsf += g; out.nrsf += k === 'amenity' ? 0 : u.nrsf; out.units += RES.includes(k) ? u.units : 0;
+    if (k === 'storage' && u.nrsf > 0) { u.storageUnits = Math.round(u.nrsf / STORAGE_UNIT_SF); u.storageUnitSf = STORAGE_UNIT_SF; out.storageUnits = (out.storageUnits || 0) + u.storageUnits; } /* (about how many units: the net rentable sf at an average unit of STORAGE_UNIT_SF, an estimate, lib/btypes.mjs) */
+    for (const c of ['beds', 'children', 'students']) if (u[c] > 0) out[c] = (out[c] || 0) + u[c]; /* (a building type's count: beds, children, students) */
   }
   return out;
 }
@@ -417,7 +422,7 @@ function runM(M, A0, user) {
   // (coverage on the first year after stabilizing: the NOI the permanent loan is sized on)
   const income = st.gpr > 0, sum = forSale ? null : { yoc: income ? noi / totalCost : null, spread: income ? noi / totalCost - A.marketCap / 100 : null, value: income ? noi / (A.marketCap / 100) : null, dscr: permPmt ? noiAt(T2 + 1) / (permPmt * 12) : null, 
     coc: cocByYear?.[0] ?? null, cocAvg: cocByYear?.length ? cocByYear.reduce((s, v) => s + v, 0) / cocByYear.length : null, cocByYear, holdYears };
-  const area = { gross: P.gsf, leasable: P.nrsf, units: P.units, keys: P.keys, byUse: Object.fromEntries(Object.entries(P.uses).map(([k, u]) => [k, { gross: u.gsf, leasable: u.nrsf, usable: u.usable ?? null, load: u.load ?? null, eff: u.eff, units: u.units || 0, keys: u.keys || 0, basis: u.basis }])) };
+  const area = { gross: P.gsf, leasable: P.nrsf, units: P.units, keys: P.keys, byUse: Object.fromEntries(Object.entries(P.uses).map(([k, u]) => [k, { gross: u.gsf, leasable: u.nrsf, usable: u.usable ?? null, load: u.load ?? null, eff: u.eff, units: u.units || 0, keys: u.keys || 0, basis: u.basis, ...Object.fromEntries(['beds', 'children', 'students', 'storageUnits'].filter(c => u[c] > 0).map(c => [c, u[c]])) }])), ...Object.fromEntries(['beds', 'children', 'students', 'storageUnits'].filter(c => P[c] > 0).map(c => [c, P[c]])) }; /* (a building type's counts and the storage units estimate, when the plan has them) */
   const R = { A, P, M, area, sched: { ...sch, toStabilize: T2, total: T, sale: T }, budget: { from: BI ? 'budget' : 'parametric', hardByUse: hardOf, equip, siteQty: { prep: prepSf, lots, notHome, ground: !!ground }, land, hard, ffe, site, siteParts: site0, storm: site0.vault, vaultAcFt: M.vaultAcFt || 0, pondAcFt: Math.max(0, (M.detentionAcFt || 0) - (M.vaultAcFt || 0)), deck: site0.deck, ti, lc, soft, cont, fee, budget, interest, loanFees, total: totalCost },
     sources: { equity: contrib, loanPeak: peakLoan, ltc: peakLoan / totalCost }, ops: { ...st, tax, taxNNN: st.recTax, opexRes, opexComm, mgmt, opex, noi },
     exit: { price, dispNet, payoff, perm, refiOut, sales: Array.from(sales).reduce((s, v) => s + v, 0) }, returns: { ...sum, unlevIrr: uIrr, levIrr: lIrr, multiple: contrib ? distrib / contrib : null, profit: distrib - contrib, peakEquity: contrib, margin: forSale ? (Array.from(sales).reduce((s, v) => s + v, 0) - totalCost) / Math.max(1, Array.from(sales).reduce((s, v) => s + v, 0)) : null },
@@ -573,7 +578,7 @@ export function workbook(R, title = 'Site plan') {
   const first = 11, last = sched.length + 2; // two IRR rows go in above the table
   sched.splice(6, 0, ['Unlevered IRR (annual)', { f: '(1+IRR(D' + first + ':D' + last + '))^12-1' }], ['Levered IRR (annual)', { f: '(1+IRR(E' + first + ':E' + last + '))^12-1' }]);
   const budget = [['BUDGET'], ['Land (with closing)', Math.round(R.budget.land)], ['Hard costs', Math.round(R.budget.hard + (R.budget.ffe || 0))], ['Site work and parking', Math.round(R.budget.site)], ['Tenant improvements and leasing commissions', Math.round(R.budget.ti + (R.budget.lc || 0))], ['Soft costs', Math.round(R.budget.soft)], ['Contingency', Math.round(R.budget.cont)], ['Developer fee', Math.round(R.budget.fee)], ['Construction interest', Math.round(R.budget.interest)], ['Loan fees', Math.round(R.budget.loanFees)], ['Total', { f: 'SUM(B2:B10)' }],
-    [], ['AREA'], ['Gross building sf', Math.round(R.area.gross)], ['Leasable / rentable sf', Math.round(R.area.leasable)], ...(R.area.keys ? [['Hotel keys', R.area.keys]] : []), ...(R.area.units ? [['Units', R.area.units]] : [])];
+    [], ['AREA'], ['Gross building sf', Math.round(R.area.gross)], ['Leasable / rentable sf', Math.round(R.area.leasable)], ...(R.area.keys ? [['Hotel keys', R.area.keys]] : []), ...(R.area.beds ? [['Beds', R.area.beds]] : []), ...(R.area.children ? [['Children (daycare capacity)', R.area.children]] : []), ...(R.area.students ? [['Students', R.area.students]] : []), ...(R.area.storageUnits ? [['Storage units (about, at ' + STORAGE_UNIT_SF + ' sf average)', R.area.storageUnits]] : []), ...(R.area.units ? [['Units', R.area.units]] : [])];
   return { Returns: returns, Assumptions: assumptions, 'One page (TestFit method)': one, 'Schedule model': sched, Budget: budget };
 }
 
