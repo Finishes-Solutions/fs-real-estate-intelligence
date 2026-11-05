@@ -11,6 +11,8 @@ import { pathToFileURL } from 'node:url';
 import * as B from '../lib/layoutbrief.mjs';
 import * as RUN from '../lib/layoutrun.mjs';
 import * as V from '../lib/layoutcheck.mjs';
+import * as SP from '../lib/siteplan.mjs';
+import * as G from '../lib/guardrails.mjs';
 import { planSVG } from '../lib/sitesheet.mjs';
 import { parkingMetrics } from './parking-metrics.mjs';
 
@@ -58,6 +60,10 @@ const SITES = {
   ty58: [[0, 0], [600, 0], [600, 420], [0, 420]],
   ty62: [[0, 0], [600, 0], [600, 450], [0, 450]],
   ty84: [[0, 0], [700, 0], [700, 520], [0, 520]],
+  /* Waller-like guarded sites (docs/LAYOUT-ENGINE.md item 33): 24.8 ac and 13.0 ac rectangles, the plan's guardrails on
+     (lib/guardrails.mjs: the 5% count reserve, detention at 1 ac-ft a developed acre 4 ft deep, 26 ft fire-lane aisles) */
+  wal25: [[0, 0], [1300, 0], [1300, 831], [0, 831]],
+  wal13: [[0, 0], [900, 0], [900, 630], [0, 630]],
   ty110: [[0, 0], [800, 0], [800, 600], [0, 600]],
   ty145: [[0, 0], [900, 0], [900, 700], [0, 700]]
 };
@@ -146,9 +152,17 @@ const CASES = [
   /* parking round 3 (docs/LAYOUT-ENGINE.md item 31): a building at the street with its parking behind, asked for in words (the
      run steers to it through lib/layoutintent.mjs asksFor where that's folded in; otherwise measured and said) */
   { id: 'PK-street-retail', family: 'retail', site: 'ty43', ask: 'retail on the street, parking in the rear, 15,000 sf' },
-  { id: 'PK-street-medical', family: 'office', site: 'ty55', ask: '20,000 sf medical office at the front with parking behind it' }
+  { id: 'PK-street-medical', family: 'office', site: 'ty55', ask: '20,000 sf medical office at the front with parking behind it' },
+  /* mixed use under a city's rules (docs/LAYOUT-ENGINE.md item 33): guard runs the app's way (lib/guardrails.mjs forLayout,
+     then lib/layoutrun.mjs briefForPlan with the deeper-pond tries the app asks for); and angled parking on a mixed plan */
+  { id: 'MX-guard-hotel25', family: 'mixed_use', site: 'wal25', guard: true, ask: 'a 120-key hotel and 20,000 sf of retail, parking behind the buildings' },
+  { id: 'MX-guard-hotel13', family: 'mixed_use', site: 'wal13', guard: true, ask: 'a 120-key hotel and 20,000 sf of retail, parking behind the buildings' },
+  { id: 'MX-angled', family: 'mixed_use', site: 'ty84', ask: 'a hotel with 120 keys and 20,000 sf of retail, angled parking' },
+  { id: 'MX-guard-angled', family: 'mixed_use', site: 'wal25', guard: true, ask: 'a 120-key hotel and 20,000 sf of retail, 60 degree angled parking' }
 ];
-const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
+const plan = (id, guard = false) => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: guard ? [-95.93, 30.06] : [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })), ...(guard ? { params: { guard: { mode: 'on' } } } : {}) }; };
+// a guarded case's plan and brief, as the app makes them (lib/guardrails.mjs forLayout: the scenario's plan and program; runPlan's brief)
+const guarded = c => { const p0 = plan(c.site, true), prog = SP.guessProgram(c.ask), g = G.forLayout({ ...p0, program: prog }, prog, { count: 3 }); return { p: g.plan, brief: RUN.briefForPlan(g.plan, g.program, { ...g.opts, deeper: true }, { ask: c.ask }) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });
 
 let baseMods = null;
@@ -157,7 +171,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const rows = [], cards = [];
 for (const c of CASES) {
   if (ONLY && !c.id.includes(ONLY)) continue;
-  const p = plan(c.site), brief = B.briefFromRequest(c.ask, p);
+  const gd = c.guard ? guarded(c) : null, p = gd ? gd.p : plan(c.site), brief = gd ? gd.brief : B.briefFromRequest(c.ask, p);
   if (c.perUnit) brief.rules.values.parkingPerUnit = { v: c.perUnit, cls: 'assumption', source: 'bench: a lower parking rule for this case' };
   const t0 = Date.now(), rec = RUN.runBrief(brief), ms = Date.now() - t0, again = RUN.runBrief(JSON.parse(JSON.stringify(brief)));
   const same = again.rankingHash === rec.rankingHash && again.options.every((o, i) => o.geometryHash === rec.options[i]?.geometryHash);
@@ -177,7 +191,7 @@ for (const c of CASES) {
 }
 const esc = s => String(s ?? '').replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 fs.writeFileSync(path.join(OUT, 'bench.json'), JSON.stringify(rows, null, 1));
-fs.writeFileSync(path.join(OUT, 'plans.json'), JSON.stringify(cards.map(({ c, top }) => ({ id: c.id, site: c.site, ask: c.ask, plan: plan(c.site), elements: top?.elements || [], program: top?.program || null, quantities: top?.quantities || null, notes: top?.notes || [] }))));
+fs.writeFileSync(path.join(OUT, 'plans.json'), JSON.stringify(cards.map(({ c, top }) => ({ id: c.id, site: c.site, ask: c.ask, plan: plan(c.site, !!c.guard), elements: top?.elements || [], program: top?.program || null, quantities: top?.quantities || null, notes: top?.notes || [] }))));
 const md = ['| Case | Family | Outcome | Top option | Fails | Unknown | Replay | Before (same validator) |', '|---|---|---|---|---|---|---|---|'].concat(rows.map(r => { const o = r.options[0]; return '| ' + [r.id, r.family, r.outcome, o ? o.status + ' · ' + (o.units ? o.units + ' units' : o.gfa.toLocaleString('en-US') + ' sf') + ' · parking ' + o.parking.join('/') : (r.problems[0] || '').slice(0, 70), o ? o.failed.join(', ') || '—' : '—', o ? o.unknown : '—', r.replayIdentical ? 'identical' : 'DIFFERS', r.base ? r.base.options.map(b => b.status + (b.failed.length ? ' (' + b.failed.join(', ') + ')' : '')).join('; ') || 'no options' : 'n/a'].join(' | ') + ' |'; }));
 fs.writeFileSync(path.join(OUT, 'bench.md'), md.join('\n') + '\n');
 const html = '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font:11px Arial;background:#fff;width:2240px}.g{display:grid;grid-template-columns:repeat(4,550px);gap:10px;padding:10px}.c{border:1px solid #ccc;padding:4px}.c svg{width:540px;height:auto;max-height:420px}.h{font-weight:bold}.f{color:#b00}.ok{color:#060}</style></head><body><div class="g">' +
