@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 9:03 AM CT: Schools, daycares, hotels and gas stations get the lanes they need; each type parked by its own rule (197f92e, a45bdea)
+- **Schools:** a parent pick-up and drop-off line (winding back on itself when it's long) and a separate bus loop, kept apart, with the play yard and field (moved off the pond if it landed there). A 600-student school holds 70 cars and 6 buses.
+- **Daycares:** a fenced play yard beside the building and a drop-off lane where the lot has room.
+- **Hotels:** a drive-through drop-off canopy at the entrance where it fits; "a 120-key hotel over 8,000 sf of retail" gives exactly 8,000 sf of shops.
+- **Gas stations:** waiting room at each side of the pump islands.
+- **Mixed requests:** a bank zone gets its drive-thru, a daycare or school zone its play yard, and each zone is parked by its own type's rule (a bank at 4 per 1,000 sf, not a restaurant's 10), with the city's reserve where city rules apply.
+- New checks: queues long enough, the bus loop apart from the parents' line, no play yard on a pond. Queue lengths are estimates, with their sources cited. The pro forma's area table lists beds, children, students and storage units.
+- 84 test sites, every one passing with no warnings; the full test suite passes.
+
 ### 7:24 AM CT: Mixed-use plans parked right under a city's rules (6816a6f, fe7f6b8)
 - **Each use is parked by its own rule:** under Waller's rules a 120-key hotel with 20,000 sf of shops now needs 210 spaces (126 for the keys, 84 for the shops), not 380; homes at 2.1 a home, shops and offices at their own ratio, a hotel by its keys. The independent check counts each use the same way.
 - **The city's 5% reserve is counted once** (2.1 spaces a home, was 2.205).

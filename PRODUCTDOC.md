@@ -1155,6 +1155,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Lanes and yards for each type (Nov 5):** schools get a bus loop and a parent pick-up line, daycares a fenced play yard and drop-off lane, hotels a drop-off canopy, gas stations room to wait at the pumps; in mixed requests each part is parked by its own type's rule.
 - **Lakes in the middle, exact counts (Nov 5):** "homes around a central lake" rings a lake with homes; exact unit counts are met where the land allows (the notes say if any homes were combined), and when a count can't fit the plan says the most that does.
 - **Building up front, parking behind (Nov 5):** ask for "retail on the street with parking in the rear" and the building is set at the street with the parking behind it; entrance drives are kept clear further in from the street.
 - **More building detail (Nov 5):** car washes with stacking lanes, drive-thru queues that are checked, T-shaped buildings, point towers, triplexes and fourplexes, parking garages, hotels over retail; mixed requests give each part its own type; add a building by type from a searchable list in the editor; hotel keys, beds, children and students in the numbers.
