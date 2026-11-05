@@ -46,6 +46,6 @@ export const CAPS = {
   'mx-vertical': { family: 'mixed_use', label: 'Vertical mixed use (retail under apartments)', status: 'partial', engine: 'lib/sitegen.mjs verticalOf: one double-loaded building along the street, the shops on the ground floor of a stretch drawn to the floor area asked (building.ground), apartments above it and on every floor of the rest; shared surface parking behind, a drive down each end', note: 'Each use parks at its own ratio, no shared-parking reduction taken (an assumption a parking study could lower). Homes from floor area at the reviewed dev corridor buildings\' gross area a home (P28, P11, P33); the form itself is reviewed (E027, E028: homes over ground-floor shops), its unit mix and the shops\' depth are not; the shops\' loading, trash and the residential lobby are not drawn. A garage instead of surface parking is not offered.' }
 };
 // uses that aren't one of the forms above pass through as the engine's own use (offices, hotels, storage, fuel…)
-export const FORMLESS_OK = ['office', 'medical', 'hotel', 'church', 'storage', 'fuel', 'foodtrucks', 'other', 'retail', 'restaurant', 'industrial', 'multifamily', 'townhomes', 'duplex', 'sfr'];
+export const FORMLESS_OK = ['office', 'medical', 'hotel', 'church', 'venue', 'storage', 'fuel', 'foodtrucks', 'other', 'retail', 'restaurant', 'industrial', 'multifamily', 'townhomes', 'duplex', 'sfr'];
 export const capOf = form => CAPS[form] || null;
 export function capsTable() { return Object.entries(CAPS).map(([id, c]) => ({ id, ...c })); }

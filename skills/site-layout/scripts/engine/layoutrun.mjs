@@ -33,7 +33,7 @@ import * as SITE from './btsite.mjs';
 import { restripeAngled } from './siteparking.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.05.11'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.12'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -636,7 +636,7 @@ export function garageEntries(plan, o, prog = null) {
     // (first a way out over open ground with the lobby toward the street; then across a parking row, its stalls taken
     // out; then, where the only face a drive reaches is the street side, the lobby turned to the other long face)
     for (const [pass, lf] of [[0, lobby0], [1, lobby0], [0, lobby0 === '-v' ? '+v' : '-v'], [1, lobby0 === '-v' ? '+v' : '-v']]) { lobbyFace = lf;
-      for (const face of ['+u', '-u', lobbyFace === '-v' ? '+v' : '-v']) {
+      for (const face of ['+u', '-u', lobbyFace === '-v' ? '+v' : '-v', lobbyFace === '-v' ? '+v-' : '-v-']) { /* (the back face at either end: the ramp follows the entrance, docs/LAYOUT-ENGINE.md item 42) */
         const E = S.garageEntry({ ...b, lobbyFace, garageFace: face });
         if (drives().some(d => { const sh = S.shapeOf(d); return S.inRing(E.at, sh) || S.gapBetween([E.at], sh) <= 3; })) { best = { face, t: 0, rect: null, cut: [] }; break; }
         for (let t = 6; t <= 260; t += 2) {
@@ -653,7 +653,7 @@ export function garageEntries(plan, o, prog = null) {
     if (!best) { notes.push((b.name || 'The tower') + (deck(b) ? ': no drive reaches a face of it for its entrance.' : ': no drive reaches a face of its podium for the garage entrance.')); continue; }
     Object.assign(b, { lobbyFace, garageFace: best.face });
     if (best.rect) { els = els.flatMap(e => best.cut.includes(e) ? cutRow(e, best.rect) : [e]); els.push({ id: 'garage-entry-' + (b.id || T.indexOf(t0)), kind: 'drive', poly: best.rect.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]), name: 'Garage entry', note: GARAGE_DRIVE + ' ft drive into the ' + (deck(b) ? 'garage' : 'podium garage') }); }
-    notes.push((b.name || 'The tower') + ': ' + (deck(b) ? 'its entrance' : 'garage entrance') + ' on the ' + ({ '+u': 'right end', '-u': 'left end', '+v': 'back', '-v': 'back' })[best.face] + (best.rect ? ', a ' + Math.round(best.t) + ' ft drive to it' : '') + (best.cut.length ? ' (across a parking row: its stalls there taken out)' : '') + (deck(b) ? '; its stairs and lobby on the street side.' : '; the lobby on the street side.'));
+    notes.push((b.name || 'The tower') + ': ' + (deck(b) ? 'its entrance' : 'garage entrance') + ' on the ' + ({ '+u': 'right end', '-u': 'left end', '+v': 'back', '-v': 'back', '+v-': 'back', '-v-': 'back' })[best.face] + (best.rect ? ', a ' + Math.round(best.t) + ' ft drive to it' : '') + (best.cut.length ? ' (across a parking row: its stalls there taken out)' : '') + (deck(b) ? '; its stairs and lobby on the street side.' : '; the lobby on the street side.'));
   }
   return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), ...notes] };
 }
@@ -1305,13 +1305,29 @@ export function runBrief(briefIn, { now = null } = {}) {
   // arrangement that passes is left out (the upward probe of as many as fit can bring several of the same rows)
   const arr = o => String(o.name || '').split(' · ')[0], ok = o => !(best && o.validation.feasible && yieldOf(o) < 0.6 * best) && !(options.some(x => x.quantities.totals.units > 0) ? !(o.quantities.totals.units > 0) : best > 0 && !(yieldOf(o) > 0)); // (an option with nothing built in it, beside ones that build: left out; homes asked for, an option with none)
   const others = o => options.some(x => x !== o && !keep.includes(x) && arr(x) !== arr(o) && ok(x) && x.validation.status === 'pass' && !seen.has(sig(x)));
-  for (const o of options) { if (keep.length >= brief.solver.options) break; const k = sig(o); if (seen.has(k)) continue; if (!ok(o)) continue; if (keep.filter(x => arr(x) === arr(o)).length >= 2 && others(o)) continue; seen.add(k); keep.push(o); }
+  const wantsAny = brief.program.uses.some(u => u.use !== 'amenity'), empty = o => !Object.entries(o.quantities.byUse || {}).some(([u, v]) => u !== 'amenity' && (v.units > 0 || v.gfa > 0 || v.buildings > 0)) && !(o.quantities.totals.units > 0); // (a layout with nothing built in it, parking and a pond alone: never handed back as the answer; said below, docs/LAYOUT-ENGINE.md item 42)
+  for (const o of options) { if (keep.length >= brief.solver.options) break; const k = sig(o); if (seen.has(k)) continue; if (!ok(o) || wantsAny && empty(o)) continue; if (keep.filter(x => arr(x) === arr(o)).length >= 2 && others(o)) continue; seen.add(k); keep.push(o); }
   keep.forEach((o, i) => { o.rank = i + 1; });
   askTradeNotes(keep, brief);
   const outcome = !keep.length ? 'no-feasible-found' : keep.some(o => o.validation.status === 'pass') ? 'feasible' : keep.some(o => o.validation.feasible) ? 'needs-review' : 'no-feasible-found';
-  return { ...rec, outcome, optimality: 'best found (heuristic search; not proven optimal)', engineMapping: E.mapping, partial, engineError: err?.error || null,
+  return { ...rec, outcome, optimality: 'best found (heuristic search; not proven optimal)', engineMapping: E.mapping, partial, engineError: err?.error || null, ...(keep.length ? {} : { problems: [nothingFits(brief, options, err)] }),
     solver: { seed: brief.solver.seed, tickMs: brief.solver.tickMs, evaluation: stats, candidates: options.length },
     rankingHash: hashOf(keep.map(o => [o.rank, o.geometryHash])), options: keep };
+}
+
+// no layout to hand back: said in plain words, never an empty answer with nothing said (docs/LAYOUT-ENGINE.md item 42).
+// The land inside the setbacks and its least width (across the narrowest way of its hull), less the keep-outs, and what
+// the arrangements tried came to.
+export function nothingFits(brief, options = [], err = null) {
+  const ring = brief.site.ring, sb = { ...S.SETBACKS, ...(brief.rules?.values?.setbacks?.v || brief.site.setbacks || {}) };
+  let inner; try { inner = S.insetRing(ring, ring.map(() => Math.min(+sb.side || 0, +sb.front || 0, +sb.rear || 0))); } catch { inner = null; } if (!(inner?.length >= 3)) inner = ring;
+  const land = Math.max(0, S.ringArea(inner) - (brief.site.exclusions || []).reduce((t, x) => t + S.ringArea(x.ring), 0));
+  const hull = (pts => { const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+    for (const p of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); } for (const p of P.slice().reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); } return lo.slice(0, -1).concat(up.slice(0, -1)); })(inner);
+  let narrow = Infinity; hull.forEach((a, i) => { const b = hull[(i + 1) % hull.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (!(L > 0)) return; narrow = Math.min(narrow, Math.max(...hull.map(p => Math.abs((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) / L))); });
+  const what = brief.program.uses.filter(u => u.use !== 'amenity').map(u => (CAPS[u.form]?.label || u.use).toLowerCase()).join(' and ') || 'the program';
+  const tried = options.length ? options.length + ' arrangement' + (options.length > 1 ? 's' : '') + ' tried left no room for a building with its parking, drives and stormwater' : 'none of the arrangements tried fit a building with its parking, drives and stormwater';
+  return { path: 'site', msg: 'No layout found for ' + what + ' on this site: the land inside the setbacks is ' + (land / 43560).toFixed(2) + ' ac' + (Number.isFinite(narrow) ? ', about ' + Math.round(narrow) + ' ft across at its narrowest' : '') + ((brief.site.exclusions || []).length ? ' (less the land kept out)' : '') + ', and ' + tried + '. A bigger or wider site, fewer homes or less floor area, structured parking or another building type would fit.' + (err ? ' (A layout generator stopped: ' + String(err.error || err).slice(0, 160) + '.)' : '') };
 }
 
 // "Fits about N of the M units asked for" said against what the request asked (item 39): the engine is asked for a

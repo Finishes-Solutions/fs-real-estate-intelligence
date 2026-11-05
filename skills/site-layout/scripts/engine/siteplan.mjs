@@ -1646,14 +1646,14 @@ export function outline(e) {
 // estimates (missing-middle triplexes and fourplexes run about 50-70 ft wide, 2 to 2.5 stories), not reviewed buildings.
 export const PLEX = { 3: { units: 3, w: 66, d: 44, floors: 2 }, 4: { units: 4, w: 64, d: 56, floors: 2 } };
 export const PODIUM = { towerShare: REF_PODIUM?.towerShare ?? 0.6, wall: 4, stallW: 9, stallD: 18, aisle: 24, ramp: 12, core: 3, lobby: 9, col: 3, depth: 128 };
-const FACES = ['-v', '+v', '-u', '+u'];
-// the garage of a podium w x d ft (or a building: its w, d, lobbyFace '-v'|'+v', garageFace '-u'|'+u'|'+v'|'-v'), in the
+const FACES = ['-v', '+v', '-u', '+u', '-v-', '+v-']; // ('+v-' / '-v-': an entrance on that long face at its -u end, the ramp at that end: docs/LAYOUT-ENGINE.md item 42)
+// the garage of a podium w x d ft (or a building: its w, d, lobbyFace '-v'|'+v', garageFace '-u'|'+u'|'+v'|'-v'|'+v-'|'-v-'), in the
 // building's own frame (u along w, v along d): { rows: [{ v0, v1, back, slots: [{ u0, u1, use, ground }] }], aisles,
 // cross, ramp, cores, lobby, cols, entry: { face, at, out }, typical, ground } (typical / ground: spaces on a parking
 // level above the ground and on the ground level)
 export function garagePlan(e) {
   const P = PODIUM, w = +e.w, d = +e.d, L = w - 2 * P.wall, D = d - 2 * P.wall, lobbyFace = e.lobbyFace === '+v' ? '+v' : '-v', sv = lobbyFace === '+v' ? -1 : 1; // (planned with the lobby at -v, then mirrored)
-  const gf0 = FACES.includes(e.garageFace) && e.garageFace !== lobbyFace ? e.garageFace : '+u', gfP = gf0[1] === 'v' ? '+v' : gf0; // (in the planning frame the back face is +v)
+  const gf0 = FACES.includes(e.garageFace) && e.garageFace.slice(0, 2) !== lobbyFace ? e.garageFace : '+u', gfP = gf0[1] === 'v' ? '+v' : gf0, atEnd = gf0.length === 3 ? -1 : 1; // (in the planning frame the back face is +v; atEnd: the end of a long face the entrance is at)
   const u0 = -L / 2, u1 = L / 2, vlo = -D / 2, mod = 2 * P.stallD + P.aisle, m = Math.max(0, Math.floor(D / mod)), extra = D - m * mod >= P.stallD + P.aisle;
   const n = Math.max(0, Math.floor((L - 2 * P.aisle) / P.stallW)), ua = u0 + P.aisle + ((L - 2 * P.aisle) - n * P.stallW) / 2;
   const rows = [], aisles = [];
@@ -1662,7 +1662,7 @@ export function garagePlan(e) {
   for (const r of rows) r.slots = Array.from({ length: n }, (_, k) => ({ u0: ua + k * P.stallW, u1: ua + (k + 1) * P.stallW, use: null }));
   // the ramp: 12 slots from the back row at the entrance's end (+u for an entrance on the back face)
   const one = (+e.parkLevels === 1 || +e.levels === 1) && REF_PODIUM?.singleLevelRamp === false; // (one parking level: entered at grade, no ramp; P25)
-  const rampEnd = gfP === '-u' ? -1 : 1; let need = one ? 0 : P.ramp;
+  const rampEnd = gfP === '-u' ? -1 : gfP === '+v' ? atEnd : 1; let need = one ? 0 : P.ramp;
   for (const r of rows.slice().reverse()) { const idx = r.slots.map((_, k) => rampEnd > 0 ? n - 1 - k : k); for (const k of idx) { if (need <= 0) break; if (!r.slots[k].use) { r.slots[k].use = 'ramp'; need--; } } if (need <= 0) break; }
   // two cores under the tower: one in the street-side row, one in the back row, a quarter of the length from the middle
   const place = (r, uc, k0 = P.core) => { if (!r || n < k0) return null; const s = Math.max(0, Math.min(n - k0, Math.round((uc - ua) / P.stallW - k0 / 2)));
@@ -1678,7 +1678,7 @@ export function garagePlan(e) {
   const cols = []; for (const r of rows) for (let k = 0; k <= n; k += P.col) cols.push([ua + k * P.stallW, r.back]); // (columns at the back of each row, every 3 stalls)
   const ramp = (() => { const q = rows.flatMap(r => r.slots.filter(x => x.use === 'ramp').map(x => [x.u0, r.v0, x.u1, r.v1])); return q.length ? { u0: Math.min(...q.map(a => a[0])), v0: Math.min(...q.map(a => a[1])), u1: Math.max(...q.map(a => a[2])), v1: Math.max(...q.map(a => a[3])) } : null; })();
   const a0 = aisles[0] ? (aisles[0].v0 + aisles[0].v1) / 2 : 0;
-  const entry = gfP === '+u' ? { at: [w / 2, a0], out: [1, 0] } : gfP === '-u' ? { at: [-w / 2, a0], out: [-1, 0] } : { at: [u1 - P.aisle / 2, d / 2], out: [0, 1] };
+  const entry = gfP === '+u' ? { at: [w / 2, a0], out: [1, 0] } : gfP === '-u' ? { at: [-w / 2, a0], out: [-1, 0] } : { at: [atEnd > 0 ? u1 - P.aisle / 2 : u0 + P.aisle / 2, d / 2], out: [0, 1] };
   const cross = [{ u0, u1: u0 + P.aisle, v0: vlo, v1: -vlo }, { u0: u1 - P.aisle, u1, v0: vlo, v1: -vlo }];
   const mv = v => v * sv, mr = r => r && ({ ...r, v0: Math.min(mv(r.v0), mv(r.v1)), v1: Math.max(mv(r.v0), mv(r.v1)) }); // (mirrored when the lobby faces +v)
   return { rows: rows.map(r => ({ ...mr(r), back: mv(r.back), slots: r.slots })), aisles: aisles.map(mr), cross: cross.map(mr), ramp: mr(ramp), cores: cores.map(mr), lobby: mr(lobby), cols: cols.map(([u, v]) => [u, mv(v)]),
@@ -2323,7 +2323,7 @@ function applyTownhomeLots(p, text) {
 export const STUDIO_MIX = [{ name: 'Studio', sf: 520, pct: 65, beds: 0 }, { name: '1 BR', sf: 700, pct: 35, beds: 1 }];
 function applyStudios(p, text) {
   const t = String(text || '').toLowerCase(); if (!/\bstudios\b|\bstudio[- ](?:apartments?|units?|buildings?|flats?)\b/.test(t) || !p || /\b(?:yoga|dance|recording|art|fitness|photo|tattoo)\s+studios?\b/.test(t)) return p; // studio homes, not a yoga or recording studio
-  const other = /\b(?:garden|walk-?up|mid-?rise|apartments?)\b/.test(t.replace(/\bstudio[- ](?:apartments?|units?|buildings?)(?:[- ]buildings?)?/g, ''));
+  const other = /\b(?:garden|walk-?up|mid-?rise)[- ](?:style[- ])?(?:apartments?|units?|homes|flats)\b|\bapartments?\b|\b(?:walk-?up|mid-?rise)s?\b(?![- ](?:buildings?|bars?|style))/.test(t.replace(/\bstudio[- ](?:apartments?|units?|buildings?)(?:[- ]buildings?)?/g, ''));
   const studio = { use: 'multifamily', name: 'Studio apartment buildings', mix: STUDIO_MIX };
   if (p.zones?.length) { const i = p.zones.findIndex(z => z.use === 'multifamily'); if (i < 0) return { ...p, zones: [...p.zones, studio] }; if (!other) return { ...p, zones: p.zones.map((z, k) => k === i ? { ...z, ...studio } : z) };
     const zs = p.zones.slice(); zs[i] = { ...zs[i], name: zs[i].name || (/\bgarden\b/.test(t) ? 'Garden apartments' : 'Apartments') }; zs.splice(i + 1, 0, studio); return { ...p, zones: zs }; }

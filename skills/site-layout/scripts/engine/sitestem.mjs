@@ -51,8 +51,8 @@ export function stemOf(plan) {
 }
 
 // the straight entry drive up the strip, from the street line to 2 ft into the body (it meets the body's entry drive)
-export function stemDrive(st, name = 'Main entry', street = '') {
-  const { c0, c1, w } = st, dv = [c1[0] - c0[0], c1[1] - c0[1]], L = Math.hypot(...dv), d = [dv[0] / L, dv[1] / L], nn = [-d[1], d[0]], e = [c1[0] + d[0] * 2, c1[1] + d[1] * 2];
+export function stemDrive(st, name = 'Main entry', street = '', reach = 2) {
+  const { c0, c1, w } = st, dv = [c1[0] - c0[0], c1[1] - c0[1]], L = Math.hypot(...dv), d = [dv[0] / L, dv[1] / L], nn = [-d[1], d[0]], e = [c1[0] + d[0] * reach, c1[1] + d[1] * reach];
   const poly = [[c0[0] - nn[0] * w / 2, c0[1] - nn[1] * w / 2], [c0[0] + nn[0] * w / 2, c0[1] + nn[1] * w / 2], [e[0] + nn[0] * w / 2, e[1] + nn[1] * w / 2], [e[0] - nn[0] * w / 2, e[1] - nn[1] * w / 2]].map(st.toXY);
   return { kind: 'drive', poly: ccw(poly), name, note: Math.round(w) + ' ft entry drive up the ' + st.wStem + ' ft strip' + (street ? ' from ' + street : ''), entry: true, stem: true, id: 'stem' + CX.rand().toString(36).slice(2, 7) };
 }
@@ -67,11 +67,33 @@ export function stemOptions(plan, programIn, opts, layout) {
   const body = { ...plan, ring: st.body, front: st.front, streets: [], setbacks: { ...(plan.setbacks || {}), edges: st.edges }, streetNames: { [st.front]: street } };
   const out = layout(body, programIn, { ...opts, noStem: true, stemEntry: { at: st.mouth, w: st.w } });
   const L = Math.round(st.len), say = 'The site reaches ' + street + ' only by its ' + st.wStem + ' ft strip, so the main entry is a ' + Math.round(st.w) + ' ft drive ' + L + ' ft up the strip to the rest of the site; with one way in, fire access for a larger project needs the fire marshal’s sign-off (an emergency-only gate to a neighbouring road, or a turnaround).';
+  // the body's entry flares out (its curb returns) where it meets the body's front, and an entry runs a foot past its
+  // street line: on the whole site that front is the strip's mouth, its shoulders the neighbours' lot lines. Where the
+  // body's entry reaches within 2 ft of the site's own lot lines it is cut back 3 ft inside the mouth and the strip's
+  // drive runs on 5 ft to meet it (docs/LAYOUT-ENGINE.md item 42: a flag lot's entry left past the lot line and read as a
+  // second way in across a neighbour)
+  const big = 1e5, past = (e, d = 2) => S.shapeOf(e).some(p => !S.inRing(p, plan.ring) || plan.ring.some((r0, i) => S.segDist(p, r0, plan.ring[(i + 1) % plan.ring.length]) <= d));
+  const cutBack = e => { const keep = clip(S.shapeOf(e), [st.toXY([-big, st.len + 3]), st.toXY([big, st.len + 3]), st.toXY([big, big]), st.toXY([-big, big])]).sort((p, q) => S.ringArea(q) - S.ringArea(p))[0];
+    return keep ? { ...e, poly: keep.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) } : e; };
   return out.map(o => {
     if (!o?.elements?.length) return o;
-    const drive = stemDrive(st, 'Main entry', street), hit = e => S.rectsOverlap(e, drive, 0);
-    const els = o.elements.filter(e => !(e.kind === 'sign' || e.kind === 'green' && e.median && hit(e)) && !(['lot', 'building', 'parking', 'pond', 'plaza', 'garage', 'trash'].includes(e.kind) && hit(e)))
-      .map(e => e.kind === 'drive' && (e.entry || e.name === 'Main entry') ? { ...e, entry: false, name: 'Entry drive', blvd: undefined } : e);
+    const ent = e => e.kind === 'drive' && (e.entry || e.name === 'Main entry'), pastEnt = o.elements.filter(e => ent(e) && past(e)), ov = (a, b) => { try { return S.rectsOverlap(a, b, 0); } catch { return false; } };
+    let drive = stemDrive(st, 'Main entry', street, pastEnt.length ? 5 : 2);
+    const cut = new Map(pastEnt.map(e => [e, cutBack(e)])), meets = pastEnt.filter(e => ov(cut.get(e), drive)), gone = new Set(meets); // (cut back and joined to the strip's drive: one entry from the street to the body)
+    if (meets.length) { let u = [close(ccw(S.shapeOf(drive)))]; try { for (const e of meets) u = polyclip.union([u], [close(ccw(S.shapeOf(cut.get(e))))])[0] || u; } catch { /* (kept as the strip's drive alone) */ }
+      const r = ccw(S.tidyRing(u[0].slice(0, -1), 0.3)); if (r.length >= 4 && S.ringArea(r) > S.ringArea(S.shapeOf(drive))) drive = { ...drive, poly: r.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) }; }
+    else if (pastEnt.length) { // the body's entry laid out away from the mouth: the strip's drive runs on into the body to the first drive it meets (over open ground only), and that entry goes
+      const drives = o.elements.filter(e => e.kind === 'drive' && !pastEnt.includes(e)), solid = o.elements.filter(e => ['building', 'parking', 'pond', 'garage', 'plaza', 'lot', 'trash', 'pool'].includes(e.kind));
+      let got = false; for (let reach = 7; reach <= 160 && !got; reach += 2) { const d2 = stemDrive(st, 'Main entry', street, reach); if (solid.some(e => ov(e, d2))) break; if (drives.some(e => ov(e, d2))) { drive = { ...d2, id: drive.id }; pastEnt.forEach(e => gone.add(e)); got = true; } }
+      // or, blocked, a drive across just inside the mouth from the strip's drive to where that entry was cut back (over open ground), the three one entry
+      if (!got) for (const e of pastEnt) { const c = S.shapeOf(cut.get(e)).map(st.toUV), us = c.filter(q => q[1] <= st.len + 4).map(q => q[0]); if (!us.length) continue;
+        const ua = Math.min(...us, st.c1[0] - st.w / 2), ub = Math.max(...us, st.c1[0] + st.w / 2), band = { kind: 'drive', poly: ccw([[ua, st.len + 3], [ub, st.len + 3], [ub, st.len + 3 + st.w], [ua, st.len + 3 + st.w]].map(st.toXY)) };
+        if (solid.some(x => ov(x, band)) || !S.shapeOf(band).every(p => S.inRing(p, plan.ring))) continue;
+        let u = [close(ccw(S.shapeOf(drive)))]; try { u = polyclip.union([u], [close(S.shapeOf(band))], [close(ccw(S.shapeOf(cut.get(e))))]); } catch { continue; }
+        if (u.length !== 1) continue; const r = ccw(S.tidyRing(u[0][0].slice(0, -1), 0.3)); drive = { ...drive, poly: r.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) }; gone.add(e); break; } }
+    const hit = e => S.rectsOverlap(e, drive, 0);
+    const els = o.elements.filter(e => !gone.has(e) && !(e.kind === 'sign' || e.kind === 'green' && e.median && hit(e) || e.kind === 'tree' && hit(e)) && !(['lot', 'building', 'parking', 'pond', 'plaza', 'garage', 'trash'].includes(e.kind) && hit(e)))
+      .map(e => ent(e) ? { ...(cut.get(e) || e), entry: false, name: 'Entry drive', blvd: undefined } : e);
     return { ...o, elements: [drive, ...els], stem: { w: st.w, len: L }, notes: [say, ...(o.notes || []).filter(t => !/monument sign|boulevard|median/i.test(t))] };
   });
 }
