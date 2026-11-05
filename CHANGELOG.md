@@ -50,6 +50,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Fix:** taking a module off a templated building kept its "estimate" note and the right number of stacked homes.
 - 76 test sites, every one passing with no warnings; request understanding 117 of 120 without the AI; the full test suite passes.
 
+### 5:18 AM CT: Agents round 2: building types, city rules, settings, reports and uploads through the MCP server (5651bdd)
+- **Agents can list and use every building type** (56, with what each counts and where its sizes come from), and add one to a plan by type ("add a hotel with 120 keys at the front").
+- **Agent site plans follow the city's rules** the way the app's Build does (setbacks, parking, detention, fire lanes inside the City of Waller and its ETJ), and say what was applied.
+- **Change a plan's settings and lay it out again** (setbacks, parking ratio, parking angle, entrances), keeping locked pieces.
+- **More in the answers:** each "Asked: … done / not met" line and assumption measured on the current drawing; hotel keys, beds, children and students; parking quality (paving per space, islands, dead ends, walks, entrance drives); queue checks.
+- **Reports agents couldn't get before:** the Summary, Filing list, Activity, Area comparison and Traffic reports (PDF and CSV); agents can also upload a file to a project, read into facts for a person to confirm.
+- 76 of 85 capabilities fully available to agents (was 66 of 79); a second full agent session is in the test suite; the full test suite passes.
+
 ### 4:07 AM CT: The layout now does more of what you ask about where things go (0463866, 6a2e8e7)
 - **Now laid out as asked, not just noted:** the pond at the back, front, a side or by the entrance; parking in front of or behind the buildings; the entrance off a named street; a warehouse at the rear with its truck court facing the way asked. When an ask costs homes, the option says what it gave up (e.g. "parking behind the buildings: 204 homes, against 216 without it").
 - **"Homes around a central lake"** lays out again (it had fallen back to a simple plan).
@@ -87,6 +95,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Shapes from words:** "L-shaped 4-story apartments", "a U building around a pool", "flex buildings 120 ft deep with mezzanine", "a 2-story clinic 12,000 sf, 5 per 1,000 parking".
 - **Anything else is drawn at the size asked:** e.g. "a 2-story trampoline park 30,000 sf" is drawn as a building of that size, and the notes say no type matched and what was assumed.
 - Sizes without a reviewed reference project are marked as estimates. Fixed the Add panel tile that showed "undefined" above Parking field. 65 test sites, every one passing with no warnings; the full test suite passes.
+
+### 12:10 AM CT: Agents can run a site plan from start to finish through the MCP server (30331ee)
+- **Connected AI agents can now do what a person does with a site plan:** look up a property and its site facts and reports, lay out a plan from words, run the independent check, open a plan and see every piece, edit it in words or with exact moves, lock pieces, pick another layout, compare up to six versions, get the numbers (unit mix, parking, coverage, detention, pro forma), export the sheet (PDF, picture, CAD, GeoJSON, BIM script) and save it back to a project as a new option.
+- Every edit keeps the earlier version. Locked pieces never change.
+- A full agent session (address to plan to edit to export) is now part of the test suite. 66 of the app's 79 capabilities are fully available to agents (was 41); the coverage list says what remains.
 
 ## 2026-11-04
 

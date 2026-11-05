@@ -162,5 +162,30 @@ if (localChrome()) {
   r = await call('fetch', { id: 'nonsense' }, {}); assert.ok(r.isError && /project:<project_id>/.test(text(r)));
   r = await call('search', { query: '' }, {}); assert.ok(r.isError); }
 
+// a project's option as a plan (lib/mcp/plans.mjs): open, edit (a new plan), and back into the project as a new option
+{ const ST = await import('../lib/mcp/store.mjs'); ST.hooks.store = ST.memoryStore();
+  let t = ok(await call('plan_from_project', { project_id: sample.id }, {}), 'plan_from_project'); const pid = /Plan id: ([\w-]+)/.exec(t)[1];
+  assert.match(t, new RegExp(sample.name)); assert.match(t, /Numbers: [\d,]+ sf/);
+  t = ok(await call('plan_get', { plan_id: pid }, {}), 'plan_get'); const piece = /^- (\w+) · ([^(]+) \(building/m.exec(t); assert.ok(piece, 'pieces listed');
+  t = ok(await call('plan_edit', { plan_id: pid, edits: [{ action: 'change', target: piece[2].trim(), floors: 4 }] }, {}), 'plan_edit'); const pid2 = /Plan id: ([\w-]+)/.exec(t)[1]; assert.notEqual(pid2, pid);
+  let r = await call('save_plan_to_project', { plan_id: pid2 }, {}); assert.ok(r.isError && /off on this server/.test(text(r)), 'a write: refused without writes');
+  const n0 = docOf(sample.id).plans.length;
+  t = ok(await call('save_plan_to_project', { plan_id: pid2, make_study_option: false, by: 'Matt' }), 'save_plan_to_project'); assert.match(t, /Saved to .* as Option \w+ \(option_id/);
+  const d = docOf(sample.id); assert.equal(d.plans.length, n0 + 1, 'a new option, nothing replaced'); assert.equal(d.plans.at(-1).elements.find(e => e.id === piece[1]).floors, 4); assert.equal(d.plans.at(-1).by, 'Matt (agent)');
+  ST.hooks.store = null; }
+
+// a reference file added to a project (the Files tab): kept in the platform's own site-files bucket, listed on the
+// project, read by the AI (stood in for) into facts to confirm
+{ const files0 = (docOf(sample.id).files || []).length;
+  let r = await call('upload_project_file', { project_id: sample.id, name: 'survey.txt', text: 'Survey' }, {}); assert.ok(r.isError && /off on this server/.test(text(r)), 'a write: refused without writes');
+  r = await call('upload_project_file', { project_id: sample.id, name: 'survey.exe', text: 'x' }); assert.ok(r.isError && /\.pdf/.test(text(r)), 'a file type the Files tab takes');
+  PR.hooks.readFile = async (buf, name) => { assert.equal(buf.toString(), 'BOUNDARY SURVEY 9.39 AC. 25 FT PIPELINE EASEMENT ALONG THE NORTH LINE.'); return { read: { kind: 'survey', title: name, readable: true, summary: 'A boundary survey.' }, facts: [{ id: 'f1', category: 'easement', label: 'Pipeline easement', text: '25 ft pipeline easement along the north line', widthFt: 25, side: 'north', confidence: 'sure', source: 'note 3', status: 'new' }] }; };
+  const t = ok(await call('upload_project_file', { project_id: sample.id, name: 'Boundary survey.txt', text: 'BOUNDARY SURVEY 9.39 AC. 25 FT PIPELINE EASEMENT ALONG THE NORTH LINE.', by: 'Matt' }), 'upload_project_file');
+  assert.match(t, /Added Boundary survey\.txt/); assert.match(t, /Pipeline easement/); assert.match(t, /confirms them on the project’s Files tab/);
+  const fl = docOf(sample.id).files; assert.equal(fl.length, files0 + 1); const f = fl.at(-1);
+  assert.match(f.path, new RegExp('^projects/' + sample.id + '/[a-z0-9]{6,24}__Boundary-survey\\.txt$')); assert.equal(f.facts[0].status, 'new'); assert.equal(f.by, 'Matt (agent)');
+  assert.ok(db.objects.has('site-files/' + f.path), 'stored in the platform’s own site-files bucket');
+  PR.hooks.readFile = null; }
+
 assert.ok(outbound.every(u => /tigerweb\.geo\.census\.gov/.test(u)), 'the only outbound requests were the (refused) road lines: ' + outbound.join(', '));
 console.log('mcp projects passed');
