@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 2:34 AM CT: Parking round 2: planted row ends, clear entrances, shorter walks, the city's parking rule governs (bc954ae, e69e956, f54a183, 451988e, f980f71)
+- **Planted islands at row ends without losing spaces:** where there is free land at a row's end, the row grows into it and both ends are planted. Bare row ends on the test sites went from 417 to 189.
+- **Clear entrance drives:** spaces no longer sit where cars would back out into an entrance drive near the street (50 ft for small lots, 75 ft up to 499 spaces, 100 ft above; a planning yardstick from access-management guidance). Spaces inside entrance drives on the test sites went from 60 to 12.
+- **Shorter walks:** new rows go along drives near the buildings, and the farthest spaces come off instead.
+- **The city's parking rule governs:** when a city's rules apply (for example Waller's 2 per home plus its 5% reserve), the layout plans that many spaces and the check fails anything short.
+- **Fixes:** the space count on rows of 13, 26… spaces with end islands now matches the drawing; one consistent rule for when an aisle end is a dead end; a drive-thru window stays within reach of its lane.
+- All 65 test sites pass with no warnings; the full test suite passes.
+
 ### 1:30 AM CT: Site plan requests understood much better: vague, detailed, messy and spatial (733a3fb, 2275981, c1fe607)
 - **Where things go:** "retail along the main road with apartments behind", "pool in the center", "keep the west side open", "buffer the neighbors", "dog park in the corner", "townhomes at the back" are laid out that way. Any placement the layout can't make yet (the pond, parking in front or behind, the clubhouse) is listed in the notes as not met, never dropped silently; every option says "Asked: … done / not met".
 - **Vague requests** ("max density", "something that pencils") pick a use suited to the land and list what was assumed at the top of the notes.
