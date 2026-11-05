@@ -1033,3 +1033,46 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    Still: a guarded single-use field asked for angled parking keeps square stalls on its 26 ft fire-lane aisles (only
    the mixed pass uses restripeAngled's opts.wide); the 4 ft-only 13 ac layouts stop at about 89% of the program (an
    underground vault for part of the volume, vaultWhereNoPond, isn't tried as a way to fit more of it).
+
+35. Done Nov 5 (building types, round 3: the site features each type needs). The owner: "flexible building-type
+   primitives that get modified into many more building types, keeping the coloured 3D blocks". Round 2's leftovers (item
+   29), most valuable first; docs/BUILDING-TYPES.md section 7. New lib/btlanes.mjs: a lane along one face of the type's
+   building (its curb), doubling back in rows outward (a serpentine, a car's U-turn each turn) when the queue is longer
+   than the face, its two open ends routed over the open ground to the nearest drive on a 4 ft grid in the building's
+   frame (turns cost 40 ft; the last stretch straight for the lane's turning radius; landscape, walks and land held for
+   later only, never a building or its corners, parking, a pond, a play piece, another lane or the side / rear paving
+   buffer; a bus loop and a porte-cochère may take a driveway of their own to the street, 60 ft from another); every face,
+   direction and row count tried, the engine's own check (lib/siteplan.mjs check) the last word; no room, said in the
+   notes. lib/btsite.mjs typeFeatures (after round 2's car wash / yard, the same array when no type needs anything):
+   (1) a school's parent drop-off / pick-up queue (12 ft, or two lanes side by side merging at the curb when one can't
+   hold it) and its own bus loop (24 ft), on different faces, apart, tried in both orders; the queue 10% of an elementary
+   school's students in cars (charter-school pick-up studies; South Carolina DOT recommends about 900-1,500 ft of stacking
+   for an elementary school), 8% middle, 5% high, 25 ft a car (FHWA); half the students on buses (a third at a high
+   school), 60 a bus, the loop holding every bus, 45 ft a bus (estimates); a play yard or field the layout left on the
+   detention pond moved to open ground beside the school after the lanes. (2) A daycare's drop-off lane (a car a 25
+   children, at least 4, estimate) and its play yard fenced. (3) A hotel's porte-cochère: a 24 ft drive-through lane under
+   a 60 ft canopy at the entrance (3 cars, estimate; the canopy a flat plaza piece). (4) A gas station's pump lanes: one
+   each side of each island row through the canopy, the cars waiting in the drive lanes past its ends (at least one an
+   accessible island side: Huron and Seven Hills, OH; Durham, NC asks two a fueling position). (5) A bank zone's
+   drive-thru lane (5 cars, round 2's rule); a daycare or school zone's play yard / field laid beside its building; each
+   `btZones` entry carries its type's parking rule (`rule`, as a single type's `btRule`: a bank zone 4 a 1,000 sf) for
+   the parking helper's per-use rule to read; the engine and the check still park a zone at its use's rule. (6) A hotel
+   over the shops asked: "over 8,000 sf of retail" makes the shops 8,000 sf (`ground.sf`, read by lib/siteplan.mjs
+   groundOf and the check's quantities), the rest of the ground floor the lobby, the keys those of the floors above.
+   (7) The Pro forma section's area table lists beds, children, students and storage units. Checks (lib/layoutcheck.mjs
+   10c / 10d, soft): `queues.stack` measures each kind's queue on the drawing against lib/btsite.mjs queueWant (a school's
+   queue and bus loop and a bank zone's lane fail when missing; a porte-cochère, daycare lane and pump lanes are judged
+   where drawn), `queues.apart` keeps the bus loop off the parents' lane, `queues.clear` covers the new lanes (a pump
+   lane against the parking and the street only), `site.grounds-dry` keeps a type's play pieces off the ponds. rankKey
+   puts a layout holding more of its type's queues first and leaves the type's lanes out of its paving comparison. The 3D
+   map keeps its plain coloured blocks (the lanes are flat paving; the plan marks PICK-UP, BUS LOADING, DROP-OFF,
+   ENTRANCE). Bench: 80 cases, 80 passing, no warnings, replay identical; 72 earlier cases identical element for element;
+   TY-school (queue, bus loop, the field moved off the pond), TY-daycare (its play yard fenced; no room for the lane on 2.3
+   ac, said), TY-mix-pads (the bank's drive-thru, the daycare zone's fenced play yard) and TY-hotel-retail (the same
+   layout with a porte-cochère) changed as intended (engine version rei-layout/2026.11.05.6); new TY-daycare-dropoff, TY-hotel-porte, TY-hotel-retail-sf,
+   TY-gas-queue. Corpus (words path, 120): 119 / 120 fully right, as before. Holdouts unchanged (P18 fill 77, P35 fill-ug
+   320, P36 fill 128, E054 podium-urban 172). Tests: test/btypes.mjs section 7 (realistic runs: each feature drawn, over
+   open ground only, the queue numbers, the check catching a parking row across the queue and a missing bus loop, a tight
+   lot said and nothing broken, existing requests untouched). Still: the engine does not reserve room for the lanes (on
+   tight lots the porte-cochère and daycare lane are left off, said); zone parking by type waits on the parking helper; a
+   school or daycare named beside homes is not read as a zone yet.
