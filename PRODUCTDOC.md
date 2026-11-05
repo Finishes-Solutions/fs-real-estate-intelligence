@@ -1155,6 +1155,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Building up front, parking behind (Nov 5):** ask for "retail on the street with parking in the rear" and the building is set at the street with the parking behind it; entrance drives are kept clear further in from the street.
 - **More building detail (Nov 5):** car washes with stacking lanes, drive-thru queues that are checked, T-shaped buildings, point towers, triplexes and fourplexes, parking garages, hotels over retail; mixed requests give each part its own type; add a building by type from a searchable list in the editor; hotel keys, beds, children and students in the numbers.
 - **Parking lots that work better (Nov 5):** planted islands at row ends, no spaces backing into entrance drives, parking closer to the doors, and when a city's rules apply its parking requirement is the one the plan meets.
 - **Say where things go (Nov 5):** requests like "retail along the road with apartments behind", "pool in the center" or "keep the west side open" are laid out that way; anything that can't be placed yet is listed in the notes, and vague or loosely worded requests are filled in sensibly with the assumptions listed first.

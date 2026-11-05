@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 5:38 AM CT: Parking round 3: the building at the street with parking behind, entry drives set back (d09e938, 61b474d, 71268bb, 201e69e)
+- **"Retail on the street, parking in the rear" / "medical office at the front with parking behind it"** now lays the building at the front setback facing the street, with the drive along its side to the lot behind and no parking or pond between the building and the street. Any space between a building and the street now counts as a miss for that ask.
+- **Entry drives set back:** the first cross-aisle sits 50–100 ft in from the street where it costs no homes, with planted edges at the entrance (23 of 74 test sites still have a short entry, was 31). Some small lots use less paving per space.
+- **Fix:** taking a module off a templated building kept its "estimate" note and the right number of stacked homes.
+- 76 test sites, every one passing with no warnings; request understanding 117 of 120 without the AI; the full test suite passes.
+
 ### 4:07 AM CT: The layout now does more of what you ask about where things go (0463866, 6a2e8e7)
 - **Now laid out as asked, not just noted:** the pond at the back, front, a side or by the entrance; parking in front of or behind the buildings; the entrance off a named street; a warehouse at the rear with its truck court facing the way asked. When an ask costs homes, the option says what it gave up (e.g. "parking behind the buildings: 204 homes, against 216 without it").
 - **"Homes around a central lake"** lays out again (it had fallen back to a simple plan).
