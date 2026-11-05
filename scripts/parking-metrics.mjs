@@ -3,7 +3,8 @@
 // plans.json is what scripts/layout-bench-v2.mjs writes: each case's site and its top option. parkingMetrics(plan) is
 // exported for other scripts. Per plan:
 //   stalls          surface stalls drawn (stall marks: lib/siteplan.mjs stallCentres), garages and driveways not counted
-//   sfStall         lot paving per stall: stall rows + drive paving within 26 ft of a row + field paving, ÷ stalls
+//   sfStall         lot paving per stall: stall rows (planted end caps and islands left out) + drive paving within 26 ft
+//                   of a row + field paving, ÷ stalls
 //                   (a surface lot is usually 300-350 sf a stall on 9 x 18 ft stalls and 24 ft aisles)
 //   surplus         paving under no stall row and no drive (field paving left over at row and aisle ends), sf and share
 //   maxRun / long   the longest run of stalls side by side with no planted island (rows meeting end to end are one run),
@@ -14,6 +15,11 @@
 //                   many have stalls more than 150 ft past the last join, an end clear of stalls not taken as a way out
 //   walk            stall centre to the nearest wall of the nearest building (the clubhouse left out), ft: median, 90th percentile, max (a
 //                   building's door is somewhere on its walls, so this is the least walk; real walks are longer)
+//   walkBld90       walk per building: each building's share of the stalls (by floor area: footprint x floors), the
+//                   nearest that many; the worst building's 90th percentile, and how many buildings pass 200 ft (walkBld200)
+//   throat          the shortest entrance throat: ft in from the street before a stall backs into the entry drive
+//                   (throatX: before a drive crosses it; lib/layoutrun.mjs entryThroats), against throatNeed (50 / 75 / 100 ft for a lot
+//                   of under 200 / under 500 / 500 or more stalls), and entryStalls: stalls inside that length
 //   ada             accessible stalls placed (lib/siteplan.mjs accessible) against 2010 ADA 208.2 for the stalls drawn,
 //                   and how much farther from a building they are, on average, than the same number of nearest stalls
 //   tiny            stall rows of 1-4 stalls (parallel guest stalls and RV stalls left out)
@@ -21,7 +27,7 @@
 //   orphan          stall rows with no drive or field paving along either long side
 import fs from 'node:fs';
 import * as S from '../lib/siteplan.mjs';
-import { longDeadAisles } from '../lib/layoutrun.mjs';
+import { longDeadAisles, entryThroats, throatNeed } from '../lib/layoutrun.mjs';
 
 const RAD = Math.PI / 180;
 const pct = (a, p) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1) + 0.5))]; };
@@ -46,6 +52,11 @@ export function parkingMetrics(plan) {
   const paint = (poly, bit) => { const [a, b, c, d] = bbox(poly); for (let j = Math.max(0, Math.floor((b - Y0) / C)); j <= Math.min(ny - 1, Math.ceil((d - Y0) / C)); j++) for (let i = Math.max(0, Math.floor((a - X0) / C)); i <= Math.min(nx - 1, Math.ceil((c - X0) / C)); i++) { const p = [X0 + (i + 0.5) * C, Y0 + (j + 0.5) * C]; if (S.inRing(p, poly)) grid[j * nx + i] |= bit; } };
   const drives = els.filter(e => e.kind === 'drive' && !e.future), fields = els.filter(e => e.kind === 'field');
   for (const e of rows) paint(S.outline(e), 1);
+  // planted end caps and islands are landscape, not paving (cleared from the rows' cells)
+  const unpaint = poly => { const [a, b, c, d] = bbox(poly); for (let j = Math.max(0, Math.floor((b - Y0) / C)); j <= Math.min(ny - 1, Math.ceil((d - Y0) / C)); j++) for (let i = Math.max(0, Math.floor((a - X0) / C)); i <= Math.min(nx - 1, Math.ceil((c - X0) / C)); i++) { const p = [X0 + (i + 0.5) * C, Y0 + (j + 0.5) * C]; if (S.inRing(p, poly)) grid[j * nx + i] &= ~1; } };
+  for (const e of rows) { if (e.parallel) continue; for (const c of S.capsOf(e)) if (c.poly?.length >= 3) unpaint(c.poly);
+    const ax = axisOf(e), u = [Math.cos(ax.deg * RAD), Math.sin(ax.deg * RAD)], v = [-u[1], u[0]], hw = ax.pitch / 2, hd = ax.depth / 2;
+    for (const q of S.islandsOf(e)) unpaint([[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([a, b]) => [q[0] + u[0] * a + v[0] * b, q[1] + u[1] * a + v[1] * b])); }
   for (const e of drives) paint(S.outline(e), 2);
   for (const e of fields) paint(S.outline(e), 4);
   // drive cells within 26 ft of a row: the lot's aisles
@@ -86,6 +97,16 @@ export function parkingMetrics(plan) {
     const best = d.slice().sort((x, y) => x - y).slice(0, ad.length), mean = a => a.reduce((t, x) => t + x, 0) / Math.max(1, a.length);
     Object.assign(out, { adaPlaced: ac.stalls.length, adaNeed: need, adaExtra: ad.length ? Math.round(mean(ad) - mean(best)) : null });
   }
+  // walk per building: each building's share of the stalls (by its floor area: footprint x floors), its nearest that many
+  // (stalls may be counted for two neighbours: a bound, not an assignment); the worst building's 90th percentile walk
+  // and how many buildings have one past 200 ft
+  if (blds.length) { const Bs = (served.length ? served : B0), wt = Bs.map(e => S.ringArea(S.outline(e)) * (+e.floors || 1)), tw = wt.reduce((t, x) => t + x, 0) || 1;
+    const p90s = blds.map((o, j) => { const k = Math.max(1, Math.round(n * wt[j] / tw)), ds = all.map(p => distTo(p, o)).sort((a, b) => a - b); return ds[Math.min(ds.length - 1, Math.ceil(0.9 * k) - 1)]; });
+    Object.assign(out, { walkBld90: Math.round(Math.max(...p90s)), walkBld200: p90s.filter(x => x > 200).length }); }
+  // entrances: the throat (ft in from the street before a stall backs into the entry drive or a drive crosses it), against
+  // the length asked for the lot's size (lib/layoutrun.mjs throatNeed), and the stalls inside that length
+  { const need = throatNeed(n); let th = []; try { th = entryThroats(plan, els, need); } catch { th = []; }
+    Object.assign(out, { throatNeed: need, throat: th.length ? Math.min(...th.map(t => t.first)) : null, throatX: th.length ? Math.min(...th.map(t => t.cross)) : null, entryStalls: th.reduce((t, x) => t + x.stalls.length, 0) }); }
   // stray rows: tiny, skewed, orphaned
   const tiny = rows.filter(e => !e.parallel && cen.get(e).length > 0 && cen.get(e).length <= 4).length;
   const wt = new Map(); for (const e of ninety) { const k = Math.round(axisOf(e).deg % 90); wt.set(k, (wt.get(k) || 0) + cen.get(e).length); }
@@ -98,7 +119,7 @@ export function parkingMetrics(plan) {
   return out;
 }
 
-const COLS = [['stalls', 'Stalls'], ['sfStall', 'sf/stall'], ['surplusPct', 'Surplus %'], ['maxRun', 'Max run'], ['long', 'Runs >15'], ['bareEnds', 'Bare ends'], ['deadEnds', 'Dead ends'], ['deadEnd150', 'DE >150'], ['deadEndMax', 'DE max ft'], ['walkMed', 'Walk med'], ['walk90', 'Walk p90'], ['walkMax', 'Walk max'], ['adaPlaced', 'ADA'], ['adaNeed', 'ADA req'], ['adaExtra', 'ADA +ft'], ['tiny', 'Tiny rows'], ['skew', 'Skew rows'], ['orphan', 'Orphan rows']];
+const COLS = [['stalls', 'Stalls'], ['sfStall', 'sf/stall'], ['surplusPct', 'Surplus %'], ['maxRun', 'Max run'], ['long', 'Runs >15'], ['bareEnds', 'Bare ends'], ['deadEnds', 'Dead ends'], ['deadEnd150', 'DE >150'], ['deadEndMax', 'DE max ft'], ['walkMed', 'Walk med'], ['walk90', 'Walk p90'], ['walkMax', 'Walk max'], ['walkBld90', 'Bldg p90'], ['walkBld200', 'Bldgs p90>200'], ['throat', 'Throat ft'], ['throatX', 'Throat x-drive'], ['throatNeed', 'Throat req'], ['entryStalls', 'Entry stalls'], ['adaPlaced', 'ADA'], ['adaNeed', 'ADA req'], ['adaExtra', 'ADA +ft'], ['tiny', 'Tiny rows'], ['skew', 'Skew rows'], ['orphan', 'Orphan rows']];
 export function metricsTable(res) {
   const head = '| Case | ' + COLS.map(c => c[1]).join(' | ') + ' |', sep = '|---|' + COLS.map(() => '---:').join('|') + '|';
   return [head, sep, ...res.map(r => '| ' + r.id + ' | ' + COLS.map(([k]) => r.m[k] ?? '—').join(' | ') + ' |')].join('\n');
