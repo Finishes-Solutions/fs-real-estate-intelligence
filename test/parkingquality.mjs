@@ -178,6 +178,18 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   const ent = top.elements.filter(e => S.isEntrance(e)); assert.ok(ent.length && ent.every(e => !bs.some(b => S.rectsOverlap({ poly: S.shapeOf(e) }, { poly: S.shapeOf(b) }, 0))), 'the way in beside the building');
   const plain = run(E.opts); assert.ok(!plain.some(o => /^Building at the street/.test(o.name)), 'not offered unasked where it is not better');
 }
+// end to end, the words: the run lays the building at the street and every stall behind its street face (the check
+// counts a stall between a building and the street as a miss)
+{
+  const I = await import('../lib/layoutintent.mjs');
+  for (const [w, h, ask] of [[520, 360, 'retail on the street, parking in the rear, 15,000 sf'], [600, 400, '20,000 sf medical office at the front with parking behind it']]) {
+    const plan = { ...lot(w, h), elements: [] }, rec = RUN.runBrief(B.briefFromRequest(ask, plan)), o = rec.options[0];
+    assert.equal(o.validation.status, 'pass', ask); assert.match(o.name, /^Building at the street, parking behind/, ask);
+    assert.ok(o.placements.length && o.placements.every(c => c.status === 'pass'), ask + ': ' + o.placements.map(c => c.said).join(' '));
+    const conv = RUN.runBrief(B.briefFromRequest(ask.replace(/,? ?parking (in the rear|behind it)/, '').replace(/ on the street| at the front/, ''), plan)).options[0]; // (the same program, no place said: the usual field in front)
+    assert.equal(I.checkPlacement(plan, conv.elements, conv.program, { id: 'x', subject: 'parking', rel: 'behind', target: 'buildings' }).status, 'fail', 'a field in front of the building is not parking behind it');
+  }
+}
 // the entry's throat: the generator's rows set the first drive across the way in back to the stacking length, and a
 // parking field's paving stops beside the entry drive (the first aisle is the first drive across)
 {

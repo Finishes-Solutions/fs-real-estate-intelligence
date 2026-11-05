@@ -122,7 +122,8 @@ function shrink(e, t) {
   // keep one end where it was (the end nearer the start of its row), so the gap to the next building grows, never shrinks
   const dx = along === 'w' ? -sh * Math.cos(a) : sh * Math.sin(a), dy = along === 'w' ? -sh * Math.sin(a) : -sh * Math.cos(a);
   e.x = +(e.x + dx).toFixed(2); e.y = +(e.y + dy).toFixed(2); e[along] = newL; e.modules--; e.units = unitsOfB(t, e.modules, e.floors); e.tplUnits = e.units; e.tplL = newL;
-  e.note = t.label + ' · ' + e.modules + ' × ' + t.module.label + ' · ' + e.units + ' units';
+  e.note = t.label + ' · ' + e.modules + ' × ' + t.module.label + ' · ' + e.units + ' units' + (t.userDepth ? ' · estimate: deeper than any reviewed corridor building' : t.stacked ? ' · estimate: two 2-story homes stacked in each reviewed townhome bay' : ''); // (a module off: still said to be an estimate where it is one, as applyTemplates says it)
+  if (e.stacked) e.stacked = { ...e.stacked, bays: e.modules }; // (the bays the drawing shows follow)
 }
 
 // Attached and paired homes asked for as an exact, maximum or ranged count: whole homes come off the ends of the

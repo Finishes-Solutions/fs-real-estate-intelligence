@@ -254,6 +254,10 @@ export function checkPlacement(plan, elements, program, p) {
   }
   if (!pcs.length) return res(p.subject === 'dog park' || p.subject === 'pool' || p.subject === 'playground' || p.subject === 'clubhouse' ? 'fail' : 'n/a', p.subject === 'dog park' || p.subject === 'pool' || p.subject === 'playground' || p.subject === 'clubhouse' ? 'there is none in it' : 'nothing of that kind in this layout');
   const c = ctr(pcs);
+  // parking behind the buildings / at the back: no stall between a building's street face and the street (inside the
+  // building's frontage), whatever the average says (docs/LAYOUT-ENGINE.md item 31)
+  if (p.subject === 'parking' && (p.rel === 'behind' || p.rel === 'back')) { const front = frontStalls(F, elements, program, pcs, p.target); if (front) return res('fail', front + ' stall' + (front > 1 ? 's' : '') + ' between the building and the street');
+    if (p.rel === 'back') { const tg = piecesOf(elements, 'buildings', program); if (tg.length && F.uv(c)[1] > F.uv(ctr(tg))[1] + 0.02) return res('pass'); } } // (parking at the back of a lot with a building at the street: behind it, none in front, is what's meant)
   if (p.rel === 'near') {
     const tg = piecesOf(elements, p.target, program); if (!tg.length) return res('unknown', 'no ' + p.target + ' to measure from');
     const d = Math.min(...pcs.map(e => Math.min(...tg.map(g => S.gapBetween(S.shapeOf(e), g.path && !g.poly ? g.path.map(q => q) : S.shapeOf(g))))));
@@ -280,6 +284,15 @@ export function checkPlacement(plan, elements, program, p) {
     if (inA < tot * 0.67) return res('fail', Math.round(100 * inA / tot) + '% of the pond is there; the rest is ' + whereIs(F, ctr(pcs.filter(e => !reg.ok(ctr([e]))))));
     return res('pass'); }
   return reg.ok(c) ? res('pass') : res('fail', 'it is ' + whereIs(F, c));
+}
+// the stalls in front of a building: a stall centre nearer the street than the building's street face and within its
+// frontage (its span across the site), for the buildings of the target (or all)
+function frontStalls(F, elements, program, rows, target) {
+  const B = piecesOf(elements, target && target !== 'buildings' ? target : 'buildings', program); if (!B.length) return 0;
+  const dep = q => q[0] * F.into[0] + q[1] * F.into[1], acr = q => q[0] * F.right[0] + q[1] * F.right[1];
+  const spans = B.map(e => { const sh = S.shapeOf(e), A = sh.map(acr); return { a0: Math.min(...A), a1: Math.max(...A), d0: Math.min(...sh.map(dep)) }; });
+  let n = 0; for (const r of rows) { let cs; try { cs = S.stallCentres(r); } catch { cs = []; } for (const q of cs) { const a = acr(q), d = dep(q); if (spans.some(s => a > s.a0 + 1 && a < s.a1 - 1 && d < s.d0 - 1)) n++; } }
+  return n;
 }
 export const KEEP_FT = 60, AWAY_FT = 50, NEAR_FT = 150;
 const compassOf = v => { const a = Math.atan2(v[1], v[0]) * 180 / Math.PI, k = Math.round(((a + 360) % 360) / 45) % 8; return ['east', 'northeast', 'north', 'northwest', 'west', 'southwest', 'south', 'southeast'][k]; };

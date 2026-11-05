@@ -613,12 +613,13 @@ export function fieldOptions(plan, programIn, prog0, opts, H) {
 // found and outscores it.
 function streetFront(plan, programIn, prog0, opts, H, out) {
   if (opts.brief || opts.streetTried || opts.quick || (opts.count === 1 && opts.budgetMs === 0) || opts.pinned?.length || opts.pod || prog0?.pads || programIn?.pads || prog0?.zones || !FIELD_USES.includes(prog0?.use)) return out;
-  const h = opts.asks?.hints || {}, asked = h.parking === 'back' || h.useAt === 'front' && !h.parking;
+  const h = opts.asks?.hints || {}, asked = !!opts.parkBack || h.parking === 'back' || h.useAt === 'front' && !h.parking;
   let s; try { s = CX.aside('street-front', () => fieldOptions1(plan, programIn, prog0, { ...opts, brief: { parking: 'back' }, relaxed: 'as-asked', streetTried: true, budgetMs: opts.budgetMs }, H)); } catch { return out; }
   s = s.filter(o => o.parked && o.briefOK && !o.openEnds); if (!s.length) return out;
   const parked = out.filter(o => o.parked), best = parked.length ? Math.max(...parked.map(o => o.score)) : -Infinity, gBest = Math.max(0, ...parked.map(o => o.gM || 0));
   const tag = o => ({ ...o, key: 'street|' + o.key, street: true, label: 'Building at the street, parking behind', recipe: { ...o.recipe, street: true }, notes: [asked ? 'The building at the street with its parking behind it, as asked (the way in beside the building).' : 'The building at the street with its parking behind it: on this lot that arrangement parks the program and holds the most (the way in beside the building).', ...(o.notes || [])] });
-  if (asked) return s.map(o => tag({ ...o, score: Math.max(o.score, best + 1) })).concat(out).sort((a, b) => b.parked - a.parked || b.score - a.score);
+  const front = o => o.score - Math.max(0, (o.recipe?.D || 0) - 100) * 3; // (a storefront on the street: a shallow, wide building first, its face along the sidewalk)
+  if (asked) return s.slice().sort((a, b) => front(b) - front(a)).slice(0, 3).map(o => tag({ ...o, score: Math.max(o.score, best + 1) })).concat(out).sort((a, b) => b.parked - a.parked || b.score - a.score);
   const win = s.filter(o => o.score > best && (o.gM || 0) >= gBest * 0.999);
   return win.length ? win.slice(0, 2).map(tag).concat(out).sort((a, b) => b.parked - a.parked || b.score - a.score) : out;
 }
@@ -704,7 +705,8 @@ function briefFoot(brief, prog) {
 function search(plan, prog, X) {
   const { P, H, pinB, brief, foot } = X;
   const A0 = H.pondNeed(plan, prog, foot, X.pinned), A = A0 < 3000 ? 0 : A0;
-  const pondWant = brief?.pond === 'none' || !A ? [null] : brief?.pond ? [brief.pond === 'side' ? 'end' : brief.pond, 'vault'] : ['back', 'front', 'end', 'vault']; // (vault: no pond, the detention underground: where a pond would cost the building)
+  const pondWant = brief?.pond === 'none' || !A ? [null] : brief?.pond ? [brief.pond === 'side' ? 'end' : brief.pond, 'vault'] : ['back', 'front', 'end', 'vault'];
+  if (brief?.parking === 'back' && !brief.pond) { const k = pondWant.indexOf('front'); if (k >= 0) pondWant.splice(k, 1); } // (the building at the street: no pond between its storefront and the sidewalk) // (vault: no pond, the detention underground: where a pond would cost the building)
   // frames: the lot's own lines and the street's (when they differ); square with a building placed by hand
   const da = Math.abs(((H.frontAngle(plan) - S.mainAngle(plan.ring)) % 90 + 135) % 90 - 45), aligns = da > 4 ? ['main', 'front'] : ['main'];
   const rc = plan.recipe?.pf ? plan.recipe : null, pin = pinB.slice().sort((p, q) => S.footArea(q) - S.footArea(p))[0];
@@ -948,6 +950,9 @@ function briefDepths(brief, R) { const d = (brief?.buildings || []).map(b => b.d
 // how good a laid-out try is (before it's finished): the most floor area the parking carries (as much as fits), or the
 // floor area asked for, parked, on the least land
 function value(c, r, prog, X) {
+  const v = value0(c, r, prog, X); return X.brief?.parking === 'back' && !c.C.deep && c.pat === 'brief' ? v - Math.max(0, c.D - 100) * 3 : v; // (the building at the street: a shallow, wide storefront along the sidewalk before a deep box)
+}
+function value0(c, r, prog, X) {
   const sp = r.stalls - S.adaLossOf(r.rows, r.stalls), gfa = r.B.reduce((t, e) => t + S.gfaOf(e), 0), need = needOf(r.B, prog) + (X.pt.need || 0) - (X.pt.stalls || 0) + X.xNeed;
   if (X.foot == null) { const g = Math.min(need > sp ? gfa * sp / need : gfa, X.cap ? X.cap * X.floors : Infinity); return g / 100 - (need > sp ? 0 : (sp - need) / Math.max(1, need) * 20); }
   if (sp < need) return -1e6 + sp;
