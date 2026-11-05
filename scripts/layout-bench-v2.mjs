@@ -142,7 +142,11 @@ const CASES = [
   { id: 'TY-garage', family: 'types', site: 'ty38', ask: 'parking garage, 400 spaces' },
   { id: 'TY-pad-village', family: 'types', site: 'ty55', ask: 'a pad-site village with 6 pads' },
   { id: 'TY-mix-hotel', family: 'types', site: 'ty84', ask: 'a hotel with 120 keys and 20,000 sf of retail' },
-  { id: 'TY-mix-pads', family: 'types', site: 'ty84', ask: 'a daycare and a bank on pads in front of townhomes' }
+  { id: 'TY-mix-pads', family: 'types', site: 'ty84', ask: 'a daycare and a bank on pads in front of townhomes' },
+  /* parking round 3 (docs/LAYOUT-ENGINE.md item 31): a building at the street with its parking behind, asked for in words (the
+     run steers to it through lib/layoutintent.mjs asksFor where that's folded in; otherwise measured and said) */
+  { id: 'PK-street-retail', family: 'retail', site: 'ty43', ask: 'retail on the street, parking in the rear, 15,000 sf' },
+  { id: 'PK-street-medical', family: 'office', site: 'ty55', ask: '20,000 sf medical office at the front with parking behind it' }
 ];
 const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });

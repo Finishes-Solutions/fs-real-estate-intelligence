@@ -160,4 +160,28 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   const r0 = RUN.runPlan({ ...plan, params: {} }, prog, {}, { ask }), short = r0.options.find(o => V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking.provided < 252);
   if (short) { const v = V.validateLayout({ ...plan, elements: short.elements, program: short.program }, cb); assert.equal(v.checks.find(c => c.id === 'parking.count').status, 'fail', 'parked at 1.6 a home: short of the city’s count'); }
 }
+// round 3 (docs/LAYOUT-ENGINE.md item 31): the building at the street with its parking behind, when asked (the ask's
+// hint, lib/layoutintent.mjs asksFor: parking 'back'); not offered unasked on a lot where it isn't better
+{
+  const L = await import('../lib/sitelayout.mjs'), CX = await import('../lib/enginectx.mjs');
+  const plan = { ...lot(520, 360), elements: [] }, brief = B.canonicalBrief(B.briefFromRequest('15,000 sf retail', plan)), E = B.toEngine(brief);
+  const asks = { list: [], misses: () => 0, hints: { parking: 'back' } };
+  const run = o => CX.deterministic({ seed: 't' }, () => L.layoutOptions(E.plan, E.program, o)).value;
+  const asked = run({ ...E.opts, asks }), top = asked[0], bs = top.elements.filter(e => e.kind === 'building'), rows = top.elements.filter(e => e.kind === 'parking');
+  assert.match(top.name, /^Building at the street, parking behind/); assert.ok(top.notes.some(t => /at the street with its parking behind it, as asked/.test(t)));
+  const by = Math.max(...bs.map(b => b.y)); assert.ok(rows.length && rows.every(r => r.y > by), 'every stall row behind the building');
+  const v = V.validateLayout({ ...E.plan, elements: top.elements, program: top.program }, brief); assert.equal(v.status, 'pass'); assert.ok(v.quantities.parking.provided >= v.quantities.parking.required);
+  const ent = top.elements.filter(e => S.isEntrance(e)); assert.ok(ent.length && ent.every(e => !bs.some(b => S.rectsOverlap({ poly: S.shapeOf(e) }, { poly: S.shapeOf(b) }, 0))), 'the way in beside the building');
+  const plain = run(E.opts); assert.ok(!plain.some(o => /^Building at the street/.test(o.name)), 'not offered unasked where it is not better');
+}
+// the entry's throat: the generator's rows set the first drive across the way in back to the stacking length, and a
+// parking field's paving stops beside the entry drive (the first aisle is the first drive across)
+{
+  for (const [w, h, ask, need] of [[900, 500, 'exactly 120 garden apartments, 3 stories', 50], [520, 360, 'medical office building 40,000 sf', 75]]) {
+    const plan = { ...lot(w, h), elements: [] }, rec = RUN.runBrief(B.briefFromRequest(ask, plan)), o = rec.options[0];
+    assert.equal(o.validation.status, 'pass', ask);
+    const t = RUN.entryThroats(plan, o.elements, need).filter(x => !x.e.emergency); assert.ok(t.length, ask);
+    assert.ok(Math.min(...t.map(x => x.cross)) >= need - 1, ask + ': first drive across the entry ' + t.map(x => x.cross).join(','));
+  }
+}
 console.log('parking quality: ok');
