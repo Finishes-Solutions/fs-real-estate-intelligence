@@ -1,6 +1,6 @@
 {
- "engine": "rei-layout/2026.11.05.4",
+ "engine": "rei-layout/2026.11.05.5",
  "files": 42,
- "sha256": "1813b2ad96abbfac7f5f9e3a06d4cb7a7cb87c219e3c110f1956c35d91809e74",
- "from": "fs-real-estate-intelligence lib/ at a113396"
+ "sha256": "70cd442c2b785a1c22541315b2a92130839e41412898fdc4f722cd8109a4d7f4",
+ "from": "fs-real-estate-intelligence lib/ at 6816a6f"
 }

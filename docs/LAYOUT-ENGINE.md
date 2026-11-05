@@ -974,3 +974,62 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    test/layoutrun.mjs (combined pairs from a stuck trim, D17, the clubhouse at the back, the lake ring and the park ring,
    duplexes past what fits). Still: the ring on irregular sites, townhomes or duplexes round a lake, the clubhouse
    ring's parking counted toward guests; "homes around a central pool" for apartments stays the resort loop.
+
+33. Done Nov 5 (mixed use under a city's rules). Found by an agent test through the MCP server ("a 120-key hotel and
+   20,000 sf of retail, parking behind the buildings" on a mocked 24.8 ac Waller parcel), reproduced on synthetic
+   Waller-like sites (the plan's guardrails on: the 5% count reserve, detention at 1 ac-ft a developed acre 4 ft deep,
+   26 ft fire-lane aisles) through the app's path (lib/guardrails.mjs forLayout, then lib/layoutrun.mjs runPlan):
+   (a) The governing rule is per use. governingParking (item 28e) laid the program's one top-level ratio (the first
+   zone's: retail, 4 a 1,000 sf with the reserve) on every use counted by floor area, so the 66,000 sf hotel was judged
+   at the shops' ratio: 362 spaces required (380 with (b)) where about 210 was right, and every option failed
+   parking.count. A mixed plan is now governed use by use (the brief's rules.parkingByUse): apartments at the city's
+   two a home with the reserve (2.1, Ord. 424, verified), a hotel by its keys at its type's rule (lib/btypes.mjs
+   perKey: one a key, 1.05 with the reserve; its sfPerKey, 550, for a hotel whose keys aren't stated), shops, offices
+   and the rest at their use's ratio (the zone's own where it has one, else the engine's: the city has no verified
+   commercial ratio) with the reserve; townhomes, duplexes and houses keep their own rule (garages: no stall reserve,
+   as the effective plan does). The independent check counts the same way (lib/layoutcheck.mjs quantities: a use's
+   parkingByUse rule first, a hotel's keys as its typed buildings state them). Single-use plans are unchanged.
+   (b) The reserve once. The app and the MCP hand runPlan the effective plan and program already (G.forLayout: the
+   program's ratios carry the reserve), and governingParking ran G.effective on them again: 2.205 a home, 4.41 a
+   1,000 sf. A plan marked __guard is now taken as it is, and a governed brief is marked (rules.guarded) and left alone
+   on a second call. runPlan's brief is its own function now (briefForPlan), which the bench uses for guarded cases.
+   (c) The zones lay their rows out for that rule. The mixed engine's zones parked at their use's default and trimmed
+   to it (lib/sitelayout.mjs zoneItems, tally), so a guarded mixed plan came out a few stalls short of the reserve
+   unless a later pass found them. lib/layoutbrief.mjs toEngine now hands it opts.parkF (a factor a use: the governing
+   rule over the engine's default, 1.05 for Waller's shops and hotel), which zoneItems and tally apply.
+   (d) Angled parking on a mixed plan. The mixed engine never read the angle: square stalls, nothing said (item 24's
+   machinery runs on single-use fields only). lib/layoutrun.mjs angleMixed now turns the mixed layout's aisles that a
+   two-way drive joins at both ends one-way with angled rows (lib/siteparking.mjs restripeAngled, which takes the
+   guardrails' 26 ft fire-lane aisles too with opts.wide, and a subset of aisles with opts.only): every subset, the
+   most aisles first, kept where it still parks the program and fails no check that passes square (hard or not); each
+   try is finished through the run's last passes (curb returns, rows along drives, turnarounds) and kept only if the
+   finished plan fails nothing the square one, finished the same way, passes (on the 8.4 ac bench lot the all-aisles
+   try lost the fire truck's turns once the curb returns went in). The zones lay out 1.2 times the stalls for 60° (1.4
+   for 45°, opts.parkF) so the angled rows have them; the surplus comes back off after. The notes say how many aisles
+   turned and why the rest stay square, or why none did (no aisle joined at both ends, the parking short, a check
+   broken).
+   (e) Small Waller sites. On 13.0 ac the zone bands and a pond across the back don't stack in the depth (393 ft of
+   rows and about 230 ft of pond in 577 ft), and the mixed engine's other places for the pond (an end, both ends, the
+   land left open, part of it) were tried only for homes, so it fell back to the simple layouts: no zones (the hotel
+   lost its type and keys), 202-204 parked. Shops, offices and a hotel with no homes now get those tries too (a layout
+   counts only with a building of each), and the simple layouts are the last resort: there each building keeps the
+   zone of its use (so the hotel keeps its type), and a run's simple option short of the governing count says so
+   (parks N of the M required). With the deeper-pond tries the app and the MCP ask for, the top option is a 6 ft pond
+   (3.3 ac for the same 13.0 ac-ft instead of 4.5): every zone in full, 120 keys, 211 of 210 parked, passing; at the
+   plan's 4 ft only, the zone layouts hold about 89% of the program and say that a deeper pond or underground storage
+   for part of the volume would make room. Also: a hotel zone short of its size was named "undefined" in the notes;
+   now its use's name.
+   Before → after (the app's path, top option): 24.8 ac guarded: 214 / 380 required, failing → 213 / 210, passing;
+   24.8 ac guarded, 60° asked: square, 214 / 380, nothing said → 60° on 3 of 3 aisles, 217 / 210, passing, said;
+   8.4 ac, angled asked (no guardrails): square (201 / 201), nothing said → 60° on 1 of 4 aisles, 203 / 201, the rest
+   square and why; 13.0 ac guarded (deeper tries on): simple layout, hotel untyped, 202 / 380 → 6 ft pond, typed hotel with 120
+   keys, 211 / 210, passing. Bench: four new cases (MX-guard-hotel25, MX-guard-hotel13, MX-angled, MX-guard-angled),
+   80 of 80 passing, no warnings, replay identical; the 76 earlier cases' top options identical element for element.
+   Prompt corpus (offline, words path): 117 of 120 fully right (the misses D02, D05, S19 are not mixed or guarded). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128,
+   E054 podium-urban 172). Engine version rei-layout/2026.11.05.5. Tests: test/mixedparking.mjs (the rules per use and
+   the check's count on a drawn hotel with and without its keys; the reserve once through an effective plan; angled
+   rows on the guarded 24.8 ac run and the note when none can turn; the 13 ac run with and without the deeper tries;
+   the simple layouts keeping their zones).
+   Still: a guarded single-use field asked for angled parking keeps square stalls on its 26 ft fire-lane aisles (only
+   the mixed pass uses restripeAngled's opts.wide); the 4 ft-only 13 ac layouts stop at about 89% of the program (an
+   underground vault for part of the volume, vaultWhereNoPond, isn't tried as a way to fit more of it).

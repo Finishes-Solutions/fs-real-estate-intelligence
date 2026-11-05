@@ -506,7 +506,7 @@ function crossDockChecks(layout, els, u, add) {
 export function quantities(layout, brief = null) {
   const els = (layout.elements || []).filter(e => e && e.kind && shapesOf(e).every(finite)), P = layout.program || {}, base = P.use || 'other', R = brief?.rules?.values || {};
   const byUse = {}, byZone = {}, U = u => (byUse[u] = byUse[u] || { buildings: 0, footprint: 0, gfa: 0, units: 0, unitsEstimated: false }), Z = k => (byZone[k] = byZone[k] || { buildings: 0, footprint: 0, gfa: 0, units: 0, unitsEstimated: false });
-  const ring = layout.ring || brief?.site?.ring || [];
+  const ring = layout.ring || brief?.site?.ring || [], keysBy = {};
   for (const e of els.filter(x => x.kind === 'building' && !x.future)) {
     const u = e.use || base, s = shapesOf(e), fa = s.reduce((t, r) => t + area(r), 0), gz = e.zone != null ? Z(e.zone) : null, g = U(u); g.buildings++; g.footprint += fa;
     // a floor area the piece states (the run's, drawn at full precision before its sides were stored at 0.01 ft) is taken
@@ -517,6 +517,7 @@ export function quantities(layout, brief = null) {
     const grA = gr ? fa * gr.floors : 0, gfa = gfa0 - grA; g.gfa += gfa;
     if (gr) { const r = U(gr.use); r.buildings++; r.gfa += grA; r.stacked = (r.stacked || 0) + 1; }
     let nU = 0, est = false; if (['multifamily', 'townhomes', 'duplex', 'sfr'].includes(u)) { if (e.units != null) nU = +e.units; else if (u === 'multifamily') { nU = Math.floor(gfa * (P.eff || 0.85) / (P.unitSf || 900)); est = true; } else nU = 1; }
+    { const k = keysBy[u] = keysBy[u] || { keys: 0, rest: 0 }; if (+e.keys > 0) k.keys += +e.keys; else k.rest += gfa; } // (keys a typed hotel states: its parking by the key where the rule is a key's)
     g.units += nU; g.unitsEstimated = g.unitsEstimated || est; if (gz) { gz.buildings++; gz.footprint += fa; gz.gfa += gfa; gz.units += nU; gz.unitsEstimated = gz.unitsEstimated || est; gz.use = u; }
   }
   for (const e of els.filter(x => x.kind === 'garage' && x.standalone && !x.future)) { const fa = shapesOf(e).reduce((t, r) => t + area(r), 0), g = U(e.use || base); g.buildings++; g.footprint += fa; g.gfa += fa * (+e.levels || 1); } // a stand-alone parking garage that is the program (lib/btypes.mjs): its levels are its floor area; its spaces are counted below as a garage's
@@ -549,20 +550,21 @@ export function quantities(layout, brief = null) {
   const driveways = homes.filter(e => ['duplex', 'townhomes'].includes(e.use || base) && /front-load/i.test(e.note || '')).reduce((s, e) => s + (+e.units || 1), 0); // a front-load duplex's driveway apron: one tandem space a home (local code may not count it)
   // required: the brief's ratios, else the engine's use defaults (stated as assumptions)
   const hk = S.HOME_KINDS[P.homeKind || (P.zones || []).find(z => z?.homeKind)?.homeKind]; // (a home community: its kind's parking, a tiny home 1, a cottage 1.5, a manufactured home 2)
-  const perUnitOf = u => R.parkingPerUnit?.v ?? (u === 'sfr' && hk ? hk.perUnit : ({ multifamily: 1.6, townhomes: 2.25, duplex: 2, sfr: 2 }[u]));
+  const BU = R.parkingByUse?.v && typeof R.parkingByUse.v === 'object' ? R.parkingByUse.v : {}; // (a mixed plan governed use by use, lib/layoutrun.mjs governingParking: each use at its own rule)
+  const perUnitOf = u => BU[u]?.perUnit ?? R.parkingPerUnit?.v ?? (u === 'sfr' && hk ? hk.perUnit : ({ multifamily: 1.6, townhomes: 2.25, duplex: 2, sfr: 2 }[u]));
   const share = u => (brief?.program?.uses || []).find(x => x.use === u && x.officeShare != null)?.officeShare;
-  const per1kOf = u => R.parkingPer1000?.v ?? (share(u) != null ? +(share(u) * 3.5 + (1 - share(u)) * 0.6).toFixed(3) : null) ?? ({ retail: 4, restaurant: 10, office: 3.5, medical: 5, hotel: 1.82, church: 10, industrial: 0.6, storage: 0.1, fuel: 4, foodtrucks: 8, amenity: 0, other: 3 }[u]);
+  const per1kOf = u => BU[u]?.per1000 ?? R.parkingPer1000?.v ?? (share(u) != null ? +(share(u) * 3.5 + (1 - share(u)) * 0.6).toFixed(3) : null) ?? ({ retail: 4, restaurant: 10, office: 3.5, medical: 5, hotel: 1.82, church: 10, industrial: 0.6, storage: 0.1, fuel: 4, foodtrucks: 8, amenity: 0, other: 3 }[u]);
   let required = 0, known = true;
-  for (const [u, g] of Object.entries(byUse)) { const pu = perUnitOf(u), pk = per1kOf(u); if (['multifamily', 'townhomes', 'duplex', 'sfr'].includes(u)) { if (pu == null) known = false; else required += g.units * pu; } else if (pk == null) known = false; else required += g.gfa / 1000 * pk; }
+  for (const [u, g] of Object.entries(byUse)) { const pu = perUnitOf(u), pk = per1kOf(u); if (['multifamily', 'townhomes', 'duplex', 'sfr'].includes(u)) { if (pu == null) known = false; else required += g.units * pu; } else if (BU[u]?.perKey != null) required += (keysBy[u]?.keys > 0 ? keysBy[u].keys + keysBy[u].rest / (+BU[u].sfPerKey || 550) : g.gfa / (+BU[u].sfPerKey || 550)) * BU[u].perKey; /* a hotel by its keys (the typed buildings' own count, else its floor area at the type's sf a key) */ else if (pk == null) known = false; else required += g.gfa / 1000 * pk; }
   required = known ? Math.ceil(required - 0.01) : null;
   const raw = surface, accessibleNeeded = raw <= 0 ? 0 : raw <= 25 ? 1 : raw <= 50 ? 2 : raw <= 75 ? 3 : raw <= 100 ? 4 : raw <= 150 ? 5 : raw <= 200 ? 6 : raw <= 300 ? 7 : raw <= 400 ? 8 : raw <= 500 ? 9 : raw <= 1000 ? Math.ceil(raw * 0.02) : 20 + Math.ceil((raw - 1000) / 100);
-  const ruled = R.parkingPerUnit?.v != null || R.parkingPer1000?.v != null, verified = R.parkingPerUnit?.cls === 'verified' || R.parkingPer1000?.cls === 'verified';
+  const ruled = R.parkingPerUnit?.v != null || R.parkingPer1000?.v != null || Object.keys(BU).length > 0, verified = R.parkingPerUnit?.cls === 'verified' || R.parkingPer1000?.cls === 'verified' || Object.keys(BU).length > 0 && R.parkingByUse?.cls === 'verified';
   // accessible stalls take their striped access aisle out of the row: each pair of them shares an aisle a stall wide
   // (the app's own count does the same, lib/siteplan.mjs metrics)
   // (where every row is angled, a pair and its aisle, square to the aisle, take four angled stalls: twice the cost)
   const accessAisles = Math.ceil(accessibleNeeded / 2) * (angledRows && !square3 ? 2 : 1);
   const parking = { required, provided: surface - accessAisles + podium + garage + garageEstimated + privateGarages + tucked + driveways, surface, accessAisles, podium, garage, tucked, garageEstimated, privateGarages, driveways, accessibleNeeded, stall, strayStalls: stray,
-    basis: verified ? 'verified' : 'assumption', rule: ruled ? (R.parkingPerUnit?.source || R.parkingPer1000?.source) : 'Engine use defaults (1.6 a unit for apartments, 4 per 1,000 sf for retail, …): planning assumptions, not code' };
+    basis: verified ? 'verified' : 'assumption', rule: ruled ? (Object.keys(BU).length ? R.parkingByUse.source : R.parkingPerUnit?.source || R.parkingPer1000?.source) : 'Engine use defaults (1.6 a unit for apartments, 4 per 1,000 sf for retail, …): planning assumptions, not code' };
   const site = ring.length >= 3 ? area(ring) : 0, tot = Object.values(byUse).reduce((t, g) => ({ units: t.units + g.units, gfa: t.gfa + g.gfa, footprint: t.footprint + g.footprint, buildings: t.buildings + g.buildings }), { units: 0, gfa: 0, footprint: 0, buildings: 0 });
   const pavedSf = els.filter(e => PAVED.includes(e.kind)).reduce((s, e) => s + shapesOf(e).reduce((t, r) => t + area(r), 0), 0);
   for (const g of Object.values(byZone)) { g.footprint = Math.round(g.footprint); g.gfa = Math.round(g.gfa); }

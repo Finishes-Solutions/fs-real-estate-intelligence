@@ -365,6 +365,13 @@ export function toEngine(bIn, { overshoot = true } = {}) { // overshoot: ask a t
   }
   const opts = { keepout: keepouts.length ? keepouts : undefined, netEvals: 6, ...(b.solver.engineOpts || {}) }; opts.count = Math.min(12, (+opts.count || b.solver.options || 3) + 2); // (two more than are shown: the run leaves out twins, a mirror image with the same numbers, and still has enough) // engineOpts: the app's own search settings, saved with the brief
   if (Array.isArray(b.pinned) && b.pinned.length) opts.pinned = b.pinned;
+  // a mixed plan's zones lay their rows out for each use's own rule (the engine's zones park at their use's default;
+  // docs/LAYOUT-ENGINE.md item 33): the jurisdiction's per-use rule (rules.parkingByUse: the city's reserve, Waller's two
+  // a home), and angled stalls asked for (they take more of a row: 60° about 1.2 times, 45° 1.4), as opts.parkF, a factor
+  // a use on the stalls its zone lays out; the run then turns the aisles it can and takes the surplus back off
+  if (!single) { const BU = b.rules?.values?.parkingByUse?.v || {}, ang = b.program.parking?.angle, af = ang === 45 ? 1.4 : PARKING_ANGLES.includes(ang) ? 1.2 : 1, pf = {};
+    for (const u of new Set(uses.map(x => x.use))) { const U = S.USES[u] || {}, r = BU[u], dflt = u === 'multifamily' ? S.normalizeProgram({ use: u }).perUnit : U.ratio, v = r ? (u === 'multifamily' ? r.perUnit : r.per1000) : null, f = (v > 0 && dflt > 0 ? Math.max(1, v / dflt) : 1) * (U.garage ? 1 : af); if (f > 1.0001) pf[u] = +f.toFixed(4); }
+    if (Object.keys(pf).length) opts.parkF = pf; }
   // the parking asked to go behind the building ("building up front, parking behind", "retail on the street, parking in
   // the rear"): the parking-field engine lays out the building at the street with its lot behind it (lib/siteparking.mjs
   // streetFront; docs/LAYOUT-ENGINE.md item 31)

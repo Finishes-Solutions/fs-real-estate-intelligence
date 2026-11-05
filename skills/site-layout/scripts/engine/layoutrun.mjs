@@ -30,9 +30,10 @@ import * as BT from './btypes.mjs';
 import * as I from './layoutintent.mjs';
 import * as G from './guardrails.mjs';
 import * as SITE from './btsite.mjs';
+import { restripeAngled } from './siteparking.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.05.4'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.5'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -939,6 +940,43 @@ function afterCut(els, gone, cut, B) {
   const all = kept.concat(fields); for (const g of gone) giveBackLand(all, S.grow(g, 30), g, 40);
   return { all, dropped };
 }
+// Angled parking asked for on a mixed-use plan (docs/LAYOUT-ENGINE.md item 33). The mixed layout (lib/sitelayout.mjs
+// zones) draws square rows on two-way aisles and never read the angle, so the plan came back square and said nothing.
+// Its aisles that a two-way drive joins at both ends are turned one-way with angled rows (lib/siteparking.mjs
+// restripeAngled, the field engine's machinery; the guardrails' 26 ft fire-lane aisles too), neighbouring ones running
+// opposite ways: all of them where that still parks the program and breaks no check that passed (fire reach included:
+// a one-way aisle is no fire lane), else as many as can be, else none. Whatever is drawn, the notes say how many aisles
+// turned and why the rest stay square. Before the surplus is pruned, so the angled rows have the spare stalls to give.
+export function angleMixed(plan, o, brief, finish = x => x) {
+  const want = brief?.program?.parking?.angle; if (!o?.elements?.length || !B.PARKING_ANGLES.includes(want)) return finish(o);
+  if (!(brief.program.uses.length > 1 || o.program?.zones?.length > 1) || o.elements.some(e => e.kind === 'parking' && S.stallAng(e))) return finish(o);
+  const chk = x => V.validateLayout({ ...plan, elements: x.elements, program: x.program || o.program || {} }, brief), pk = els => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking, p0 = pk(o.elements), passed = new Set(chk(o).checks.filter(c => c.status === 'pass').map(c => c.id));
+  const word = want === 'angled' ? 'Angled parking' : 'Angled parking at ' + want + '°', note = (x, t) => ({ ...x, tplNotes: [...(x.tplNotes || []), t] });
+  let of = 0, tries = 0, short = false, broke = false, turnable = false; const ok = [];
+  for (const ang of want === 'angled' ? [60, 45] : [want]) {
+    const all = restripeAngled(o.elements, ang, { wide: true }); of = Math.max(of, all.of); if (!all.n) continue; turnable = true;
+    // the aisles it can turn; every subset of them, the most aisles first (at most 40 tried), kept where it still parks the
+    // program and fails no check that passes now (hard or not: the fire truck's turns too)
+    const cand = o.elements.filter(e => all.els.some(x => x.oneWay && x.id === e.id));
+    for (let k = cand.length; k >= 1; k--) {
+      const subs = []; const pick = (i, acc) => { if (subs.length >= 40) return; if (acc.length === k) { subs.push(acc); return; } for (let j = i; j < cand.length; j++) pick(j + 1, acc.concat([cand[j]])); }; pick(0, []);
+      const here = [];
+      for (const sub of subs) { if (tries++ > 40) break; const ids = new Set(sub.map(e => e.id)), r = restripeAngled(o.elements, ang, { wide: true, only: a => ids.has(a.id) }); if (!r.n) continue;
+        const p = pk(r.els); if (p.required != null && p.provided < p.required) { short = true; continue; }
+        if (chk({ elements: r.els }).checks.some(c => c.status === 'fail' && passed.has(c.id))) { broke = true; continue; }
+        here.push({ now: { ...o, elements: r.els }, p: p.provided, n: r.n, ang }); }
+      ok.push(...here.sort((x, y) => y.p - x.p));
+    }
+  }
+  // each through the run's last passes (they add curb returns, rows along drives and turnarounds the angle changes), the
+  // first that fails nothing the square plan, finished the same way, passes (at most six finished)
+  let sq = null; const square = () => sq || (sq = finish(o)), sqPass = () => new Set(chk(square()).checks.filter(c => c.status === 'pass').map(c => c.id));
+  let pass0 = null, late = null;
+  for (const t of ok.slice(0, 6)) { const f = finish(t.now), lost = chk(f).checks.filter(c => c.status === 'fail' && (pass0 || (pass0 = sqPass())).has(c.id)); if (lost.length) { late = late || lost; continue; }
+    const why = short && !broke && !late ? 'as angled stalls there would leave the parking short of the ' + p0.required + ' required.' : short ? 'as angling them too would leave the parking short of the ' + p0.required + ' required or break a check that passes with them square.' : 'as turning them would break a check that passes with them square (a one-way aisle isn’t a fire lane).';
+    return note(f, 'Angled parking, as asked: ' + t.ang + '° stalls on ' + t.n + ' of the ' + of + ' parking aisles, made one-way (the arrows), neighbouring aisles running opposite ways' + (t.n < of ? '; the rest stay square on two-way aisles, ' + why : '.')); }
+  return note(square(), word + ' was asked for, but this mixed-use layout keeps square stalls on two-way aisles: ' + (!turnable ? 'its parking rows have no aisle of the field’s width that a two-way drive joins at both ends (a one-way aisle must, so cars never meet a dead end).' : late ? 'with its aisles one-way it fails a check the square layout passes (' + late.map(c => c.title || c.id).slice(0, 2).join('; ') + ').' : short && !broke ? 'angled stalls take more of a row than square ones, and with them the rows here can’t park the ' + p0.required + ' spaces required.' : 'turning its aisles one-way would break a check that passes now (a one-way aisle isn’t a fire lane: a building could be left beyond the fire lane’s reach, or the fire truck without its turns)' + (short ? ', or leave the parking short of the ' + p0.required + ' required.' : '.')));
+}
 export function pruneSurplus(plan, o, brief) {
   if (!o?.elements?.length) return o;
   const els = o.elements.slice(), isB = e => e.kind === 'building' && !e.future, B = () => els.filter(isB);
@@ -1042,7 +1080,7 @@ export function runBrief(briefIn, { now = null } = {}) {
   const { value: raw, stats } = CX.deterministic({ seed: brief.solver.seed, tickMs: brief.solver.tickMs }, () => {
     const wrapNote = 'No wrap fits this site: the garage a wrap needs (about 130 ft across and 120 ft deep inside the wings, with its ramp and cores) doesn’t fit with the wings round it, so these are the nearest layouts; on a small lot a courtyard on a parking podium ("courtyard on a podium") holds more.';
     const noWrap = o => brief.program.uses.some(u => u.form === 'mf-wrap') && !o.elements?.some(e => e.wrap && e.kind === 'garage') ? { ...o, tplNotes: [...(o.tplNotes || []), wrapNote] } : o; // (a wrap asked for that the site can't hold: said, not swapped silently)
-    const fit = (Ex, out, br = brief) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br), t2 = keepIfNoWorse(Ex.plan, t1, pruneSurplus(Ex.plan, t1, br), br); const t2g = garageEntries(Ex.plan, t2), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10), br); }); // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
+    const fit = (Ex, out, br = brief) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br); const last = t1x => { const t2 = keepIfNoWorse(Ex.plan, t1x, pruneSurplus(Ex.plan, t1x, br), br); const t2g = garageEntries(Ex.plan, t2), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10), br); }; return angleMixed(Ex.plan, t1, br, last); }); // (angled parking asked on a mixed plan: tried here, each try finished by the passes after) // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
     let got = fit(E, lay1(E));
     if (capped && short(got)) { const E2 = B.toEngine(brief); E2.opts = { ...E2.opts, deeper: false }; got = got.concat(fit(E2, lay1(E2))); } // (the retry looks for a fuller layout: no deeper-pond copies of it)
     return got;
@@ -1055,7 +1093,7 @@ export function runBrief(briefIn, { now = null } = {}) {
     const asked = (brief.program.placements || []).map(p => ({ ...I.checkPlacement(lay, elements, o.program || E.program, p), how: p.how || 'checked' }));
     const { elements: _e, notes: _n, tplNotes: _t, error: _x, ...engine } = o; // the engine's own fields (score, recipe, frame…), kept for the editor
     return { ...engine, id: 'opt-' + (i + 1), engineOrder: i, name: o.name || 'Layout ' + (i + 1), geometryHash: geometryHash(elements), elements, program: o.program || E.program, params: o.params || E.plan.params, recipe: o.recipe ?? null, zones: o.zones || [], quantities: validation.quantities, validation, placements: asked,
-      notes: [...(brief.request?.assumed || []).map(a => /^(?:No (?:use|count|size)|Mixed use)/.test(a) ? 'Assumed: ' + a : a), ...asked.map(c => c.said + (c.status === 'fail' ? ' ' + (c.how === 'checked' && !steer.has(c.id) ? 'The engine has no control for this yet: it is measured and said here, not placed; move it by hand or say where else it may go.' : c.how === 'checked' ? 'The engine looked for layouts with it there; this one doesn’t have it (another option may say what having it costs).' : 'The engine was told, but this layout couldn’t fit it there; another option may.') : '')), ...BT.presetNotes(o.notes || [], prog0), ...(o.tplNotes || []), ...BT.typeNotes(prog0, elements), ...feat.notes] };
+      notes: [...(brief.request?.assumed || []).map(a => /^(?:No (?:use|count|size)|Mixed use)/.test(a) ? 'Assumed: ' + a : a), ...asked.map(c => c.said + (c.status === 'fail' ? ' ' + (c.how === 'checked' && !steer.has(c.id) ? 'The engine has no control for this yet: it is measured and said here, not placed; move it by hand or say where else it may go.' : c.how === 'checked' ? 'The engine looked for layouts with it there; this one doesn’t have it (another option may say what having it costs).' : 'The engine was told, but this layout couldn’t fit it there; another option may.') : '')), ...BT.presetNotes(o.notes || [], prog0), ...(o.tplNotes || []), ...BT.typeNotes(prog0, elements), ...feat.notes, ...simpleShort(o, validation)] };
   });
   options.sort((a, b) => cmp(rankKey(a, brief), rankKey(b, brief)));
   options.forEach((o, i) => { o.rank = i + 1; });
@@ -1078,6 +1116,12 @@ export function runBrief(briefIn, { now = null } = {}) {
     rankingHash: hashOf(keep.map(o => [o.rank, o.geometryHash])), options: keep };
 }
 
+// a simple layout (lib/sitelayout.mjs fallback: the zone layouts didn't fit) short of the parking the brief requires: said
+// plainly, against the rule that governs (the engine's own note counts its use defaults; docs/LAYOUT-ENGINE.md item 33)
+function simpleShort(o, v) {
+  const q = v.quantities.parking, c = v.checks.find(x => x.id === 'parking.count'); if (!/^Simple layout/.test(o.name || '') || c?.status !== 'fail' || q.required == null) return [];
+  return ['A simple layout: the zone layouts don’t fit this site with what it must hold. It parks ' + q.provided + ' of the ' + q.required + ' spaces required (' + S.spacesWord(q.required - q.provided) + ' short' + (q.rule ? '; ' + String(q.rule).replace(/\.$/, '') : '') + '), so it fails the parking check: less floor area, structured parking or a bigger site would park it.'];
+}
 // where things were asked to go, across the options handed back: an option missing an ask that another option meets
 // says which one and what it gives up there (fewer homes or less floor area, a check it fails); an option meeting one
 // that a fuller option misses says what meeting it costs. Notes only: the ranking is rankKey's.
@@ -1122,16 +1166,43 @@ export const ENGINE_OPT_KEYS = ['count', 'deeper', 'brief', 'parcels', 'perParce
 // lays out to that count and the independent validator's parking.count judges against it (before, a run from the app or
 // the MCP site_plan path laid apartments out at the engine's 1.6 a home and passed its own check while the city's count
 // was short). A rule the brief already sets higher stands. Changes b in place.
+// Idempotent (Nov 5, item 33): the app and the MCP hand runPlan the guardrails' effective plan and program already
+// (G.forLayout: the program's ratios carry the count reserve), so a plan marked __guard is taken as it is, never factored
+// again (it was: 2.205 a home, the 5% twice), and a brief once governed is marked (rules.guarded) and left alone.
+// Mixed use is governed use by use (rules.parkingByUse; before, the program's one top-level ratio was laid on every use
+// counted by floor area: a 120-key hotel judged at the retail ratio, 362 spaces for 212): apartments at the city's two a
+// home, a hotel by its keys at its type's rule (lib/btypes.mjs perKey; one a key), shops, offices and the rest at their
+// use's ratio (the city has no verified commercial ratio: the engine's working number), each with the city's reserve.
+// Homes with garages (townhomes, duplexes, houses) keep their own rule, as the effective plan does.
 export function governingParking(b, plan, program) {
-  if (!plan || !G.isOn({ ...plan, program })) return b;
-  let e; try { e = G.effective({ ...plan, program, __guard: undefined }); } catch { return b; } if (!e?.program) return b;
-  const R = b.rules.values, base = S.normalizeProgram(program || {}), why = 'Jurisdiction planning guardrails (' + (G.WALLER?.name || 'City of Waller') + ')';
-  const mf = b.program.uses.some(u => u.use === 'multifamily'), perUnit = +e.program.perUnit, ratio = +e.program.ratio;
-  if (mf && perUnit > 0 && perUnit > (R.parkingPerUnit?.v ?? base.perUnit ?? 0) + 1e-9) R.parkingPerUnit = { v: perUnit, cls: 'verified', source: why + ': City of Waller Ordinance No. 424, two spaces a dwelling unit, with the 5% count reserve' };
-  if (ratio > 0 && b.program.uses.some(u => u.quantity?.unit !== 'units') && ratio > (R.parkingPer1000?.v ?? base.ratio ?? 0) + 1e-9) R.parkingPer1000 = { v: ratio, cls: 'assumption', source: why + ': the use’s ratio with the 5% count reserve' };
+  if (!plan || b.rules?.guarded) return b;
+  const pre = !!plan.__guard; // (already the effective plan: its program's numbers include the reserve)
+  if (!pre && !G.isOn({ ...plan, program })) return b;
+  let e; if (pre) e = { ...plan, program: program || plan.program }; else try { e = G.effective({ ...plan, program, __guard: undefined }); } catch { return b; }
+  if (!e?.program || !e.__guard) return b;
+  const R = b.rules.values, base = S.normalizeProgram(program || {}), cf = +e.__guard.cf || 1, why = 'Jurisdiction planning guardrails (' + (G.WALLER?.name || 'City of Waller') + ')', res = cf > 1 ? ', with the ' + Math.round((cf - 1) * 100) + '% count reserve' : '';
+  b.rules.guarded = { profile: e.__guard.profile || 'waller', cf };
+  const kinds = [...new Set(b.program.uses.map(u => u.use).filter(u => u !== 'amenity' && u !== 'garage'))];
+  if (kinds.length > 1) { // mixed use: each use by its own rule
+    const r4 = x => Math.round(x * 1e4) / 1e4, P = program || {}, zones = Array.isArray(P.zones) ? P.zones : [], by = {}, src = [];
+    for (const u of b.program.uses) {
+      const z = u.zone != null ? zones[u.zone] : null, bt = (P.btZones || []).find(x => x.zone === u.zone), pre0 = bt ? BT.presetOf(bt.btype) : null, U = S.USES[u.use] || {};
+      if (u.use === 'multifamily') { const v = r4(Math.max(S.normalizeProgram({ use: 'multifamily' }).perUnit, G.WALLER.mf.perUnit.value) * cf); if (!(by.multifamily?.perUnit >= v)) by.multifamily = { perUnit: v }; }
+      else if (U.garage) continue; // (homes park in their garages and driveways: their own rule, no stall reserve)
+      else if (u.use === 'hotel') { const pk = +pre0?.params?.perKey || 1, sk = +pre0?.params?.sfPerKey || (U.ratio > 0 ? 1000 / U.ratio : 550), v = { perKey: r4(pk * cf), sfPerKey: sk, per1000: r4(1000 / sk * pk * cf) }; if (!(by.hotel?.per1000 >= v.per1000)) by.hotel = v; }
+      else { const v = r4((+z?.ratio > 0 ? +z.ratio : U.ratio ?? 3) * cf); if (!(by[u.use]?.per1000 >= v)) by[u.use] = { per1000: v }; }
+    }
+    for (const [u, r] of Object.entries(by)) src.push((S.USES[u]?.label || u) + ' ' + (r.perUnit != null ? r.perUnit + ' a home' + (u === 'multifamily' ? ' (Ord. No. 424: two a dwelling unit)' : '') : r.perKey != null ? r.perKey + ' a key' : r.per1000 + ' a 1,000 sf'));
+    if (Object.keys(by).length) R.parkingByUse = { v: by, cls: Object.keys(by).every(u => u === 'multifamily') ? 'verified' : 'assumption', source: why + ', use by use' + res + ': ' + src.join('; ') + '. The city’s commercial ratios are unverified: each use’s working number.' };
+    return b;
+  }
+  const mf = kinds[0] === 'multifamily', perUnit = +e.program.perUnit, ratio = +e.program.ratio;
+  if (mf && perUnit > 0 && perUnit > (R.parkingPerUnit?.v ?? (pre ? 0 : base.perUnit) ?? 0) + 1e-9) R.parkingPerUnit = { v: perUnit, cls: 'verified', source: why + ': City of Waller Ordinance No. 424, two spaces a dwelling unit' + res };
+  if (ratio > 0 && b.program.uses.some(u => u.quantity?.unit !== 'units') && ratio > (R.parkingPer1000?.v ?? (pre ? 0 : base.ratio) ?? 0) + 1e-9) R.parkingPer1000 = { v: ratio, cls: 'assumption', source: why + ': the use’s ratio' + res };
   return b;
 }
-export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
+// the brief runPlan runs (the app's plan, program and search settings made a brief; the bench makes guarded runs with it)
+export function briefForPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
   const b = B.briefFromProgram(program, plan, { text: ask, parser: 'app', seed });
   governingParking(b, plan, program);
   // what a size means: the words' own meaning (a bare number exactly, "at least", "up to", "as many as fit"), unless the
@@ -1144,6 +1215,10 @@ export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } =
   const eo = Object.fromEntries(ENGINE_OPT_KEYS.filter(k => opts[k] !== undefined).map(k => [k, opts[k]]));
   if (eo.keepout) b.site.exclusions = []; // the app's keep-outs go to the engine as it gave them (with their road strips); the validator reads them as keep-out pieces
   b.solver.engineOpts = JSON.parse(JSON.stringify(eo)); b.solver.options = Math.min(12, Math.max(3, +opts.count || 3));
+  return b;
+}
+export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
+  const b = briefForPlan(plan, program, opts, { ask, seed }), eo = b.solver.engineOpts || {};
   const rec = runBrief(b);
   if (!rec.options?.length) return { outcome: rec.outcome, problems: rec.problems || [], options: [] };
   const keep = eo.keepout ? eo.keepout.map(e => ({ ...e })) : [];
