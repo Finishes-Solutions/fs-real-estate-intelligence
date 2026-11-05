@@ -1947,6 +1947,7 @@ export function normalizeProgram(p = {}) {
   if (customIn(p)) out.custom = p.custom; // an AI-crafted type's recipe rides along (lib/customtypes.mjs lays it out)
   if (['bar', 'L', 'U', 'T', 'tower'].includes(p.form)) out.form = p.form; // (T: lib/btypes.mjs T primitive)
   if (use === 'duplex' && PLEX[+p.plex]) out.plex = +p.plex; // triplexes or fourplexes drawn as their own buildings (PLEX)
+  if (p.courtShape === 'U' || p.courtShape === 'O') out.courtShape = p.courtShape; // a courtyard's shape the words name: an open U or a closed ring (lib/sitegen.mjs courtyard; lib/btypes.mjs)
   if (p.point === true && p.form === 'tower') out.point = true; // a point tower: a slim tower on its podium (towerOutline)
   if (['courtyard', 'loop', 'plaza', 'wrap', 'tuck', 'vertical', 'podium-court'].includes(p.arrangement)) out.arrangement = p.arrangement;
   // what the words or the AI said beyond the program's own fields, for the brief (lib/layoutbrief.mjs understand): where things

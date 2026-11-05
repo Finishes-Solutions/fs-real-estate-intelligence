@@ -226,6 +226,7 @@ export function grid(prog, acres = 10, asks = null) {
   if (prog.use === 'retail') { const pads = [...new Set([prog.pads === 'auto' ? 3 : Math.min(4, +prog.pads || 0), Math.max(0, (prog.pads === 'auto' ? 3 : +prog.pads || 0) - 1), 0, 2])].filter(n => n >= 0);
     for (const n of pads) for (const form of ['inline', 'L-left', 'L-right']) for (const bays of [1, 2, 3, 4]) for (const pond of ponds) for (const entrances of [1, 2]) out.push({ pads: n, form, bays, pond, entrances }); }
   else if (prog.use === 'industrial' && prog.crossDock) for (const depth of [500, 450, 560, 400, 600]) for (const court of [185, 160, 135]) for (const pond of ponds) out.push({ form: 'xdock', depth, court, pond, entrances: 2 });
+  else if (prog.use === 'industrial' && prog.truck === false && !prog.flex) { /* (no truck court: a data centre shell, lib/btypes.mjs; these arrangements are all loading courts, so the rows' own service drive lays it out, item 39) */ }
   else if (prog.use === 'industrial') {
     // asked: the warehouse at the back, or its docks facing a side (lib/layoutintent.mjs asksFor hints): columns running
     // back with the loading beside each building (on the side asked, mirrored for the left), the buildings against the
