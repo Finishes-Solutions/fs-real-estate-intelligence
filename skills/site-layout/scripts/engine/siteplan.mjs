@@ -2748,7 +2748,8 @@ export function openDeadEnds(plan, els, opts = {}) {
       const tEnd = t0 + sgn * len, ends = d0.on.filter(o => (sgn > 0 ? o.b : -o.a) >= sgn * tEnd - 1), lose = ends.reduce((n, o) => n + 2, 0);
       if (ends.length && spare - lose >= 0) { spare -= lose; cutRows = ends;
         if ((d0.rowEnd - d0.tc) * sgn > DEAD_AISLE_FT) { const sw = Math.max(...ends.map(o => o.sw)), tm = tEnd - sgn * sw, c = at(tm, 0), dd = W + 2 * STALL.d; // (past DEAD_AISLE_FT a hammerhead is paved, a T to turn in: the lot paving across the aisle and the two stalls' places each side)
-          hammerPad = { kind: 'field', id: (e.id || 'a') + (sgn > 0 ? '-hamB' : '-hamA'), x: +c[0].toFixed(2), y: +c[1].toFixed(2), ...(e.w >= e.d ? { w: 2 * sw, d: dd } : { w: dd, d: 2 * sw }), rot: e.rot || 0, name: '', note: 'Turnaround · ' + Math.round(dd) + ' ft', turn: true }; } }
+          hammerPad = { kind: 'field', id: (e.id || 'a') + (sgn > 0 ? '-hamB' : '-hamA'), x: +c[0].toFixed(2), y: +c[1].toFixed(2), ...(e.w >= e.d ? { w: 2 * sw, d: dd } : { w: dd, d: 2 * sw }), rot: e.rot || 0, name: '', note: 'Turnaround · ' + Math.round(dd) + ' ft', turn: true };
+          if (!shapeOf(hammerPad).every(p => inRing(p, inner)) || out.some(o => o !== e && !d0.on.some(q => q.r === o) && !['drive', 'truck', 'field', 'lot', 'zone', 'sign', 'trail'].includes(o.kind) && !(o.kind === 'green' && !isPark(o)) && polysOverlap(grow(shapeOf(hammerPad), -0.5), o.kind === 'building' ? grow(shapeOf(o), 3) : shapeOf(o), 0))) hammerPad = null; } } // (only where it fits: clear of buildings, ponds and the rest)
     }
     if (!len && !cutRows.length) continue;
     const grown = len ? { ...e, x: e.x + u[0] * sgn * len / 2, y: e.y + u[1] * sgn * len / 2, ...(e.w >= e.d ? { w: e.w + len } : { d: e.d + len }) } : e;
