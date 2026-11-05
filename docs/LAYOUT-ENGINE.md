@@ -747,3 +747,11 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    across an entry within the throat length (MF-garden-exact 28 ft, the wedges 13-30 ft: the loop drive's place is the
    generator's, lib/sitelayout.mjs / sitegen); the remaining bare ends are where rows meet a cross drive end to end;
    one-way circulation stays only where angled stalls are asked or win.
+   On the building-type and request-understanding work (items 26-27; bench 65 cases, base 5b39f65): all 65 passing, no
+   warnings, replay identical, no case lost homes or sf, parking met everywhere; bare row ends 417 -> 189, stalls in a
+   throat 60 -> 12, 90th percentile walk summed 5175 -> 4938 ft, max walk 6717 -> 6361 ft, dead ends 10 -> 6, sf a stall
+   summed 25,314 -> 25,331 (+0.07%), stalls 10,759 -> 10,779. Interaction found and fixed: rowsAlongDrives judged paving
+   by summing pieces, so on the TY fields (rectangular lot paving under the rows) taking far rows out looked like less
+   paving while the field stayed (TY-fitness 361 -> 447 sf a stall, TY-bigbox 341 -> 410): it now judges the paving's
+   union, planted islands left out, and those cases are unchanged. TY-clinic-custom's walk p90 74 -> 106 ft comes from a
+   different winning layout once the 13n rows count what they draw (12,000 -> 12,001 sf), not from the parking passes.
