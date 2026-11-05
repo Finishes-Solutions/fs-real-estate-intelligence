@@ -112,7 +112,7 @@ function SITE_E() { return [[0, 0], [500, 0], [500, 900], [0, 900]]; }
   const run = ([ask, d]) => customFrom(d, programFrom(d, ask));
   const R = Object.fromEntries(Object.entries(TYPE_REPLIES).map(([k, x]) => [k, run(x)]));
   // the words don't know "an inn": the model's preset sizes it by its rooms, 550 sf a key, its floors the preset's (none said)
-  assert.equal(R.inn.program.btype, 'hotel-limited'); assert.equal(R.inn.program.gfa, 80 * 550); assert.equal(R.inn.program.floors, undefined, 'the model’s guess at floors dropped: none in the words');
+  assert.equal(R.inn.program.btype, 'hotel-limited'); assert.equal(R.inn.program.gfa, 80 * 550); assert.equal(R.inn.program.floors, null, 'the model’s guess at floors dropped: none in the words');
   // a daycare by its children, the preset's own recipe (play yard, 0.2 a child) rather than the model's
   { const p = R.toddlers.program; assert.equal(p.btype, 'daycare'); assert.deepEqual(p.btCounts, { children: 90 }); assert.equal(p.custom.name, 'Daycare'); assert.equal(p.custom.parking.rate, 0.2); assert.ok(p.custom.outdoor.some(o => o.kind === 'play')); assert.equal(R.toddlers.note, undefined); }
   // a K-8 school read as a middle school (the model's variant): 140 sf a student, a play yard and a field

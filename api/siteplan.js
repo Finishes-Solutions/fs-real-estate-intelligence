@@ -255,7 +255,7 @@ export function typedFrom(d, p, prompt) {
   if (!id) return p;
   const base = { ...p }; delete base.custom;
   const W = numbersOf(wordsToDigits(words));
-  if (W.floors == null) delete base.floors; /* (the preset's usual floors, or the engine's for its use) */
+  if (W.floors == null) base.floors = null; /* (the preset's usual floors, or the engine's for its use) */
   if (+W.sf > 0 && !['storage-multi', 'storage-single', 'hotel-over-retail'].includes(id)) base.gfa = W.sf; /* (the size the words give, not the model's cut to what it thinks fits: the engine fits the most that works and says so) */
   const q = applyPreset(base, id, words, { count: bt.count, bedsPerUnit: bt.bedsPerUnit, mezzanine: bt.mezzanine, variant: bt.variant });
   if (!q?.btype) return p;
