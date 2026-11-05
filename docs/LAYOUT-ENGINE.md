@@ -1341,8 +1341,8 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    Bench (88 cases): 88 passing, no warnings, replay identical; 83 identical element for element; changed as intended:
    TY-datacenter (service drive, no court), TY-bigbox (one box 462 × 260 ft, was 706 × 170; 120,000 sf as before),
    TY-fitness (167 × 240 ft, was 348 × 115; 40,000 sf), TY-garage (405 spaces as before), TY-daycare-homes (its name only);
-   no homes or floor area lost; parking metrics 13,521 -> 13,518 stalls, 207 -> 211 bare row ends, no dead ends past
-   150 ft. Corpus (words path): the 120 at 119 as before (D05 honestly short); types 26 -> 31 of 33 (TY20, TY28 the land
+   no homes or floor area lost; parking metrics (folded onto parking round 5, 8bf388d) 13,505 -> 13,503 stalls, 200 ->
+   204 bare row ends, no dead ends past 150 ft, landscape standard met 54 of 76 as before. Corpus (words path): the 120 at 119 as before (D05 honestly short); types 26 -> 31 of 33 (TY20, TY28 the land
    limits above, said); fresh types 8 -> 10 of 10. Live (gpt-6-luna, the 33 types once, 33 calls, about $0.06): 28 -> 30 of 33 (TY20 189
    of 220 and TY28 the land limits, said; TY27 the model's own go-kart recipe drawn at 32,073 of at least 36,000 sf, not
    among these misses). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054
