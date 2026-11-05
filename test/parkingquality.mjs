@@ -275,4 +275,31 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
     const th = RUN.entryThroats(p, o.elements, 50).filter(x => !x.e.emergency); assert.ok(th.length && Math.min(...th.map(x => x.cross)) >= 50, ask + ': throat ' + th.map(x => x.cross));
   }
 }
+// item 43: the main drive's first 200 ft clear of stalls on a lot of 200 or more. A way in meeting a first aisle at a T,
+// rows across it beyond (the stalls facing the T and the next rows in): cut at the zone, their ends kept, the gap
+// left as lawn, paid for by the stalls to spare; a lot with none to spare is left as drawn
+{
+  const p = lot(900, 600), rowsAt = [[121, -1], [169, 1], [211, -1], [259, 1], [301, -1]], els = [
+    { id: 'a1', kind: 'drive', x: 450, y: 100, w: 780, d: 24, rot: 0, name: '', note: '24 ft drive aisle' },
+    { id: 'a2', kind: 'drive', x: 450, y: 190, w: 780, d: 24, rot: 0, name: '', note: '24 ft drive aisle' },
+    { id: 'a3', kind: 'drive', x: 450, y: 280, w: 780, d: 24, rot: 0, name: '', note: '24 ft drive aisle' },
+    { id: 'cw', kind: 'drive', x: 72, y: 190, w: 24, d: 204, rot: 0, name: '', note: '24 ft drive aisle' },
+    { id: 'ce', kind: 'drive', x: 828, y: 190, w: 24, d: 204, rot: 0, name: '', note: '24 ft drive aisle' },
+    { id: 'entry', kind: 'drive', x: 450, y: 44, w: 30, d: 88, rot: 0, name: 'Main entry', note: '30 ft driveway', entry: true },
+    ...rowsAt.map(([y, r], i) => ({ id: 'r' + i, kind: 'parking', x: 450, y, w: 711, d: 18, rot: 0, row: r, lock: true, islands: true, caps: 'square' })),
+    { id: 'shop', kind: 'building', x: 450, y: 420, w: 400, d: 100, rot: 0, use: 'retail', floors: 1 }
+  ];
+  const brief = B.canonicalBrief(B.briefFromRequest('40,000 sf retail', { ...p, elements: [] }));
+  brief.rules.values.parkingPer1000 = { v: 4, cls: 'assumption', source: 'test' };
+  const m0 = RUN.mainDriveStalls(p, els), q0 = pk(p, els, brief); assert.ok(m0 >= 20 && q0.provided - q0.required > m0, 'main ' + m0 + ', ' + q0.provided + '/' + q0.required);
+  const o = RUN.clearMainDrive(p, { elements: els, program: { use: 'retail' } }, brief), q1 = pk(p, o.elements, brief);
+  assert.equal(RUN.mainDriveStalls(p, o.elements), 0); assert.ok(q1.provided >= q1.required);
+  assert.ok(o.elements.some(e => e.id === 'r0-m1') && o.elements.some(e => e.id === 'r0-m2'), 'the row facing the T keeps both ends');
+  assert.ok((o.tplNotes || []).some(n => /main drive/.test(n)));
+  // nothing to spare: paid for by new rows on the drives' free sides (or left as drawn), never short, never farther
+  brief.rules.values.parkingPer1000 = { v: q0.provided / 40, cls: 'assumption', source: 'test' };
+  const o2 = RUN.clearMainDrive(p, { elements: els, program: { use: 'retail' } }, brief), q2 = pk(p, o2.elements, brief);
+  assert.ok(q2.provided >= q2.required, q2.provided + '/' + q2.required); assert.ok(RUN.walkP90(o2.elements) <= RUN.walkP90(els) + 0.5);
+  if (o2.elements !== els) assert.ok(o2.elements.some(e => /-row[LR]/.test(e.id)) && RUN.mainDriveStalls(p, o2.elements) < m0);
+}
 console.log('parking quality: ok');
