@@ -42,7 +42,10 @@ const SITES = {
   th5: [[0, 0], [660, 0], [660, 330], [0, 330]],
   th8: [[0, 0], [750, 0], [750, 465], [0, 465]],
   thdeep4: [[0, 0], [300, 0], [300, 580], [0, 580]],
-  thcorner6: { ring: [[0, 0], [560, 0], [560, 467], [0, 467]], streets: [1] }
+  thcorner6: { ring: [[0, 0], [560, 0], [560, 467], [0, 467]], streets: [1] },
+  /* angled parking: a 6 ac grocery lot, and a 3.75 ac lot whose parking bays are a few feet short of square stalls' 60 ft modules */
+  grocery6: [[0, 0], [600, 0], [600, 435], [0, 435]],
+  bay60: [[0, 0], [560, 0], [560, 292], [0, 292]]
 };
 const CASES = [
   { id: 'MF-garden-exact', family: 'multifamily', site: 'rect10', ask: 'exactly 120 garden apartments, 3 stories' },
@@ -87,7 +90,11 @@ const CASES = [
   { id: 'TH-sub5', family: 'multifamily', site: 'th5', ask: 'townhomes, as many as fit' },
   { id: 'TH-sub8', family: 'multifamily', site: 'th8', ask: 'townhomes, as many as fit' },
   { id: 'TH-deep4', family: 'multifamily', site: 'thdeep4', ask: 'townhomes, as many as fit' },
-  { id: 'TH-corner6', family: 'multifamily', site: 'thcorner6', ask: 'townhomes, as many as fit' }
+  { id: 'TH-corner6', family: 'multifamily', site: 'thcorner6', ask: 'townhomes, as many as fit' },
+  // angled parking: asked for on a grocery-anchored center and on a retail field; not asked, on a lot whose bays suit 60°
+  { id: 'RE-grocery-angled', family: 'retail', site: 'grocery6', ask: 'grocery-anchored shopping center with a 40,000 sf grocery anchor, 50,000 sf total, angled parking' },
+  { id: 'RE-field-angled', family: 'retail', site: 'grocery6', ask: '40,000 sf retail with angled parking' },
+  { id: 'RE-bay60', family: 'retail', site: 'bay60', ask: '30,000 sf retail' }
 ];
 const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });

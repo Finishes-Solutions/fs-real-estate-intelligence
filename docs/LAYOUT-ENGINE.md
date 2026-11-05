@@ -499,3 +499,55 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    LOT-curved-apt 444 -> 456; other cases unchanged; bench time about 15% longer (a fourth pond place per stack).
    Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Still: wedge9 keeps about
    0.9 ac open behind its back row (no lane reaches it; a short cul-de-sac off the back lane would), and L12 stays at 204.
+
+24. Done Nov 4 (angled parking). The owner: "the parking doesn't always have to be straight but can be angled sometimes
+   like grocery store parking lots". Every stall was 90° on a 24 ft two-way aisle. Now stall rows can be laid at 60° or
+   45° on one-way aisles. Sizes (lib/siteplan.mjs ANGLED, one table, mid-range of ULI / NPA "The Dimensions of Parking"
+   5th ed. and the ITE "Traffic Engineering Handbook" 7th ed. for a 9 ft stall and a standard car): 60°: 20 ft row
+   depth square to the aisle, 17 ft one-way aisle, 57 ft module; 45°: 18 ft, 14 ft, 50 ft; 90° unchanged (18 ft, 24 ft
+   two-way, 60 ft). Along the aisle a stall takes 9 / sin(angle) (10.39 ft, 12.73 ft) and a row loses d / tan(angle) at
+   its ends (11.5 ft, 18 ft), planted as triangles; every thirteenth stall is a slanted island as before.
+   (a) Geometry: an angled row is a parking rectangle with `ang` (60 | 45) and `flow` (+1 / -1: the way its aisle's
+   traffic runs along the row's length); the stalls are parallelograms leaning with the traffic so a driver turns in
+   forward (lib/siteplan.mjs stalls / stallLines / stallCentres / capsOf / angledStallPolys). A one-way aisle is a drive
+   with `oneWay: true` and `flow`, its note "17 ft one-way drive aisle"; arrows are painted along it every 60 ft
+   (onewayMarks: the plan sheet, the dimension sheet, the map and the DXF draw them).
+   (b) Circulation and fire access: neighbouring one-way aisles run opposite ways and the two-way collectors (26 ft)
+   join every aisle at both ends; a candidate with one aisle and no service drive, or no collector at one end, is not
+   tried at an angle. A one-way aisle is never a fire lane: the engine's fire reach leaves it out (it was already under
+   23.5 ft) and so do the validator's fire route and fire-width check (turning.mjs oneWayLane). New validator check
+   `access.one-way` (hard, geometry): every one-way aisle meets a two-way drive at both ends, has its direction marked,
+   and the angled stalls along it lean with its traffic.
+   (c) Counting: the engine counts whole stalls at the pitch; the validator counts angled stalls independently from the
+   stripes as drawn (layoutcheck.mjs angledStalls): neighbouring parallel stripes a stall width apart (square to the
+   stripes), each parallelogram holding the ULI design car (about 6.6 x 17.3 ft) and not planted, inside its row and the
+   site, clear of buildings. Accessible stalls stay square with their access aisles: in a 90° row when the plan has one
+   (the rows along the collectors are always square), else two square stalls and their aisle carved from four angled
+   stalls (one and its aisle from three), so where every row is angled each accessible pair costs two stalls, not one
+   (siteplan.mjs adaLossOf; the validator's access-aisle share likewise).
+   (d) When: asked for in words ("angled parking", "angled stalls", "diagonal parking", "60 degree parking", "45°
+   parking", "parking at 60 degrees", "grocery style / grocery-store parking"; guessProgram -> program.parkAngle ->
+   brief program.parking.angle, validated as 60 | 45 | 'angled'; an AI brief's angle reaches the engine through
+   toEngine, with a mapping note): the field engine (lib/siteparking.mjs) lays every field at the angle (both angles
+   when just "angled"), and if no angled layout parks the program it lays them square and says why; a grocery-anchored
+   center (lib/sitecenter.mjs) is laid out as before and its rows laid again at the angle on the same land
+   (siteparking.mjs restripeAngled: each 60 ft module becomes 20 ft rows on a 20 ft one-way aisle; an aisle whose end
+   stops in the open paving gets a 24 ft two-way drive across its end to the next aisle's, the rows there giving up
+   whole stalls; only aisles that meet two-way drives at both ends turn), then only the aisles that already end at
+   drives, then square, each saying so. Not asked: every field arrangement is also tried at 60° and 45° where its depth
+   holds more stall rows a foot of aisle than square stalls do (a depth a few feet short of whole 60 ft modules), on the
+   side (enginectx.mjs aside: its own evaluation budget, clock and random stream) and offered only where it parks the
+   program and outscores every square layout found (or no square one parks it), so other requests get exactly the
+   options they got before. Notes say angled and why ("As asked" / "this field's depth holds more stalls at 60°").
+   Bench (three new cases, all passing, no warnings, replay identical): RE-grocery-angled (6 ac, "grocery-anchored
+   shopping center with a 40,000 sf grocery anchor, 50,000 sf total, angled parking"): 2 of its 3 aisles one-way at 60°
+   (the two-way aisle along the storefronts keeps the square row and the accessible stalls), 202 / 200 spaces, 83,215 sf
+   paved (laid square, as before this change: 202 / 200, 82,638 sf); RE-field-angled (6 ac, "40,000 sf retail with
+   angled parking"): 60° on two one-way aisles, 165 / 160 (square: 163 / 160, 124,811 sf paved; angled 134,534 sf, the
+   price of the angle); RE-bay60 (560 x 292 ft, "30,000 sf retail", no angle asked): square stalls fit only 28,099 sf
+   (program check failing), 60° parks all 30,000 sf (124 / 120) on less paving (84,359 vs 86,830 sf). The 41 earlier
+   cases are unchanged, every option identical. Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054
+   podium-urban 172). Tests: test/angledparking.mjs. Still: 45° wins less often than 60° (its 50 ft module seldom beats a
+   single-loaded square bay); the square layouts drawn by the older generator (lib/sitelayout.mjs
+   attempt, apartments' guest rows) are not restriped; the engine's square-row count and its drawn stall centres can
+   differ by one on a 13-stall row with end caps (found here, pre-existing, not changed: the validator follows the marks).

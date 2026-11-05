@@ -202,6 +202,23 @@ export function splitMix(n, mix) {
 // a front-load duplex parks one car in its garage and one on its driveway apron (25 ft in front of the garage)
 export const drivewayOf = e => e.kind === 'building' && (e.use === 'duplex' || e.use === 'townhomes') && /front-load/i.test(e.note || '') ? (e.units ?? 1) : 0; // (a front-load townhome too: its apron in front of the garage)
 export const STALL = { w: 9, d: 18, aisle: 24 };
+// angled stalls ("grocery store" parking): one table, planning-level, a 9 ft stall at 45 and 60 degrees to a ONE-WAY
+// aisle. d is the stall row's depth measured square to the aisle (curb or head line to the aisle's edge), aisle the
+// one-way aisle's width; a double-loaded module is 2 d + aisle. The values sit mid-range of the published tables for a
+// 9 ft stall and a standard car: ULI / NPA "The Dimensions of Parking" (5th ed., 2010) and the ITE "Traffic Engineering
+// Handbook" (7th ed., 2016, parking chapter), which give for a 9 ft stall about 45°: 17-18 ft stall depth, 12-14 ft
+// one-way aisle, a 48-51 ft module; 60°: 19-20 ft, 16-18 ft, 55-58 ft; 90°: 18 ft, 24 ft two-way, 60 ft (STALL above).
+// Along the aisle a stall takes w / sin(angle) (10.39 ft at 60°, 12.73 ft at 45°), and a row loses d / tan(angle) at
+// its ends to the triangles its first and last stripes leave (planted). Local codes govern; never tighter than these.
+export const ANGLED = Object.freeze({ 60: Object.freeze({ w: 9, d: 20, aisle: 17, module: 57 }), 45: Object.freeze({ w: 9, d: 18, aisle: 14, module: 50 }),
+  source: 'ULI/NPA The Dimensions of Parking (5th ed.) and ITE Traffic Engineering Handbook (7th ed.): 9 ft stall; 60°: 20 ft stall depth, 17 ft one-way aisle, 57 ft module; 45°: 18 ft, 14 ft, 50 ft (mid-range planning values)' });
+// a parking piece's stall angle: 60 or 45 for an angled row (e.ang), 0 for square stalls (a custom outline is always 90°)
+export const stallAng = e => e && !e.poly && (+e.ang === 60 || +e.ang === 45) ? +e.ang : 0;
+// an angle's module sizes: stall width w, row depth d, one-way aisle, the stall's length along the aisle (pitch) and
+// what a row loses at its ends (off: the slant of a stripe along the aisle)
+export function angledDims(ang, sw = ANGLED[ang]?.w || 9) { const A = ANGLED[ang], t = ang * RAD; return { w: sw, d: A.d, aisle: A.aisle, module: 2 * A.d + A.aisle, pitch: sw / Math.sin(t), off: A.d / Math.tan(t) }; }
+// the stall length along a row's aisle (what a row is shortened by to take one stall off)
+export const stallPitch = e => stallAng(e) ? (e.sw || 9) / Math.sin(stallAng(e) * RAD) : e.sw || STALL.w;
 export const DRIVE_W = 26;
 
 // ---------- frame: lon/lat <-> feet around an origin ----------
@@ -1333,6 +1350,19 @@ export function loopMarks(plan) {
       for (const k of [1, -1]) out.push({ line: [tail(k), p2(p)], color: '#ffffff', w: 0.8 }); } }
   return out;
 }
+// a one-way parking aisle (e.oneWay, e.flow: +1 traffic runs toward its +length end, -1 the other way): a white arrow
+// painted every 60 ft or so along its middle, the way it runs (the angled rows either side lean that way too).
+// [{ line, color, w }] like loopMarks.
+export function onewayMarks(plan) {
+  const out = [];
+  for (const e of (plan.elements || []).filter(x => x.kind === 'drive' && x.oneWay && (x.flow === 1 || x.flow === -1) && !x.poly && !x.path && +x.w > 0 && +x.d > 0)) {
+    const L = Math.max(e.w, e.d), along = e.w >= e.d ? [1, 0] : [0, 1], u = rot(along.map(v => v * e.flow), e.rot || 0), q = [-u[1], u[0]], n = Math.max(1, Math.round((L - 40) / 60));
+    for (let k = 0; k < n; k++) { const t = -L / 2 + 20 + (L - 40) * (k + 0.5) / n, p = [e.x + u[0] * t * e.flow, e.y + u[1] * t * e.flow], tip = [p[0] + u[0] * 5, p[1] + u[1] * 5];
+      out.push({ line: [p2([p[0] - u[0] * 5, p[1] - u[1] * 5]), p2(tip)], color: '#ffffff', w: 0.8 });
+      for (const s of [1, -1]) out.push({ line: [p2([tip[0] - u[0] * 3.5 + q[0] * s * 3, tip[1] - u[1] * 3.5 + q[1] * s * 3]), p2(tip)], color: '#ffffff', w: 0.8 }); }
+  }
+  return out;
+}
 // where an entrance meets the street: its route's first point (an outline's is read square from its middle to the lot line)
 export const mouthOf = (e, ring) => (r => r ? r.path[0] : centroid(shapeOf(e)))(ring?.length >= 3 && routeOf(e, ring));
 // where a dragged piece settles: inside the setbacks (buildings) or landscape buffers (paving), and lined up with the
@@ -1755,7 +1785,35 @@ const rectDist = (c, a, b) => c.reduce((m, p, i) => Math.min(m, segSeg(p, c[(i +
 // single-loaded row if there's room. Rows run along whichever side holds more stalls, or the way Stall direction set
 // (stallRot: 0 along its width, 90 along its depth). A piece with a custom outline (poly) is filled by lib/stalls.mjs:
 // { count, rows, swap, fill } with fill the stalls themselves (n is 0: it has no single row length).
+// Angled rows (e.ang 60 or 45, ANGLED): stalls run along the piece's width (u), parallelograms whose stripes slant at
+// the angle to the aisle, leaning the way the aisle's one-way traffic runs (e.flow +1: toward +u, -1: toward -u), so a
+// driver turns in forward. e.row (+1 the aisle on the +v side, -1 on the -v side) is one row; without it the depth holds
+// double-loaded modules (row, one-way aisle, row; the modules' aisles alternate direction), then a single-loaded row.
+// { count, rows: [[v0, v1]], n, W, swap: false, ang, pitch, off, x0 (where the first stall's slant starts), aisleAt:
+// [+1 | -1 a row's aisle side], flows: [+1 | -1 a row's traffic], skip (island slots), S }
+function angStalls(e) {
+  const ang = stallAng(e), A = ANGLED[ang], S = { w: e.sw || A.w, d: e.sd || A.d, aisle: e.sa || A.aisle }, t = ang * RAD, pitch = S.w / Math.sin(t), off = S.d / Math.tan(t), W = +e.w || 0, D = +e.d || 0, f0 = e.flow < 0 ? -1 : 1;
+  const n = Math.max(0, Math.floor((W - off + 0.01) / pitch)), rows = [], aisleAt = [], flows = [];
+  if (e.row) { if (D >= S.d - 0.01) { rows.push(e.row > 0 ? [D / 2 - S.d, D / 2] : [-D / 2, -D / 2 + S.d]); aisleAt.push(e.row > 0 ? 1 : -1); flows.push(f0); } }
+  else { let y = -D / 2, j = 0; while (D / 2 - y >= 2 * S.d + S.aisle - 0.01) { const f = j % 2 ? -f0 : f0; rows.push([y, y + S.d], [y + S.d + S.aisle, y + 2 * S.d + S.aisle]); aisleAt.push(1, -1); flows.push(f, f); y += 2 * S.d + S.aisle; j++; }
+    if (D / 2 - y >= S.d + S.aisle - 0.01) { rows.push([y, y + S.d]); aisleAt.push(1); flows.push(j % 2 ? -f0 : f0); } }
+  const skip = new Set(); if (e.islands) for (let k = 12; k < n; k += 13) skip.add(k);
+  return { count: rows.length * Math.max(0, n - skip.size), rows, n, W, swap: false, ang, pitch, off, x0: -(n * pitch + off) / 2, aisleAt, flows, skip, S };
+}
+// stall i of row r of an angled piece: its parallelogram (aisle edge first), in the piece's own frame (u along w)
+function angLocal(st, r, i) {
+  const [y0, y1] = st.rows[r], s = st.aisleAt[r], f = st.flows[r], va = s > 0 ? y1 : y0, vh = s > 0 ? y0 : y1, a = st.x0 + (f > 0 ? 0 : st.off) + i * st.pitch, h = st.x0 + (f > 0 ? st.off : 0) + i * st.pitch;
+  return [[a, va], [a + st.pitch, va], [h + st.pitch, vh], [h, vh]];
+}
+const toPlanOf = e => ([u, v]) => { const q = rot([u, v], e.rot || 0); return [+(e.x + q[0]).toFixed(2), +(e.y + q[1]).toFixed(2)]; };
+// an angled piece's stalls as parallelograms in plan feet, islands left out: [{ poly, r, i }]
+export function angledStallPolys(e) {
+  if (!stallAng(e)) return []; const st = angStalls(e), put = toPlanOf(e), out = [];
+  st.rows.forEach((_, r) => { for (let i = 0; i < st.n; i++) if (!st.skip.has(i)) out.push({ poly: angLocal(st, r, i).map(put), r, i }); });
+  return out;
+}
 export function stalls(e, S0 = STALL) {
+  if (stallAng(e)) return angStalls(e);
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0; // a plan's own stall size
   if (e.poly) { const f = STL.polyStalls(e, S); return { count: f.count, rows: f.rows.map(r => [r.a, r.b]), n: 0, W: 0, swap: !!f.swap, fill: f }; }
   const lay = (W, D) => {
@@ -1775,10 +1833,22 @@ export function stalls(e, S0 = STALL) {
 // planted islands in a parking rectangle (every 13th space when e.islands): centres in plan feet, 9 x 18 ft
 export function islandsOf(e, S0 = STALL) {
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0;
-  if (!e.islands || e.poly) return [];
+  if (!e.islands || e.poly || stallAng(e)) return []; // (an angled row's islands are slanted: capsOf draws them)
   const st = stalls(e, S), x0 = -st.n * S.w / 2, out = [];
   const put = (u, v) => { const p = st.swap ? [v, -u] : [u, v], q = rot(p, e.rot || 0); return [e.x + q[0], e.y + q[1]]; };
   for (const [y0, y1] of st.rows) for (let k = 12; k < st.n - (e.caps ? 1 : 0); k += 13) out.push(put(x0 + (k + 0.5) * S.w, (y0 + y1) / 2));
+  return out;
+}
+// an angled row's planted ends and islands: the triangle each end stripe leaves at the row's end, and the island
+// stalls (every thirteenth), slanted like the stalls. [{ poly, tree }] in plan feet, as capsOf's.
+function angCaps(e) {
+  const st = angStalls(e), put = toPlanOf(e), out = [], cen = q => [q.reduce((t, p) => t + p[0], 0) / q.length, q.reduce((t, p) => t + p[1], 0) / q.length]; if (!st.n) return out;
+  st.rows.forEach((_, r) => {
+    const a = angLocal(st, r, 0), b = angLocal(st, r, st.n - 1), va = a[0][1], vh = a[3][1], L = st.x0, R = st.x0 + st.n * st.pitch + st.off;
+    const tri = pts => pts.filter((p, k) => pts.findIndex(q => Math.abs(q[0] - p[0]) < 0.05 && Math.abs(q[1] - p[1]) < 0.05) === k);
+    for (const q of [tri([[L, va], a[0], a[3], [L, vh]]), tri([b[1], [R, va], [R, vh], b[2]])]) if (q.length === 3) { const c = cen(q); out.push({ poly: q.map(put), tree: put([c[0], c[1]]) }); }
+    for (const i of st.skip) { const q = angLocal(st, r, i), c = cen(q); out.push({ poly: q.map(put), tree: put(c) }); }
+  });
   return out;
 }
 // rounded planted islands at both ends of every stall row (e.caps): a half-disc in the end space, flat against the next
@@ -1786,6 +1856,7 @@ export function islandsOf(e, S0 = STALL) {
 // Outlines in plan feet, and a tree in each.
 export function capsOf(e, S0 = STALL) {
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0;
+  if (stallAng(e)) return angCaps(e);
   if (!e.caps || e.poly) return [];
   const st = stalls(e, S); if (st.n < 6) return [];
   const x0 = -st.n * S.w / 2, out = [], put = (u, v) => { const q = rot(st.swap ? [v, -u] : [u, v], e.rot || 0); return [+(e.x + q[0]).toFixed(2), +(e.y + q[1]).toFixed(2)]; };
@@ -1801,6 +1872,12 @@ export function capsOf(e, S0 = STALL) {
 export function stallLines(e, S0 = STALL) {
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0;
   if (e.poly) return STL.linesOf(stalls(e, S).fill);
+  if (stallAng(e)) { // an angled row: every stripe at the angle (aisle edge to head line), and the head line
+    const st = angStalls(e), put = toPlanOf(e), out = []; if (!st.n) return out;
+    st.rows.forEach((_, r) => { for (let i = 0; i <= st.n; i++) { const q = i < st.n ? angLocal(st, r, i) : angLocal(st, r, i - 1); out.push(i < st.n ? [put(q[0]), put(q[3])] : [put(q[1]), put(q[2])]); }
+      const a = angLocal(st, r, 0), b = angLocal(st, r, st.n - 1); out.push([put(a[3]), put(b[2])]); });
+    return out;
+  }
   const st = stalls(e, S), W = st.swap ? e.d : e.w, out = [], x0 = -st.n * S.w / 2;
   const put = (u, v) => { const p = st.swap ? [v, -u] : [u, v], q = rot(p, e.rot || 0); return [+(e.x + q[0]).toFixed(2), +(e.y + q[1]).toFixed(2)]; };
   if (W <= 0) return out;
@@ -1838,6 +1915,7 @@ export function normalizeProgram(p = {}) {
   out.flex = !!p.flex; // (industrial: flex space)
   out.crossDock = !!p.crossDock; // (industrial: a cross-dock, doors on both long sides, lib/sitegencom.mjs crossDock)
   out.anchor = +p.anchor || 0; // (retail: the anchor's floor area)
+  if (+p.parkAngle === 60 || +p.parkAngle === 45 || p.parkAngle === 'angled') out.parkAngle = p.parkAngle === 'angled' ? 'angled' : +p.parkAngle; // (angled stall rows asked for: ANGLED; kept off the program when not asked, so other programs read as before)
   out.lotDSet = p.lotDSet != null ? !!p.lotDSet : +p.lotD > 0 && +p.lotD !== 115; // (a lot depth asked for: the layouts keep it; else they may use a shallower one)
   if (HOME_USES.includes(use) && !out.zones && +p.clubhouse?.sf > 0) out.clubhouse = { sf: Math.round(clamp(p.clubhouse.sf, 1000, 10000, 4000)) }; // a neighbourhood's own leasing / amenity building (lib/sitelayout.mjs withClubhouse)
   if ((+p.pads > 0 || p.pads === 'auto') && !out.zones && ['retail', 'restaurant', 'office', 'medical', 'other', 'fuel'].includes(use)) out.pads = p.pads === 'auto' ? 'auto' : Math.round(clamp(p.pads, 0, 4, 0)); // a single commercial use's outparcel pads ('auto': as many as the frontage allows)
@@ -2209,6 +2287,8 @@ function guessProgram0(text) {
   if (/\b(?:dumpsters?|trash (?:enclosures?|corrals?)|refuse)\b/.test(t) && !/\bno (?:dumpsters?|trash)/.test(t)) p.trash = true; // enclosures only when asked for
   { const m = t.match(/\b(two|three|four|2|3|4)\s+(?:separate\s+)?(?:entrances|entries|entry points|driveways|access points|curb cuts|ways in)\b/), W = { two: 2, three: 3, four: 4 }; // how many ways in
     if (m) p.entrances = W[m[1]] || +m[1]; else if (/\b(?:second|another|extra|additional|multiple|more)\s+(?:entrance|entry|driveway|access point|curb cut|way in)/.test(t)) p.entrances = 2; }
+  { const m = /\b(45|60)\s*(?:°|-?\s*deg(?:ree)?s?)\s*(?:angled?\s*)?(?:parking|stalls?|spaces?)|\bparking (?:stalls |spaces )?(?:at|on) (?:an? )?(45|60)\s*(?:°|-?\s*deg)/.exec(t1); // angled parking asked for ("60 degree parking", "angled parking", "grocery-style parking"): the field engine lays its stall rows at that angle on one-way aisles (lib/siteparking.mjs)
+    if (m) p.parkAngle = +(m[1] || m[2]); else if (/\b(?:angled?|diagonal|slanted)[- ](?:parking|stalls?|spaces?)\b|\bgrocery[- ](?:store[- ])?style parking|\bgrocery[- ]store parking|\bparking (?:at|on) an angle\b/.test(t1)) p.parkAngle = 'angled'; }
   if (p.storm) {} else if (/retention|wet pond|permanent pool/.test(t)) p.storm = 'retention'; else if (/underground (?:detention|storage|vault)|detention vault|storm ?(?:water )?vault|under the parking/.test(t)) p.storm = 'underground'; else if (/regional (?:detention|pond|facility|basin)|off[- ]?site (?:detention|storage|pond)|detention (?:is |will be )?(?:handled |provided |done )?(?:off[- ]?site|elsewhere|off the site|by (?:a|the) (?:regional|district|master))|drains? to (?:a |the )?(?:regional|master)|master[- ]planned detention|no on[- ]?site detention/.test(t)) p.storm = 'none'; // ("no detention" sets the share to 0 above)
   const ex = [['patio', /outdoor (?:seating|dining)|patio|terrace/], ['playground', /playground|play ?area|tot lot/], ['lawn', /grass|lawn|green ?space|open space/], ['drivethru', /drive[- ]?thru|drive[- ]?through(?! drive)/]].filter(([, re]) => re.test(t)).map(([k]) => k); if (ex.length) p.extras = ex; // small extras laid out with the main use
   if (/no truck|without truck/.test(t)) p.truck = false; else if (/truck court|dock|loading/.test(t)) p.truck = true;
@@ -2315,7 +2395,7 @@ export function metrics(plan) {
   const useOf = e => USES[e.use] ? e.use : prog.use, gfaOf = e => gfaOfEl(e); // a home counts its living area, not its garage
   const site = ringArea(ring), footprint = sum('building'), gfa = B.reduce((s, e) => s + gfaOf(e), 0);
   const canopy = sum('canopy'), paved = sum('parking') + sum('drive') + sum('truck') + sum('plaza') + sum('foodtruck') + canopy + sum('tanks') + fieldPaving(els), pond = sum('pond'), hard = sum('court') + sum('pool'), keepout = sum('keepout'); // an easement is neither built on nor open space; a canopy's paving counts once, as paving
-  const lots = els.filter(e => e.kind === 'parking' && !e.rv && !e.vac), raw = lots.reduce((s, e) => s + stalls(e).count, 0), stallsN = raw - adaLoss(raw), ada = adaCount(raw); // accessible pairs share an aisle
+  const lots = els.filter(e => e.kind === 'parking' && !e.rv && !e.vac), raw = lots.reduce((s, e) => s + stalls(e).count, 0), stallsN = raw - adaLossOf(lots, raw), ada = adaCount(raw); // accessible pairs share an aisle
   const deck = els.filter(e => e.kind === 'garage').reduce((s, e) => s + garageStalls(e), 0) + els.reduce((s, e) => s + podiumStalls(e), 0); // parking garages: about 330 sq ft a space on each level; podium levels on their grid
   // homes: apartments from floor area, townhomes and duplexes as drawn; parking needed per building by its own use
   const single = B.every(e => useOf(e) === prog.use), wholeMf = single && prog.use === 'multifamily' && gfa && !B.some(e => e.units != null || e.ground);
@@ -2375,6 +2455,7 @@ export function metrics(plan) {
 }
 // the centre of every stall in a parking piece (plan feet), islands and end caps left out
 export function stallCentres(e, S0 = STALL) {
+  if (stallAng(e)) return angledStallPolys(e).map(({ poly: q }) => [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4]);
   const S = e.sw ? { w: e.sw, d: e.sd || S0.d, aisle: e.sa || S0.aisle } : S0, st = stalls(e, S), x0 = -st.n * S.w / 2, out = [];
   if (e.poly) return STL.centresOf(st.fill);
   const skip = new Set(); if (e.islands) for (let k = 12; k < st.n - (e.caps ? 1 : 0); k += 13) skip.add(k); if (e.caps && st.n >= 6) { skip.add(0); skip.add(st.n - 1); }
@@ -3233,6 +3314,10 @@ export function adaCount(n) {
   for (const [m, k] of T) if (n <= m) return k; return n <= 1000 ? Math.ceil(n * 0.02) : 20 + Math.ceil((n - 1000) / 100);
 }
 export const adaLoss = n => Math.ceil(adaCount(n) / 2);
+// the same on a plan's parking pieces: where every stall row is angled (no square row of three or more to take them),
+// a pair of accessible stalls and their aisle, square to the aisle, take four angled stalls (one and its aisle, three),
+// so each costs twice as much (accessible below)
+export const adaLossOf = (lots, n) => adaLoss(n) * (lots.some(e => stallAng(e)) && !lots.some(e => e.kind === 'parking' && !e.rv && !e.vac && !e.parallel && !stallAng(e) && stalls(e).count >= 3) ? 2 : 1);
 // where they go: in the stall rows nearest each building (closest first, taking turns between buildings), as
 // accessible stall, striped aisle, accessible stall. Never on a planted island or an end cap.
 export function accessible(plan) {
@@ -3241,8 +3326,16 @@ export function accessible(plan) {
   const B = els.filter(e => e.kind === 'building' && !USES[e.use]?.garage), ent = els.find(e => e.name === 'Main entry');
   const goals = B.length ? B.map(b => ({ o: outline(b) })) : [{ o: ent ? outline(ent) : plan.ring || [[0, 0]] }];
   const slots = []; // runs of three ordinary stalls side by side
-  const P90 = P.filter(e => !e.parallel); // (parallel guest stalls along a drive take no accessible stall while a 90° row can)
-  for (const e of P90.length ? P90 : P) {
+  const P90 = P.filter(e => !e.parallel && !stallAng(e)), PA = P.filter(e => !e.parallel && stallAng(e)); // (parallel guest stalls along a drive take no accessible stall while a 90° row can; nor do angled rows, accessible stalls stay square to their aisle)
+  for (const e of P90.length ? P90 : PA.length ? PA : P) {
+    if (stallAng(e)) { // an angled row (no square row on the plan): two accessible stalls and their aisle, square to the aisle, take the room of four angled stalls (one and its aisle, three)
+      const st = stalls(e), put = toPlanOf(e);
+      st.rows.forEach((_, r) => { for (let i = 0; i + 2 < st.n; i++) { const ok = k => { for (let j = i; j < i + k; j++) if (st.skip.has(j) || j >= st.n) return false; return true; }; if (!ok(3)) continue;
+        const va = angLocal(st, r, i)[0][1], vh = va - st.aisleAt[r] * STALL.d, run = m => [st.x0 + i * st.pitch + st.off, st.x0 + (i + m) * st.pitch], c = put([(run(3)[0] + run(3)[1]) / 2, (va + vh) / 2]);
+        const boxes = k => { const [u0, u1] = run(k === 3 ? 4 : 3), w = STALL.w, mid = (u0 + u1) / 2; return Array.from({ length: k }, (_, j) => { const a = mid - k * w / 2 + j * w; return [[a, va], [a + w, va], [a + w, vh], [a, vh]].map(put); }); };
+        slots.push({ key: e.id + ':' + r, i, three: ok(4), extra: 1, boxes, c, d: goals.map(g => g.o.reduce((m, p, k) => Math.min(m, segDist(c, p, g.o[(k + 1) % g.o.length])), Infinity)) }); } });
+      continue;
+    }
     if (e.poly) { // a custom outline: runs of neighbouring stalls in its rows (lib/stalls.mjs)
       const f = stalls(e).fill, bx = STL.boxesOf(f);
       f.rows.forEach((r, ri) => { for (const [i0, i1] of STL.runsOf(r, f.S.w)) for (let i = i0; i < i1; i++) {
@@ -3260,14 +3353,14 @@ export function accessible(plan) {
       slots.push({ key: e.id + ':' + r, i, three, c, box: k => box(k, y0, y1), d: goals.map(g => g.o.reduce((m, p, k) => Math.min(m, segDist(c, p, g.o[(k + 1) % g.o.length])), Infinity)) });
     } });
   }
-  const used = new Map(), free = (q, k) => { const u = used.get(q.key) || new Set(); for (let j = q.i - 1; j <= q.i + k; j++) if (u.has(j)) return false; return true; }, take = (q, k) => { const u = used.get(q.key) || used.set(q.key, new Set()).get(q.key); for (let j = q.i; j < q.i + k; j++) u.add(j); };
+  const used = new Map(), free = (q, k) => { const u = used.get(q.key) || new Set(); for (let j = q.i - 1; j <= q.i + k + (q.extra || 0); j++) if (u.has(j)) return false; return true; }, take = (q, k) => { const u = used.get(q.key) || used.set(q.key, new Set()).get(q.key); for (let j = q.i; j < q.i + k + (q.extra || 0); j++) u.add(j); };
   let left = n, g = 0, guard = 0;
   while (left > 0 && guard++ < 400) {
     const k = left >= 2 ? 3 : 2, best = slots.filter(q => (k === 2 || q.three) && free(q, k)).sort((a, b) => a.d[g] - b.d[g])[0]; g = (g + 1) % goals.length;
     if (!best) { if (k === 3) { left = 1; continue; } break; }
-    take(best, k); const ada = k === 3 ? [best.i, best.i + 2] : [best.i], ai = best.i + 1;
-    for (const i of ada) { const poly = best.box(i); out.stalls.push({ poly, van: out.stalls.length < out.van, sym: centroid(poly) }); }
-    const ap = best.box(ai), [a0, a1, a2, a3] = ap, lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    take(best, k); const ada = k === 3 ? [best.i, best.i + 2] : [best.i], ai = best.i + 1, bx = best.boxes ? best.boxes(k) : null, boxOf = j => bx ? bx[j - best.i] : best.box(j); // (an angled run: its square boxes)
+    for (const i of ada) { const poly = boxOf(i); out.stalls.push({ poly, van: out.stalls.length < out.van, sym: centroid(poly) }); }
+    const ap = boxOf(ai), [a0, a1, a2, a3] = ap, lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
     out.aisles.push({ poly: ap, lines: [0.15, 0.4, 0.65].map(t => [lerp(a0, a3, t), lerp(a1, a2, t + 0.3)]) }); left -= ada.length;
   }
   return out;
@@ -3501,7 +3594,7 @@ export function planFeatures(plan, selected, keep = null) {
   const A = accessible(plan);
   for (const a of A.stalls) feats.push({ type: 'Feature', properties: { k: 'ada', van: a.van ? 1 : 0 }, geometry: poly(a.poly) });
   for (const a of A.aisles) for (const l of [...a.lines, ...a.poly.map((p, i) => [p, a.poly[(i + 1) % a.poly.length]])]) feats.push({ type: 'Feature', properties: { k: 'mark', c: '#2f6db5', w: 1 }, geometry: { type: 'LineString', coordinates: ll(l) } });
-  for (const m of [...entryMarks(plan), ...loopMarks(plan)]) feats.push({ type: 'Feature', properties: { k: 'mark', c: m.color, w: m.w > 1 ? 3 : 1 }, geometry: { type: 'LineString', coordinates: ll(m.line) } });
+  for (const m of [...entryMarks(plan), ...loopMarks(plan), ...onewayMarks(plan)]) feats.push({ type: 'Feature', properties: { k: 'mark', c: m.color, w: m.w > 1 ? 3 : 1 }, geometry: { type: 'LineString', coordinates: ll(m.line) } });
   for (const m of driveThruMarks(plan.elements || [])) feats.push(m.line ? { type: 'Feature', properties: { k: 'mark', c: '#1b1e1f', w: 3 }, geometry: { type: 'LineString', coordinates: ll(m.line) } } : { type: 'Feature', properties: { k: 'label', t: m.t, kind: 'drive', big: 0 }, geometry: { type: 'Point', coordinates: F.toLL(m.at) } }); // a drive-thru's pickup window and order point
   for (const [x, y, r] of d.trees) for (const [ring, b, t, c] of tree3D(x, y, r)) feats.push({ type: 'Feature', properties: { k: 'tree', b: +(b / FT).toFixed(2), h: +(t / FT).toFixed(2), c }, geometry: poly(ring) }); // 3D trees (metres)
   const fc = { type: 'FeatureCollection', features: feats }; Object.defineProperty(fc, 'keep', { value: { bad, d } }); return fc;
@@ -3533,7 +3626,7 @@ export function toDXF(plan, title = '') {
   // the paving's outside edge as one closed curb line (and round any holes), accessible stalls and entry markings
   for (const pv of pavement(plan)) { pl('CURB', pv.outer); pv.holes.forEach(h => pl('CURB', h)); }
   const A = accessible(plan); A.stalls.forEach(a => pl('ADA', a.poly)); A.aisles.forEach(a => { pl('ADA', a.poly); a.lines.forEach(l => line('ADA', l)); });
-  [...entryMarks(plan), ...loopMarks(plan)].forEach(mk => line('MARKINGS', mk.line));
+  [...entryMarks(plan), ...loopMarks(plan), ...onewayMarks(plan)].forEach(mk => line('MARKINGS', mk.line));
   const m = metrics(plan), th = Math.max(4, Math.min(20, Math.sqrt(m.siteSf || 1e4) / 40));
   for (const e of plan.elements || []) {
     if (isRing(e)) { const r = ringOf(e); pl('DRIVE', ringDisc(r.c, r.R, 64)); pl('DRIVE', ringDisc(r.c, r.Ri, 64)); } else pl(layerOf[e.kind] || 'LANDSCAPE', outline(e)); // (a roundabout: its two circles, not its outline's seam across the lane)

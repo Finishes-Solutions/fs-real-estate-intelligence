@@ -72,7 +72,7 @@ export function planSVG(plan0, opts = {}) {
     const A = S.accessible(plan);
     for (const a of A.aisles) { o.push(poly(a.poly, 'fill="none" stroke="' + P.ada + '" stroke-width="' + lw(0.5) + '"')); for (const l of a.lines) o.push(ln(l, P.ada, lw(0.5))); }
     for (const a of A.stalls) { o.push(poly(a.poly, 'fill="' + P.ada + '" fill-opacity=".85" stroke="#ffffff" stroke-width="' + lw(0.5) + '"')); const r = Math.max(1.2, 2.6 * k); o.push('<circle cx="' + X(a.sym[0]) + '" cy="' + Y(a.sym[1]) + '" r="' + r.toFixed(1) + '" fill="none" stroke="#ffffff" stroke-width="' + (r * 0.35).toFixed(2) + '"/>'); }
-    for (const m of [...S.entryMarks(plan), ...S.loopMarks(plan)]) o.push(ln(m.line, m.color, Math.max(0.6, m.w * k).toFixed(2))); // (and a drop-off loop's one-way arrows)
+    for (const m of [...S.entryMarks(plan), ...S.loopMarks(plan), ...S.onewayMarks(plan)]) o.push(ln(m.line, m.color, Math.max(0.6, m.w * k).toFixed(2))); // (and a drop-off loop's one-way arrows)
   }
   for (const e of els.filter(x => x.kind === 'lot')) o.push(poly(S.outline(e), 'fill="none" stroke="#9aa38f" stroke-width="' + lw(0.5) + '" stroke-dasharray="3 2"'));
   for (const i of d.islands) o.push(poly(S.outline(i), 'fill="' + P.green + '" stroke="#a9c79a" stroke-width="' + lw(0.4) + '"'));

@@ -680,7 +680,7 @@ export function pruneSurplus(plan, o, brief) {
       .map(e => ({ e, d: Math.min(...B().map(b => S.gapBetween(S.shapeOf(e), S.shapeOf(b)))) })).sort((a, b) => b.d - a.d || String(a.e.id).localeCompare(String(b.e.id)));
     for (const { e } of cand) {
       if (p.provided <= want()) break;
-      const sw = e.sw || S.STALL.w, n = Math.floor((e.w + 0.01) / sw);
+      const sw = S.stallPitch(e), n = Math.floor((e.w - (S.stallAng(e) ? S.angledDims(S.stallAng(e)).off : 0) + 0.01) / sw); // (an angled row: its stall's length along the aisle, less its slanted ends)
       { const i0 = els.indexOf(e); els.splice(i0, 1); const p0 = pk(); if (p0.provided >= p.required && p.provided - p0.provided <= p.provided - want() + MIN_ROW) { p = p0; gone.push(S.shapeOf(e)); cut++; continue; } els.splice(i0, 0, e); } // (a short row the surplus nearly covers goes whole, not left a stub)
       if (n <= MIN_ROW) continue;
       const r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], ends = [1, -1].map(sg => [e.x + u[0] * sg * e.w / 2, e.y + u[1] * sg * e.w / 2]);

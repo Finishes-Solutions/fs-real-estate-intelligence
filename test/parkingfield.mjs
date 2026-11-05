@@ -60,7 +60,7 @@ function sound(plan, o, what, use) {
   const angs = rowsOf(o.elements).map(e => ((((e.rot || 0) % 90) + 90) % 90)), a0 = angs[0];
   assert.ok(angs.every(a => Math.min(Math.abs(a - a0), 90 - Math.abs(a - a0)) < 0.6), what + ': rows square to each other');
   // islands: a planted end at each end of every row of eight stalls or more
-  assert.ok(rowsOf(o.elements).every(e => e.caps || Math.round(e.w / (e.sw || S.STALL.w)) < 8), what + ': planted row ends');
+  assert.ok(rowsOf(o.elements).every(e => e.caps || e.ang && S.capsOf(e).length >= 2 || Math.round(e.w / (e.sw || S.STALL.w)) < 8), what + ': planted row ends'); // (an angled row: the triangles its end stripes leave are planted)
   assert.ok(o.elements.filter(e => e.kind === 'pond').length <= 1, what + ': one pond');
   return m;
 }

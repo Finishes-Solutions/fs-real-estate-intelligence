@@ -53,6 +53,34 @@ function shapesOf(e) {
   }
   try { const s = S.shapeOf(e); return finite(s) ? [s] : []; } catch { return []; }
 }
+// angled stalls, measured from the stripes as drawn (S.stallLines: the marks the user sees) and the planted marks
+// (S.capsOf), not from the engine's count: stripes slanting 20-80 degrees to the row's long side, taken in order along
+// each line of them; two neighbouring stripes make a stall when they are parallel, a stall width apart (square to the
+// stripes), and the parallelogram between them holds the design car (ANG_CAR) and is not planted. null when the piece
+// has no slanted stripes (square stalls are counted from their marks as before). [{ c, corners }]
+export const ANG_CAR = { L: 17.3, W: 6.6, w: 9, source: 'ULI/NPA The Dimensions of Parking (5th ed.): design vehicle about 6 ft 7 in × 17 ft 4 in (an 85th-percentile car), in a 9 ft stall' };
+export function angledStalls(e, rows = shapesOf(e)) {
+  let L; try { L = S.stallLines(e); } catch { return null; } const r0 = rows[0]; if (!L?.length || !r0 || r0.length < 3) return null;
+  let ax = null, best = 0; for (let i = 0; i < r0.length; i++) { const a = r0[i], b = r0[(i + 1) % r0.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l > best) { best = l; ax = [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; } }
+  const nx = [-ax[1], ax[0]], dir = l => { const d = [l[1][0] - l[0][0], l[1][1] - l[0][1]], n = Math.hypot(d[0], d[1]) || 1; return [d[0] / n, d[1] / n, n]; };
+  const slant = L.map(l => { const [dx, dy, len] = dir(l), c = Math.abs(dx * ax[0] + dy * ax[1]), th = Math.acos(Math.min(1, c)) * 180 / Math.PI; return { l, len, th, u: [dx, dy], m: [(l[0][0] + l[1][0]) / 2, (l[0][1] + l[1][1]) / 2] }; }).filter(q => q.th >= 20 && q.th <= 80);
+  if (!slant.length) return null;
+  let planted = []; try { planted = S.capsOf(e).map(c => c.poly); } catch { planted = []; }
+  const byV = slant.map(q => ({ q, v: q.m[0] * nx[0] + q.m[1] * nx[1] })).sort((p, q) => p.v - q.v), groups = []; // (stripes of one row share their midline)
+  for (const x of byV) { const g = groups[groups.length - 1]; if (g && x.v - g.v < 1) g.list.push(x.q); else groups.push({ v: x.v, list: [x.q] }); }
+  const out = [];
+  for (const { list } of groups) {
+    list.sort((p, q) => (p.m[0] * ax[0] + p.m[1] * ax[1]) - (q.m[0] * ax[0] + q.m[1] * ax[1]));
+    for (let k = 0; k + 1 < list.length; k++) {
+      const a = list[k], b = list[k + 1]; if (Math.abs(a.u[0] * b.u[1] - a.u[1] * b.u[0]) > 0.02) continue; // (parallel)
+      const gap = Math.abs((b.l[0][0] - a.l[0][0]) * -a.u[1] + (b.l[0][1] - a.l[0][1]) * a.u[0]), th = a.th * Math.PI / 180; // (square to the stripes)
+      if (gap < ANG_CAR.w - 0.05 || Math.min(a.len, b.len) < ANG_CAR.L + ANG_CAR.W / Math.tan(th) - 0.05) continue;
+      const corners = [a.l[0], b.l[0], b.l[1], a.l[1]], c = [(a.m[0] + b.m[0]) / 2, (a.m[1] + b.m[1]) / 2];
+      if (planted.some(pq => inPoly(c, pq))) continue; out.push({ c, corners });
+    }
+  }
+  return out;
+}
 const isEntrance = e => e.kind === 'drive' && (e.entry || e.emergency || e.name === 'Main entry' || /^Entrance\b/.test(e.name || '') || e.through); // (an emergency access lane meets the lot line by design)
 function levels(e) {
   if (Number.isFinite(+e.z0) || Number.isFinite(+e.z1)) return [+e.z0 || 0, Number.isFinite(+e.z1) ? +e.z1 : (+e.z0 || 0) + 10];
@@ -227,6 +255,27 @@ export function validateLayout(layout, brief = null) {
     for (const b of garages) { const at = S.garageEntry(b).at; if (!reached.some(p => (p.kind === 'drive' || p.kind === 'parking') && sh.get(p).some(s0 => inPoly(at, s0) || ptPolyDist(at, s0) <= 3))) shut.push(id(b)); }
     add({ id: 'access.garage', title: 'Every podium garage reached by a drive', status: !garages.length ? 'n/a' : shut.length ? 'fail' : 'pass', measured: shut.length, required: 0, units: 'garages with no drive in', tolerance: '3 ft', features: shut, rule: 'The garage entrance on the podium (not the lobby face) meets a drive of the network' });
     add({ id: 'access.buildings', title: 'Every building near connected circulation', status: far.length ? 'fail' : 'pass', measured: far.length, required: 0, units: 'buildings too far', tolerance: need + ' ft', features: far.slice(0, 40), basis: basisOf(rv), rule: rv?.source || 'Planning default 60 ft' });
+  }
+
+  { // one-way parking aisles (angled parking): each end meets a two-way drive, so traffic that enters an aisle has a way
+    // on and the aisles work as a circulation (a one-way aisle is never a fire lane: access.fire-width and the fire route
+    // leave it out); the angled stalls beside an aisle lean the way its traffic runs (a driver turns in forward)
+    const isAisle1 = e => e.kind === 'drive' && !e.future && !e.path && !e.poly && +e.w > 0 && +e.d > 0 && TURN.oneWayLane(e) && !/drive-?thru|bypass/i.test((e.name || '') + ' ' + (e.note || ''));
+    const ows = els.filter(isAisle1), two = els.filter(e => (e.kind === 'drive' || e.kind === 'truck') && !e.future && !TURN.oneWayLane(e)), bad = [];
+    const angRows = els.filter(e => e.kind === 'parking' && !e.future).map(e => ({ e, st: angledStalls(e, sh.get(e)) })).filter(q => q.st?.length);
+    for (const a of ows) {
+      const r = (+a.rot || 0) * Math.PI / 180, long = +a.w >= +a.d, u = long ? [Math.cos(r), Math.sin(r)] : [-Math.sin(r), Math.cos(r)], v = [-u[1], u[0]], Lh = Math.max(+a.w, +a.d) / 2, Wh = Math.min(+a.w, +a.d) / 2;
+      const at = (t, q) => [a.x + u[0] * t + v[0] * q, a.y + u[1] * t + v[1] * q];
+      for (const sg of [-1, 1]) { const probe = [at(sg * (Lh - 3), -Wh + 2), at(sg * (Lh + 3), -Wh + 2), at(sg * (Lh + 3), Wh - 2), at(sg * (Lh - 3), Wh - 2)];
+        if (!two.some(o => o !== a && sh.get(o).some(q => polyDist(probe, q) <= TOL.touch))) bad.push(id(a) + ' ' + (sg > 0 ? '+' : '-') + 'end meets no two-way drive'); }
+      if (a.flow !== 1 && a.flow !== -1) { bad.push(id(a) + ' has no direction marked'); continue; }
+      const f = [u[0] * a.flow, u[1] * a.flow], off = p => (p[0] - a.x) * v[0] + (p[1] - a.y) * v[1], along = p => (p[0] - a.x) * u[0] + (p[1] - a.y) * u[1];
+      for (const { e, st } of angRows) for (const q of st) { const [p0, , , p1] = q.corners, d0 = Math.abs(off(p0)), d1 = Math.abs(off(p1)), near = d0 < d1 ? p0 : p1, far = d0 < d1 ? p1 : p0;
+        if (Math.min(d0, d1) > Wh + 1.5 || Math.abs(along(near)) > Lh + 1) continue; // (a stall along this aisle: its stripe starts at the aisle's edge)
+        if ((far[0] - near[0]) * f[0] + (far[1] - near[1]) * f[1] <= 0) { bad.push(id(e) + ' leans against ' + id(a) + '’s traffic'); break; } }
+    }
+    add({ id: 'access.one-way', title: 'One-way aisles work as a circulation', status: !ows.length ? 'n/a' : bad.length ? 'fail' : 'pass', measured: bad.length, required: 0, units: 'problems', features: bad.slice(0, 30), basis: 'geometry',
+      rule: 'Each one-way parking aisle (angled parking) meets a two-way drive at both ends, its direction marked, and the angled stalls beside it lean the way it runs; one-way aisles are not fire lanes', note: ows.length ? ows.length + ' one-way aisle' + (ows.length > 1 ? 's' : '') + ', ' + angRows.length + ' angled row' + (angRows.length === 1 ? '' : 's') + '.' : '' });
   }
 
   // 10. parking: required (from the brief's rules) and provided (counted from the drawing) reported separately
@@ -416,11 +465,18 @@ export function quantities(layout, brief = null) {
   for (const g of Object.values(byUse)) { g.footprint = Math.round(g.footprint); g.gfa = Math.round(g.gfa); }
   // stalls drawn: each one inside its row, inside the site and not under a building
   const stall = { ...{ w: 9, d: 18, aisle: 24 }, ...(R.stall?.v || {}) }, B = els.filter(e => e.kind === 'building' && !e.future).map(e => shapesOf(e)).flat(), stray = [];
-  let surface = 0;
+  let surface = 0, square3 = false, angledRows = 0;
   for (const e of els.filter(x => x.kind === 'parking' && !x.rv && !x.vac)) {
+    const rows = shapesOf(e), ang = angledStalls(e, rows);
+    if (ang) { // angled stripes: the stalls measured from them (angledStalls), each inside its row and the site, clear of buildings
+      angledRows++;
+      for (const q of ang) { const c = q.c, okRow = q.corners.every(p => rows.some(r => inPoly(p, r) || ptPolyDist(p, r) < 0.5)), okSite = !ring.length || inPoly(c, ring), clear = !B.some(b => inPoly(c, b)); if (okRow && okSite && clear) surface++; else stray.push((e.id || 'parking') + ' @' + c.map(v => Math.round(v)).join(',')); }
+      continue;
+    }
     let cs; try { cs = S.stallCentres(e); } catch { cs = []; }
-    const rows = shapesOf(e);
-    for (const c of cs) { const okRow = rows.some(r => inPoly(c, r) || ptPolyDist(c, r) < 0.5), okSite = !ring.length || inPoly(c, ring), clear = !B.some(b => inPoly(c, b)); if (okRow && okSite && clear) surface++; else stray.push((e.id || 'parking') + ' @' + c.map(v => Math.round(v)).join(',')); }
+    let here = 0;
+    for (const c of cs) { const okRow = rows.some(r => inPoly(c, r) || ptPolyDist(c, r) < 0.5), okSite = !ring.length || inPoly(c, ring), clear = !B.some(b => inPoly(c, b)); if (okRow && okSite && clear) { surface++; here++; } else stray.push((e.id || 'parking') + ' @' + c.map(v => Math.round(v)).join(',')); }
+    if (here >= 3 && !e.parallel) square3 = true;
   }
   // a tower's parking podium: counted on a stall grid over each parking level (podiumGrid), not drawn stall by stall
   const podium = els.filter(e => e.kind === 'building' && !e.future).reduce((s, e) => { const t = towerOf(e); return s + (t && t.park ? podiumGrid(e, t.park) : 0); }, 0);
@@ -445,7 +501,8 @@ export function quantities(layout, brief = null) {
   const ruled = R.parkingPerUnit?.v != null || R.parkingPer1000?.v != null, verified = R.parkingPerUnit?.cls === 'verified' || R.parkingPer1000?.cls === 'verified';
   // accessible stalls take their striped access aisle out of the row: each pair of them shares an aisle a stall wide
   // (the app's own count does the same, lib/siteplan.mjs metrics)
-  const accessAisles = Math.ceil(accessibleNeeded / 2);
+  // (where every row is angled, a pair and its aisle, square to the aisle, take four angled stalls: twice the cost)
+  const accessAisles = Math.ceil(accessibleNeeded / 2) * (angledRows && !square3 ? 2 : 1);
   const parking = { required, provided: surface - accessAisles + podium + garage + garageEstimated + privateGarages + tucked + driveways, surface, accessAisles, podium, garage, tucked, garageEstimated, privateGarages, driveways, accessibleNeeded, stall, strayStalls: stray,
     basis: verified ? 'verified' : 'assumption', rule: ruled ? (R.parkingPerUnit?.source || R.parkingPer1000?.source) : 'Engine use defaults (1.6 a unit for apartments, 4 per 1,000 sf for retail, …): planning assumptions, not code' };
   const site = ring.length >= 3 ? area(ring) : 0, tot = Object.values(byUse).reduce((t, g) => ({ units: t.units + g.units, gfa: t.gfa + g.gfa, footprint: t.footprint + g.footprint, buildings: t.buildings + g.buildings }), { units: 0, gfa: 0, footprint: 0, buildings: 0 });

@@ -31,6 +31,9 @@ export const QTY_UNITS = ['units', 'sf', 'buildings'];
 export const OVERLAYS = ['senior', 'student', 'affordable'];
 export const officeBlend = share => +(share * 3.5 + (1 - share) * 0.6).toFixed(3); // spaces a 1,000 sf: office 3.5, warehouse 0.6 (planning assumptions)
 export const PARKING_MODES = ['surface', 'tuck-under', 'garage', 'podium', 'structured', 'shared'];
+// surface stalls at an angle, on one-way aisles (program.parking.angle; lib/siteplan.mjs ANGLED): 60, 45, or 'angled'
+// (the engine tries both). Absent: square stalls, angled only where a field's depth parks more that way.
+export const PARKING_ANGLES = [60, 45, 'angled'];
 
 // The rules a run is checked against when the brief brings none of its own. Every value is labelled: an 'assumption'
 // is a planning default, never a verified requirement; the validator reports checks against it as such.
@@ -134,7 +137,7 @@ export function briefFromProgram(program, plan, { text = '', parser = 'structure
     schema: BRIEF_SCHEMA,
     request: { text: String(text || ''), parser },
     site: siteFromPlan(plan),
-    program: { uses, overlays: overlaysFromWords(text), parking: { mode: /\btuck[- ]?under\b/i.test(text) ? 'tuck-under' : /\bpodium\b/i.test(text) ? 'podium' : /\bgarage|structured\b/i.test(text) ? 'garage' : 'surface' }, engine: stripProgram(P) },
+    program: { uses, overlays: overlaysFromWords(text), parking: { mode: /\btuck[- ]?under\b/i.test(text) ? 'tuck-under' : /\bpodium\b/i.test(text) ? 'podium' : /\bgarage|structured\b/i.test(text) ? 'garage' : 'surface', ...(PARKING_ANGLES.includes(P.parkAngle) ? { angle: P.parkAngle } : {}) }, engine: stripProgram(P) },
     rules: { id: DEFAULT_RULES.id, version: DEFAULT_RULES.version, values: { ...DEFAULT_RULES.values, ...(plan.setbacks ? { setbacks: { v: { ...S.SETBACKS, ...plan.setbacks }, cls: plan.setbacksSource ? 'verified' : 'assumption', source: plan.setbacksSource || 'Setbacks on the plan (default or entered by hand); not verified against zoning' } } : {}) } },
     locks: [],
     solver: { seed: seed ?? 'rei-1', tickMs: 25, options }
@@ -209,6 +212,7 @@ export function validateBrief(b) {
   }
   for (const o of b.program?.overlays || []) if (!OVERLAYS.includes(o)) E('program.overlays', 'Unknown overlay ' + o);
   if (b.program?.parking?.mode && !PARKING_MODES.includes(b.program.parking.mode)) E('program.parking.mode', 'Parking mode must be one of ' + PARKING_MODES.join(', '));
+  if (b.program?.parking?.angle != null && !PARKING_ANGLES.includes(b.program.parking.angle)) E('program.parking.angle', 'Parking angle must be one of ' + PARKING_ANGLES.join(', '));
   if (!b.solver || b.solver.seed == null) E('solver.seed', 'A seed is needed so the run can be replayed');
   if (b.solver && !(+b.solver.tickMs > 0)) E('solver.tickMs', 'The evaluation budget tick must be positive');
   return { ok: !errors.length, errors, warnings, missing };
@@ -272,6 +276,8 @@ export function toEngine(bIn, { overshoot = true } = {}) { // overshoot: ask a t
     const apts = uses.filter(u => u.use === 'multifamily' && u.quantity.unit === 'units').reduce((t, u) => t + est(u), 0), homes = uses.filter(u => ['townhomes', 'duplex', 'sfr'].includes(u.use) && u.quantity.unit === 'units').reduce((t, u) => t + est(u), 0);
     if ((apts > 200 || homes > 30) && !(+P.entrances >= 2)) { P.entrances = 2; mapping.push('Two ways in planned from the start: the program is over 200 apartments or 30 homes (IFC Appendix D, where adopted).'); } }
   // parking rule from the brief (else the engine's use default)
+  { const ang = b.program.parking?.angle; if (PARKING_ANGLES.includes(ang)) { if (P.parkAngle == null) P.parkAngle = ang; // (angled parking asked for: the field engine lays its rows at the angle, lib/siteparking.mjs)
+    mapping.push('Angled parking' + (ang === 'angled' ? '' : ' at ' + ang + '°') + ' asked for: surface stalls at the angle on one-way aisles (ULI / ITE planning sizes, lib/siteplan.mjs ANGLED), neighbouring aisles running opposite ways; accessible stalls stay square. Where angled rows can’t park the program, square stalls, and the option says so.'); } }
   const pr = b.rules?.values; if (pr?.parkingPerUnit?.v != null) P.perUnit = pr.parkingPerUnit.v; if (pr?.parkingPer1000?.v != null) P.ratio = pr.parkingPer1000.v;
   // flex: an office share parks at a blend of the office and warehouse ratios (OFFICE_BLEND, an assumption)
   uses.forEach((u, i) => { if (u.officeShare != null && u.use === 'industrial') { const z = single ? P : P.zones[i]; z.ratio = officeBlend(u.officeShare); z.flex = true; mapping.push('Flex parking at ' + z.ratio.toFixed(2) + ' a 1,000 sf for a ' + Math.round(u.officeShare * 100) + '% office share (assumption: office 3.5, warehouse 0.6 a 1,000 sf).'); } });
