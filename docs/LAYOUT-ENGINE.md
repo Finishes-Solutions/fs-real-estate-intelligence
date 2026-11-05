@@ -1025,7 +1025,7 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    square and why; 13.0 ac guarded (deeper tries on): simple layout, hotel untyped, 202 / 380 → 6 ft pond, typed hotel with 120
    keys, 211 / 210, passing. Bench: four new cases (MX-guard-hotel25, MX-guard-hotel13, MX-angled, MX-guard-angled),
    80 of 80 passing, no warnings, replay identical; the 76 earlier cases' top options identical element for element.
-   Prompt corpus (offline, words path): 117 of 120 fully right (the misses D02, D05, S19 are not mixed or guarded). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128,
+   Prompt corpus (offline, words path): 119 of 120 fully right (D05 misses, as on the base). Folded onto item 32: its ring layout named a zone through ZONE_NAME, which (e) had renamed; the name is kept and (e) uses a local copy (S19 had come out with no layout). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128,
    E054 podium-urban 172). Engine version rei-layout/2026.11.05.5. Tests: test/mixedparking.mjs (the rules per use and
    the check's count on a drawn hotel with and without its keys; the reserve once through an effective plan; angled
    rows on the guarded 24.8 ac run and the note when none can turn; the 13 ac run with and without the deeper tries;
