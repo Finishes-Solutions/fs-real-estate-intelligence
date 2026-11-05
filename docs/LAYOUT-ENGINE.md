@@ -1137,3 +1137,48 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    stall) and short entries on wedges (WEDGE-trap 15 ft, WEDGE-tri / arc 30 ft) and small pads (TY-daycare 30 ft: its 32
    stalls take the turn off the entry drive at once; 50 ft is the yardstick's floor): not worked on this round. The
    landscape standard: the wedges and towers short of 5%.
+34. Done Nov 5 (the live AI understands building types). The owner: "the AI understands vague, detailed and spatial site
+   plan requests so results return what was asked and what is best (scored on a prompt corpus, offline and live)" and
+   "flexible building-type primitives … many more building types". Items 27 and 29 gave the words path 56 presets; the
+   AI's program step (api/siteplan.js) named none of them, and the app's normalising of its program dropped every
+   type field, so on the live AI path a hotel's keys, a daycare's children, a data centre's yard or a car wash's
+   stacking lanes never reached the engine (types category, live, before: 1 of 33 fully right).
+   (a) Corpus first. 33 building-type requests (test/fixtures/prompt-corpus.mjs TYPES, category `types`) written with
+   their expected reading before anything was tuned: hotels with keys (limited, extended stay, full service, over
+   retail), multi-story and drive-up storage, a medical office building, an urgent care, assisted living by beds,
+   student housing by beds, a daycare by children, schools by students (middle, K-8), a car wash, a credit union with
+   drive-up lanes, a data centre, cold storage, flex with a mezzanine, fourplexes, live-work, a point tower, L / U / T
+   apartments, a pad village, a big box, a gym, a stand-alone garage, independent senior living, three mixes with a type
+   a zone, and one type no preset knows (an indoor go-kart track). The scorer (scripts/prompt-corpus.mjs) checks the
+   preset read (`type`, `zone types`) and on the best layout a building of the preset, what it counts (keys, beds,
+   children, students, buildings, garage spaces), the shape (L, U, T, point tower, triplex / fourplex), a queue lane
+   holding the cars asked and pieces absent (`--types`, `--full`, `--fresh3`).
+   (b) The program step. A short presets table generated from lib/btypes.mjs (presetTable: id, what it is, the words
+   that name it, its use, what it counts, its usual numbers and parking; 28 lines, about 4,000 characters) in the
+   instructions; `buildingType` { preset, count, bedsPerUnit, mezzanine, variant } and each zone's `preset` / `count`
+   in the schema; `form` takes T. The model's choice goes through the words' own code (lib/btypes.mjs applyPreset,
+   zonePreset: each preset's apply, the words' numbers first and the model's counts filling what the words leave out; a
+   shape through applyType's shape step), in api/siteplan.js typedFrom; the words' preset stands when the model names
+   none. A preset's usual floors stand unless the words give floors (the model's guess is dropped), the words' size
+   stands over a size the model cut "to fit", homes are counted from beds, and a recipe preset's own recipe (a
+   daycare's play yard, a school's field) wins over the model's. A type no preset covers keeps the model's own recipe,
+   and the notes say no preset matched. The app runs the API's program as it comes (no re-normalising), so the type
+   fields reach the engine.
+   (c) Live misreadings fixed (after the first full run): a "courtyard building" the model called U-shaped keeps the
+   engine's courtyard form (a shape preset only when the words name no form or name the shape); a count the model
+   picked inside the range asked stays the range (lib/layoutbrief.mjs useFromProgram); apartments the model answered as
+   a mix with a commons zone for their own pool are one use (the pool's place kept); a freestanding coffee shop with a
+   drive-thru is a restaurant (instructions).
+   Scores (docs/bench/prompt-eval.md round 4): live, gpt-6-luna, the full 153: types 1 → 28 of 33 fully right (reading
+   45% → 100%, outcome 29% → 93%); the original 120 118 → 116 in the final full run, the four misses then (D09, S02 model
+   variance, fixed and re-run right; D05, S06 as before). Words path: the 120 unchanged at 119, types 26 of 33 (the
+   words path was not tuned). Ten fresh type requests written after tuning, scored once: live 9 of 10, words 8 of 10.
+   About 475 calls in all (about $0.87 at gpt-6-luna prices, counted from the replies' tokens). Bench: 76 cases, all
+   passing, no warnings, replay identical, element for element the same as 22d0519. Holdouts unchanged (P18 fill 77,
+   P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests: test/prompts.mjs (mocked replies through the mapping:
+   an inn by rooms, a daycare by children over the model's recipe, a K-8 school, cold storage and a data centre over the
+   model's numbers, dorms by beds, quadplexes, a slim tower, an L, a hotel zone by keys, the go-kart track's own recipe,
+   the words' preset when the model names none, the live fixes). Still missed, live and words alike (the engine, not the
+   reading): a data centre on 40 ac still drawn with a truck court (TY15), a 16-story point tower holding 189 of 220,
+   "U-shaped … round a central courtyard" drawn as the courtyard ring not a U, a 125,000 sf big box fitting 109,802 on
+   10 ac, a 500-car garage on 2.3 ac holding 171; FT10 a T-shaped mid-rise 88 of 120.

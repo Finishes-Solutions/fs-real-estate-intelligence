@@ -1,7 +1,7 @@
 # Request understanding: score on the corpus
 
 How the site layout reads requests (vague, detailed, messy, spatial) and whether the best layout delivers them.
-Corpus: `test/fixtures/prompt-corpus.mjs` (120 requests, written with their expected reading before the parser was
+Corpus: `test/fixtures/prompt-corpus.mjs` (120 requests and, since round 4, 33 building-type requests, written with their expected reading before the parser was
 tuned; 16 FRESH ones written after and scored once). Scorer: `node scripts/prompt-corpus.mjs` (words path, no AI) and
 `node test/prompt-eval-live.mjs` (the real AI program step, by hand). LAYOUT-ENGINE.md item 26 describes the changes.
 
@@ -202,3 +202,64 @@ model's programs for S06 and S31 lay out differently from the words' (not traced
 Newly right: D02 (240 mid-rise units, was 208), D17 (200 apartments, was 192), S19 (homes round a central lake: the
 lake in the middle, 85 homes, was 46 with the lake at the back). Still missed: D05 “96 duplex units on a private
 street”: the land holds about 78 (said in the notes as the most that fits; was 64). Fresh sets not re-scored.
+
+## Round 4: building types on the live AI path (22d0519 → this branch; LAYOUT-ENGINE.md item 34)
+
+33 building-type requests (category `types`, `TYPES` in the corpus) were written with their expected reading before
+the AI's program step was given the presets: the preset read, and on the best layout a building of it, what it counts
+(keys, beds, children, students, garage spaces, pads), its shape, its queue lanes. The full corpus is now 153
+(`--full`). Live runs: gpt-6-luna through the app's program step at its own effort (high), OpenAI, Nov 5; usage not
+recorded anywhere, the keys read into the eval process only.
+
+**AI path, before (22d0519: no presets in the instructions or schema)**
+
+| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |
+|---|---|---|---|---|---|
+| vague | 25 | 100% | 100% | 25 / 25 | — |
+| detailed | 35 | 100% | 98% | 34 / 35 | — |
+| messy | 25 | 100% | 100% | 25 / 25 | — |
+| spatial | 35 | 100% | 95% | 34 / 35 | 2 / 2 |
+| types | 33 | 45% | 29% | 1 / 33 | — |
+| all | 153 | 89% | 75% | 119 / 153 | 2 / 2 |
+
+**AI path, after (the presets table, buildingType and zones[].preset, mapped through the words' preset code; final full run)**
+
+| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |
+|---|---|---|---|---|---|
+| vague | 25 | 100% | 100% | 25 / 25 | — |
+| detailed | 35 | 98% | 95% | 33 / 35 | — |
+| messy | 25 | 100% | 100% | 25 / 25 | — |
+| spatial | 35 | 100% | 93% | 33 / 35 | 3 / 3 |
+| types | 33 | 100% | 93% | 28 / 33 | — |
+| all | 153 | 99% | 96% | 144 / 153 | 3 / 3 |
+
+The first full run after the change (before the fixes in item 34 (c)) scored 143 / 153: types 27 / 33, the 120 at 116
+(D21 "between 200 and 240 apartments" read as exactly 220, D28 "courtyard building" given the U preset over its
+courtyard form, both fixed and re-run right; TY28's 125,000 sf cut to 120,000 by the model, fixed). In the final run D09
+(a coffee shop with a drive-thru answered as retail) and S02 (apartments answered with a commons zone for their pool)
+missed by model variance; both fixed (instructions, mapping) and re-run right. Before, the AI path dropped every type
+field (the program's normalising), so even types the words know came out as plain uses.
+
+**Words path (no AI), after** (the words path was not tuned; the 120 are unchanged)
+
+| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |
+|---|---|---|---|---|---|
+| vague | 25 | 100% | 100% | 25 / 25 | — |
+| detailed | 35 | 100% | 98% | 34 / 35 | — |
+| messy | 25 | 100% | 100% | 25 / 25 | — |
+| spatial | 35 | 100% | 100% | 35 / 35 | — |
+| types | 33 | 99% | 91% | 26 / 33 | — |
+| all | 153 | 100% | 96% | 145 / 153 | — |
+
+Ten type requests written after tuning, never tuned to, scored once (`--fresh3`): live 9 / 10 (reading 100%, outcome
+95%), words 8 / 10 (reading 92%, outcome 86%). Live missed FT10 “a T-shaped mid-rise apartment building, 120 units”
+(88 units drawn); the words also missed FT09 “a dorm with 400 beds and 20,000 sf of shops in front” (read as shops only).
+
+Still missed, live (final run): D05 (as before), S06 (the warehouse midway back, as in round 2's live run), and in the
+types: TY15 a data centre still drawn with a truck court on 40 ac, TY20 a 16-story point tower 189 of 220, TY22 "U-shaped
+… round a central courtyard" drawn as the courtyard ring, TY28 a 125,000 sf big box fitting 109,802, TY30 a 500-car garage
+on 2.3 ac holding 171: the engine's limits, missed by the words path too (which also misses TY19 "live-work units …, 20 of
+them": no count read, and TY33's 200 apartments grown to 432 beside the hotel).
+
+Calls: 153 before, 153 + 153 after (two full runs), 10 fresh, 5 re-runs of fixed cases, 1 smoke test: about 475, about
+$0.87 at gpt-6-luna prices (tokens counted from the replies: about 5.4 M in, 0.65 M out).

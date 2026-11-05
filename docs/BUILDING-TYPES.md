@@ -126,7 +126,7 @@ shops of a hotel over retail at the sf asked, and the counts in the Pro forma ar
 - A school or daycare named beside homes in one mixed request ("a school for 500 students and 100 townhomes") is not
   read as a zone of its type yet (only the pad words, "a daycare and a bank on pads in front of townhomes", make zones).
 - The car wash's stacking lanes still need a drive within 90 ft of a short end of its plot (round 2's own router).
-- The AI's program step does not name presets yet (another helper is adding them to the prompt).
+- (Done Nov 5, LAYOUT-ENGINE.md item 34) The AI's program step names presets: a short presets table in its instructions (lib/btypes.mjs presetTable), buildingType and zones[].preset in its schema, applied by the words' own preset code (applyPreset, zonePreset).
 - Ground-floor uses other than shops under homes or a hotel.
 - Single-story drive-up storage on small lots can trip the fire-truck turning warning on its drive aisles (the storage
   layout's own, seen without the preset too); not on the bench.
