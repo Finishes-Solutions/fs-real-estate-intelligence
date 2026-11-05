@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 11:47 AM CT: The AI reads building types; lakes on any lot; room for drop-off lanes; a school beside homes (19f47ca, 6790a86, a6b4956, fcdba05)
+- **The AI now understands building types:** asked through the AI (gpt-6-luna), "an express car wash", "a 120-key hotel", "assisted living, 120 beds" and the like now come back as that type with its count, shape and lanes (28 of 33 test requests fully right, was 1). Before, the AI's answer lost the type and drew a plain box. A type no preset covers is still drawn at the size asked and the notes say so.
+- **Fixes to the AI's reading:** a courtyard building keeps its courtyard; a size you give is kept (a big box isn't shrunk "to fit"); a count inside a range you asked stays the range; a coffee shop with a drive-thru is a restaurant; apartments' own pool isn't split off as a separate zone.
+- **Homes round a central lake on any lot:** L-shaped, wedge and curved lots, and townhomes or duplexes as well as houses.
+- **Room for drop-off lanes:** a hotel's drop-off canopy or a daycare's drop-off lane the first layout left no room for is now fitted by laying out again, kept only when it costs no homes or floor area.
+- **"A school for 500 students and 100 townhomes"** lays out as a school zone with its lanes and grounds and the townhomes beside it. A 250-key hotel is one building, not two.
+- 88 test sites, every one passing with no warnings; requests 119 of 120 without the AI; the full test suite passes.
+
 ### 10:15 AM CT: Parking round 4: shorter walks win ties, more planted row ends, angled parking says why (7f6560c)
 - **Shorter walks to the door count in choosing a layout:** among layouts with the same homes or floor area, one whose parking sits far from the doors now ranks lower. A hotel with shops: the 90th-percentile walk went from 246 to 204 ft; a guarded hotel and shops with angled parking from 244 to 142 ft.
 - **More planted row ends:** a row with free land past its end grows a space so a hemmed-in row elsewhere can end in a planted island (bare row ends on the test sites 236 → 211).
