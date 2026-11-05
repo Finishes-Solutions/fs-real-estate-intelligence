@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 1:30 AM CT: Site plan requests understood much better: vague, detailed, messy and spatial (733a3fb, 2275981, c1fe607)
+- **Where things go:** "retail along the main road with apartments behind", "pool in the center", "keep the west side open", "buffer the neighbors", "dog park in the corner", "townhomes at the back" are laid out that way. Any placement the layout can't make yet (the pond, parking in front or behind, the clubhouse) is listed in the notes as not met, never dropped silently; every option says "Asked: … done / not met".
+- **Vague requests** ("max density", "something that pencils") pick a use suited to the land and list what was assumed at the top of the notes.
+- **Messy wording** is read: typos and shorthand (apts, whse, pkg), "60ksf", "1.5 spaces/unit", "4 per 1,000 sf", "3-4 story", "~", "+/-". Fixed misreadings: "1 space per unit" was read as 1 home, "trailer parking" as a trailer park, "pool in the center" as a shopping centre.
+- **The AI reading of requests** uses the same placement words with worked examples.
+- Scored on 120 test requests: without the AI 112 fully right (was 45); with the AI (gpt-6-luna) 107 (was 83). A quick set of these requests is now part of the test suite; the full test suite passes.
+
 ### 12:21 AM CT: Many more building types, built from flexible base shapes (16b552b, 3a7bbe2, 9107365, f1528a3)
 - **Building types are now base shapes you can adjust:** bar, L, U, courtyard, tower on podium, wrap, rows, detached homes, small multiplexes, big box, cross-dock, flex bays, storage campus, canopy and store, drive-thru pad, car-wash tunnel, a building with its grounds and a parking garage. Each takes sizes, stories, depth and parking rules from your words. Every type you could ask for before lays out exactly as it did.
 - **21 new types:** limited-service and extended-stay hotels (counted in keys), multi-story and drive-up self storage, medical office and clinics, assisted living (beds), independent senior living, student housing (beds), fourplexes, live-work townhomes, flex with a mezzanine, cold storage, data centre shell, fitness club, big-box store, bank with drive-thru, daycare with play yard, schools with play yard and field, and express car washes. Each is named, counted and coloured on the plan and the 3D map (plain blocks, as now).
