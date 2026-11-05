@@ -279,6 +279,9 @@ export function toEngine(bIn, { overshoot = true } = {}) { // overshoot: ask a t
   const fill = modes.every(m => m === 'exact' || m === 'max' || m === 'range') ? false : modes.every(m => m === 'min' || m === 'maximize') ? true : 'phase';
   if (fill === 'phase') mapping.push('The program mixes exact and open-ended quantities; the engine fills the site and marks what is past the exact asks as Phase 2. The program check judges each use by its own meaning.');
   plan.params = { ...(b.program.params || {}), fill };
+  // townhome rows stand the brief's building separation apart (the validator's separation.buildings; 10 ft by default, an
+  // assumption), not the engine's own 20 ft: a block's frontage holds rows end to end at the spacing the rules ask for
+  if (uses.some(u => u.use === 'townhomes') && +pr?.buildingSeparation?.v > 0 && plan.params.homeGap == null) plan.params.homeGap = +pr.buildingSeparation.v;
   if (s.terrain) plan.terrain = s.terrain; // the ground's fall (the pond goes on the low side), saved with the site
   // the design storm's rainfall for the detention estimate (lib/hydrology.mjs): the point estimate recorded on the brief
   // (site.rainfall, fetched from NOAA Atlas 14) or on the plan, else the regional Atlas 14 figure where the site is in one;

@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 6:00 PM CT: Townhome subdivisions packed much tighter (23fd17f)
+- **"Townhomes, as many as fit" lines every lane:** rows now sit at the building separation in your rules (10 ft by default, was 20 ft), run close to the corners and cross drives, and line the edges of the loop road and the street, so a 5-acre test lot now holds 62 homes, up from 37 (8 acres: 104, up from 73).
+- **Guest parking fills the gaps at the ends of rows** before any home is given up for it.
+- **A second entrance instead of a gated emergency lane:** when a full subdivision needs a second way in, the street-side row farthest from the other entrances gives way for a real entrance.
+- **Ponds sized right on dense layouts:** a tight layout whose pond came up short is redrawn with more room for it.
+- Four townhome subdivision cases added to the test sites (41 in all, every one passing with no warnings). The agent skill's copy of the engine is updated to match.
+
 ### 3:53 PM CT: Wedge-shaped lots fit a third apartment building when parking allows (917b329)
 - **Wedge lots:** on a triangular or tapering lot, apartments placed along the lot lines that would end up just over 200 homes (where the fire code would want a second way in that a single street can't give) are also offered trimmed back to 200. That is one more whole building where the land allows: a 6-acre triangle at one space per home now gets 3 buildings and 192 homes, up from 2 buildings and 160.
 - Nine wedge-lot cases added to the test sites (37 in all, every one passing with no warnings). The full test suite passes.

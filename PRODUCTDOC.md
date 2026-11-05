@@ -1155,6 +1155,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Tighter townhome subdivisions (Nov 4):** "townhomes, as many as fit" now lines both sides of every lane and the road round the edge, with guest parking at the ends of rows; expect roughly 40–70% more homes than before on the same lot.
 - **Wedge lots (Nov 4):** on triangular or tapering lots, "as many as fit" can now fit one more apartment building where the land and parking allow, stopping just short of the size that would need a second entrance.
 - **A site-layout skill for AI agents (Nov 4):** install skills/site-layout.zip in an agent and it lays out a site with this app's own engine (the same layouts and checks as Build), compares options, and hands a layout sheet to the plan-set agent.
 - **Plain 3D again, more housing types (Nov 4):** tilt the map and buildings show as plain blocks coloured by use (the designed facades now appear only in plan sets and the BIM model); ask for "stacked townhomes" or "build-to-rent cottages"; flag lots, lots with an easement or wetland, curved frontages and very small lots now lay out.
