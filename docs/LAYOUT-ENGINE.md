@@ -1317,7 +1317,8 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    (b) Data centre (no truck court asked: one was drawn). lib/sitelayout.mjs warehouse rows with `truck: false` (not flex)
    draw a 24 ft service drive behind (a fire lane, kept reached; its links at both ends kept, a hammerhead where an end
    meets nothing) instead of a 130 ft court; lib/sitegencom.mjs's loading-court arrangements sit out for it. Cold storage
-   keeps its court.
+   keeps its court. A building running back from the street (both long sides as far from it) gets its equipment yard on
+   the side away from its parking, by the service drive (lib/btsite.mjs equipmentYard).
    (c) Big box (125,000 sf on 10.3 ac drawn as two 85 ft shop rows, 109,802 sf). lib/siteparking.mjs (one additive line):
    a program depth past the use's own depth list is laid out at that depth (and 40-120 ft deeper, or 40 shallower, where
    that holds more): one box 263-420 ft deep. 110,352 sf: a land limit at 4 a 1,000 sf with the 0.97 ac pond, said

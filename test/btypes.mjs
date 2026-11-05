@@ -172,7 +172,7 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   // a data centre: a fenced equipment yard at the back, the building the floor area asked
   ({ o } = run('data center 100,000 sf', 800, 600));
   const dc = o.elements.find(e => e.btype === 'data-center'), yard = o.elements.find(e => e.yard === 'equipment');
-  assert.equal(o.validation.status, 'pass'); assert.ok(yard && o.elements.some(e => e.kind === 'fence' && e.note === 'Equipment yard fence')); assert.ok(Math.abs(dc.w * dc.d - 100000) <= 1000); assert.ok(yard.y > dc.y, 'the yard on the side away from the street');
+  assert.equal(o.validation.status, 'pass'); assert.ok(yard && o.elements.some(e => e.kind === 'fence' && e.note === 'Equipment yard fence')); assert.ok(Math.abs(dc.w * dc.d - 100000) <= 1000); { const ent = o.elements.find(e => e.name === 'Main entry'), dE = e => Math.hypot(e.x - ent.x, e.y - ent.y); assert.ok(dE(yard) > dE(dc), 'the yard at the back, away from the street and the parking'); }
   // a type per zone
   p = S.guessProgram('a hotel with 120 keys and 20,000 sf of retail');
   assert.deepEqual(p.btZones, [{ zone: 1, btype: 'hotel-limited', name: 'Hotel' }]); assert.equal(p.zones[1].gfa, 66000);

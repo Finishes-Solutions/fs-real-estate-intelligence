@@ -110,13 +110,14 @@ export function equipmentYard(plan, els, B, spec) {
   const share = Math.max(0.1, Math.min(0.4, +spec.share || 0.25)), ring = plan.ring || [], f = +plan.front || 0, a = ring[f] || [0, 0], b = ring[(f + 1) % (ring.length || 1)] || [1, 0];
   const near = p => { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L / L)); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); }; // (distance from the street edge)
   const long = B.w >= B.d, side = (s) => { const q = rot(long ? [0, s * B.d / 2] : [s * B.w / 2, 0], B.rot || 0); return [B.x + q[0], B.y + q[1]]; };
-  const s = near(side(1)) >= near(side(-1)) ? 1 : -1, D = long ? B.d : B.w, y = D * share; // (the yard on the side farther from the street)
+  const P = els.filter(e => e.kind === 'parking').map(e => S.centroid(S.shapeOf(e))), dP = p => P.length ? Math.min(...P.map(c => Math.hypot(c[0] - p[0], c[1] - p[1]))) : 0;
+  const s = Math.abs(near(side(1)) - near(side(-1))) > 10 ? (near(side(1)) >= near(side(-1)) ? 1 : -1) : dP(side(1)) >= dP(side(-1)) ? 1 : -1, D = long ? B.d : B.w, y = D * share; // (the yard on the side farther from the street; a building running back from it, both long sides as far: the side away from its parking, item 39)
   const keep = long ? { w: B.w, d: B.d - y } : { w: B.w - y, d: B.d }, off = rot(long ? [0, -s * y / 2] : [-s * y / 2, 0], B.rot || 0), yo = rot(long ? [0, s * (D / 2 - y / 2)] : [s * (D / 2 - y / 2), 0], B.rot || 0);
   const bld = { ...B, ...keep, x: +(B.x + off[0]).toFixed(2), y: +(B.y + off[1]).toFixed(2), note: String(B.note || '').replace(/[\d,]+ sf$/, Math.round(keep.w * keep.d * (B.floors || 1)).toLocaleString('en-US') + ' sf') }; delete bld.gfa;
   const yard = { id: B.id + '-yard', kind: 'plaza', x: +(B.x + yo[0]).toFixed(2), y: +(B.y + yo[1]).toFixed(2), w: long ? B.w : y, d: long ? y : B.d, rot: B.rot || 0, name: 'Equipment yard', note: 'Generators and cooling · fenced', yard: 'equipment' };
   const c = S.corners(yard), fence = { id: B.id + '-fence', kind: 'fence', path: [...c, c[0]].map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]), name: '', note: 'Equipment yard fence' };
   const out = els.map(e => e === B ? bld : e).concat([yard, fence]);
-  return { els: out, note: 'Data center: the back ' + Math.round(y) + ' ft of its building plot (' + Math.round(share * 100) + '% of the footprint) is a fenced yard for its generators and cooling, on the side away from the street (an estimate to confirm with the equipment layout).' };
+  return { els: out, note: 'Data center: the back ' + Math.round(y) + ' ft of its building plot (' + Math.round(share * 100) + '% of the footprint) is a fenced yard for its generators and cooling, at its back, away from the street and its parking (an estimate to confirm with the equipment layout).' };
 }
 
 // ---------- round 3: the lanes and yards a type needs (lib/btlanes.mjs) ----------
