@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 5:00 PM CT: Robustness: flag lots, empty answers, venues, podiums tested across 320 lot and type combinations (59ea59d, b9b5e85)
+- **A sweep of 320 layouts** across 22 lot shapes (rectangles, L, T, U, wedges, flag lots, curved frontages, easements, wetlands, corner lots, real parcels) and every building type now runs as a check; 149 come out clean (was 139), hard check failures 50 → 34, and no layout comes back empty without saying why (was 6).
+- **Flag lots:** the entry drive stays on the lot and joins the strip to the street (flag-lot failures 12 → 0).
+- **When nothing fits,** the plan says why: the land inside the setbacks, its narrowest width, and what would fit.
+- **Event venues** lay out (they were reported as unsupported). **"Podium apartments"** with no floors given assume 7 floors (5 over 2) and say so (a 4-acre lot: 186 homes, was 76). **"180 studio apartments in 3-story garden buildings"** reads as one program.
+- 88 test sites pass with no warnings; the full test suite passes.
+
 ### 3:32 PM CT: Parking round 6: no dead paving, entry drives clear on small lots (63927b4, 4b2c07d)
 - **Paving nobody uses goes back to lawn:** pieces of a parking lot with no space and no drive on them (up to a fifth of some lots' paving) are now planted. A street-front retail lot went from 559 to 425 sf of paving per space; a full-service hotel 380 to 335; a big box 358 to 331.
 - **Clear entry drives on small lots:** the rows move back so the first cross-aisle is a full entry length from the street (50, 75 or 100 ft by lot size) with no spaces beside the entry over that length (a daycare lot 30 → 62 ft; a data centre, a pad village and a mixed lot 30 → 50 ft).
