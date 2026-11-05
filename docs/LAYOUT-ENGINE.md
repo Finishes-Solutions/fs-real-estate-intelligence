@@ -685,3 +685,51 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    mixed request, the AI's program naming presets, a preset picker in the editor, fourplex and T footprints of their own,
    the stand-alone garage, queue / stacking lanes and school drop-off, drive-up storage's fire-turning warning on small
    lots (the storage layout's own), the pro forma by beds / children / students.
+
+28. Done Nov 4 (parking, round 2). The gaps item 25 left, measured on the top option of all 44 bench cases with
+   scripts/parking-metrics.mjs (holdouts only as a non-regression check). The metrics script now leaves planted end caps
+   and islands out of the paving (sf a stall), and measures three new things: walk per building (each building's share
+   of the stalls by floor area, its nearest that many: the worst building's 90th percentile, and how many pass 200 ft);
+   each entrance's throat (ft in from the street to the first stall centre beside the entry drive, and to the first drive
+   across it) against a length by lot size (lib/layoutrun.mjs throatNeed: 50 ft under 200 spaces, 75 ft to 499, 100 ft
+   for 500 or more; a planning yardstick in the range the TRB Access Management Manual, 2nd ed. 2014, and ITE / Stover &
+   Koepke "Transportation and Land Development" give for driveway throat length; local access codes set the real number);
+   and the stalls inside that length (entry stalls). Fixes:
+   (a) the 13n count: lib/siteplan.mjs rowStallCount, used by stalls(): a row of 13, 26... stalls with end caps counts its
+   last island once (it is the end cap, as stallCentres draws it); the field engine's row estimate uses it too. Every
+   square row now counts what it draws (test: n 1-60, caps and islands either way); rowEndIslands' avoidance is now only
+   a guard. Some plans count a stall or a few more than before (MX-horizontal 645 -> 658 of 644 required).
+   (b) row-end islands at no cost (lib/layoutrun.mjs growEndIslands, before rowEndIslands in the run's last repairs):
+   where the land at a row's end is free (inside the paving setback, clear of buildings by 5 ft, drives, lot paving,
+   other rows, ponds, pools, courts and parks; lawn is planted over), the row grows a stall width each end and both end
+   stalls are planted (its stalls stay put); where only one end is free, two widths that way, the stalls one along, only
+   where the new end stall fronts the aisle and no stall ends up farther from a building; never a stall fewer, never a
+   new dead end.
+   (c) stalls by the doors and clear entrances (rowsAlongDrives, after trailsClear): new 90° rows (planted ends, an island
+   every 13th) along the free sides of two-way drives that carry none, no farther from a building than three quarters of
+   the stalls now and never inside an entrance's throat; then stalls come off row ends, first those in a throat (while
+   the parking still meets what's required), then the farthest, back to the count the plan had (a row left under 6 goes
+   whole, its drive and lot paving with it: afterCut, shared with pruneSurplus). Kept only where the 90th percentile walk
+   drops 5 ft or more with paving up 1% at most, or the throat clears, or the paving drops 2% at the same walk; never more
+   stalls in a throat, never a new dead end.
+   (d) one dead-end rule: lib/siteplan.mjs deadEnds takes an end clear of stalls for HAMMER_FT (18 ft, as openDeadEnds
+   and the corner wings cut them; was 16 ft, with 2 ft slack) as a way out only while the stalls run no more than
+   DEAD_AISLE_FT (150, the same constant longDeadAisles and the validator use) past the last join; past that it takes a
+   paved turnaround or a drive. Planted end caps are not stalls in either detector.
+   (e) entryThroats takes the inward side from the ring's winding (a clockwise ring had it reversed; lib/siteparking.mjs
+   throatOf has the same reversal and is unchanged: commercial fields only).
+   Bench (top option, all 44 passing, no warnings, replay identical, no case lost homes or sf, parking meets the
+   requirement everywhere): bare row ends 364 -> 168 (MF-garden-rot 46 -> 2, LOT-curved-apt 54 -> 13, LOT-wetland-apt
+   30 -> 8, MX-horizontal 18 -> 0); stalls in an entrance's throat 50 -> 11 (LOT-curved-apt 18 -> 3, MF-midrise 8 -> 0,
+   MF-courtyard 4 -> 0); 90th percentile walk summed over the cases 3575 -> 3431 ft (WEDGE-tri-midrise 279 -> 255, max
+   377 -> 340; MF-wedge-midrise 179 -> 137; WEDGE-tri-1pk 119 -> 77); dead ends (any length, engine's rule) 10 -> 6;
+   paving a stall unchanged in total (17,105 -> 17,104 sf summed). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36
+   fill 128, E054 podium-urban 172). Tests:
+   test/parkingquality.mjs (round-2 cases with merged rows, blocked ends and a throat). Tried and taken out: shifting a
+   row toward its free end without the walk check (MF-tuckunder's p90 83 -> 95 ft, MF-tower 46 -> 54).
+   Still (next worst): the stalls beyond WEDGE-tri-midrise's pond (only 10 near stalls found along drives; moving 38
+   needs a new bay, not rows on drives); 370-390 sf a stall on small lots and loop drives (MF-garden-exact 370, MF-tower
+   380: rows along loops are kept out of the throat and FAR_FT reach, and the passes add no new aisles); the first drive
+   across an entry within the throat length (MF-garden-exact 28 ft, the wedges 13-30 ft: the loop drive's place is the
+   generator's, lib/sitelayout.mjs / sitegen); the remaining bare ends are where rows meet a cross drive end to end;
+   one-way circulation stays only where angled stalls are asked or win.
