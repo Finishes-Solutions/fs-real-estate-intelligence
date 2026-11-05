@@ -46,7 +46,20 @@ const SITES = {
   thcorner6: { ring: [[0, 0], [560, 0], [560, 467], [0, 467]], streets: [1] },
   /* angled parking: a 6 ac grocery lot, and a 3.75 ac lot whose parking bays are a few feet short of square stalls' 60 ft modules */
   grocery6: [[0, 0], [600, 0], [600, 435], [0, 435]],
-  bay60: [[0, 0], [560, 0], [560, 292], [0, 292]]
+  bay60: [[0, 0], [560, 0], [560, 292], [0, 292]],
+  /* building types (lib/btypes.mjs): rectangles from a 1.5 ac pad to a 14.5 ac tract, the street on edge 0 */
+  ty15: [[0, 0], [300, 0], [300, 220], [0, 220]],
+  ty23: [[0, 0], [330, 0], [330, 300], [0, 300]],
+  ty29: [[0, 0], [420, 0], [420, 300], [0, 300]],
+  ty34: [[0, 0], [500, 0], [500, 300], [0, 300]],
+  ty38: [[0, 0], [500, 0], [500, 330], [0, 330]],
+  ty43: [[0, 0], [520, 0], [520, 360], [0, 360]],
+  ty55: [[0, 0], [600, 0], [600, 400], [0, 400]],
+  ty58: [[0, 0], [600, 0], [600, 420], [0, 420]],
+  ty62: [[0, 0], [600, 0], [600, 450], [0, 450]],
+  ty84: [[0, 0], [700, 0], [700, 520], [0, 520]],
+  ty110: [[0, 0], [800, 0], [800, 600], [0, 600]],
+  ty145: [[0, 0], [900, 0], [900, 700], [0, 700]]
 };
 const CASES = [
   { id: 'MF-garden-exact', family: 'multifamily', site: 'rect10', ask: 'exactly 120 garden apartments, 3 stories' },
@@ -95,7 +108,30 @@ const CASES = [
   // angled parking: asked for on a grocery-anchored center and on a retail field; not asked, on a lot whose bays suit 60°
   { id: 'RE-grocery-angled', family: 'retail', site: 'grocery6', ask: 'grocery-anchored shopping center with a 40,000 sf grocery anchor, 50,000 sf total, angled parking' },
   { id: 'RE-field-angled', family: 'retail', site: 'grocery6', ask: '40,000 sf retail with angled parking' },
-  { id: 'RE-bay60', family: 'retail', site: 'bay60', ask: '30,000 sf retail' }
+  { id: 'RE-bay60', family: 'retail', site: 'bay60', ask: '30,000 sf retail' },
+  // building types as presets of parametric primitives (lib/btypes.mjs, docs/BUILDING-TYPES.md): the new types, and types
+  // modified by the words (a shape, keys, beds, a depth, a mezzanine), and a type no preset matches
+  { id: 'TY-hotel-keys', family: 'types', site: 'ty29', ask: 'a 6-story hotel with 120 keys' },
+  { id: 'TY-extended-stay', family: 'types', site: 'ty29', ask: 'extended-stay hotel, 110 keys' },
+  { id: 'TY-storage-3s', family: 'types', site: 'ty38', ask: '3-story self storage 90,000 sf' },
+  { id: 'TY-mob', family: 'types', site: 'ty43', ask: 'medical office building 40,000 sf' },
+  { id: 'TY-clinic-custom', family: 'types', site: 'ty23', ask: 'a custom type: 2-story clinic 12,000 sf, 5 per 1,000 parking' },
+  { id: 'TY-daycare', family: 'types', site: 'ty23', ask: 'a daycare for 150 children' },
+  { id: 'TY-assisted', family: 'types', site: 'ty58', ask: 'assisted living, 120 beds' },
+  { id: 'TY-student', family: 'types', site: 'rect10', ask: 'student housing, 600 beds' },
+  { id: 'TY-fourplex', family: 'types', site: 'ty84', ask: 'fourplexes, 48 units' },
+  { id: 'TY-livework', family: 'types', site: 'ty34', ask: 'live-work townhomes, 24 units' },
+  { id: 'TY-flex-mezz', family: 'types', site: 'rect10', ask: 'flex buildings 120 ft deep with mezzanine, 60,000 sf' },
+  { id: 'TY-cold', family: 'types', site: 'big40', ask: 'cold storage warehouse 200,000 sf' },
+  { id: 'TY-datacenter', family: 'types', site: 'ty110', ask: 'data center 100,000 sf' },
+  { id: 'TY-carwash', family: 'types', site: 'ty15', ask: 'express car wash' },
+  { id: 'TY-bank', family: 'types', site: 'pad1', ask: 'bank with drive-thru' },
+  { id: 'TY-fitness', family: 'types', site: 'ty62', ask: 'fitness center 40,000 sf' },
+  { id: 'TY-bigbox', family: 'types', site: 'ty145', ask: 'big box retail 120,000 sf' },
+  { id: 'TY-school', family: 'types', site: 'ty145', ask: 'elementary school for 600 students' },
+  { id: 'TY-L-apts', family: 'types', site: 'rect10', ask: 'L-shaped 4-story apartments, 150 units' },
+  { id: 'TY-U-pool', family: 'types', site: 'rect10', ask: 'U building around a pool, 120 units' },
+  { id: 'TY-unknown', family: 'types', site: 'ty55', ask: 'a 2-story trampoline park 30,000 sf' }
 ];
 const plan = id => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })) }; };
 const pick = r => ({ status: r.status, fail: r.counts.fail, unknown: r.counts.unknown, failed: r.failed, warnings: (r.checks || []).filter(c => !c.hard && c.status === 'fail').map(c => c.id), units: r.quantities?.totals.units || 0, gfa: r.quantities?.totals.gfa || 0, parking: r.quantities ? [r.quantities.parking.provided, r.quantities.parking.required] : null });

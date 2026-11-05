@@ -594,3 +594,36 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    MX-vertical p90 179); 380-450 sf a stall on small lots and where a loop drive carries no stalls (MF-garden-exact 393,
    MF-tower 391); the engine's own deadEnds (plan warnings, openDeadEnds) still takes an aisle end 16 ft clear as a way
    out; the 13n-stall cap count difference is avoided, not fixed.
+
+27. Done Nov 4 (building types from primitives). The owner: "a wide array of building types … very flexible and not a
+   fixed set of options. maybe working primitives for various types that get modified?" Audit and model:
+   docs/BUILDING-TYPES.md. Types had been fixed lists in seven places (17 uses, 30 forms, ~12 generators, 7 reviewed
+   templates, the ~400-footprint Draw library, AI recipes, 16 map colours), with nothing between a use and a form taking
+   parameters from the words; unknown words fell to `other` or a wrong use ("data center" read as retail, "cold storage
+   facility" as self storage, "fourplexes" as `other`), and "L-shaped apartments" drew the garden stack round a corner,
+   62 of 150 homes short. Now lib/btypes.mjs: a type = a primitive (23: bar, garden stack, L, U, courtyard, T, tower on
+   podium, point tower, wrap, podium court, row, detached, multiplex, big box, cross-dock, flex bays, storage campus,
+   canopy, drive-thru pad, tunnel, building with its grounds, cluster, garage; each with an outline for any parameters)
+   × bounded parameters (floors, floor to floor, depth, length, wing, sf a home / key / child / student, beds a unit,
+   mezzanine, ratio; core and parking relation) × use rules (the engine use it lays out as, its count, its parking rule,
+   its colour key and floor height), every number marked reviewed / engine / standard / estimate with its source. The
+   31 existing types are presets with the engine's own numbers (test/btypes.mjs checks them against USES, sitegen
+   TYPES / WRAP / GATE, PODIUM, HOME_TYPES, FUEL and the reviewed templates) and change nothing: the 44 earlier bench
+   cases are identical element for element, and 28 existing requests get no type fields. 21 new presets (hotels by keys,
+   limited-service and extended-stay; multi-story and drive-up storage; medical office building, clinic; assisted and
+   independent senior living; student housing by beds; fourplexes; live-work; flex with a mezzanine and a depth; cold
+   storage; data centre shell; fitness club; big box; bank with drive-thru; daycare; school; express car wash; and a
+   stand-alone garage, reported as not drawn), 3 shape presets (L, U, round a pool) and a closest-primitive mapping for
+   words no preset knows ("a 2-story trampoline park 30,000 sf": a bar at that size, with a note). `applyType` runs last
+   in guessProgram on single-use programs; the type's parking rule goes into the brief's rules (engine and validator
+   count the same requirement); a preset's usual floors ride as `btFloors` (lib/planbrief.mjs still sees only the words'
+   floors); apartments of a type with no reviewed template take the brief form `multifamily` (homes from floor area);
+   flex and warehouse depth from the words (`depthFix`, lib/sitelayout.mjs). After a run lib/layoutrun.mjs tags each
+   building of the type (`btype`, colour key `tc`, `floorH`, its name and count: "Hotel A · 6-story · 120 keys"; homes
+   keep the engine's line) and the option's notes name the preset, primitive and sources. The 3D map keeps its plain
+   blocks with parapet and floor lines, coloured by the type's key at its floor height; the plan key and the PDF sheet
+   carry the type colours. Bench: 21 new TY- cases, all passing with no warnings and replay identical (65 of 65 overall).
+   Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Still: types per zone of a
+   mixed request, the AI's program naming presets, a preset picker in the editor, fourplex and T footprints of their own,
+   the stand-alone garage, queue / stacking lanes and school drop-off, drive-up storage's fire-turning warning on small
+   lots (the storage layout's own), the pro forma by beds / children / students.

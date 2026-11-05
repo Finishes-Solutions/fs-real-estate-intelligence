@@ -114,6 +114,7 @@ function useFromProgram(z, text, i, zi = null) {
   if (zi != null) out.zone = zi; // the engine zone it is (a mixed plan's buildings carry e.zone)
   if (z.name) out.name = String(z.name).slice(0, 60);
   if (z.use === 'multifamily') { const f = zoneForm(z); if (f) out.form = f; }
+  if (z.btForm) out.form = z.btForm; // (a building type's own form, lib/btypes.mjs: 'multifamily' is the engine's apartments without a reviewed template)
   if (z.use === 'retail' && +z.anchor > 0) out.anchor = { value: +z.anchor, unit: 'sf' }; // the anchor store's floor area, as the words gave it (the rest is shop space)
   if (z.floors) out.floors = z.floors;
   if (z.buildings) out.buildings = { mode: 'exact', value: z.buildings };
@@ -151,6 +152,7 @@ export function briefFromProgram(program, plan, { text = '', parser = 'structure
   { const t = String(text || ''), m = /\b(\d{2})\s*(?:ft|feet|foot|')\s*[- ]?deep\b/i.exec(t), deep = /\bdeep(?:er)? (?:double[- ]loaded )?corridor (?:buildings?|bars?)\b/i.test(t), corr = /\bcorridor\b|\bbars?\b|\bmid[- ]?rise\b/i.test(t);
     const v = m && corr ? +m[1] : deep ? DEEP.dflt : null;
     if (v) for (const u of brief.program.uses.filter(u => u.use === 'multifamily')) { if (!u.form || u.form === 'mf-garden') u.form = 'mf-midrise'; if (DEEP.forms.includes(u.form)) u.depth = { value: Math.max(DEEP.min, Math.min(DEEP.max, v)), unit: 'ft', cls: 'assumption', source: 'the request: corridor buildings ' + v + ' ft deep, deeper than any reviewed corridor building (65 ft)' }; } }
+  if (P.btRule && !P.zones && DEFAULT_RULES.values[P.btRule.key]) brief.rules.values[P.btRule.key] = { v: P.btRule.v, cls: 'assumption', source: String(P.btRule.source).slice(0, 300) }; // (a building type's parking rule, lib/btypes.mjs: the engine and the check count the same requirement)
   brief.site.stormwater = sm === 'underground' ? 'underground' : sm === 'none' ? 'offsite' : sm === 'detention' || sm === 'retention' ? 'onsite-pond' : null;
   return brief;
 }
@@ -295,6 +297,7 @@ export function toEngine(bIn, { overshoot = true } = {}) { // overshoot: ask a t
   { const st = plan.params.storm && typeof plan.params.storm === 'object' ? plan.params.storm : {}, rr = st.rain || s.rainfall || HY.regionalRain(s.origin, st.rp || HY.HYDRO.rp);
     if (rr && !st.rain) { plan.params = { ...plan.params, storm: { ...st, rain: rr } }; mapping.push('Detention estimated by NRCS TR-55 (chapter 6) for the ' + rr.rp + '-year 24-hour storm, ' + rr.p + ' in (' + rr.source + '); an estimate for the civil engineer to confirm.'); } }
   const form = uses.find(u => u.use === 'multifamily')?.form;
+  if (P.btFloors && !P.floors) P.floors = P.btFloors; // (a building type's usual floors, lib/btypes.mjs, when the words give none)
   if (form === 'mf-courtyard') P.arrangement = 'courtyard';
   if (uses.some(u => u.form === 'ind-cross-dock')) { const z = single ? P : P.zones?.[uses.findIndex(u => u.form === 'ind-cross-dock')]; if (z) z.crossDock = true; mapping.push('A cross-dock: dock doors on both long sides, a truck court on each, the car parking in front (lib/sitegencom.mjs crossDock).'); }
   if (form === 'mf-tower-podium' || form === 'mf-podium') P.form = 'tower';

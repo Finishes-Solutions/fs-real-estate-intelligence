@@ -14,6 +14,7 @@ import * as CX from './enginectx.mjs';
 import { WALLER } from './rulesheet.mjs';
 import * as STL from './stalls.mjs';
 import { REF_PODIUM } from './reftemplates.mjs';
+import * as BT from './btypes.mjs';
 
 const FT = 3.280839895, RAD = Math.PI / 180;
 
@@ -2224,7 +2225,7 @@ function applyPlaza(p, text) {
   if (p.use === 'retail' || !p.zones) { p.plaza = true; p.court = court; } p.arrangement = 'plaza';
   return p;
 }
-export function guessProgram(text) { return applyTownhomeLots(applyStudios(applyPlaza(guessProgram0(text), text), text), text); }
+export function guessProgram(text) { return BT.applyType(applyTownhomeLots(applyStudios(applyPlaza(guessProgram0(text), text), text), text), text); } // (BT.applyType: the building type the words name, lib/btypes.mjs; existing types unchanged)
 // for-sale townhomes ("fee simple townhomes", "for-sale townhomes", "townhome lots", "with garages"): each home on a lot of
 // its own, never the rental court; "front-load" / "driveways": garages and front doors on the street, a driveway apron each
 // (the E053 Portland Road row, lib/reftemplates.mjs th-frontload-row-2s), else rear-load off a lane
@@ -3549,7 +3550,7 @@ export function planFeatures(plan, selected, keep = null) {
   for (const q of d.patios) { feats.push({ type: 'Feature', properties: { k: 'yard' }, geometry: poly(q.poly) }); feats.push({ type: 'Feature', properties: { k: 'fence' }, geometry: { type: 'MultiLineString', coordinates: q.walls.map(ll) } }); }
   for (const e of plan.elements || []) {
     const use = USES[e.use] ? e.use : prog.use;
-    const props = { k: e.kind, use, id: e.id, ...(e.gate ? { gate: 1 } : {}), ...(e.emergency ? { em: 1 } : {}), ...(e.kind === 'lot' && e.trees ? { wood: 1 } : {}), sel: e.id === selected ? 1 : 0, bad: bad.has(e.id) ? 1 : 0, nm: e.name ? 1 : 0, ...(isMedian(e) ? { med: 1 } : {}), ph: e.phase || 1, ...(e.kind === 'court' ? { c: SPORTS[courtSport(e)].surf } : {}), h: e.kind === 'building' ? +((e.floors || 1) * USES[use].floorH / FT).toFixed(1) : 0 };
+    const props = { k: e.kind, use: BT.colorKey({ tc: e.tc, use }), id: e.id, ...(e.gate ? { gate: 1 } : {}), ...(e.emergency ? { em: 1 } : {}), ...(e.kind === 'lot' && e.trees ? { wood: 1 } : {}), sel: e.id === selected ? 1 : 0, bad: bad.has(e.id) ? 1 : 0, nm: e.name ? 1 : 0, ...(isMedian(e) ? { med: 1 } : {}), ph: e.phase || 1, ...(e.kind === 'court' ? { c: SPORTS[courtSport(e)].surf } : {}), h: e.kind === 'building' ? +((e.floors || 1) * (+e.floorH || USES[use].floorH) / FT).toFixed(1) : 0 }; // (a building type's own floor height: lib/btypes.mjs)
     const tower = e.kind === 'building' && e.form === 'tower' && e.podium > 0 && (e.floors || 1) > e.podium;
     if (tower) props.h = +(e.podium * USES[use].floorH / FT).toFixed(1); // the podium; the tower goes on top
     if (e.kind === 'garage') props.h = +((e.levels || 4) * 10.5 / FT).toFixed(1);
@@ -3560,9 +3561,9 @@ export function planFeatures(plan, selected, keep = null) {
     // line at every floor (the designed facades of Oct 27, from the plan-set designs, were taken off the map Nov 4 at the
     // owner's request; plan sets and the BIM model still draw from the designs: lib/massing.mjs, lib/bimplan.mjs)
     if (e.kind === 'building' || e.kind === 'garage') { // 3D detail: the tower, a parapet round the roof and a line at every floor
-      const fh = e.kind === 'garage' ? 10.5 : USES[use].floorH, fl = e.kind === 'garage' ? (e.levels || 4) : e.floors || 1, ring = (o, d1, d2) => ({ type: 'Polygon', coordinates: [ll(offsetRing(o, d1).concat([offsetRing(o, d1)[0]])), ll(offsetRing(o, d2).reverse().concat([offsetRing(o, d2).reverse()[0]]))] });
+      const fh = e.kind === 'garage' ? 10.5 : +e.floorH || USES[use].floorH, fl = e.kind === 'garage' ? (e.levels || 4) : e.floors || 1, ring = (o, d1, d2) => ({ type: 'Polygon', coordinates: [ll(offsetRing(o, d1).concat([offsetRing(o, d1)[0]])), ll(offsetRing(o, d2).reverse().concat([offsetRing(o, d2).reverse()[0]]))] });
       const gfl = gr ? gr.floors : 0, at = f => f <= gfl ? f * GROUND_H : gfl * GROUND_H + (f - gfl) * fh; // (the floors' heights: a shop floor under the homes is taller)
-      const top = tower ? towerOutline(e) : outline(e), base = outline(e), H = at(fl), x3 = (part, geometry, b, h) => feats.push({ type: 'Feature', properties: { k: 'b3', part, use, ph: e.phase || 1, g: e.kind === 'garage' ? 1 : 0, b: +(b / FT).toFixed(2), h: +(h / FT).toFixed(2) }, geometry });
+      const top = tower ? towerOutline(e) : outline(e), base = outline(e), H = at(fl), x3 = (part, geometry, b, h) => feats.push({ type: 'Feature', properties: { k: 'b3', part, use: props.use, ph: e.phase || 1, g: e.kind === 'garage' ? 1 : 0, b: +(b / FT).toFixed(2), h: +(h / FT).toFixed(2) }, geometry });
       if (tower) x3('tower', poly(top), e.podium * fh, H);
       x3('parapet', ring(top, 0, -1.2), H, H + 3);
       if (tower) x3('parapet', ring(base, 0, -1.2), e.podium * fh, e.podium * fh + 3);
