@@ -51,15 +51,18 @@ Every edit or pick saves a new `plan_id`; the earlier plan is kept. `plan_set` a
 
 | tool | arguments | what |
 |---|---|---|
-| `plan_get` | `plan_id`, `include_record` | the site, request, numbers, every piece by id and name, the run's other layouts, history |
-| `plan_edit` | `plan_id`, `words` or `edits`, `refit`, `use_ai` | the app's Change With AI: "move the clubhouse to the entry", "lock the pool"; typed `{ action: move / remove / change / add / swap / turn / lock / unlock, target, to, beside, with, x, y, every, floors, units, gfa, type, kind, use, name, turnBy }` |
+| `plan_get` | `plan_id`, `include_record` | the site, request, numbers (keys, beds), building types, the asks ("Asked: … done / not met") and assumptions, every piece by id and name, the run's other layouts, history |
+| `plan_edit` | `plan_id`, `words` or `edits` or `settings`, `refit`, `use_ai` | the app's Change With AI: "move the clubhouse to the entry", "lock the pool", "add a hotel with 120 keys at the front", "set parking angle 60"; typed `{ action: move / remove / change / add / swap / turn / lock / unlock, target, to, beside, with, x, y, every, floors, units, gfa, type, btype, keys, kind, use, name, turnBy }`; `settings { setbacks, parking_per_unit, parking_per_1000, parking_angle (45 / 60 / 90), entrances, entrance_style, guardrails, scenario }` lay the site out again with them, locked pieces kept |
 | `plan_pick` | `plan_id`, `layout` (2, 3… or a name) | another layout of the same run becomes the plan |
 | `plan_compare` | `plan_ids` (up to 6), `include_alternatives` | numbers, checks and a quick value side by side, with what changed against the first |
-| `plan_check` | `plan_id`, `all` | the independent check (pass / fail / unknown, measured vs required), the quality check, the jurisdiction's checks |
-| `plan_numbers` | `plan_id`, `land_price` | floor area, units and unit mix, parking, coverage, open space, detention; the pro forma |
+| `plan_check` | `plan_id`, `all` | the independent check (pass / fail / unknown, measured vs required), the quality check, the jurisdiction's checks, the asks measured on the drawing, queues |
+| `plan_numbers` | `plan_id`, `land_price` | floor area, units and unit mix, hotel keys, beds, children, students, parking drawn and required with its quality measured (paving a stall, islands, dead ends, walks, entrance throat, accessible stalls), queues, coverage, open space, detention; the pro forma |
 | `plan_export` | `plan_id`, `formats` (pdf, svg, image, dxf, geojson, json, bim), `sheet` | files as resources |
 | `plan_from_project` / `save_plan_to_project` | `project_id`, `option_id` / `plan_id` | a project's option as a plan; a plan back into a project as a new option (write) |
 | `site_report` | a location, `kind` (parcel_map, topography, site_environmental, area_report, parcel_outline) | the parcel card's one-click reports |
+| `building_types` | `id`, `query`, `family` | the building types a request can name (hotels by keys, daycare, car wash…), their shape, defaults and usual size; `btype` for `plan_edit` add |
+| `report_filings` / `report_traffic` | a location, `kind` (summary, filing_list, activity, area_comparison with `areas`), filters, `include_csv` | the website's Export › New report files and the Traffic report |
+| `upload_project_file` | `project_id`, `name`, `content_base64` or `text` | a reference file added to a project's Files tab, read by the AI into facts (write) |
 
 A whole session: `find_property` → `site_facts` → `site_plan` (request in words) → `plan_check` → `plan_edit` →
 `plan_compare` → `plan_export` (pdf) → `plan_set`. Use this skill's offline engine (way B) only without the connector.

@@ -5,23 +5,39 @@ storage: no call to the app over HTTP and nothing belonging to the source repos.
 capability (from PRODUCTDOC.md and the UI / `api/` code) and the MCP tool that covers it.
 
 Legend: **✓** covered, **◐** partly (what is missing is said), **✗** not covered, **n/a** not something an agent needs.
-"Before" is `origin/main` at 7d2676c; "after" is this branch (matthew/mcp-full-system).
+"Before" is `origin/main` at 7d2676c; "round 1" is matthew/mcp-full-system-b (30331ee); "round 2" is matthew/mcp-round2
+(round 1 merged onto the layout engine's building types, placements and parking round 2, matthew/townhome-packing-b).
+The tables below show before → after; a row changed in round 2 says so ("R2").
 
 ## Summary
 
-| | before | after |
-|---|---|---|
-| Capabilities in the tables below | 79 | 79 |
-| ✓ covered | 41 | 66 |
-| ◐ partly | 15 | 9 |
-| ✗ not covered | 20 | 1 |
-| ✗ left out on purpose (licensing: live flights, routing, Regrid) | 3 | 3 |
-| Tools (all, with project changes on) | 47 | 57 |
+| | before | round 1 | round 2 |
+|---|---|---|---|
+| Capabilities in the tables below | 79 | 79 | 85 (6 new engine abilities) |
+| ✓ covered | 41 | 66 | 76 |
+| ◐ partly | 15 | 9 | 6 |
+| ✗ not covered | 20 | 1 | 0 |
+| ✗ left out on purpose (licensing: live flights, routing, Regrid) | 3 | 3 | 3 |
+| Tools (all, with project changes on) | 47 | 57 | 61 |
+| Tool list size, read-only connection (test cap 95,000 characters) | — | 86,291 | 92,395 |
 
 New tools: `plan_get`, `plan_edit`, `plan_pick`, `plan_compare`, `plan_check`, `plan_numbers`, `plan_export`,
 `plan_from_project`, `save_plan_to_project` (write), `site_report`. Changed: `site_plan` keeps the run's other layouts and
 the layout recipe with the saved plan, and points to the plan tools; `plan_set` and `site_renderings` take any plan id
 (an edited or picked one too); the server instructions describe the end-to-end workflow.
+
+Round 2 tools: `building_types`, `report_filings`, `report_traffic`, `upload_project_file` (write). Changed: `site_plan`
+lays out inside the jurisdiction's guardrails the way the app's Build does (lib/guardrails.mjs forLayout / unapply round
+the engine: the scenario's setbacks, the city's parking count with its reserve, detention by volume, fire-lane aisles;
+before, it handed the engine the raw program and only checked against the guardrails afterwards), says angled parking
+that wasn't drawn, and keeps the layout's notes; `plan_get` / `plan_check` give the request's "Asked: … done / not met"
+lines (measured on the drawing, so an edit that meets or breaks an ask shows) and its assumptions; `plan_check` adds the
+jurisdiction and queue sections and checks a one-use plan's parking at the city's count; `plan_numbers` adds hotel keys,
+beds, children and students, the building types, parking quality measured on the drawing (scripts/parking-metrics.mjs:
+paving a stall, islands, dead ends, walks, entrance throat, accessible stalls) and queues; `plan_edit` adds buildings by
+type (`btype`, sized to the keys / units / floors asked, in words or typed) and `settings` (setbacks, parking ratio and
+angle, entrances, entrance style, guardrails and scenario) that lay the site out again with locked pieces kept; the
+tool descriptions were trimmed so the list stays under the cap.
 
 ## Property and site information
 
@@ -68,8 +84,8 @@ the layout recipe with the saved plan, and points to the plan tools; `plan_set` 
 | Site Environmental PDF | Card › Reports | ✗ | ✓ `site_report` site_environmental |
 | Area Report PDF (1/3/5/10 mi rings) | Card › Reports | ✗ | ✓ `site_report` area_report |
 | Parcel Outline GeoJSON | Card › Reports | ◐ outline inside `find_property` text | ✓ `site_report` parcel_outline |
-| Traffic report PDF | Reports | ◐ data via `traffic_counts`, no PDF | ◐ |
-| Summary / Filing list / Area comparison / Activity report (PDF, Excel, CSV) | Export › New report | ◐ the data via `construction_filings` / `top_companies`, not the files | ◐ |
+| Traffic report PDF (and CSV) | Reports | ◐ data via `traffic_counts`, no PDF | ✓ R2 `report_traffic` (live speeds and incidents where `TOMTOM_API_KEY` is set) |
+| Summary / Filing list / Area comparison / Activity report (PDF, Excel, CSV) | Export › New report | ◐ the data via `construction_filings` / `top_companies`, not the files | ✓ R2 `report_filings` (PDF and CSV; the website's Excel comes as CSV; area comparison has the filing figures, census figures via `demographics`) |
 
 ## Site plans: building and iterating
 
@@ -78,6 +94,12 @@ the layout recipe with the saved plan, and points to the plan tools; `plan_set` 
 | Build a plan from words (Build with AI, Low–High effort) | Site plan › Build | ✓ `site_plan` | ✓ |
 | What should go here? (best-use ideas) | Site plan | ✓ `site_plan` without request | ✓ |
 | Exact, replayable layout from a typed brief | (engine) | ✓ `layout_run`, `layout_replay`, `layout_capabilities` | ✓ |
+| Building types: name one in the request, see the list, add one by type (51 + 5 word-only presets) | Build words, Add › Add a building by type | ✗ (new in the engine) | ✓ R2 `building_types`; `site_plan` words; `plan_edit` `btype` (+ `keys`, `units`, `floors`) |
+| Where things go ("parking behind the buildings", "pool in the center"): each ask done / not met, and what was assumed | Build notes | ✗ (new in the engine) | ✓ R2 `site_plan` notes, `plan_get`, `plan_check`, `plan_edit` (measured on the drawing) |
+| Angled parking (45° / 60° on one-way aisles) | Build words, Settings | ✗ (new in the engine) | ◐ R2 `site_plan` words, `plan_edit` settings `parking_angle`; a mix of uses on zones doesn't draw angled rows yet (said in "Not done") |
+| Parking quality (paving a stall, islands, dead ends, walks, entrance throat, accessible stalls) | (parking metrics) | ✗ | ✓ R2 `plan_numbers` |
+| Queues: drive-thru lanes, car-wash stacking, and their checks | Numbers › Independent check | ✗ (new in the engine) | ✓ R2 `plan_check`, `plan_numbers` |
+| Hotel keys, beds, children, students | Numbers | ✗ (new in the engine) | ✓ R2 `plan_numbers`, `plan_get`, `plan_compare` deltas |
 | Open a saved plan: pieces, names, numbers | Plan panel | ✗ (plan_id only fed plan_set / renderings) | ✓ `plan_get` |
 | Change With AI (words) | Plan panel › Change | ◐ `layout_edit` on layout_run records only, not on a `site_plan` plan | ✓ `plan_edit` words (the app's AI edit, else read directly) |
 | Move / turn / resize / remove / swap / add a piece | Editing a plan, tool bar | ◐ `layout_edit` (run records) | ✓ `plan_edit` typed edits |
@@ -94,9 +116,9 @@ the layout recipe with the saved plan, and points to the plan tools; `plan_set` 
 | Numbers: unit mix, parking, coverage, open space, detention | Numbers | ◐ in the `site_plan` answer | ✓ `plan_numbers` |
 | Pro forma (default market assumptions) | Pro forma | ✗ (projects only) | ✓ `plan_numbers` |
 | Free-form drawing (Edit Shape, draw parking outlines, bend a drive, easements) | Drawing by hand | ✗ | ◐ bend / cul-de-sac on subdivision streets via `plan_edit` words; no free polygon drawing |
-| Settings on an existing plan (setbacks, ratios, home mix, entrance and street rules) | Site parameters | ◐ at build time (`site_plan` words, `layout_run` arguments) | ◐ home mix via `plan_edit` words; others at build time |
+| Settings on an existing plan (setbacks, ratios, home mix, entrance and street rules) | Site parameters | ◐ at build time (`site_plan` words, `layout_run` arguments) | ✓ R2 `plan_edit` `settings` or words ("front setback 40 ft", "5 per 1,000", "2 entrances"): the site laid out again, locked pieces kept; home mix via words |
 | Pods re-laid, subdivision blocks re-laid | Change With AI | ✗ | ◐ said as not done; lay out again |
-| Waller scenarios A / B / C | Waller guardrails | ◐ applied in `site_plan` | ◐ |
+| Waller guardrails and scenarios A / B / C | Waller guardrails | ◐ checked in `site_plan`, not laid out under | ✓ R2 laid out under them as the app does; the city's parking count governs; `plan_edit` settings `guardrails`, `scenario` |
 | Home communities (tiny / manufactured / RV) | Site plan | ✓ `site_plan` home arguments | ✓ |
 
 ## Exports, plan sets, renderings
@@ -125,7 +147,7 @@ the layout recipe with the saved plan, and points to the plan tools; `plan_set` 
 | Assumptions, budget lines, scenarios | Feasibility workspace | ✓ `set_assumptions`, `edit_budget`, `save_scenario` (write) | ✓ |
 | Report set (PDF, Excel, CSV, JSON) | Reports step | ✓ `feasibility_report` | ✓ |
 | Project files and links | Files tab | ✓ `project_files` (read) | ✓ |
-| Upload reference files to a project | Files tab | ✗ | ✗ (agents pass facts as `site_plan` `references`) |
+| Upload reference files to a project | Files tab | ✗ | ✓ R2 `upload_project_file` (write; the platform's own site-files bucket; up to 3 MB a call, bigger on the Files tab; the AI reads facts, a person confirms them) |
 
 ## Not needed by an agent (n/a)
 
@@ -134,17 +156,33 @@ Map browsing, layers and filters on screen; Settings and sign-in; Ask AI chat (t
 
 ## Remaining gaps
 
-1. Export › New report files (Summary, Filing list, Area comparison, Activity report) and the Traffic report PDF: the
-   data is there (`construction_filings`, `top_companies`, `traffic_counts`), the files aren't.
-2. Free-form drawing on a plan (a drawn parking outline, Edit Shape, easements drawn by hand).
-3. Settings changed on an existing plan and the plan re-laid with them (setbacks, parking ratios, entrance and street
-   rules): today these are given when the plan is built (`site_plan` words, `layout_run` arguments).
-4. Re-laying one pod or one subdivision block from `plan_edit` (the app does it in the browser's layout worker).
-5. Uploading reference files to a project.
-6. IFC needs the BIM tool (`BIMCRAFT_CLI`) on the deployment; without it `plan_export` gives the BIM script.
-7. Request reading without the AI: "pool in the center" is read as a shopping center (retail + apartments) by the
-   direct reading (`lib/siteplan.mjs` guessProgram); with the AI on (the default at Medium) it is read correctly. Left
-   to the request-understanding work.
+1. Free-form drawing on a plan (a drawn parking outline, Edit Shape, easements drawn by hand).
+2. Re-laying one pod or one subdivision block from `plan_edit` (the app does it in the browser's layout worker).
+3. IFC needs the BIM tool (`BIMCRAFT_CLI`) on the deployment; without it `plan_export` gives the BIM script.
+4. Name suggestions (the app's Suggest Names list); `plan_edit` "call it …" names things.
+5. Zoning text where the city doesn't publish it.
+6. The website's Excel files come as CSV through the MCP; uploads over 3 MB go through the Files tab.
+
+Round 1's gap "pool in the center read as a shopping center without the AI" is fixed by the request-understanding work
+(lib/siteplan.mjs guessProgram reads it as apartments with the pool placed in the middle).
+
+Found in round 2, for the layout engine and parking work (the MCP calls into them and says what happens; it does not
+patch their output):
+
+- **Mixed uses under Waller's detention:** with the guardrails' detention (1 acre-foot a developed acre at a 4 ft
+  average depth), "a 120-key hotel and 20,000 sf of retail" on sites up to about 13 acres falls back to the engine's
+  simple layout: its buildings carry no zone, so no building type, and it parks 202–204 of the 212 spaces the city's
+  count needs. On 24.8 acres the zones lay out, the hotel is typed and the count is met (the e2e's scenario 2 uses that
+  site). The same program without the guardrails lays out on zones at 13.4 acres. The app's Build does the same (it
+  calls the engine the same way).
+- **governingParking on a mix:** lib/layoutrun.mjs governingParking puts the program's top-level ratio (the shops' 4.2 a
+  1,000 sf with the reserve) on every use counted by area, so a 66,000 sf hotel is judged at 362 spaces where the
+  guardrails' metrics need 212. `plan_check` applies it to one-use plans only for now.
+- **The 5% reserve twice:** runPlan's governingParking reads the plan through G.effective again; called with the
+  effective plan (as the app's laid() and the MCP do), the brief's rule becomes 2.205 a home where the plan's numbers
+  use 2.1. The layout parks a little more than the city needs; the counts the user sees are the 2.1 ones.
+- **Angled parking on a mix:** a program of zones with `parkAngle` lays square stalls and says nothing; the MCP says
+  it in "Not done" (and in the `site_plan` answer).
 
 ## How it is tested
 
@@ -152,5 +190,11 @@ Map browsing, layers and filters on screen; Settings and sign-in; Ask AI chat (t
 `site_facts` → `site_report` → `site_plan` "garden apartments, as many as fit, pool in the center" → `plan_check` →
 `plan_get` → `plan_edit` "move the clubhouse to the entry" (AI and direct reading) → `plan_compare` → `plan_numbers` →
 `plan_export` (PDF, SVG, image, DXF, GeoJSON, JSON, BIM) → `plan_pick` → locks → `plan_set` from the edited plan, plus
-the plain-sentence errors. Every outside service is stood in for; storage is in memory. `test/mcp-projects.mjs` covers
-`plan_from_project` and `save_plan_to_project`.
+the plain-sentence errors. Scenario 2: `building_types` → `find_property` on a second, 24.8 acre parcel in Waller →
+`site_plan` "a 120-key hotel and 20,000 sf of retail, parking behind the buildings" (the guardrails on: the city's
+parking count governs and is met; the hotel is a typed building with 120 keys; the ask said as done or not met) →
+`plan_get` / `plan_check` / `plan_numbers` (keys, parking measured) → `plan_edit` "set parking angle 60" (laid out
+again; said when not drawn) and settings (front setback 60 ft) → buildings added by type (words "add a bank at the
+front", typed daycare) → `plan_compare` → `plan_export` → `report_filings` (summary, activity with CSV, area
+comparison, filing list) and `report_traffic`. Every outside service is stood in for; storage is in memory.
+`test/mcp-projects.mjs` covers `plan_from_project`, `save_plan_to_project` and `upload_project_file`.
