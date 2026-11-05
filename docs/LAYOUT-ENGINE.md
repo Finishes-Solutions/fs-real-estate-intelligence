@@ -844,3 +844,71 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    lib/siteparking.mjs, draws every building behind its parking); the lake in the middle; a way in off a side street is
    met where the way-in step adds one, not steered (entrances are added after the candidates are compared); the corner
    test is looser than the scorer's.
+
+31. Done Nov 5 (parking, round 3). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 74-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base d35bb9c), then fixed, most valuable first:
+   (a) The building at the street, its parking behind (lib/siteparking.mjs streetFront). The parking-field engine always
+   drew the building behind its field; form-based and urban codes often want the storefront on the sidewalk and the lot
+   at the back. It is now a candidate, laid out as a brief's "parking behind the buildings" is (briefRows: the street
+   row, then the field, the way in beside the building), on the side (lib/enginectx.mjs aside: its own clock and random
+   stream, so the search finds exactly what it did before). Asked for in words ("building up front, parking behind",
+   "retail on the street, parking in the rear": lib/layoutintent.mjs asksFor hints.parking 'back', or the use placed at
+   the front; it reaches the engine as opts.asks where the spatial-asks work is folded in, the candidates then compared
+   by lib/sitelayout.mjs askPick and the run's placements rank): every such layout that parks the program joins the
+   field options first (three at most), named "Building at the street, parking behind" and saying "as asked". Not
+   asked: offered only where it parks the program, holds as much floor area as the best layout found and outscores it
+   (on the bench it never does, so no case changed by it). A compact street row now leaves room beside the building for
+   the way in (before, the brief path failed for a 15,000 sf shop row on 4.3 ac: every candidate too narrow for the
+   entry). Checked end to end with the spatial-asks branch merged in a scratch branch: "12,000 sf retail building up
+   front with parking behind" (4.3 ac), "retail on the street, parking in the rear, 15,000 sf", "20,000 sf medical office
+   at the front with parking behind it" (5.5 ac) and "a 6,000 sf restaurant up front, parking in back" (2.9 ac) all rank
+   the street layout first, every ask met, passing with no warnings. Bench cases PK-street-retail and PK-street-medical
+   carry those asks (on this branch alone, without the asks folded in, they lay out as before and say the ask is unmet).
+   (b) Entry throats. The first drive across the main entry sat inside the stacking length (lib/layoutrun.mjs
+   throatNeed: 50 / 75 / 100 ft) on 31 of 74 cases. Two causes. In the parking-field engine the field's paving ran under
+   the strip beside the entry drive (no stalls there, but open paving a car could cut across, 30-57 ft in); it now stops
+   at the strip's sides, which are planted (lib/siteparking.mjs build: the throat box cut out of the first field's
+   paving), so the first drive across is the first aisle at the engine's stacking distance. In the generator
+   (lib/sitegen.mjs) rows facing the street, rows running back and the strips along a wedge's street line put their
+   first aisle or front drive at the paving setback (10-28 ft in); each is now drawn with it the stacking length in
+   (75 ft where the homes asked need 200 stalls or more, else 50; alongEdges p.thr for a strip along the street) where
+   that costs no homes and parks them as well (the same buildings' homes, the stalls the homes need or as many as
+   before), else as before, the land in front lawn. Every layout of the grid is drawn the same way. Tried first and
+   changed: a pass after the grid that redrew the kept layouts and swapped them in (or offered them beside): it broke
+   the grid's near-twins apart (one of a pair set back, the other not), which changed what the search picked: a prompt
+   corpus request ("160 apartments, clubhouse in the middle of the site", S32) lost its layout with the clubhouse in
+   the middle, and a strip along a wedge's street line came out parked down 16 homes (WEDGE-tri-midrise) until the
+   parking was compared too. test/parkingquality.mjs's guarded run (Waller rules): its two 3-row garden layouts now
+   park exactly the same and the run keeps one as twins, so its third option is a 108-home courtyard; the test now
+   checks every option is judged and parked at 2.1 a home and that the top one holds the 120 and passes (it checked
+   every option for 252 stalls).
+   (c) Tried and taken out: a new bay by the buildings for stranded parking (a 24 ft spur aisle off a drive's free side,
+   rows both sides, an 18 ft turning end, stalls within 150 ft of a building, the farthest stalls taken out for it). On
+   WEDGE-tri-midrise (38 stalls beyond the pond, p90 255 ft) and TY-hotel-retail no such bay fits anywhere (no candidate
+   even without the walk limit): the land by the buildings is full and the pond holds the rest, so the fix belongs to the
+   generator's pond and bay placement, not a pass after it. Also taken out: running the stalls-along-drives pass for
+   paving alone where walks are already short (over 400 sf a stall): no case improved (MF-tower's loop legs are curved
+   paths or entrances; the far rows trimmed leave their drives).
+   (d) One-way aisles with 90° stalls: not used, by design. A 90° stall needs the same 22-24 ft to back out of whether
+   the traffic runs one way or two (ULI / NPA "The Dimensions of Parking"), so a one-way 90° field saves no paving and
+   adds wrong-way conflicts; one-way circulation earns its place only with angled stalls (item 24: 17 / 14 ft aisles).
+   Bench (74 original cases, top option; base d35bb9c → after): all passing, no warnings, replay identical, no case lost
+   homes or floor area, parking met everywhere; 48 identical element for element. Cases whose first drive across the
+   entry is inside the stacking length 31 → 23 (MF-garden-exact 28 → 50 ft, MF-stacked 46 → 96, MF-midrise 46 → 50,
+   WEDGE-hyp-1pk 13 → 100, RE-strip 54 → 72, TY-mob, TY-fitness, TY-hotel-full and RE-field-angled 55-57 → 75,
+   TY-student 46 → 75, TY-bigbox 82 → 100, TY-unknown 30 → 50); sf a stall summed 27,627 → 27,491 (MF-stacked 375 → 340,
+   MF-garden-exact 370 → 352, RE-strip 356 → 340, TY-unknown 450 → 431, TY-fitness 361 → 352, TY-mob 383 → 374);
+   90th percentile walk summed 5,804 → 5,803 ft (MF-garden-exact 59 → 48, TY-hotel-keys 113 → 82; MF-stacked 18 → 59,
+   its layout now the one with buildings along the street); stalls 12,088 → 12,087; bare row ends 216 → 222
+   (MF-garden-exact 0 → 5: its columns now end on the set-back front drive); stalls in a throat 15 → 15; dead ends
+   8 → 8. Two new cases (PK-street-*), 76 of 76 passing. Prompt corpus (offline, words path): 112 → 113 of 120 fully
+   right. Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version
+   rei-layout/2026.11.05.3. Tests: test/parkingquality.mjs (the street arrangement asked and not asked; throats on a
+   generated garden layout and a medical office field).
+   Still (next worst): WEDGE-tri-midrise's stalls beyond the pond (p90 255 ft: the generator's pond and bay placement);
+   the wedges' entries (WEDGE-trap 15 ft, WEDGE-tri / arc 30 ft: the entry meets a slanted strip's bay, not a strip along
+   the street); TY-hotel-retail's one-sided field (p90 246 ft); bare row ends where rows meet a cross drive end to end
+   (222); small pads' aisles meeting the entry from the side (TY-daycare 30 ft); 370-475 sf a stall on loop drives and
+   small lots (MF-tower 376, TY-assisted 470).

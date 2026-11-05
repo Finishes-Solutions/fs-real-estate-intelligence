@@ -156,7 +156,11 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   assert.equal(b.rules.values.parkingPerUnit.v, 2.1); assert.equal(b.rules.values.parkingPerUnit.cls, 'verified');
   const off = RUN.governingParking(B.briefFromProgram(prog, { ...plan, params: {} }, { text: ask, parser: 'app' }), { ...plan, params: {} }, prog); assert.equal(off.rules.values.parkingPerUnit.v, null, 'guardrails off: the engine default');
   const r = RUN.runPlan(plan, prog, {}, { ask }); assert.ok(r.options.length);
-  for (const o of r.options) { const q = V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking; assert.equal(q.required, 252); assert.ok(q.provided >= 252, o.name + ': ' + q.provided); assert.equal(o.check.status, 'pass'); }
+  // (every option judged at 2.1 a home and parking it; the top one holds the 120 asked and passes. Nov 5, item 31: with the
+  // entry throats set back, the two garden layouts park exactly the same and the run keeps one, so a lower option may
+  // be a shorter courtyard, still parked at the governing rule)
+  for (const o of r.options) { const v = V.validateLayout({ ...plan, elements: o.elements, program: o.program }, cb), q = v.quantities.parking; assert.equal(q.required, Math.ceil(v.quantities.totals.units * 2.1 - 1e-9), o.name); assert.ok(q.provided >= q.required, o.name + ': ' + q.provided); assert.equal(v.checks.find(c => c.id === 'parking.count').status, 'pass', o.name); }
+  { const o = r.options[0], q = V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking; assert.equal(q.required, 252); assert.ok(q.provided >= 252); assert.equal(o.check.status, 'pass'); }
   const r0 = RUN.runPlan({ ...plan, params: {} }, prog, {}, { ask }), short = r0.options.find(o => V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking.provided < 252);
   if (short) { const v = V.validateLayout({ ...plan, elements: short.elements, program: short.program }, cb); assert.equal(v.checks.find(c => c.id === 'parking.count').status, 'fail', 'parked at 1.6 a home: short of the city’s count'); }
 }
