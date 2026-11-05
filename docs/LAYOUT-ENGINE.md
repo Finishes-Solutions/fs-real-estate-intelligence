@@ -1376,24 +1376,24 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    IN-warehouse 33 ft). The stack now moves back into its spare depth until the first aisle is the stacking length in
    (50 / 75 / 100 ft for under 200 / 500 / more spaces, as throatNeed), as far as the slack goes, and no stall stands
    beside the way in for that length (the entry's throat zone grows to match). Nothing is lost: the same blocks, rows
-   and buildings, the front left as lawn. Not where homes line the street (their own entry depth rule), on a podium, or
-   where a daycare's lot is under 3 ac: there the spare depth is its drop-off lane's, and taking it lost TY-daycare's
-   drop-off lane. First drive across the entry: TY-datacenter, TY-pad-village, TY-daycare-dropoff, MX-angled,
-   TY-mix-hotel 30 -> 50 ft, IN-warehouse 33 -> 50, MX-guard-hotel25 34 -> 50, MX-guard-angled 36 -> 52 (stalls in the
-   throat 4 -> 1); TY-daycare-dropoff 501 -> 387 sf a stall, 90th-percentile walk 82 -> 66 ft. TY-school's layout moved
-   too: first drive across 60 -> 50 ft (still the 50 ft asked), one stall inside it (0 before), 397 -> 381 sf a stall.
+   and buildings, the front left as lawn. Not where homes line the street (their own entry depth rule), on a podium, on
+   a mixed plan with homes or a plan with an easement (the Waller Tomball Rd re-fit test lost 2 of its 200 apartments
+   when the stack moved), or where a daycare's lot is under 3 ac: there the spare depth is its drop-off lane's, and
+   taking it lost TY-daycare's drop-off lane. First drive across the entry: TY-datacenter, TY-pad-village, TY-daycare-dropoff, MX-angled,
+   TY-mix-hotel 30 -> 50 ft (TY-daycare-dropoff 30 -> 62), IN-warehouse 33 -> 50, MX-guard-hotel25 34 -> 50,
+   MX-guard-angled 36 -> 52 (stalls in the throat 4 -> 1); TY-daycare-dropoff 501 -> 407 sf a stall, 90th-percentile walk
+   82 -> 67 ft.
    (c) The main drive measured (scripts/parking-metrics.mjs mainStalls): on lots of 200 stalls or more, stalls backing
    into the way in within 200 ft of the street (the entry's width and 34 ft either side). Base 437 summed over 27 lots
    (LOT-curved-apt 58, RE-anchored 55, RE-grocery-angled 35, IN-crossdock 33, MF-garden-max 32, TY-mob 30): measured,
    not yet worked on.
    Bench (88 cases, top option; base 4aae79d -> after): all passing, no warnings, replay identical, no case lost homes or
-   floor area, parking met everywhere; 34 identical element for element (most of the rest differ only in lawn outlines
-   and ids). sf a stall summed 32,736 -> 32,248; cases whose first drive across the entry is inside the stacking length
-   25 -> 21, first drive across summed 6,888 -> 7,048 ft; stalls inside an entrance's stacking length 14 -> 11;
-   landscape standard 54 -> 55 of 76 lots, share summed 410.4 -> 415.5 points; bare row ends 200 -> 198;
-   90th-percentile walk summed 7,001 -> 6,923 ft (TY-bigbox 186 -> 126), max 8,969 -> 8,890; dead ends 6 -> 7
-   (TY-daycare-dropoff's front aisle; dead ends past 150 ft 0 -> 0); stalls 13,505 -> 13,506; main-drive stalls
-   437 -> 433. Prompt corpus (offline, words path) 119 of 120, types 26 of 33, as before. Holdouts unchanged (P18 fill
+   floor area, parking met everywhere; 35 identical element for element (most of the rest differ only in lawn outlines
+   and ids). sf a stall summed 32,736 -> 32,284; cases whose first drive across the entry is inside the stacking length
+   25 -> 21, first drive across summed 6,888 -> 7,070 ft; stalls inside an entrance's stacking length 14 -> 10;
+   landscape standard 54 -> 55 of 76 lots, share summed 410.4 -> 414.9 points; bare row ends 200 -> 200;
+   90th-percentile walk summed 7,001 -> 6,924 ft (TY-bigbox 186 -> 126), max 8,969 -> 8,900; dead ends 6 -> 6, none
+   past 150 ft; stalls 13,505 -> 13,506; main-drive stalls 437 -> 433. Prompt corpus (offline, words path) 119 of 120, types 26 of 33, as before. Holdouts unchanged (P18 fill
    77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version rei-layout/2026.11.05.11. Tests:
    test/parkingquality.mjs (dead lot paving trimmed, a turnaround and slivers kept, nothing dead left alone; a daycare's
    and a pad village's way in clear of drives for 50 ft).
@@ -1402,5 +1402,5 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    can go (MF-tower's top-left stub with its turnaround: folding its 27 stalls onto the free rear side of the top drive
    and cutting the stub back is the next try; not done). WEDGE-tri's slanted entry (29 ft, lib/sitegen.mjs) and
    MX-guard-hotel13 (36 ft) unchanged. WEDGE-trap-midrise's far field (p90 179 ft), bare ends where nothing is free and
-   nothing spare (198; WEDGE-hyp-midrise 14, WEDGE-trap-midrise 14, LOT-curved-apt 12) and the 21 lots short of the
+   nothing spare (200; WEDGE-hyp-midrise 14, WEDGE-trap-midrise 14, LOT-curved-apt 12) and the 21 lots short of the
    landscape standard: not worked on this round. Main-drive stalls measured only.
