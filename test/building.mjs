@@ -134,3 +134,17 @@ console.log('building api tests passed');
   asked.length = 0; const r3 = mock(); await building({ query: { lat: '30.06', lon: '-95.896', part: 'parcel', apn: '0422450000099' }, headers: { 'x-forwarded-for': '9.9.9.10' } }, r3);
   assert.equal(r3.body.parcel.propId, '0422450000001', 'the district has no such account: StratMap\'s record (the card then goes by the line drawn on the map)');
   console.log('parcel by the account drawn on the map ok'); }
+
+{ // Harris County in StratMap: GIS_AREA 0 and one account's legal acreage stamped on a shared outline (23737 FM 2920,
+  // Hockley: legal 1.83 ac on a 29 ac outline holding accounts 0422660000024 and 0422660000065). The outline's area wins,
+  // the legal acreage is kept beside it, and the stacked accounts are counted.
+  const { normalizeParcel, geomAcres } = await import('../api/building.js');
+  const lat = 30.0667, lon = -95.7955, dx = 1100 / (364567 * Math.cos(lat * Math.PI / 180)), dy = 1148 / 364567; // about 1,100 x 1,148 ft = 28.99 ac
+  const rect = { rings: [[[lon, lat], [lon, lat + dy], [lon + dx, lat + dy], [lon + dx, lat], [lon, lat]]] };
+  const p = normalizeParcel({ PROP_ID: '0422660000024', OWNER_NAME: 'TERPSTRA PETER S', LEGAL_AREA: '1.83', GIS_AREA: '0', SITUS_ADDR: '23737 FM 2920 RD , HOCKLEY, TX 77447' }, rect, 2);
+  assert.equal(p.areaSource, 'outline'); assert.ok(Math.abs(parseFloat(p.area) - 28.99) < 0.3, p.area); assert.equal(p.legalArea, '1.83 acres'); assert.equal(p.shared, 2);
+  assert.ok(Math.abs(geomAcres(p.geometry) - 28.99) < 0.3);
+  const q = normalizeParcel({ GIS_AREA: '2.5', LEGAL_AREA: '2.4' }, rect); assert.deepEqual([q.area, q.areaSource, q.legalArea, q.shared], ['2.5 acres', 'gis', undefined, undefined]); // a GIS area still wins, close legal not repeated
+  assert.deepEqual([normalizeParcel({ LEGAL_AREA: '1.83' }).area, normalizeParcel({ LEGAL_AREA: '1.83' }).areaSource], ['1.83 acres', 'legal']); // no outline: the legal acreage
+  console.log('legal acreage vs the outline ok');
+}

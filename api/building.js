@@ -50,8 +50,23 @@ export function esriPolygon(geometry) {
     if (host) host.push(h); else polys.push([h]); } // a counter-clockwise ring inside no piece is a piece of its own
   return polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys };
 }
-export function normalizeParcel(attrs, geometry) {
-  const a = attrs || {}, area = num(pick(a, 'GIS_AREA', 'LEGAL_AREA')), unit = pick(a, 'GIS_AREA_UNIT', 'LGL_AREA_UNIT');
+// a GeoJSON polygon's area in acres (a local plane at the polygon's latitude: within about 0.5% at parcel scale)
+export function geomAcres(g) {
+  const polys = g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : []; if (!polys.length) return null;
+  const lat0 = polys[0][0][0][1] * Math.PI / 180, kx = 111320 * Math.cos(lat0), ky = 110540;
+  const ringM2 = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += r[j][0] * kx * r[i][1] * ky - r[i][0] * kx * r[j][1] * ky; return Math.abs(s / 2); };
+  const m2 = polys.reduce((t, p) => t + ringM2(p[0]) - p.slice(1).reduce((h, r) => h + ringM2(r), 0), 0);
+  return m2 > 4 ? m2 / 4046.8564 : null;
+}
+// Land area: the layer's GIS area when it has one; else the drawn outline's (Harris County's StratMap rows have GIS_AREA 0
+// and stamp every account on a shared outline with one account's legal acreage: 23737 FM 2920, Hockley showed 1.83 ac on
+// a 29 ac outline); else the legal acreage. The legal acreage is kept beside it when it differs by more than 10%.
+// shared: how many appraisal accounts carry this same outline (stacked accounts, condominium units).
+export function normalizeParcel(attrs, geometry, shared = 1) {
+  const a = attrs || {}, gis = num(pick(a, 'GIS_AREA')), legal = num(pick(a, 'LEGAL_AREA')), unit = pick(a, 'GIS_AREA_UNIT', 'LGL_AREA_UNIT'), geom = esriPolygon(geometry), drawn = geomAcres(geom);
+  const acresUnit = !unit || /acre/i.test(String(unit));
+  const [area, areaSource] = gis > 0 ? [gis, 'gis'] : drawn && acresUnit ? [drawn, 'outline'] : legal > 0 ? [legal, 'legal'] : [null, null];
+  const legalDiffers = legal > 0 && areaSource !== 'legal' && acresUnit && Math.abs(legal - area) > 0.1 * Math.max(legal, area);
   const mail = [pick(a, 'MAIL_LINE1', 'MAIL_ADDR'), pick(a, 'MAIL_LINE2'), [pick(a, 'MAIL_CITY'), pick(a, 'MAIL_STAT', 'MAIL_STATE'), pick(a, 'MAIL_ZIP')].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   const tidy = v => String(v || '').replace(/\s+,/g, ',').replace(/(,\s*)+$/, '').replace(/,\s*,/g, ',').trim(); // "Highway 90A , ," -> "Highway 90A"
   const situs = tidy(pick(a, 'SITUS_ADDR') || [pick(a, 'SITUS_NUM'), pick(a, 'SITUS_STREET', 'SITUS_STRE', 'SITUS_ST_1'), pick(a, 'SITUS_ST_2')].filter(Boolean).join(' ')), city = pick(a, 'SITUS_CITY');
@@ -62,10 +77,11 @@ export function normalizeParcel(attrs, geometry) {
     situsStreet: situs || null, situsCity: city, situsZip: (String(pick(a, 'SITUS_ZIP') || '').match(/\d{5}/) || [null])[0],
     landUse: pick(a, 'LOC_LAND_USE', 'LAND_USE', 'STATE_CD'), marketValue: num(pick(a, 'MKT_VALUE')), landValue: num(pick(a, 'LAND_VALUE')),
     improvementValue: num(pick(a, 'IMP_VALUE')), yearBuilt: pick(a, 'YEAR_BUILT'), acquired: fmtDate(pick(a, 'DATE_ACQ', 'DEED_DATE')), taxYear: pick(a, 'TAX_YEAR'),
-    area: area ? Math.round(area * 100) / 100 + ' ' + (unit ? String(unit).toLowerCase() : 'acres') : null, raw, // StratMap areas are acres unless a unit says otherwise
+    area: area ? Math.round(area * 100) / 100 + ' ' + (unit && areaSource !== 'outline' ? String(unit).toLowerCase() : 'acres') : null, areaSource, raw, // StratMap areas are acres unless a unit says otherwise
+    legalArea: legalDiffers ? Math.round(legal * 100) / 100 + ' acres' : undefined, shared: shared > 1 ? shared : undefined,
     buildingSqft: num(pick(a, 'BLDG_SQFT', 'IMPRV_SQFT', 'IMP_SQFT', 'LIVING_AREA', 'LIV_AREA', 'BLD_AREA', 'BLDG_AREA', 'TOT_SQFT', 'SQ_FT', 'SQFT')),
     stories: num(pick(a, 'STORIES', 'NUM_STORIES', 'NO_STORIES', 'FLOORS')),
-    geometry: esriPolygon(geometry)
+    geometry: geom
   };
 }
 
@@ -157,8 +173,9 @@ async function stratParcel(lat, lon) {
     mapExtent: [lon - .002, lat - .002, lon + .002, lat + .002].join(','), imageDisplay: '400,400,96', returnGeometry: 'true', f: 'json' });
   const d = await getJSON(PARCELS.replace(/\/\d+$/, '') + '/identify?' + q);
   if (d.error) throw new Error(d.error.message || 'service error');
-  const f = (d.results || [])[0];
-  return f ? normalizeParcel(f.attributes, f.geometry) : null;
+  const rs = d.results || [], f = rs[0]; if (!f) return null;
+  const key = r => JSON.stringify(r.geometry?.rings?.[0]?.[0]), same = rs.filter(r => key(r) === key(f) && r.attributes?.PROP_ID !== undefined).length; // accounts stacked on this outline
+  return normalizeParcel(f.attributes, f.geometry, same);
 }
 
 export function inRing(r, [x, y]) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
