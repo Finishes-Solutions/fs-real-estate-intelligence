@@ -345,8 +345,9 @@ export function layoutStack(F, spec) {
   // townhome rows laid out as many as fit, beside a cross drive: 12 ft from it, 14 ft at a corner of the loop (the curve's
   // own outline keeps them off its arc); they were held 32 ft off every corner, which left each block's ends and the
   // loop's corners empty. A count asked for keeps the roomier corners: it is laid out with land to spare, and the tighter
-  // corners only changed which stacks landed on the count (exactly 50 on 10 ac came out 49)
-  const HX = c => B[c.i + 1]?.fill === 'homes' || B[c.i]?.fill === 'homes';
+  // corners only changed which stacks landed on the count (exactly 50 on 10 ac came out 49). Duplex rows the same (they
+  // were left at 32 ft: a 266 ft block between a loop's leg and its middle cross drive held 2 duplexes, not 3)
+  const HX = c => ['homes', 'duplex'].includes(B[c.i + 1]?.fill) || ['homes', 'duplex'].includes(B[c.i]?.fill);
   // the main entry (and the second) keeps townhome rows 14 ft off its sides only: across the first lane, the rows facing
   // it from the far side were held 14 ft off its end too, which emptied a stretch of that row
   const entryEls = new Set([...(entry?.els || []), ...(entry2?.els || [])]);
@@ -1105,7 +1106,7 @@ const fit = v => +v.toFixed(2);
 function attempt(plan, F, seq, prog, o) {
   const P = profile(F), blocks = seq.blocks.map(b => ({ ...b })), aisles = seq.aisles.map(a => ({ ...a })), n = aisles.length;
   const ko = KO ? KO.map(e => S.grow(S.shapeOf(e), 4).map(p => F.wave ? F.bw(rot(p, -F.psi)) : rot(p, -F.psi))) : []; // easements (opts.keepout), in the frame
-  const resL = o.resBoxes ? o.resBoxes : o.pondAt === 'ends' ? ['start', 'end'].map(at => reserveBand(F, o.pond * 0.6, at, o.winX)).filter(Boolean) : [reserveBand(F, o.pond * 1.2 * (o.pondRes || 1), o.pondAt, o.winX)].filter(Boolean), res0 = resL[0] || null, keep = (o.keep || []).concat(ko, resL); // (resBoxes: the pond beside the shops, mixedOptions) // ('ends': half the pond at each end of the rows)
+  const resL = o.resBoxes ? o.resBoxes : o.pondAt === 'ends' ? ['start', 'end'].map(at => reserveBand(F, o.pond * 0.6, at, o.winX)).filter(Boolean) : [o.pondAt === 'open' ? null : reserveBand(F, o.pond * 1.2 * (o.pondRes || 1), o.pondAt, o.winX)].filter(Boolean), res0 = resL[0] || null, keep = (o.keep || []).concat(ko, resL); // (resBoxes: the pond beside the shops, mixedOptions) // ('ends': half the pond at each end of the rows)
   let lo = (['bldg', 'pads', 'homes', 'duplex'].includes(blocks[0].fill) ? P.b : P.p)[0], hi = (['bldg', 'homes', 'duplex'].includes(blocks[n].fill) ? P.b : P.p)[1];
   if (res0 && !F.deep && (o.pondAt === 'back' || o.pondAt === 'front')) { const ys = res0.map(p => p[1]); if (o.pondAt === 'front') lo = Math.max(lo, Math.max(...ys) + 4); else hi = Math.min(hi, Math.min(...ys) - 4); }
   let y = lo + blocks[0].h + aisles[0].w / 2; aisles[0].y = y;
@@ -1906,7 +1907,11 @@ function layoutCore(plan0, programIn, opts = {}) {
     for (const wv of waves) {
     for (const align of aligns) {
     const F0 = frameOf(plan, deep, align), F = wv ? waveFrame(F0, waveOf(F0)) : F0, seqs = sequences(prog.use, opts.pod ? { ...prog, lotDSet: true } : prog, F); // (a pod's homes on the lot depth asked: the shallower lots changed which pod plan won, for fewer homes)
-    for (const pondAt of pond ? ['back', 'front', 'end'] : ['none']) {
+    // as many as fit: also a try with no band held for the pond ('open'): the rows go where they fit and the pond takes the
+    // land they leave (finishLand's largest open pieces), kept only when it holds the detention (97% of the engine's
+    // estimate). A band held across the back or the end left land beside the pond that no row could reach (a wedge's
+    // narrowing back: the pond in a third of the band, the rest open land), while the rows lost the band's length
+    for (const pondAt of pond ? ['back', 'front', 'end', ...(foot == null && !opts.pod && !pinned.length ? ['open'] : [])] : ['none']) {
       const ranked = seqs.map(seq => ({ seq, v: estimate(F, seq, prog, pond, pondAt, foot) })).filter(q => q.v != null).sort((a, b) => b.v - a.v).slice(0, depth); if (opts.debug) console.log('frame', deep, 'psi', F.psi.toFixed(1), 'pondAt', pondAt, 'seqs', seqs.length, 'ranked', ranked.length, 'X', F.X0.toFixed(0), F.X1.toFixed(0), 'Y', F.Y0.toFixed(0), F.Y1.toFixed(0));
       for (const q of ranked) for (const shift of shifts) for (const at of entries) for (const win of foot && !pinned.length && !opts.pod ? [null, windowFor(F, q.seq, prog, foot)].filter((w, i) => !i || w) : [null]) { // (a pod is sized already: no compact window)
         if (limit && ++limit.used > limit.n && CX.now() > limit.end || limit && CX.now() > limit.stop) return; // the wider look runs to its time, but never fewer than n tries (a busy machine still finds the good ones), and stops at four times its time
@@ -1919,7 +1924,7 @@ function layoutCore(plan0, programIn, opts = {}) {
         // townhome rows packed to the land: the pond drawn in its reserve can come out short of the detention (a strip at the
         // end loses its edges to the buffers and banks), so the try is laid out again with the reserve grown by what was
         // short, twice at most, each kept as a try of its own (the validator warns below 97% of the estimate)
-        for (let k = 0, ak = a, ok = o; k < 2 && ak && prog.use === 'townhomes' && o.pondAt !== 'none' && ak.st.pondNeed > 0 && ak.st.pond < ak.st.pondNeed * 0.97; k++) { const o2 = { ...o, pondRes: Math.min(2.2, (ok.pondRes || 1) * ak.st.pondNeed / Math.max(1, ak.st.pond) * 1.05) }, a2 = attempt(plan, F, q.seq, prog, o2); if (a2) found.push(take(a2, q.seq, o2, deep, align, F0, pondAt)); ak = a2; ok = o2; } // opts.xNeed: spaces for pieces placed after (an AI-crafted type's courts)
+        for (let k = 0, ak = a, ok = o; k < 2 && ak && prog.use === 'townhomes' && o.pondAt !== 'none' && o.pondAt !== 'open' && ak.st.pondNeed > 0 && ak.st.pond < ak.st.pondNeed * 0.97; k++) { const o2 = { ...o, pondRes: Math.min(2.2, (ok.pondRes || 1) * ak.st.pondNeed / Math.max(1, ak.st.pond) * 1.05) }, a2 = attempt(plan, F, q.seq, prog, o2); if (a2) found.push(take(a2, q.seq, o2, deep, align, F0, pondAt)); ak = a2; ok = o2; } // opts.xNeed: spaces for pieces placed after (an AI-crafted type's courts)
         // ... and the drawn plan's own detention: the reserve was sized to the use's typical impervious share (TR-55, 55% for
         // townhomes), but rows packed end to end with their lanes, drives and guest stalls cover more (62% on 8 ac at 125
         // homes), and the storage grows with it, so the validator, judging the drawn plan's own share, wants more than the
@@ -1928,11 +1933,11 @@ function layoutCore(plan0, programIn, opts = {}) {
         // a try of its own) with the pond sized to its own drawn impervious share and the reserve grown by what was short;
         // the pond then takes the largest rectangle the strip holds up to that (pondFine), not the next step down (90%)
         const needOf = els => { const par = plan.params || {}; if (!par.storm?.rain || win || opts.pod) return 0; const fut = els.filter(e => e.kind === 'green' && e.future).reduce((t, e) => t + S.elArea(e), 0), imp = HY.impOfElements(els, site, S.elArea); return Math.max(0, stormNeed(Math.min(devAc, (site - fut) / 43560), { ...par, storm: { ...par.storm, imp } }, prog, site / 43560).area - pondHave); };
-        for (let k = 0, ak = a, ok = o; k < 3 && ak && prog.use === 'townhomes' && o.pondAt !== 'none'; k++) {
+        for (let k = 0, ak = a, ok = o; k < 3 && ak && prog.use === 'townhomes' && o.pondAt !== 'none' && o.pondAt !== 'open'; k++) {
           const need = needOf(ak.els); if (!(need > o.pond) || ak.st.pond >= need * 0.97) break;
           const want = need * 1.01, o2 = { ...o, pond: want, pondFine: true, pondRes: Math.min(2.2 * o.pond / want, ok.pond * (ok.pondRes || 1) / Math.max(1, ak.st.pond) * 1.03) /* (the reserve, o.pond × 1.2 × pondRes, grown by what the pond fell short, to 2.2 times the first one's at most) */ }, a2 = attempt(plan, F, q.seq, prog, o2);
           if (a2) found.push(take(a2, q.seq, o2, deep, align, F0, pondAt)); ak = a2; ok = o2; }
-        if (!a) continue; found.push(take(a, q.seq, o, deep, align, F0, pondAt));
+        if (!a) continue; if (pondAt === 'open' && !(a.st.pond >= a.st.pondNeed * 0.97)) continue; found.push(take(a, q.seq, o, deep, align, F0, pondAt));
         // townhomes as many as fit: the same try with the loop's legs pulled in from the lot lines a row's depth, its apron
         // and the setback, and a row of homes outside each (legRows); kept as a try of its own where it holds more homes
         if (prog.use === 'townhomes' && prog.units == null && prog.load !== 'front' && !pinned.length && !opts.pod) { const oi = { ...o, spec: { ...(o.spec || {}), legInset: true } }, ai = attempt(plan, F, q.seq, prog, oi); if (ai && ai.st.units > a.st.units) found.push(take(ai, q.seq, oi, deep, align, F0, pondAt)); }
@@ -2288,7 +2293,7 @@ function optionOf(plan, f, prog, foot, pond) {
   else if (sn.area > 0 && m.pond < sn.area * 0.9) notes.push((sn.mode === 'retention' ? 'Retention' : 'Detention') + ' holds about ' + Math.round(m.pond / sn.area * 100) + '% of the ' + sn.volume.toFixed(1) + ' acre-feet needed; plan on underground storage for the rest.');
   const fut = f.els.filter(e => e.name === 'Future development').reduce((s, e) => s + S.elArea(e), 0); if (fut > 0) notes.push((fut / 43560).toFixed(1) + ' acres are left for a future phase.');
   if (f.notes) notes.unshift(...f.notes); // (an arrangement's own: a food truck park's)
-  const name = (f.name || (f.label || (f.deep ? OPTION_NAMES.deep : OPTION_NAMES.across))) + (f.win ? ' · compact, room to expand' : '') + (f.pondAt === 'front' ? ' · pond at the entry' : f.pondAt === 'back' ? ' · pond at the back' : f.pondAt === 'end' ? ' · pond at the end' : '');
+  const name = (f.name || (f.label || (f.deep ? OPTION_NAMES.deep : OPTION_NAMES.across))) + (f.win ? ' · compact, room to expand' : '') + (f.pondAt === 'front' ? ' · pond at the entry' : f.pondAt === 'back' ? ' · pond at the back' : f.pondAt === 'end' ? ' · pond at the end' : f.pondAt === 'open' ? ' · pond in the land left' : '');
   return { name, elements: f.els, notes, zones: [{ name: S.USES[prog.use].label, use: prog.use, zone: null, ring: plan.ring, acres: S.ringArea(plan.ring) / 43560 }], program: prog, phi: f.a.F.phi, score: f.score, recipe: f.recipe, sizes: sizesOf(f.els) };
 }
 

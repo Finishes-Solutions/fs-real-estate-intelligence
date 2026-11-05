@@ -472,3 +472,30 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    147 -> 166 (99%), MF-townhomes 79 -> 80; other cases unchanged. Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36
    fill 128, E054 podium-urban 172). Still: TH-sub8's 125 needs about 2 homes' worth of the end strip for its pond, and
    giving up a whole end row (the smallest) to complete a pond nets out negative there (5 homes for 2).
+
+23. Done Nov 4 (deep land under "as many as fit"). Some as-many-as-fit cases left large usable land empty (MF-duplex on
+   wedge9: 42 homes, duplex rows only along the lanes; MF-garden-max on L12: 204, the L's corners and the land by the
+   pond empty). Diagnosed on the synthetic bench (holdouts only as a non-regression check): (a) duplex rows were held
+   32 ft off every cross drive at a loop's corners (item 20b fixed this for townhomes only): the 266 ft blocks between
+   the loop's legs and its middle cross drive held 2 duplexes a row, not 3; (b) the pond's land was held as a band across
+   the back (or the front or the end) before the rows were laid out; on a wedge the back band narrows, so the pond took a
+   third of it and the rest was open land no row could reach, while the rows gave up the band's length; (c) a third lane
+   into the deep part of wedge9 doesn't fit: two inner blocks need 548 ft of depth and the land holds 541 ft where it is
+   still a row wide (letting the back row run into the narrowing land laid it out, but the pond then had to go beside the
+   rows and that try held 44); (d) L12 is parking-bound (204 apartments, 336 of 327 spaces): the corner left at the L is a
+   stall row deep, too shallow for a building and its walk, and the 216-apartment tries need a gated emergency lane (the
+   two entrances along the one street can't be half the diagonal apart with the pond at the end), so they rank below,
+   as they should; (e) LOT-easement-apt's open land is across the pipeline easement, which nothing may be paved over, and
+   LOT-wetland-apt's is a strip beside the wetland too narrow for a bar running across (a bar running back would fit; the
+   search lays out one direction per plan); the wedge mid-rise cases are parking-bound (item 19). Fixes
+   (lib/sitelayout.mjs): (a) duplex rows as many as fit keep the townhome corners (14 ft off a loop's corner, 12 ft off an
+   inner cross drive; a count asked for keeps 32 ft); (b) as many as fit, each stack is also tried with no band held for
+   the pond ('open', named "pond in the land left"): the rows go where they fit and finishLand puts the pond in the
+   largest land they leave, the try kept only where the pond holds 97% of the engine's estimate (the validator still
+   judges detention on its own estimate; threshold unchanged). Tried and taken out: the back row allowed past the
+   profile's last full-width line (no gain: 44), duplex/townhome stacks ending in a lane with no row behind it (54 homes,
+   but no land left for the pond), and moving Entrance 2 instead of adding a third (L12: the first lane ends at the pond,
+   no spot far enough). Bench (top option, all passing, no warnings, replay identical): MF-duplex 42 -> 52,
+   LOT-curved-apt 444 -> 456; other cases unchanged; bench time about 15% longer (a fourth pond place per stack).
+   Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Still: wedge9 keeps about
+   0.9 ac open behind its back row (no lane reaches it; a short cul-de-sac off the back lane would), and L12 stays at 204.
