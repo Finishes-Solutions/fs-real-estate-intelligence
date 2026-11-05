@@ -3,6 +3,15 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-05
+
+### 12:21 AM CT: Many more building types, built from flexible base shapes (16b552b, 3a7bbe2, 9107365, f1528a3)
+- **Building types are now base shapes you can adjust:** bar, L, U, courtyard, tower on podium, wrap, rows, detached homes, small multiplexes, big box, cross-dock, flex bays, storage campus, canopy and store, drive-thru pad, car-wash tunnel, a building with its grounds and a parking garage. Each takes sizes, stories, depth and parking rules from your words. Every type you could ask for before lays out exactly as it did.
+- **21 new types:** limited-service and extended-stay hotels (counted in keys), multi-story and drive-up self storage, medical office and clinics, assisted living (beds), independent senior living, student housing (beds), fourplexes, live-work townhomes, flex with a mezzanine, cold storage, data centre shell, fitness club, big-box store, bank with drive-thru, daycare with play yard, schools with play yard and field, and express car washes. Each is named, counted and coloured on the plan and the 3D map (plain blocks, as now).
+- **Shapes from words:** "L-shaped 4-story apartments", "a U building around a pool", "flex buildings 120 ft deep with mezzanine", "a 2-story clinic 12,000 sf, 5 per 1,000 parking".
+- **Anything else is drawn at the size asked:** e.g. "a 2-story trampoline park 30,000 sf" is drawn as a building of that size, and the notes say no type matched and what was assumed.
+- Sizes without a reviewed reference project are marked as estimates. Fixed the Add panel tile that showed "undefined" above Parking field. 65 test sites, every one passing with no warnings; the full test suite passes.
+
 ## 2026-11-04
 
 ### 11:10 PM CT: Parking: no long dead-end aisles, planted row ends (b4b0a64)

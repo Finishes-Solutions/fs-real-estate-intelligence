@@ -1155,6 +1155,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Many more building types (Nov 5):** hotels, self storage, medical office and clinics, assisted and senior living, student housing, fourplexes, live-work, cold storage, data centres, fitness clubs, big boxes, banks, daycares, schools and car washes; shapes like "L-shaped" or "a U around a pool" from your words; anything else is drawn at the size you give and the notes say what was assumed.
 - **Better parking lots (Nov 4):** long dead-end parking aisles get a turnaround, and rows end in planted islands where there are spaces to spare.
 - **Angled parking (Nov 4):** say "angled parking", "60 degree parking" or "grocery-style parking" for angled stalls on one-way aisles, with arrows on the plan; the planner also picks angled parking by itself where it fits the program better than straight rows.
 - **Fuller duplex communities (Nov 4):** duplex rows reach the corners of the loop road, and the pond can go in the land the homes leave.
