@@ -716,6 +716,18 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    and the corner wings cut them; was 16 ft, with 2 ft slack) as a way out only while the stalls run no more than
    DEAD_AISLE_FT (150, the same constant longDeadAisles and the validator use) past the last join; past that it takes a
    paved turnaround or a drive. Planted end caps are not stalls in either detector.
+   openDeadEnds' hammerhead (the last two stalls each side cut) is paved as a turnaround (lot paving, turn) where the
+   stalls run past DEAD_AISLE_FT, so its own fix still counts under the one rule.
+   (f) the jurisdiction's parking rule governs: lib/layoutrun.mjs runPlan (the app's and the MCP site_plan path's way
+   into the run) raises the brief's parking rule to the jurisdiction's where its planning guardrails are on
+   (governingParking: Waller, Ord. 424, two spaces a home with the 5% count reserve, 2.1; a use's per-1,000 ratio with the
+   reserve), so the run lays out to that count and the independent validator's parking.count fails a layout short of it.
+   Before, a guarded garden-apartment run laid out at the engine's 1.6 a home and passed its own check (found by the MCP
+   helper: 514 stalls drawn for the city's 656). A higher rule the brief already sets stands. Test: test/parkingquality.mjs
+   (120 apartments under the guardrails: 252 required, every option parks it).
+   (g) the 13n count fix let a different pad layout win on test/parkingfield.mjs's 1.5-acre drive-thru lot, where the
+   building cut back from its back wall (lib/sitepad.mjs, "as much as fits") left the window 7.5 ft off the lane: after that
+   cut the window must still be within 4 ft of the lane (dtInfo's reach), else the layout is dropped.
    (e) entryThroats takes the inward side from the ring's winding (a clockwise ring had it reversed; lib/siteparking.mjs
    throatOf has the same reversal and is unchanged: commercial fields only).
    Bench (top option, all 44 passing, no warnings, replay identical, no case lost homes or sf, parking meets the

@@ -147,4 +147,17 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   assert.equal(RUN.entryThroats(p, o.elements, RUN.throatNeed(100))[0].stalls.length, 0, 'the throat clear');
   assert.ok(PM.parkingMetrics({ ...p, elements: o.elements }).walk90 <= m.walk90, 'no farther to walk');
 }
+// the jurisdiction's parking rule governs: a plan under the Waller guardrails (Ord. 424: two spaces a home, the 5% count
+// reserve) is laid out to 2.1 a home and judged against it; a layout parked at the engine's 1.6 fails the count
+{
+  const plan = { origin: [-95.93, 30.06], ring: [[0, 0], [900, 0], [900, 500], [0, 500]], front: 0, streets: [], setbacks: { ...SB }, elements: [], params: { guard: { mode: 'on' } } };
+  const ask = '120 garden apartments, 3 stories', prog = S.guessProgram(ask);
+  const b = RUN.governingParking(B.briefFromProgram(prog, plan, { text: ask, parser: 'app' }), plan, prog), cb = B.canonicalBrief(b);
+  assert.equal(b.rules.values.parkingPerUnit.v, 2.1); assert.equal(b.rules.values.parkingPerUnit.cls, 'verified');
+  const off = RUN.governingParking(B.briefFromProgram(prog, { ...plan, params: {} }, { text: ask, parser: 'app' }), { ...plan, params: {} }, prog); assert.equal(off.rules.values.parkingPerUnit.v, null, 'guardrails off: the engine default');
+  const r = RUN.runPlan(plan, prog, {}, { ask }); assert.ok(r.options.length);
+  for (const o of r.options) { const q = V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking; assert.equal(q.required, 252); assert.ok(q.provided >= 252, o.name + ': ' + q.provided); assert.equal(o.check.status, 'pass'); }
+  const r0 = RUN.runPlan({ ...plan, params: {} }, prog, {}, { ask }), short = r0.options.find(o => V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking.provided < 252);
+  if (short) { const v = V.validateLayout({ ...plan, elements: short.elements, program: short.program }, cb); assert.equal(v.checks.find(c => c.id === 'parking.count').status, 'fail', 'parked at 1.6 a home: short of the city’s count'); }
+}
 console.log('parking quality: ok');

@@ -2719,7 +2719,7 @@ export function openDeadEnds(plan, els, opts = {}) {
       if (!q.concat([at(t1, 0)]).every(p => inRing(p, inner)) || solid.some(o => polysOverlap(o.row ? quad(t0, t1, W / 2 - 1.5) : q, o.s, o.row ? 0.5 : 0))) break; // (the rows along it: side by side, not over)
       reach = k; if (net.some(o => polysOverlap(quad(t1 - sgn * 4, t1, W / 2 - 3), o, 0))) { got = k; break; }
     }
-    let len = got || (rowsTo > 1 ? Math.min(reach, Math.ceil(rowsTo)) : 0), cutRows = [], link = null;
+    let len = got || (rowsTo > 1 ? Math.min(reach, Math.ceil(rowsTo)) : 0), cutRows = [], link = null, hammerPad = null;
     // 2. a 26 ft drive across the rows' ends to the drive beside it (a loop through both), taking the stalls it crosses
     // off the ends of those rows when the plan can spare them
     if (!got && d0.stalls >= 10) {
@@ -2746,7 +2746,9 @@ export function openDeadEnds(plan, els, opts = {}) {
     }
     if (!got && !link && d0.stalls >= 10) { // boxed in: a hammerhead, if the plan can spare the stalls (2 off each row at the end)
       const tEnd = t0 + sgn * len, ends = d0.on.filter(o => (sgn > 0 ? o.b : -o.a) >= sgn * tEnd - 1), lose = ends.reduce((n, o) => n + 2, 0);
-      if (ends.length && spare - lose >= 0) { spare -= lose; cutRows = ends; }
+      if (ends.length && spare - lose >= 0) { spare -= lose; cutRows = ends;
+        if ((d0.rowEnd - d0.tc) * sgn > DEAD_AISLE_FT) { const sw = Math.max(...ends.map(o => o.sw)), tm = tEnd - sgn * sw, c = at(tm, 0), dd = W + 2 * STALL.d; // (past DEAD_AISLE_FT a hammerhead is paved, a T to turn in: the lot paving across the aisle and the two stalls' places each side)
+          hammerPad = { kind: 'field', id: (e.id || 'a') + (sgn > 0 ? '-hamB' : '-hamA'), x: +c[0].toFixed(2), y: +c[1].toFixed(2), ...(e.w >= e.d ? { w: 2 * sw, d: dd } : { w: dd, d: 2 * sw }), rot: e.rot || 0, name: '', note: 'Turnaround · ' + Math.round(dd) + ' ft', turn: true }; } }
     }
     if (!len && !cutRows.length) continue;
     const grown = len ? { ...e, x: e.x + u[0] * sgn * len / 2, y: e.y + u[1] * sgn * len / 2, ...(e.w >= e.d ? { w: e.w + len } : { d: e.d + len }) } : e;
@@ -2759,7 +2761,7 @@ export function openDeadEnds(plan, els, opts = {}) {
     const shorten = o => { const r = o.r, sw = o.sw, ra = r.w >= r.d ? 'w' : 'd', ax = rot(ra === 'w' ? [1, 0] : [0, 1], r.rot || 0), dir = (ax[0] * u[0] + ax[1] * u[1]) * sgn > 0 ? 1 : -1;
       if (r[ra] - 2 * sw < sw * 2) return []; return [{ ...r, [ra]: r[ra] - 2 * sw, x: r.x - ax[0] * dir * sw, y: r.y - ax[1] * dir * sw }]; };
     out = out.flatMap(o => {
-      if (o === e) return con ? [grown, con] : [grown];
+      if (o === e) return [grown, ...(con ? [con] : []), ...(hammerPad ? [hammerPad] : [])];
       const cr = cutRows.find(c => c.r === o); if (cr) return shorten(cr);
       const lc = link?.cuts.find(c => c.r === o); if (lc) return [trimEnd(lc)];
       if (!cut || o.kind !== 'green' || isPark(o) || !o.poly || !polysOverlap(o.poly, cut, 0)) return [o];
