@@ -32,7 +32,7 @@ import * as G from './guardrails.mjs';
 import * as SITE from './btsite.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.05.3'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.4'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -1007,7 +1007,9 @@ function rankKey(o, brief) {
   // it meets a side or rear line, an easement from the neighbour)
   const lane = o.elements.some(e => e.emergency) ? 1 : 0;
   const placeMiss = (o.placements || []).filter(c => c.status === 'fail').length; // (where things were asked to go: a layout meeting more of it first)
-  return [v.feasible ? 0 : 1, -met, formMiss, placeMiss, v.counts.fail, v.counts.unknown, lane, -yieldV, Math.round(paving), o.geometryHash];
+  const paired = o.elements.reduce((t, e) => t + (e.kind === 'building' && +e.combined > 0 ? +e.combined : 0), 0); /* (an exact count met in whole stacks before one met by combining homes into larger ones, lib/bldgtemplates.mjs) */
+  const off = brief.program.uses.filter(u => u.quantity.mode === 'exact' && u.quantity.unit === 'units' && u.quantity.value > 0).reduce((t, u) => t + Math.round(Math.abs((o.quantities.byUse[u.use]?.units || 0) - u.quantity.value) / u.quantity.value * 1000), 0); /* (an exact count no layout reaches: the nearest first) */
+  return [v.feasible ? 0 : 1, -met, off, formMiss, placeMiss, v.counts.fail, v.counts.unknown, lane, paired, -yieldV, Math.round(paving), o.geometryHash];
 }
 export const rankOf = rankKey;
 const cmp = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] < b[i]) return -1; if (a[i] > b[i]) return 1; } return 0; };
@@ -1036,7 +1038,7 @@ export function runBrief(briefIn, { now = null } = {}) {
   const lay1 = Ex => { let out; try { out = layoutOptions(Ex.plan, Ex.program, asks ? { ...Ex.opts, asks } : Ex.opts) || []; } catch (e) { out = [{ error: String(e && e.message || e) }]; } return out; };
   const short = list => brief.program.uses.some(u => { if (u.use !== 'multifamily' || !['exact', 'range', 'max'].includes(u.quantity.mode)) return false; const need = u.quantity.mode === 'range' ? u.quantity.min : u.quantity.mode === 'max' ? Math.floor(u.quantity.value * 0.9) : u.quantity.value; // (at most: well under the cap is worth a second try)
     const units = o => T.templatesFor(u.form, u).length ? o.elements.filter(e => e.template && e.tplUse === u.id).reduce((t, e) => t + e.units, 0) : o.elements.filter(e => e.kind === 'building' && (e.use || o.program?.use) === 'multifamily' && (u.zone == null || e.zone == null || e.zone === u.zone)).reduce((t, e) => t + (+e.units || 0), 0);
-    return !list.some(o => !o.error && o.elements?.length && units(o) >= need); });
+    return !list.some(o => !o.error && o.elements?.length && units(o) >= need && !o.elements.some(e => +e.combined > 0)); }); /* (met only by combining homes into larger ones: the fuller retry is still looked for, lib/bldgtemplates.mjs) */
   const { value: raw, stats } = CX.deterministic({ seed: brief.solver.seed, tickMs: brief.solver.tickMs }, () => {
     const wrapNote = 'No wrap fits this site: the garage a wrap needs (about 130 ft across and 120 ft deep inside the wings, with its ramp and cores) doesn’t fit with the wings round it, so these are the nearest layouts; on a small lot a courtyard on a parking podium ("courtyard on a podium") holds more.';
     const noWrap = o => brief.program.uses.some(u => u.form === 'mf-wrap') && !o.elements?.some(e => e.wrap && e.kind === 'garage') ? { ...o, tplNotes: [...(o.tplNotes || []), wrapNote] } : o; // (a wrap asked for that the site can't hold: said, not swapped silently)

@@ -28,6 +28,7 @@ import { industrialZoneOf, commercialZoneOf, homesZoneOf, plazaZoneOf, tractOpti
 import { cornerRetail, cornerMixed, cornerSide, placeWing } from './sitecorner.mjs';
 import { anchoredCenter, anchorOf } from './sitecenter.mjs';
 import * as GEN from './sitegen.mjs';
+import { ringPieces } from './sitering.mjs';
 import * as PARC from './siteparcels.mjs';
 import { customOptions } from './customtypes.mjs';
 import * as P from './sitepods.mjs';
@@ -564,7 +565,7 @@ function homesIn(F, i, b, A, bOb, part, live = null) {
   if (b.fill === 'sfr') return lotsIn(F, i, b, A, bOb, part, live);
   const FL = b.fill === 'homes' && (b.prog?.load === 'front') ? frontLoadT() : null; // a front-load townhome row: garages and front doors on the street, a driveway apron each
   const PX = b.fill === 'duplex' ? S.PLEX[b.prog?.plex] : null; // (a triplex or fourplex of its own, S.PLEX)
-  const out = [], n = A.length, th = b.fill === 'homes', D = FL ? FL.D : PX ? PX.d : 40, apron = FL ? FL.apron : th ? 5 : 25, unitW = FL ? FL.unitW : PX ? PX.w : th ? 24 : 64, gap = th ? (+PAR.homeGap > 0 ? +PAR.homeGap : 20) : 22, load = FL ? 'front-load' : 'rear-load';
+  const out = [], n = A.length, th = b.fill === 'homes', D = FL ? FL.D : PX ? PX.d : 40, apron = FL ? FL.apron : th ? 5 : 25, unitW = FL ? FL.unitW : PX ? PX.w : th ? 24 : 64, gap = th ? (+PAR.homeGap > 0 ? +PAR.homeGap : 20) : !Number.isFinite(b.max) && +PAR.homeGap > 0 ? Math.max(10, +PAR.homeGap) : 22, /* (duplexes as many as fit: the brief's building separation between them, 10 ft at the least, as townhome rows have, not 22) */ load = FL ? 'front-load' : 'rear-load';
   const bands = [];
   if (i > 0) { const y = A[i - 1].y + A[i - 1].w / 2 + apron; bands.push([y, y + D, 'down']); }
   if (i < n) { const y = A[i].y - A[i].w / 2 - apron; bands.push([y - D, y, 'up']); }
@@ -1803,7 +1804,7 @@ function layoutChoices(plan0, programIn, opts = {}) {
     let lots = Q.product ? [] : layoutCore(plan0, programIn, opts), got = Math.max(0, ...lots.map(o => S.metrics({ ...plan0, elements: o.elements, program: o.program }).units || 0));
     // short of the count: the rows laid out as many as fit (packed tighter at the corners than a count's layouts, which
     // keep land to spare) where that holds more, so a count past what fits gets the most that do
-    if (!Q.product && Q.use === 'townhomes' && got < Q.units) { const most = layoutCore(plan0, { ...programIn, units: null }, opts), g2 = Math.max(0, ...most.map(o => S.metrics({ ...plan0, elements: o.elements, program: o.program }).units || 0)); if (g2 > got) { lots = most.map(o => ({ ...o, program: { ...o.program, units: Q.units } })); got = g2; } }
+    if (!Q.product && (Q.use === 'townhomes' || Q.use === 'duplex') && got < Q.units) { const most = layoutCore(plan0, { ...programIn, units: null, ...(Q.use === 'duplex' ? { max: true } : {}) }, opts), g2 = Math.max(0, ...most.map(o => S.metrics({ ...plan0, elements: o.elements, program: o.program }).units || 0)); if (g2 > got) { lots = most.map(o => ({ ...o, program: { ...o.program, units: Q.units } })); got = g2; } }
     if (Q.product || got < Q.units * 0.9) {
       const courts = courtOptions(plan0, Q, opts, Q.product ? [Q.product] : Q.use === 'duplex' ? ['court', 'court6'] : ['court6', 'court']), close = o => Math.abs((S.metrics({ ...plan0, elements: o.elements, program: o.program }).units || 0) - Q.units);
       const note = Q.product ? 'Laid out as a community on one tract: two-story rows on a shared parking court.' : Q.units + ' ' + (Q.use === 'duplex' ? 'duplex units' : 'townhomes') + ' on lots of their own don’t fit here' + (got ? ' (about ' + got + ' would)' : '') + ', so this is a rental community on one tract: two-story rows on a shared parking court.';
@@ -2067,7 +2068,10 @@ function layoutCore(plan0, programIn, opts = {}) {
 // the generator's layouts past the eight taken that meet more of the asks than the eight do (two at most)
 function askKept(plan, prog, all, f, asks) {
   const miss = g => g.askMiss ??= asks.misses(plan, g.els, prog), m0 = Math.min(Infinity, ...all.slice(0, 8).map(miss));
-  if (miss(f) >= m0) return false; const better = all.slice(8).filter(g => miss(g) < m0); return better.indexOf(f) >= 0 && better.indexOf(f) < 2;
+  if (miss(f) >= m0) return false; const sel = all.askSel ??= (() => { const better = all.slice(8).filter(g => miss(g) < m0), arr = g => (g.key || '').split('|').slice(0, -1).join('|'), seen = new Set(), one = better.filter(g => { const k = arr(g); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 8); /* (twins that differ only in their ways in count once) */
+    const yieldOf = g => g.a?.st?.units || g.a?.st?.gfa || 0, top = Math.max(0, ...all.slice(0, 8).map(yieldOf)), short = g => yieldOf(g) < top * 0.98 ? 1 : 0;
+    return one.map((g, i) => [g, short(g), i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).slice(0, 2).map(x => x[0]); })(); /* (those holding as much as the eight first) */
+  return sel.includes(f);
 }
 // where the request placed things the generators have no control for (the pond, the parking, the clubhouse, the docks,
 // a way in, a single use: lib/layoutintent.mjs asksFor): the candidates drawn that miss the fewest of those asks (parked,
@@ -2376,6 +2380,47 @@ function comMerge(a, b, fp, frac = 0.5) {
   items.push({ t: 'a', w: AISLE, kind: 'service' });
   return { z: a.z, zi: a.zi, items, merged: true, W, rowStalls: a.rowStalls, com: { need, lead: a.com.lead, bldgs: bl } };
 }
+// homes round the commons in the middle (lib/sitering.mjs ringPieces): when the words put single-family homes round an
+// amenity zone in the middle ("homes around a central lake") and nothing else is built. Each try: the inner rows on all
+// four sides, the front and back only, or none; lots as deep as the zone's; the middle a lake holding the detention (or a
+// park with the amenity centre when a pool or clubhouse is asked, its pond behind it). The pond is sized to the drawn
+// plan's own detention estimate (S.stormOf, as the validator judges it): a try whose middle can't hold it is dropped.
+function ringOptions(plan, prog, F, pond) {
+  const zones = prog.zones || [], hi = zones.findIndex(z => z.use === 'sfr' && z.place?.where === 'around'), ci = zones.findIndex(z => z.use === 'amenity');
+  if (hi < 0 || ci < 0 || !(zones[hi].place.next || []).includes(ci) || zones.some((z, i) => i !== hi && i !== ci)) return [];
+  const bb = (F.X1 - F.X0) * (F.Y1 - F.Y0); if (F.site < bb * 0.97) return []; // (a near-rectangle for now: the loop's legs run square to the frame)
+  const z = zones[hi], hp = { ...prog, ...z }, RL = sfrRules(), want = commonsWants(zones[ci].items, { homes: true }), center = want.has('center') ? 'park' : 'lake', lake = center === 'lake' || want.has('lake') || want.has('pond');
+  const LR = hp.lot || {}, BL = Math.max(RL.BL, +LR.front || 0), need = lotNeeds(hp, RL), lotD = +hp.lotD || 115, mix = (hp.homeMix || S.HOME_MIX).filter(t => t.pct > 0), tot = mix.reduce((t, m) => t + m.pct, 0) || 1;
+  const askW = +hp.lotW > 0 ? Math.max(+hp.lotW, need.minW) : 0, HP = (PAR.housePlans === false ? [] : housePlansFor({ min: hp.homeSfMin, max: hp.homeSfMax, n: hp.floorPlans, kind: hp.homeKind })).filter(h => !askW || h.w + 10 <= askW);
+  const stories = []; { const c = {}; for (let k = 0; k < 600; k++) { const t = mix.reduce((b, m) => { const w = (k + 1) * m.pct / tot - (c[m.stories] || 0); return !b || w > b.w ? { m, w } : b; }, null).m; c[t.stories] = (c[t.stories] || 0) + 1; stories.push(t.stories); } } // (the home mix in turn, as lotsIn lays it along a street)
+  const wOf = w0 => Math.max(w0, need.minW, askW, need.minSf ? Math.ceil(need.minSf / lotD) : 0);
+  const home = (k, room) => {
+    if (HP.length) { for (let j = 0; j < HP.length; j++) { const H = HP[(k + j) % HP.length], lw = wOf(Math.max(H.lotW, LR.side ? H.w + 2 * LR.side : 0)); if (lw <= room) return { lotW: lw, w: H.w, d: H.d, sf: H.sf, floors: H.floors, plan: H }; } return null; }
+    const st = stories[k % stories.length], T0 = S.HOME_TYPES[st], lw = wOf(T0.lotW); if (lw > room) return null;
+    const plans = HOUSE_PLANS.filter(h => h.floors === st && h.lotW <= lw && (!LR.side || h.w + 2 * LR.side <= lw) && !/rear-load/.test(h.id)), H = plans.length && PAR.housePlans !== false ? plans[(k * 7) % plans.length] : null;
+    return H ? { lotW: lw, w: H.w, d: H.d, sf: H.sf, floors: st, plan: H } : { lotW: lw, w: Math.min(T0.w, lw - 10), d: T0.d, sf: T0.sf, floors: st, plan: null };
+  };
+  const n = F.rr.length, inRing = p => S.inRing(p, F.rr) || F.rr.some((a, i) => S.segDist(p, a, F.rr[(i + 1) % n]) < 1);
+  const out = [];
+  for (const inner of ['all', 'fb', 'none']) {
+    let want0 = pond * 1.05, r = null, els = null, got = 0, need0 = pond;
+    for (let it = 0; it < 4; it++) { // the pond sized to the drawn plan's own detention estimate
+      r = ringPieces(F, { pave: RL.pave, park: RL.park, BL, lotD, inner, center, pond: want0, home, inRing }); if (!r) break;
+      els = toPlanEls(F, r.els).map(e => e.kind === 'pond' && lake ? { ...e, name: 'Amenity lake' } : e); got = r.pond;
+      try { need0 = S.stormOf({ ...plan, program: prog, elements: els })?.area || 0; } catch { need0 = pond; }
+      if (got >= need0 * 0.99 || want0 >= r.pondMax) break; want0 = Math.min(r.pondMax, need0 * 1.04);
+    }
+    if (!r || !els || need0 > 0 && got < need0 * 0.97) continue; // (the middle can't hold the detention: not offered)
+    const entry = els.find(e => e.name === 'Main entry'); nameAll(els, entry ? [entry.x, entry.y] : S.centroid(plan.ring), { ...prog, unitSf: 900 });
+    const fx = repair(plan, els), m = S.metrics({ ...plan, program: prog, elements: fx.els }), homes = fx.els.filter(e => e.kind === 'building' && e.use === 'sfr').length;
+    const toP = q => q.map(p => toPlan(F, p).map(fit)), [mx0, my0, mx1, my1] = r.mid, mid = toP(box(mx0, my0, mx1, my1)), all = toP(F.rr);
+    const label = (center === 'lake' ? 'Homes round a central lake' : 'Homes round a central park, its clubhouse and pool') + ' · a loop street, ' + (inner === 'all' ? 'lots both sides all the way round' : inner === 'fb' ? 'lots both sides front and back' : 'lots outside it');
+    out.push({ recipe: { deep: false, ring: { inner, center, lotD } }, els: fx.els, bad: fx.bad, score: homes * 10 + 400 - fx.bad.length * 500 - fx.cut * 40, lsf: S.lsfOf(m), key: 'ring|' + inner + '|' + center, scale: 1,
+      zones: [{ name: center === 'lake' ? 'Central lake' : 'Central park', use: 'amenity', zone: ci, ring: mid, acres: S.ringArea(mid) / 43560 }, { name: ZONE_NAME.sfr || 'Homes', use: 'sfr', zone: hi, ring: all, acres: S.ringArea(all) / 43560 }],
+      m, order: zones.map((q, i) => i), frac: 0.5, win: null, pondAt: 'middle', grow: false, tag: '', got: 1, n: 1, short: Math.max(0, m.required - m.spaces), seq: null, mo: {}, prog, label });
+  }
+  return out;
+}
 export function mixedOptions(plan, prog, opts = {}) {
   useParams(plan);
   const zones = prog.zones, site = S.ringArea(plan.ring), found = [];
@@ -2534,6 +2579,10 @@ export function mixedOptions(plan, prog, opts = {}) {
   // a corner lot with shops at the front: an L of shops round their parking, and a pad at the corner, from the best tries
   if (!opts.pinned?.length && !opts.noCorner && plan.streets?.length) for (const f of found.filter(f => !f.bad.length && zones[f.order[0]].use === 'retail').sort((a, b) => b.score - a.score).slice(0, 2))
     for (const v of cornerMixed(plan, F, f, zones, { spans, attempt })) found.push(mixedFinish(v.a, v.mo, v.seq, v.prog, f, v.tag, v.bonus, v.wing));
+  // homes round the commons in the middle ("homes around a central lake", "houses round a park and pool"): a loop street
+  // ringing the middle, lots both sides of it and the feature in the middle (lib/sitering.mjs), beside the bands above
+  const ringed = !opts.pinned?.length ? ringOptions(plan, prog, F, pond) : [];
+  found.push(...ringed);
   // the owner's objective, the most leasable + sellable floor area: up to 1,000 points, each try's share of the most any
   // try holds (land held for later: what was asked, so none); the hard rules above (checks, parking, the detention, a size
   // asked for) still weigh more than it can
@@ -2542,6 +2591,8 @@ export function mixedOptions(plan, prog, opts = {}) {
   const N = opts.count || 3;
   for (const f of ok) if (pick.length < Math.min(3, N) && !pick.some(p => p.key === f.key || look(p.els) === look(f.els))) pick.push(f);
   for (const f of ok) if (pick.length < N && !pick.includes(f) && !pick.some(p => look(p.els) === look(f.els))) pick.push(f);
+  if (ringed.length) { const r = ringed.filter(f => !f.bad.length).sort((a, b) => b.score - a.score)[0], nh = f => f.els.reduce((t, e) => t + (e.kind === 'building' && HOMES.includes(e.use) ? e.units || 1 : 0), 0); /* (the arrangement the words asked for is always offered: first unless it holds well under the bands' homes) */
+    if (r && !pick.includes(r)) { if (pick.length >= N) pick.pop(); if (nh(r) >= 0.8 * Math.max(0, ...pick.map(nh))) pick.unshift(r); else pick.push(r); } }
   { // homes beside shops: the layout with the most homes is always among them (the shops and the detention as asked), so the choice shows what the land holds for homes too
     const nh = f => f.els.reduce((t, e) => t + (e.kind === 'building' && HOMES.includes(e.use) ? e.units || 1 : 0), 0), asked = f => zones.every(z => { const t = z.units || z.gfa || (COMMERCIAL.includes(z.use) ? Math.max(20000, Math.min(120000, site / 43560 * 700)) : 0); if (!t || z.use === 'amenity' || z.use === 'garage') return true; const B = f.els.filter(e => e.kind === 'building' && e.use === z.use); return (z.units ? B.reduce((s, e) => s + (e.units || 0), 0) : B.reduce((s, e) => s + S.gfaOf(e), 0)) >= t * 0.97; });
     const most = homesIn && pick.length >= 2 ? ok.filter(f => !pick.includes(f) && !f.short && (pond <= 0 || f.m.pond >= pond * 0.9) && asked(f)).sort((a, b) => nh(b) - nh(a) || b.score - a.score)[0] : null;
@@ -2566,7 +2617,7 @@ export function mixedOptions(plan, prog, opts = {}) {
     if (m.required > m.spaces) notes.push('Parking is ' + S.spacesWord(m.required - m.spaces) + ' short of ' + m.required + '.');
     if (pond > 0 && m.pond < pond * 0.9) notes.push('Ponds hold about ' + Math.round(m.pond / pond * 100) + '% of the detention the site needs (' + (pond / 43560).toFixed(1) + ' acres); plan on underground storage or a regional facility for the rest.');
     const name = (f.win ? (f.frac === 0.5 ? 'Centred on the frontage' : f.frac < 0.5 ? 'Left end of the frontage' : 'Right end of the frontage') : f.frac === 0.5 ? 'Central boulevard' : 'Side entry') + (f.order.join('') !== zones.map((z, i) => i).join('') ? ' · commons at the back' : '');
-    return { name: name + (f.pondAt === 'front' ? ' · pond at the entry' : /^beside/.test(f.pondAt) ? ' · pond beside the shops' : '') + (f.tag ? ' · ' + f.tag : ''), elements: f.els, notes, zones: f.zones, program: prog, phi: F.phi, score: f.score, recipe: f.recipe, sizes: sizesOf(f.els), ...(f.rescue ? { rescued: true } : {}) }; // (rescued: the detention placed another way, below; withPods offers pods ahead of it)
+    return { name: f.label || name + (f.pondAt === 'front' ? ' · pond at the entry' : /^beside/.test(f.pondAt) ? ' · pond beside the shops' : '') + (f.tag ? ' · ' + f.tag : ''), elements: f.els, notes, zones: f.zones, program: prog, phi: F.phi, score: f.score, recipe: f.recipe, sizes: sizesOf(f.els), ...(f.rescue ? { rescued: true } : {}) }; // (rescued: the detention placed another way, below; withPods offers pods ahead of it)
   });
   // a corner lot with shops at the front: the plan again with a pad at the corner (one more pad, its floor area out of the
   // shops', when none were asked for; else the pads from the corner), ranked with the rest
