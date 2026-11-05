@@ -1222,7 +1222,8 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    by whole stalls), the engine's own check the last word. The run's own pass after the layout finds the lanes drawn
    (porteCochere and daycareLanes skip a building that has its lane). Those options are kept only where they drew the lane,
    pass when a plain option passes and hold as much as the best plain one; rankKey puts, at the same yield, the layout with
-   more of its type's lanes first. Six of the seven now draw it (MX-guard-hotel13 still doesn't: its top plain option is kept), same floor area, parked. A school's queue (50 cars for 500 students) is
+   more of its type's lanes first. All but MX-guard-hotel13 now draw it (there the reserve run's layouts held less; its plain option is kept, the
+   lane said missing), same floor area, parked. A school's queue (50 cars for 500 students) is
    too long for a row; its lanes still need open ground.
    (c) "A school for 500 students and 100 townhomes", "a daycare for 120 children beside 40 homes" read as the homes alone
    (the type silently dropped). lib/btypes.mjs civicZones: a school or daycare named in a clause of its own (split on and,
@@ -1238,11 +1239,12 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    (d) From the contact sheet: a 250-key full-service hotel came out as two hotels (Hotel A and B). Hotels are one building
    (the hotel presets set buildings 1).
    Bench: 88 cases (4 new: RING-L-homes 83 homes, RING-wedge-th 212, RING-L-duplex 148, TY-daycare-homes 40 homes and the
-   daycare with its fenced yard and drop-off lane), 88 passing, no warnings, replay identical; 77 of the 84 earlier cases
-   identical element for element; changed as intended: TY-hotel-keys, TY-extended-stay, TY-hotel-full (now one building),
-   TY-mix-hotel, MX-guard-angled (each gains its porte-cochère), TY-daycare (its drop-off lane), TY-hotel-retail (the same
-   porte-cochère on the reserve run's layout, 192 / 186 for 189 / 186). Parking metrics on the 84 earlier cases: 13,437 ->
-   13,445 stalls, 236 -> 232 bare row ends, 0 long dead ends. Corpus (words path, 120): 119 / 120 fully right, as before (D05
+   daycare with its fenced yard and drop-off lane), 88 passing, no warnings, replay identical (folded onto parking round 4, 71d7ce2); 77 of the 84
+   earlier cases identical element for element; changed as intended: TY-hotel-keys, TY-extended-stay, TY-hotel-full (now
+   one building), TY-mix-hotel, TY-hotel-retail, TY-hotel-retail-sf (each gains its porte-cochère: the last two had lost it on
+   71d7ce2), TY-daycare (its drop-off lane). Parking metrics on the 84 earlier cases: 13,422 -> 13,433 stalls, 211 -> 207 bare
+   row ends, 8 -> 6 dead ends (none past 150 ft), landscape standard met as before (47); the 90th-percentile walks a little
+   longer summed over the cases (6,880 -> 6,980 ft: the lanes take the stalls nearest the door). Corpus (words path, 120): 119 / 120 fully right, as before (D05
    honestly short). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172).
    Engine version rei-layout/2026.11.05.8. Tests: test/layoutrun.mjs (the ring on an L and a wedge with no overlapping homes,
    lots or streets; townhomes and duplexes round a lake, a count capped; the rectangle ring unchanged; the porte-cochère and
