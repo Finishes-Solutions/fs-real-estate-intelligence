@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 4:07 AM CT: The layout now does more of what you ask about where things go (0463866, 6a2e8e7)
+- **Now laid out as asked, not just noted:** the pond at the back, front, a side or by the entrance; parking in front of or behind the buildings; the entrance off a named street; a warehouse at the rear with its truck court facing the way asked. When an ask costs homes, the option says what it gave up (e.g. "parking behind the buildings: 204 homes, against 216 without it").
+- **"Homes around a central lake"** lays out again (it had fallen back to a simple plan).
+- **"retail 25k + 1 pad"** reads as 25,000 sf and a pad; "trampoline park", "bowling alley" and "indoor water park" are read as buildings; "office park" as offices.
+- **Notes name the type you said:** "a daycare and a bank on pads in front of townhomes" reports "the bank toward the street: done" and "the daycare toward the street: done".
+- Scored on 120 test requests without the AI: 116 fully right (was 112); spatial requests 34 of 35. All 74 test sites pass with no warnings; the full test suite passes.
+
 ### 3:23 AM CT: Building types round 2: real outlines, queues, garages, a type per zone, add by type (e89e640, 629e8da, 51a5a8d, d9d45a9)
 - **Their own outlines:** T-shaped buildings, slim point towers, triplexes and fourplexes, and pad-site villages ("a pad-site village with 6 pads", "food hall pads").
 - **Queues drawn and checked:** express car washes with two stacking lanes into the tunnel (about 12 cars wanted; an estimate), bank and restaurant drive-thrus, and a fenced equipment yard behind a data centre. A new check fails a queue that sits on a drive, across parking or out into the street.
