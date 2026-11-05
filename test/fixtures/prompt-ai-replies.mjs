@@ -18,3 +18,20 @@ export const REPLIES = {
   // the model's junk is dropped, its good entries kept
   JUNK: { ...base, use: 'multifamily', units: 150, placements: [pl('spaceship', 'middle'), pl('pool', 'sideways'), pl('pool', 'corner', 'up'), pl('dog park', 'corner', 'northeast')] }
 };
+// building types named by the model (buildingType; a mix's zones[].preset), many in words the words path doesn't know,
+// with the model's own numbers where they differ from the preset's: [request, reply]
+const bt = (preset, o = {}) => ({ buildingType: { preset, count: null, bedsPerUnit: null, mezzanine: null, variant: null, ...o } });
+const recipe = (name, pattern, buildings, parking) => ({ name, pattern, buildings, outdoor: [], sites: { label: null, w: null, d: null, count: null }, parking: { per: '1000sf', rate: 3, basis: null, label: null, plus1k: null, ...parking }, figures: [] });
+export const TYPE_REPLIES = {
+  inn: ['an inn with 80 rooms', { ...base, ...bt('hotel-limited', { count: 80 }), use: 'hotel', gfa: 40000, floors: 3 }],
+  toddlers: ['a place for 90 toddlers to learn and play', { ...base, ...bt('daycare', { count: 90 }), use: 'other', gfa: 7650, custom: recipe('Learning center', 'commons', [{ label: 'Learning center', type: null, w: 90, d: 85, floors: 1, count: 1 }], { per: 'child', rate: 0.25, basis: 90, label: 'children' }) }],
+  k8: ['a K-8 charter school for 650 students', { ...base, ...bt('school', { count: 650, variant: 'middle' }), use: 'other', gfa: 80000 }],
+  cold: ['refrigerated distribution, 150k sf', { ...base, ...bt('cold-storage'), use: 'industrial', gfa: 150000, ratio: 0.6, truck: true }],
+  colo: ['a 120,000 sf colo building', { ...base, ...bt('data-center'), use: 'industrial', gfa: 120000, ratio: 0.5, truck: true }],
+  dorm: ['dorms for 480 beds, 4-bedroom suites', { ...base, ...bt('student', { count: 480, bedsPerUnit: 4 }), use: 'multifamily', units: 480, floors: 3 }],
+  quads: ['a quadplex community, 48 homes', { ...base, ...bt('plex', { count: 48, variant: 'fourplex' }), use: 'duplex', units: 48 }],
+  slim: ['a slim 18-story residential tower, 240 units', { ...base, ...bt('point-tower', { count: 240 }), use: 'multifamily', units: 240, floors: 18, form: 'tower' }],
+  ell: ['apartments in an L, 140 units', { ...base, ...bt('mf-l'), use: 'multifamily', units: 140 }],
+  hotelMix: ['a 150-key hotel with 25,000 sf of retail in front', { ...base, use: 'retail', zones: [zone('retail', { preset: null, count: null, gfa: 25000, placement: { where: 'front', road: null, next: [], side: null } }), zone('hotel', { preset: 'hotel-limited', count: 150, gfa: 80000, floors: 5 })], placements: [pl('retail', 'front')] }],
+  kart: ['an indoor go-kart track, 40,000 sf', { ...base, ...bt(null), use: 'other', gfa: 40000, custom: recipe('Indoor go-kart track', 'row', [{ label: 'Go-kart track', type: null, w: 250, d: 160, floors: 1, count: 1 }], { rate: 4 }) }]
+};

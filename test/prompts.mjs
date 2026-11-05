@@ -7,7 +7,7 @@ import * as S from '../lib/siteplan.mjs';
 import * as B from '../lib/layoutbrief.mjs';
 import * as I from '../lib/layoutintent.mjs';
 import { CASES, FAST } from './fixtures/prompt-corpus.mjs';
-import { REPLIES } from './fixtures/prompt-ai-replies.mjs';
+import { REPLIES, TYPE_REPLIES } from './fixtures/prompt-ai-replies.mjs';
 import { planOf, readingChecks, runWords } from '../scripts/prompt-corpus.mjs';
 
 process.env.OPENAI_API_KEY ||= ''; // (the API module is imported for its mapping only; nothing here calls a model)
@@ -99,6 +99,45 @@ function SITE_E() { return [[0, 0], [500, 0], [500, 900], [0, 900]]; }
   // the AI's placement survives the app's normalising and reaches the brief beside the words' own
   const b = B.briefFromProgram(S.normalizeProgram(programFrom(REPLIES.S06, 'big warehouse')), planOf('B40'), { text: 'big warehouse', parser: 'ai' });
   assert.deepEqual(b.program.placements.map(p => p.subject + ' ' + p.rel), ['industrial back', 'truck court facing']);
+}
+
+// ---- building types named by the AI (buildingType, zones[].preset) through the words' own preset code (no network) ----
+{
+  const { programFrom, customFrom, SCHEMA, SYSTEM } = await import('../api/siteplan.js');
+  const BT = await import('../lib/btypes.mjs'), RUN = await import('../lib/layoutrun.mjs');
+  assert.deepEqual(SCHEMA.properties.buildingType.properties.preset.enum.filter(Boolean).sort(), [...BT.AI_PRESET_IDS].sort(), 'the schema offers every preset');
+  assert.ok(SCHEMA.required.includes('buildingType') && SCHEMA.properties.zones.items.required.includes('preset'), 'a single use and each zone of a mix can name one');
+  for (const id of BT.AI_PRESET_IDS) assert.ok(SYSTEM.includes('- ' + id + ': '), 'the instructions list ' + id);
+  assert.ok(BT.presetTable().length < 5000, 'the presets table stays short (' + BT.presetTable().length + ' chars)');
+  const run = ([ask, d]) => customFrom(d, programFrom(d, ask));
+  const R = Object.fromEntries(Object.entries(TYPE_REPLIES).map(([k, x]) => [k, run(x)]));
+  // the words don't know "an inn": the model's preset sizes it by its rooms, 550 sf a key, its floors the preset's (none said)
+  assert.equal(R.inn.program.btype, 'hotel-limited'); assert.equal(R.inn.program.gfa, 80 * 550); assert.equal(R.inn.program.floors, undefined, 'the model’s guess at floors dropped: none in the words');
+  // a daycare by its children, the preset's own recipe (play yard, 0.2 a child) rather than the model's
+  { const p = R.toddlers.program; assert.equal(p.btype, 'daycare'); assert.deepEqual(p.btCounts, { children: 90 }); assert.equal(p.custom.name, 'Daycare'); assert.equal(p.custom.parking.rate, 0.2); assert.ok(p.custom.outdoor.some(o => o.kind === 'play')); assert.equal(R.toddlers.note, undefined); }
+  // a K-8 school read as a middle school (the model's variant): 140 sf a student, a play yard and a field
+  { const p = R.k8.program; assert.equal(p.btype, 'school'); assert.equal(p.custom.name, 'Middle school'); assert.equal(p.btCounts.students, 650); assert.equal(Math.round(p.gfa / 1000), Math.round(650 * 140 / 1000)); }
+  // the preset's numbers over the model's: cold storage parks 0.3 a 1,000; a data centre has no truck court and its yard
+  assert.equal(R.cold.program.btype, 'cold-storage'); assert.equal(R.cold.program.ratio, 0.3); assert.equal(R.cold.program.btRule.v, 0.3);
+  assert.equal(R.colo.program.btype, 'data-center'); assert.equal(R.colo.program.truck, false); assert.equal(R.colo.program.btSite.kind, 'yard');
+  // beds: 480 beds in 4-bed units is 120 units, parked 0.6 a bed; the floor area from the units, not the model's units at 900 sf
+  { const p = R.dorm.program; assert.equal(p.btype, 'student'); assert.equal(p.units, 120); assert.equal(p.bedsPerUnit, 4); assert.equal(p.perUnit, 2.4); assert.equal(p.gfa, Math.round(120 * 1100 / 0.85)); }
+  assert.equal(R.quads.program.btype, 'plex'); assert.equal(R.quads.program.plex, 4); assert.equal(R.quads.program.units, 48);
+  { const p = R.slim.program; assert.equal(p.btype, 'point-tower'); assert.equal(p.point, true); assert.equal(p.form, 'tower'); assert.equal(p.floors, 18, 'floors the words give stand'); }
+  assert.equal(R.ell.program.btype, 'mf-l'); assert.equal(R.ell.program.form, 'L', 'a shape the words put another way: the model’s preset');
+  // a type a zone: the hotel zone sized by its 150 keys (82,500 sf, not the model's 80,000), its buildings tagged after the run
+  { const p = R.hotelMix.program; assert.deepEqual(p.btZones.map(z => [z.zone, z.btype]), [[1, 'hotel-limited']]); assert.equal(p.zones[1].gfa, 150 * 550); assert.equal(p.zones[0].gfa, 25000); }
+  // no preset: the model's own recipe, and the notes say no preset matched
+  assert.equal(R.kart.program.btype, undefined); assert.equal(R.kart.program.custom.name, 'Indoor go-kart track'); assert.ok(/No building-type preset matches/.test(R.kart.note));
+  // the model naming no preset where the words name one: the words' preset (as the words path would)
+  { const d = { ...TYPE_REPLIES.cold[1], ...{ buildingType: { preset: null, count: null, bedsPerUnit: null, mezzanine: null, variant: null } } }; const p = run(['cold storage warehouse 200,000 sf', { ...d, gfa: 200000 }]).program; assert.equal(p.btype, 'cold-storage'); assert.equal(p.gfa, 200000); }
+  // an unknown preset id is ignored
+  assert.equal(run(['apartments in an L, 140 units', { ...TYPE_REPLIES.ell[1], buildingType: { ...TYPE_REPLIES.ell[1].buildingType, preset: 'spaceport' } }]).program.btype, undefined, 'an id that names no preset: none (the words name none either)');
+  // laid out: realistic sites, the buildings tagged as the preset with what they count (as the app runs the AI's program: raw, not re-normalized)
+  const lay = (k, site) => { const [ask] = TYPE_REPLIES[k], b = B.briefFromProgram(R[k].program, planOf(site), { text: ask, parser: 'ai' }); assert.ok(B.validateBrief(b).ok, k + ': a valid brief'); return RUN.runBrief(b).options[0].elements; };
+  { const els = lay('inn', 'R5'), h = els.filter(e => e.btype === 'hotel-limited'); assert.ok(h.length > 0); assert.equal(h.reduce((s, e) => s + e.keys, 0), 80); }
+  { const els = lay('hotelMix', 'W20'), h = els.filter(e => e.btype === 'hotel-limited'); assert.equal(h.reduce((s, e) => s + e.keys, 0), 150); assert.ok(els.some(e => e.kind === 'building' && e.use === 'retail')); }
+  { const els = lay('toddlers', 'R5'); assert.equal(els.filter(e => e.btype === 'daycare').reduce((s, e) => s + e.children, 0), 90); assert.ok(els.some(e => e.kind === 'play')); }
 }
 
 // ---- the corpus, fast subset, end to end: read, laid out, met (or said) ----
