@@ -137,4 +137,20 @@ export const CASES = [
   { id: 'E82', cat: 'lock', base: 'HR', ask: 'keep the hotel exactly where it is, make the retail 25,000 sf', out: [['lock', 'hotel'], ['gfa', 'retail', 'about', 25000, 0.1]] }
 ];
 // written after the tuning (LAYOUT-ENGINE.md item 41), scored once
-export const FRESH = [];
+export const FRESH = [
+  { id: 'F01', cat: 'move', base: 'GA', ask: 'put the pool in the middle of the site', out: [['in', 'pool', 'middle']] },
+  { id: 'F02', cat: 'move', base: 'GA', ask: 'nudge apt bldg 10 east 30 ft', out: [['moved', 'name:Apt Bldg 10', 'east', 30]] },
+  { id: 'F03', cat: 'resize', base: 'GA', ask: 'bump everything to 4 floors', out: [['floors', 'apartments', 4]] },
+  { id: 'F04', cat: 'resize', base: 'MU', ask: 'shrink the retail down to 12,000 sf', out: [['gfa', 'retail', 'about', 12000, 0.1]] },
+  { id: 'F05', cat: 'resize', base: 'TH', ask: 'cut it to 90 townhomes', out: [['units', 'about', 90, 8]] },
+  { id: 'F06', cat: 'swap', base: 'GA', ask: 'get rid of building 4', out: [['gone', 'name:Apt Bldg 4']] },
+  { id: 'F07', cat: 'swap', base: 'MU', ask: 'add a tot lot next to the clubhouse', out: [['count', 'playground', 'min', 2]] },
+  { id: 'F08', cat: 'parking', base: 'GA', ask: 'go to 2 spaces per unit', out: [['perUnit', 2]] },
+  { id: 'F09', cat: 'parking', base: 'RC', ask: 'diagonal parking please', out: [['angled']] },
+  { id: 'F10', cat: 'settings', base: 'TH', ask: 'rear setback of 40 feet', out: [['setback', 'back', 40]] },
+  { id: 'F11', cat: 'vague', base: 'GA', ask: 'squeeze more units in', out: [['units', 'more%', 0.08]] },
+  { id: 'F12', cat: 'vague', base: 'MU', ask: 'too crowded, give it more breathing room', out: [['crowd', 'less']] },
+  { id: 'F13', cat: 'messy', base: 'HR', ask: 'hotel to 140 rms', out: [['keys', 'about', 140]] },
+  { id: 'F14', cat: 'multi', base: 'GA', ask: 'remove bldg 9 and add a dog park where it was', out: [['gone', 'name:Apt Bldg 9'], ['has', 'dog park']] },
+  { id: 'F15', cat: 'lock', base: 'TH', ask: 'leave townhome row 2 alone and make it less dense', out: [['lock', 'name:Townhome Row 2'], ['units', 'less%', 0.05]] }
+];
