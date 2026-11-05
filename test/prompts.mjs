@@ -85,6 +85,7 @@ function SITE_E() { return [[0, 0], [500, 0], [500, 900], [0, 900]]; }
     const miss = readingChecks(c, brief).filter(x => !x.ok); assert.deepEqual(miss.map(x => x.name + ' → ' + x.got), [], id + ': the AI’s reading kept');
   }
   const j = programFrom(REPLIES.JUNK, '150 apartments'); assert.deepEqual(j.placements.map(p => [p.subject, p.rel, p.edge || ''].join(' ').trim()), ['pool corner', 'dog park corner northeast'], 'unknown subjects and relations dropped; an unknown edge left off');
+  assert.deepEqual(programFrom({ ...REPLIES.M04, use: 'retail', units: null, perUnit: null, compare: true }, 'mixed use').zones.map(z => z.use), ['retail', 'multifamily'], '"mixed use" answered as one use: the words’ shops and apartments');
   // the AI's placement survives the app's normalising and reaches the brief beside the words' own
   const b = B.briefFromProgram(S.normalizeProgram(programFrom(REPLIES.S06, 'big warehouse')), planOf('B40'), { text: 'big warehouse', parser: 'ai' });
   assert.deepEqual(b.program.placements.map(p => p.subject + ' ' + p.rel), ['industrial back', 'truck court facing']);

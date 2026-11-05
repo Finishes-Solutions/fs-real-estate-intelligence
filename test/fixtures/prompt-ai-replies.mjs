@@ -11,6 +11,9 @@ export const REPLIES = {
   S06: { ...base, use: 'industrial', gfa: 300000, truck: true, placements: [pl('industrial', 'back'), pl('truck court', 'facing', 'east')] },
   S30: { ...base, use: 'multifamily', units: 200, entrances: 2, placements: [pl('entrance', 'edge', 'side')] },
   V01: { ...base, use: 'multifamily', compare: true, assumptions: ['Housing compared by value: nothing in the request names a use.'] },
+  // two uses placed with no zones (as gpt-6-luna answered in the live eval, Nov 5): the zones are made from the placements
+  S16: { ...base, use: 'office', truck: true, placements: [pl('office', 'along', 'front'), pl('industrial', 'back')] },
+  V19: { ...base, use: 'retail', compare: true, placements: [pl('retail', 'front'), pl('multifamily', 'back')], assumptions: ['Shops on the road, apartments behind.'] },
   M04: { ...base, use: 'multifamily', units: 200, perUnit: 1.5 },
   // the model's junk is dropped, its good entries kept
   JUNK: { ...base, use: 'multifamily', units: 150, placements: [pl('spaceship', 'middle'), pl('pool', 'sideways'), pl('pool', 'corner', 'up'), pl('dog park', 'corner', 'northeast')] }

@@ -595,6 +595,59 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    MF-tower 391); the engine's own deadEnds (plan warnings, openDeadEnds) still takes an aisle end 16 ft clear as a way
    out; the 13n-stall cap count difference is avoided, not fixed.
 
+26. Done Nov 4 (understanding requests). The owner: "make sure the AI can understand lots of various prompts, vague
+   ones, and detailed ones, and understand spatially what is being asked for so prompting returns what is asked and what
+   is best". A corpus of 120 requests (test/fixtures/prompt-corpus.mjs: 25 vague, 35 detailed, 25 messy, 35 spatial,
+   across garden / mid-rise / senior / townhome / duplex / cottage housing, retail, grocery, pads, office, medical,
+   hotel, church, industrial, cross-dock, flex, storage and mixed use, on 8 synthetic sites), each with its expected
+   reading and checks on the best layout (scripts/prompt-corpus.mjs, its own geometry, not the engine's), written before
+   the parser was tuned; 16 more written after tuning and scored once (FRESH).
+   (a) Messy words (lib/siteplan.mjs tidyRequest, before any reading): typos and shorthand ("appartments", "untis",
+   "apts", "whse", "stry", "flrs", "pkg", "ofc"), "60ksf", "30k retail", "s.f.", "180 du", "1.5 spaces/unit", "1.6 pkg
+   ratio", "4 per 1,000 sf" (a ratio, no longer a 1,000 sf size), "townhomes x 80", "~", "+/-", "w/", "@"; pond acres
+   ("a 3 acre pond": its share of the site), a density ("25 du/ac": the count from the acreage), setbacks said ("50 ft
+   setbacks on all sides", "front setback 40 ft, side 15, rear 30": the brief's rules, labelled the request's). Bugs
+   found and fixed: "1 space per unit" read as 1 unit; "3-4 story apartments" as a range of 3-4 units; "1.75 spaces per
+   unit" as 75 units; "trailer parking" as a trailer park (homes beside the warehouse); "regional detention so no pond"
+   as underground vaults; "the pool in the center" as a shopping center; "senior living" and "senoir" not senior.
+   (b) Open requests (lib/layoutintent.mjs vagueProgram): no use named → housing compared by value on 2 acres or more
+   (garden, studio, townhomes, duplexes; "density" / "units": apartments, as many as fit), shops on a smaller lot, "mixed
+   use" → shops in front, apartments behind. Every assumption is kept on the brief (request.assumed, not hashed) and said
+   first in each option's notes ("Assumed: No count given for …: as many as fit").
+   (c) Where things go: program.placements in rei.brief/1, optional ({ subject, rel, edge?, target?, ft? }; subjects:
+   the uses and pool, clubhouse, playground, dog park, courts, pond, parking, truck court, entrance, open space,
+   commons, buildings; rel: front, back, middle, corner, edge, near, behind, before, away, keep, facing, along, beside,
+   between, around; edge: front, back, side street, neighbours, left / right from the street, the compass). A brief
+   without it hashes as before. Honoured by the engine: a use's place among zones (front / back / middle / corner /
+   behind another use: the bands and pods already read it); "keep the trees on the north side", "a 50 ft buffer along
+   the north line", "no buildings within 75 ft of the west line", "buffer the neighbours to the west", "keep the
+   southwest corner open" (an exclusion strip or square the engine keeps out of and the validator checks; a street edge
+   raises the front setback instead; depths not said are 60 / 50 ft, said as assumed); "the pool in the center" (the
+   resort loop round a central pool); a pool, playground, dog park or courts moved (or a dog park / playground added) to
+   the place asked after the layout, kept only when no hard check gets worse. Measured and said only: the clubhouse's,
+   pond's, parking's and truck court's place, an entrance on a side street, a single use at the front or back. Every
+   option measures every ask and says it in its notes ("Asked: the dog park in the corner: done." / "…: not met in this
+   layout (it is toward the back, on the right as seen from the street). The engine has no control for this yet…");
+   options meeting more asks rank first (after feasibility, the program and the form).
+   (d) The AI path (api/siteplan.js): the program schema has the same placements field and the instructions give the
+   vocabulary with worked examples, the open-request rule and the messy-number rules; the model's placements are kept
+   on the program and merged with the words' own (test/prompts.mjs feeds fixture replies through the mapping;
+   test/prompt-eval-live.mjs runs the corpus through the real model, by hand).
+   Scores (docs/bench/prompt-eval.md): words path, before → after: reading checks 71% → 100%, outcome checks 76% → 94%,
+   requests fully right 45 → 112 of 120 (vague 8 → 25, detailed 25 → 32, messy 9 → 25, spatial 3 → 30); unmet place
+   asks said in the notes 0 of 20 → 6 of 6. Fresh requests (never tuned to): 15 of 16 fully right. AI path, live (gpt-6-luna,
+   the app's program step, all 120): reading 88% → 98%, outcomes 83% → 91%, fully right 83 → 107 (spatial 9 → 29);
+   then the worst live misreadings fixed (two placed uses answered as one, bare "mixed use", a grocery with shops as two
+   retail zones, a church's seats; zones are now made from the model's placements when it gives none) and re-checked
+   live on 17 requests, all right.
+   Bench: 44 cases unchanged, every option identical, replay identical. Holdouts unchanged (P18 fill 77, P35 fill-ug
+   320, P36 fill 128, E054 podium-urban 172). Tests: test/prompts.mjs (a fast subset of 13 corpus requests, about 16 s).
+   Still: pond position, parking in front of / behind the buildings, a single warehouse at the back and its truck
+   court's direction are said, not placed (no engine control yet); "homes around a central lake" through a run lays out
+   a fallback (the regional detention estimate makes the lake layouts fail; laid out directly they draw 48 homes round
+   the lake; pre-existing); exact counts the land can't hold (240 mid-rise units, 96 duplex units on 10 ac) come back
+   short as before.
+
 27. Done Nov 4 (building types from primitives). The owner: "a wide array of building types … very flexible and not a
    fixed set of options. maybe working primitives for various types that get modified?" Audit and model:
    docs/BUILDING-TYPES.md. Types had been fixed lists in seven places (17 uses, 30 forms, ~12 generators, 7 reviewed
