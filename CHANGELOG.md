@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 10:15 AM CT: Parking round 4: shorter walks win ties, more planted row ends, angled parking says why (7f6560c)
+- **Shorter walks to the door count in choosing a layout:** among layouts with the same homes or floor area, one whose parking sits far from the doors now ranks lower. A hotel with shops: the 90th-percentile walk went from 246 to 204 ft; a guarded hotel and shops with angled parking from 244 to 142 ft.
+- **More planted row ends:** a row with free land past its end grows a space so a hemmed-in row elsewhere can end in a planted island (bare row ends on the test sites 236 → 211).
+- **Angled parking asked for on a single-use plan** is tried there too; where the stalls sit on the fire lanes or angling would leave parking short, the notes say why they stayed straight.
+- Parking lot landscaping is now measured (planted share and spaces per tree, against a typical 5% and a tree every 10 spaces).
+- 84 test sites, every one passing with no warnings; the full test suite passes.
+
 ### 9:03 AM CT: Schools, daycares, hotels and gas stations get the lanes they need; each type parked by its own rule (197f92e, a45bdea)
 - **Schools:** a parent pick-up and drop-off line (winding back on itself when it's long) and a separate bus loop, kept apart, with the play yard and field (moved off the pond if it landed there). A 600-student school holds 70 cars and 6 buses.
 - **Daycares:** a fenced play yard beside the building and a drop-off lane where the lot has room.
