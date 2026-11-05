@@ -5,6 +5,21 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 2:29 PM CT: Building types fill out properly: garages, T and U shapes, data centres, big boxes; a stray file removed (6e441e0, fdde683)
+- **A 500-car parking garage on 2.3 acres** is drawn with 513 spaces on 6 levels and an entrance drive (was 171), judged by its spaces.
+- **A T-shaped mid-rise** keeps its 4 floors and holds the 120 homes asked (was 96). **"U-shaped around a central courtyard"** draws an open U; a closed ring only when you name one.
+- **A data centre** gets a service drive and fire lane behind it instead of a truck court; its equipment yard goes on the side away from its parking.
+- **A 125,000 sf big box** is one store at its depth; on 10 acres the parking holds 110,352 sf and the plan says so. A 16-story point tower says it fits about 172 of 220 units (it named the engine's own target before).
+- **Counts in words:** "20 of them" is read as the count; "a hotel and 200 apartments" keeps 200 apartments (was 432); a dorm with shops becomes two zones, shops at the front. A daycare's pond is named beside the daycare, not "the shops".
+- **Removed a stray link** to a local folder that was committed by mistake in the last merge (`node_modules`); it is now ignored by name.
+- Building-type requests read without the AI: 31 of 33 (was 26); live AI 30 of 33. 88 test sites pass with no warnings; the full test suite passes.
+
+### 1:09 PM CT: Parking round 5: no parking stranded on wedge lots, clear entries, more planting (4aae79d)
+- **Parking beside the buildings on wedge lots:** where a strip of a wedge lot lost its building, its parking used to stay behind, far from the doors. The layout is now redrawn with the bays beside the remaining buildings and the pond on that land (on the 6-acre test wedge the 90th-percentile walk went from 255 to 179 ft, the longest from 340 to 197 ft).
+- **Entry drives kept clear on wedge lots:** an entrance whose first cross-drive would come too close to the street is avoided where it costs nothing (a trapezoid lot's first cross-drive went from 15 to 100 ft in).
+- **More planting:** spare spaces become planted row ends, then an island every 10th space, never below what's required. 54 of 76 test lots now meet a typical parking-lot landscape standard (5% planted and a tree per 10 spaces), was 49.
+- 88 test sites, every one passing with no warnings; the full test suite passes.
+
 ### 11:47 AM CT: The AI reads building types; lakes on any lot; room for drop-off lanes; a school beside homes (19f47ca, 6790a86, a6b4956, fcdba05)
 - **The AI now understands building types:** asked through the AI (gpt-6-luna), "an express car wash", "a 120-key hotel", "assisted living, 120 beds" and the like now come back as that type with its count, shape and lanes (28 of 33 test requests fully right, was 1). Before, the AI's answer lost the type and drew a plain box. A type no preset covers is still drawn at the size asked and the notes say so.
 - **Fixes to the AI's reading:** a courtyard building keeps its courtyard; a size you give is kept (a big box isn't shrunk "to fit"); a count inside a range you asked stays the range; a coffee shop with a drive-thru is a restaurant; apartments' own pool isn't split off as a separate zone.

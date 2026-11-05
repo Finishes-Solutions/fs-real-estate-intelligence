@@ -172,7 +172,7 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   // a data centre: a fenced equipment yard at the back, the building the floor area asked
   ({ o } = run('data center 100,000 sf', 800, 600));
   const dc = o.elements.find(e => e.btype === 'data-center'), yard = o.elements.find(e => e.yard === 'equipment');
-  assert.equal(o.validation.status, 'pass'); assert.ok(yard && o.elements.some(e => e.kind === 'fence' && e.note === 'Equipment yard fence')); assert.ok(Math.abs(dc.w * dc.d - 100000) <= 1000); assert.ok(yard.y > dc.y, 'the yard on the side away from the street');
+  assert.equal(o.validation.status, 'pass'); assert.ok(yard && o.elements.some(e => e.kind === 'fence' && e.note === 'Equipment yard fence')); assert.ok(Math.abs(dc.w * dc.d - 100000) <= 1000); { const ent = o.elements.find(e => e.name === 'Main entry'), dE = e => Math.hypot(e.x - ent.x, e.y - ent.y); assert.ok(dE(yard) > dE(dc), 'the yard at the back, away from the street and the parking'); }
   // a type per zone
   p = S.guessProgram('a hotel with 120 keys and 20,000 sf of retail');
   assert.deepEqual(p.btZones, [{ zone: 1, btype: 'hotel-limited', name: 'Hotel' }]); assert.equal(p.zones[1].gfa, 66000);
@@ -271,5 +271,53 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   const gb = B.briefFromRequest(ask, site(700, 520)), prog = S.guessProgram(ask);
   RUN.governingParking(gb, { ...site(700, 520), program: prog, __guard: { cf: 1.05, profile: 'waller' } }, prog);
   assert.deepEqual(gb.rules.values.parkingByUse.v.restaurant, { per1000: 4.2, type: 'bank' }); assert.equal(gb.rules.values.parkingByUse.v.other.type, 'daycare');
+}
+// ---------- 9. drawing limits found by the live scoring (docs/LAYOUT-ENGINE.md item 39) ----------
+{
+  const site = (w, h) => ({ origin: [-96.42, 30.38], ring: [[0, 0], [w, 0], [w, h], [0, h]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, elements: [] });
+  const run = (ask, w, h) => { const b = B.briefFromRequest(ask, site(w, h)), rec = RUN.runBrief(b); return { b, rec, o: rec.options[0] }; };
+  // a stand-alone garage: a third bay before a deck runs past 330 ft; on a lot too short for the deck as sized, laid out again
+  // at the length drawn in more levels (at most GARAGE_MAX), with its entrance drive, judged by the spaces asked
+  let p = S.guessProgram('parking garage for 500 cars'); assert.equal(p.custom.buildings[0].d, 186); assert.ok(p.custom.buildings[0].w <= 330 && p.btCounts.spaces >= 500);
+  assert.equal(BT.garageFit(p, 330, 186), null, 'a deck drawn as sized needs no refit');
+  const gf = BT.garageFit(p, 223, 186); assert.ok(gf.length && gf.every(q => q.btCounts.spaces > S.garageGrid(223, 186, 5) && q.floors <= BT.GARAGE_MAX && q.custom.buildings[0].w <= 228));
+  let { rec, o } = run('parking garage for 500 cars', 330, 300);
+  const gar = o.elements.filter(e => e.kind === 'garage' && e.standalone), sp = gar.reduce((t, e) => t + S.garageStalls(e), 0);
+  assert.ok(sp >= 500, 'the 2.3 ac lot holds the 500 spaces asked (' + sp + ')'); assert.ok(gar[0].levels <= BT.GARAGE_MAX);
+  assert.equal(o.validation.checks.find(c => c.id === 'access.connectivity').status, 'pass', 'its entrance drive reaches the network');
+  const pu = o.validation.checks.find(c => c.id === 'program.u1'); assert.equal(pu.units, 'spaces'); assert.equal(pu.status, 'pass');
+  assert.ok(o.elements.some(e => e.kind === 'drive' && /^Garage entry/.test(e.name || '')));
+  assert.ok(!o.notes.some(n => /^Fits about [\d,]+ of the [\d,]+ sq ft/.test(n)), 'no floor-area shortfall said for a garage');
+  assert.ok(RUN.replayRun(rec).identical, 'replay identical');
+  // a data centre: no truck court; a service drive (fire lane) behind it instead, reached from the entrance
+  ({ o } = run('hyperscale data center, 250,000 sf', 1500, 1160));
+  assert.ok(!o.elements.some(e => e.kind === 'truck'), 'no truck court'); assert.ok(o.elements.some(e => e.kind === 'drive' && e.name === 'Service drive'));
+  assert.ok(o.elements.some(e => /Equipment yard/.test(e.name || ''))); assert.equal(o.validation.status, 'pass');
+  // a cold storage warehouse keeps its truck court
+  ({ o } = run('cold storage warehouse 150,000 sf', 1000, 870)); assert.ok(o.elements.some(e => e.kind === 'truck'));
+  // a big box: one building at its depth (not split into shallow shop rows); what doesn't park is said
+  ({ o } = run('a 125,000 sf home improvement store', 900, 500));
+  const bb = o.elements.filter(e => e.kind === 'building' && e.btype === 'big-box'); assert.equal(bb.length, 1); assert.ok(Math.min(bb[0].w, bb[0].d) >= 260, 'a big box at its depth');
+  if (o.quantities.byUse.retail.gfa < 125000 * 0.99) assert.ok(o.notes.some(n => /^Room for [\d,]+ of the 125,000 sq ft/.test(n)), 'the shortfall said');
+  // a U named round a courtyard: the open U, never the closed ring; a closed ring named: the ring
+  p = S.guessProgram('a U-shaped apartment building wrapped around a central courtyard, 140 units'); assert.equal(p.courtShape, 'U');
+  assert.equal(S.guessProgram('apartments around a courtyard, closed on all four sides, 140 units').courtShape, 'O');
+  assert.equal(S.guessProgram('apartments around a central courtyard, 140 units').courtShape, undefined);
+  ({ o } = run('a U-shaped apartment building wrapped around a central courtyard, 140 units', 900, 500));
+  assert.match(o.name, /U-shaped, open to the street/); const wings = o.elements.filter(e => e.kind === 'building' && e.court); assert.equal(wings.length, 3);
+  // a T-shaped mid-rise: the mid-rise's floors; the count the request asked
+  p = S.guessProgram('a T-shaped mid-rise apartment building, 120 units'); assert.equal(p.btype, 'mf-t'); assert.equal(p.btFloors, 4);
+  ({ o } = run('a T-shaped mid-rise apartment building, 120 units', 900, 500)); assert.equal(o.quantities.byUse.multifamily.units, 120);
+  // "Fits about" said against the count asked, not the engine's overshoot
+  ({ o } = run('a 16-story point tower, 220 units', 600, 400));
+  for (const n of o.notes.filter(n => /^Fits about \d+ of the \d+ units/.test(n))) assert.match(n, /of the 220 units/);
+  // the words: a count after the type; homes' count in a clause of its own beside a type zone; a dorm beside shops
+  p = S.guessProgram('live-work units along the street, 20 of them'); assert.equal(p.btype, 'live-work'); assert.equal(p.units, 20);
+  p = S.guessProgram('hotel at the front with 110 rooms, apartments behind, 200 units'); assert.equal(p.zones.find(z => z.use === 'multifamily').units, 200);
+  p = S.guessProgram('a dorm with 400 beds and 20,000 sf of shops in front');
+  assert.deepEqual(p.zones.map(z => z.use), ['retail', 'multifamily']); assert.equal(p.zones[0].gfa, 20000); assert.equal(p.zones[0].place.where, 'front'); assert.equal(p.btZones[0].btype, 'student'); assert.equal(p.zones[1].units, 134);
+  assert.equal(S.guessProgram('apartments with 400 units and 20,000 sf of shops in front').btZones, undefined, 'plain apartments beside shops: the words\' own zones');
+  // an option's name says what the pond is beside
+  ({ rec } = run('a daycare for 120 children beside 40 homes', 1000, 870)); assert.ok(!rec.options.some(x => /pond beside the shops/.test(x.name)));
 }
 console.log('btypes ok');

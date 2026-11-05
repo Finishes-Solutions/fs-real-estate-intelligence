@@ -1249,3 +1249,106 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    Engine version rei-layout/2026.11.05.8. Tests: test/layoutrun.mjs (the ring on an L and a wedge with no overlapping homes,
    lots or streets; townhomes and duplexes round a lake, a count capped; the rectangle ring unchanged; the porte-cochère and
    drop-off on tight lots; a school or daycare beside homes as a zone).
+
+38. Done Nov 5 (parking, round 5). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 88-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base 5043727), then fixed, most valuable first:
+   (a) A wedge's strip left with no bar redrawn (lib/sitegen.mjs alongEdges p.skip, tryOne). The strips along an odd lot's
+   edges park only what their bays hold, so a bar gives way (the smallest: "a bar left out to park the rest"); where that
+   was the only bar of its strip (the street strip of WEDGE-tri-midrise) its bays stayed at the street, about 300 ft from
+   the bars they parked, with the pond on the land between. Now the layout is drawn again without that strip (its line
+   skipped; one strip is enough then): the other strip's further bays run on beside its bars and the pond takes the
+   street strip's land. Kept only where the redrawn layout holds as many homes, parks them, and its 90th-percentile walk
+   (genWalk90: stall to the nearest home's wall) is over 10 ft shorter. WEDGE-tri-midrise: walk p90 255 -> 179 ft, max
+   340 -> 197, bare row ends 15 -> 1, landscape 4.0 -> 5.8% (now meets the standard), the same 160 homes, the pond 0.57
+   -> 0.50 ac (what the site needs).
+   (b) The way in clear of drives (lib/sitegen.mjs alongEdges p.entThr, edgeTry). The strips' main entry went square in
+   from the street to the nearest aisle at the spot nearest the street's middle, even where a bay's end drive crossed it
+   a few feet in (WEDGE-trap 15 ft). A spot whose first drive across is inside the stacking length (p.thr, else 50 ft)
+   now costs 10 a foot short; the result is kept where it costs no homes and parks as well (as item 31's throat pass).
+   WEDGE-trap-midrise and WEDGE-trap-1pk: first drive across 15 -> 100 ft, no stall in the throat; the price is a few end
+   islands on the land the entry now crosses (WEDGE-trap-midrise landscape 4.7 -> 3.2%, bare ends 9 -> 14). WEDGE-tri's
+   entry (29 ft) is unchanged: its aisles run slanted to the street and only their ends meet it square.
+   (c) Planting to the landscape standard from stalls to spare (lib/layoutrun.mjs landStandard, lotArea, plantSpare,
+   plantToStandard, last in the run; lib/siteplan.mjs isleOf, e.isle). The standard the metrics measure (item 36 d: 5% of
+   the lot planted and a tree every 10 stalls, lots of 20 stalls or more) is now measured in the run exactly as the script
+   does (the lot on a 2 ft grid: rows, lot paving, and drives within 26 ft of a row; caps and islands planted). A lot
+   still short of it after the end-island passes spends its stalls to spare: planted ends on rows without them, then an
+   island every 10th stall instead of every 13th (e.isle, 8-13; the count, the drawn stalls, the islands and the editor
+   all follow it), longest rows first, never below what's required. Standard met 49 -> 54 of 76 lots (IN-warehouse,
+   MF-wrap, TY-cold, TY-hotel-full, WEDGE-tri-midrise). Tried and taken out: trimming fewer stalls off the far ends to pay
+   for the planting (pruneSurplus down to what planting costs, with or without the 3% it keeps to spare, the planting
+   before or after it). It met the standard on 56 of 76, but took the spare the later passes need (MF-garden-max's
+   second way in became a gated lane and its 204-home layout lost its rank to a 168-home one), or the far stalls kept
+   lengthened walks (MF-tower p90 47 -> 62 ft) and put stalls in an entrance's throat (MF-courtyard, TY-student). Most
+   lots still short have no stalls to spare (the wedges' strips, the townhome guest pockets of parallel stalls, the data
+   centre).
+   Bench (88 cases, top option; base 5043727 -> after): all passing, no warnings, replay identical, no case lost homes or
+   floor area, parking met everywhere; 74 identical element for element. Landscape standard 49 -> 54 of 76 lots,
+   landscape share summed 405.9 -> 410.4 points; 90th-percentile walk summed 7,077 -> 7,001 ft, max walk 9,112 -> 8,969;
+   bare row ends 207 -> 200; stalls inside an entrance's stacking length 17 -> 14; first stall / first drive across an
+   entry summed 9,516 -> 9,672 / 6,719 -> 6,888 ft; dead ends 6 -> 6; stalls 13,521 -> 13,505 (spare stalls planted);
+   sf a stall summed 32,697 -> 32,736 (an island where a spare stall was, on the same paving). Holdouts unchanged (P18
+   fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version rei-layout/2026.11.05.9. Tests:
+   test/parkingquality.mjs (the island rhythm's count and drawing agree; the run's landscape measure agrees with the
+   metrics'; a lot with spare stalls planted to the standard, none without; the wedge triangle's walk under 200 ft with
+   its 160 homes; the trapezoid's way in clear of drives for 50 ft).
+   Still (next worst): paving on loop drives and small lots (MF-tower 376, TY-assisted 478 sf a stall: not worked on);
+   short entries where the aisles meet the street slanted (WEDGE-tri 29 ft) and the 30 ft first cross drive of the field
+   engine's small lots (TY-datacenter, TY-pad-village, TY-daycare-dropoff, MX-angled; TY-daycare itself is now 62 ft);
+   bare ends where nothing is free and nothing spare (200; WEDGE-hyp-midrise 14, WEDGE-trap-midrise 14, LOT-curved-apt
+   12); WEDGE-trap-midrise's field at the far end (p90 179 ft); 22 lots short of the landscape standard with no stalls to
+   spare.
+
+39. Done Nov 5 (building-type drawing limits). The owner: "flexible building-type primitives that get modified into many
+   more building types, keeping the coloured 3D blocks" and "keep improving how every building type and lot shape fills
+   the land, with honest checks". The live scoring (docs/bench/prompt-eval.md round 4) read these requests right and the
+   drawing fell short; each was checked on the drawing, then fixed in the primitive or preset for every request of its
+   type, or found to be a land limit and said. docs/BUILDING-TYPES.md section 8. Holdouts used only as a final
+   non-regression check.
+   (a) Stand-alone garage ("parking garage for 500 cars", 2.3 ac: 171 spaces, the deck not on any drive). lib/btypes.mjs
+   garageSize: a third bay (186 ft) before a deck runs past 330 ft, then up to GARAGE_MAX 8 levels (an estimate; local
+   height limits govern); garageFit + lib/layoutrun.mjs runBrief: where the lot draws the deck shorter than sized, it is
+   laid out again at the length drawn with the levels that hold the spaces asked (or a bay deeper), ranked by the spaces
+   short (rankKey); garageEntries gives a stand-alone deck its entrance and a 24 ft drive as a podium's; lib/layoutcheck.mjs
+   judges a stand-alone garage's program line by spaces (at least those asked), not by the floor area that only sizes the
+   deck, and its "Fits about … sq ft" note is dropped. 513 spaces on 6 levels, every check passing.
+   (b) Data centre (no truck court asked: one was drawn). lib/sitelayout.mjs warehouse rows with `truck: false` (not flex)
+   draw a 24 ft service drive behind (a fire lane, kept reached; its links at both ends kept, a hammerhead where an end
+   meets nothing) instead of a 130 ft court; lib/sitegencom.mjs's loading-court arrangements sit out for it. Cold storage
+   keeps its court. A building running back from the street (both long sides as far from it) gets its equipment yard on
+   the side away from its parking, by the service drive (lib/btsite.mjs equipmentYard).
+   (c) Big box (125,000 sf on 10.3 ac drawn as two 85 ft shop rows, 109,802 sf). lib/siteparking.mjs (one additive line):
+   a program depth past the use's own depth list is laid out at that depth (and 40-120 ft deeper, or 40 shallower, where
+   that holds more): one box 263-420 ft deep. 110,352 sf: a land limit at 4 a 1,000 sf with the 0.97 ac pond, said
+   ("Room for 110,352 of the 125,000 sq ft asked for: the rest won't park …"). A fitness club (200 ft) the same.
+   (d) "U-shaped … round a central courtyard" (live: the closed ring). `courtShape` 'U' (or 'O' for "O-shaped", "closed
+   ring", "on all four sides") from the words (lib/btypes.mjs), kept by normalizeProgram, and lib/sitegen.mjs's courtyard
+   search tries only that shape; neither named, both as before. The scorer reads a court of wings joined at their corners
+   (joinCourtyard's group) as one building: three wings a U, four or more a ring.
+   (e) "A T-shaped mid-rise" (96 of 120): the shape preset now keeps the mid-rise's 4 floors when the words give none: 120.
+   (f) Point tower (16 stories, 220 units on 5.5 ac: 172). Land / arrangement limit: two 163 ft podiums beside the
+   clubhouse and pool in one row. Tried and taken out: a plate of at least 10,000 sf (the engine sizes towers linearly on a
+   240 ft podium; TY-point-tower fell 200 -> 153) and shorter podiums (one tower, fewer homes). Now said against the count
+   asked: "Fits about 172 of the 220 units asked for." (lib/layoutrun.mjs askedSaid: the note had named the engine's 1.12
+   overshoot, "of the 247").
+   (g) Words: "20 of them" / "in all" / "in total" read as the count (numbersOf); beside a type zone a homes zone takes the
+   count clause after its words ("apartments behind, 200 units": 200, was 432); a residential type (student, senior) named
+   beside shops of a size makes a zone each, the shops at the front where the words say ("a dorm with 400 beds and 20,000
+   sf of shops in front": 134 units / 402 beds and the shops; was the shops alone). An option's name says the front zone
+   it puts the pond beside ("pond beside the daycare", not "the shops").
+   Bench (88 cases): 88 passing, no warnings, replay identical; 83 identical element for element; changed as intended:
+   TY-datacenter (service drive, no court), TY-bigbox (one box 462 × 260 ft, was 706 × 170; 120,000 sf as before),
+   TY-fitness (167 × 240 ft, was 348 × 115; 40,000 sf), TY-garage (405 spaces as before), TY-daycare-homes (its name only);
+   no homes or floor area lost; parking metrics (folded onto parking round 5, 8bf388d) 13,505 -> 13,503 stalls, 200 ->
+   204 bare row ends, no dead ends past 150 ft, landscape standard met 54 of 76 as before. Corpus (words path): the 120 at 119 as before (D05 honestly short); types 26 -> 31 of 33 (TY20, TY28 the land
+   limits above, said); fresh types 8 -> 10 of 10. Live (gpt-6-luna, the 33 types once, 33 calls, about $0.06): 28 -> 30 of 33 (TY20 189
+   of 220 and TY28 the land limits, said; TY27 the model's own go-kart recipe drawn at 32,073 of at least 36,000 sf, not
+   among these misses). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054
+   podium-urban 172). Engine version rei-layout/2026.11.05.10. Tests: test/btypes.mjs section 9 (the garage on 2.3 ac with
+   its entrance, judged by spaces, replay; the data centre's service drive and no court, cold storage's court kept; the big
+   box one building at its depth with its shortfall said; U and O named; the T mid-rise; "Fits about" against the count
+   asked; the three word cases; the daycare option's name). Still: a 3-story T or L for an exact count comes up short with
+   land left (whole buildings, no trim to the count); a point tower's amenities could stand in its podium on a small lot; a
+   big box's parking field keeps the stacking-distance strip across the whole frontage.

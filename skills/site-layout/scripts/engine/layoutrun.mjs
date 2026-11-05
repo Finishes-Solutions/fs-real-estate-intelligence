@@ -33,7 +33,7 @@ import * as SITE from './btsite.mjs';
 import { restripeAngled } from './siteparking.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.05.8'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.10'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -622,8 +622,9 @@ function cutRow(e, rect) {
     const c = (a2 + b2) / 2, q = S.rotPt([c, 0], e.rot || 0); out.push({ ...e, id: e.id + (a2 > -e.w / 2 ? '-b' : '-a'), x: +(e.x + q[0]).toFixed(2), y: +(e.y + q[1]).toFixed(2), w: +(b2 - a2).toFixed(2) }); }
   return out;
 }
-export function garageEntries(plan, o) {
-  const T = (o.elements || []).filter(e => e.kind === 'building' && e.form === 'tower' && +e.parkLevels > 0 && !e.future); if (!T.length) return o;
+export function garageEntries(plan, o, prog = null) {
+  const deck = e => prog?.btype === 'garage-standalone' && e.kind === 'building' && !!e.custom && !e.future; /* (a stand-alone garage, lib/btypes.mjs: its entrance and drive as a podium's, item 39) */
+  const T = (o.elements || []).filter(e => e.kind === 'building' && e.form === 'tower' && +e.parkLevels > 0 && !e.future || deck(e)); if (!T.length) return o;
   let els = o.elements.map(e => ({ ...e })); const notes = [];
   const R = plan.ring, fr = plan.front ?? S.longestEdge(R), streets = [fr, ...(plan.streets || [])].filter(k => k != null && k < R.length), toStreet = p => Math.min(...streets.map(k => S.segDist(p, R[k], R[(k + 1) % R.length]))); // (the lobby on the long face nearer a street)
   const hard = e => ['building', 'pond', 'pool', 'garage', 'court', 'play'].includes(e.kind);
@@ -649,10 +650,10 @@ export function garageEntries(plan, o) {
       }
       if (best) break;
     }
-    if (!best) { notes.push((b.name || 'The tower') + ': no drive reaches a face of its podium for the garage entrance.'); continue; }
+    if (!best) { notes.push((b.name || 'The tower') + (deck(b) ? ': no drive reaches a face of it for its entrance.' : ': no drive reaches a face of its podium for the garage entrance.')); continue; }
     Object.assign(b, { lobbyFace, garageFace: best.face });
-    if (best.rect) { els = els.flatMap(e => best.cut.includes(e) ? cutRow(e, best.rect) : [e]); els.push({ id: 'garage-entry-' + (b.id || T.indexOf(t0)), kind: 'drive', poly: best.rect.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]), name: 'Garage entry', note: GARAGE_DRIVE + ' ft drive into the podium garage' }); }
-    notes.push((b.name || 'The tower') + ': garage entrance on the ' + ({ '+u': 'right end', '-u': 'left end', '+v': 'back', '-v': 'back' })[best.face] + (best.rect ? ', a ' + Math.round(best.t) + ' ft drive to it' : '') + (best.cut.length ? ' (across a parking row: its stalls there taken out)' : '') + '; the lobby on the street side.');
+    if (best.rect) { els = els.flatMap(e => best.cut.includes(e) ? cutRow(e, best.rect) : [e]); els.push({ id: 'garage-entry-' + (b.id || T.indexOf(t0)), kind: 'drive', poly: best.rect.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]), name: 'Garage entry', note: GARAGE_DRIVE + ' ft drive into the ' + (deck(b) ? 'garage' : 'podium garage') }); }
+    notes.push((b.name || 'The tower') + ': ' + (deck(b) ? 'its entrance' : 'garage entrance') + ' on the ' + ({ '+u': 'right end', '-u': 'left end', '+v': 'back', '-v': 'back' })[best.face] + (best.rect ? ', a ' + Math.round(best.t) + ' ft drive to it' : '') + (best.cut.length ? ' (across a parking row: its stalls there taken out)' : '') + (deck(b) ? '; its stairs and lobby on the street side.' : '; the lobby on the street side.'));
   }
   return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), ...notes] };
 }
@@ -1029,6 +1030,68 @@ export function angleMixed(plan, o, brief, finish = x => x) {
     return note(f, 'Angled parking, as asked: ' + t.ang + '° stalls on ' + t.n + ' of the ' + of + ' parking aisles, made one-way (the arrows), neighbouring aisles running opposite ways' + (t.n < of ? '; the rest stay square on two-way aisles, ' + why : '.')); }
   return note(square(), word + ' was asked for, but this layout keeps square stalls on two-way aisles: ' + (!turnable ? 'its parking rows have no aisle of the field’s width that a two-way drive joins at both ends (a one-way aisle must, so cars never meet a dead end).' : late ? 'with its aisles one-way it fails a check the square layout passes (' + late.map(c => c.title || c.id).slice(0, 2).join('; ') + ').' : short && !broke ? 'angled stalls take more of a row than square ones, and with them the rows here can’t park the ' + p0.required + ' spaces required.' : 'turning its aisles one-way would break a check that passes now (a one-way aisle isn’t a fire lane: a building could be left beyond the fire lane’s reach, or the fire truck without its turns)' + (short ? ', or leave the parking short of the ' + p0.required + ' required.' : '.')));
 }
+// The parking-lot landscape standard (docs/LAYOUT-ENGINE.md item 38; scripts/parking-metrics.mjs landStd): a lot of
+// LAND_MIN stalls or more plants about 5% of its interior and a shade tree every 10 stalls (Redmond, WA RZC 21.32;
+// Chardon, OH ch. 1159). The rows' planted end caps and islands (a tree in each) as drawn, against the lot: the rows and
+// the drives and lot paving within 26 ft of them (the metrics' lot), their union, the planted part included (lotArea;
+// it doesn't change when a stall is planted, so it's measured once). { n, trees, sf, lot, meets }
+export const LAND_MIN = 20, LAND_PCT = 5, LAND_PER_TREE = 10;
+export function lotArea(els) {
+  // the lot's paving on a 2 ft grid as scripts/parking-metrics.mjs measures it: the rows' cells, lot paving (field) cells,
+  // and drive cells within 26 ft (13 grid steps, 4-neighbour) of a row; planted caps and islands left out (landStandard
+  // adds them back for the whole lot)
+  const rows = els.filter(e => e.kind === 'parking' && !e.rv && !e.vac && !e.future); if (!rows.length) return 0;
+  const C = 2, R = 13, sh = e => S.outline(e), bb = r => { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (const [x, y] of r) { a = Math.min(a, x); b = Math.min(b, y); c = Math.max(c, x); d = Math.max(d, y); } return [a, b, c, d]; };
+  const rs = rows.map(sh), box = rs.map(bb).reduce((m, b) => [Math.min(m[0], b[0]), Math.min(m[1], b[1]), Math.max(m[2], b[2]), Math.max(m[3], b[3])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const fl = els.filter(e => e.kind === 'field' && !e.future).map(sh), X0 = Math.min(box[0] - 30, ...fl.map(r => bb(r)[0])), Y0 = Math.min(box[1] - 30, ...fl.map(r => bb(r)[1])), X1 = Math.max(box[2] + 30, ...fl.map(r => bb(r)[2])), Y1 = Math.max(box[3] + 30, ...fl.map(r => bb(r)[3]));
+  const nx = Math.ceil((X1 - X0) / C) + 1, ny = Math.ceil((Y1 - Y0) / C) + 1; if (nx * ny > 6e6) return 0; const g = new Uint8Array(nx * ny);
+  const paint = (poly, bit) => { const [a, b, c, d] = bb(poly); for (let j = Math.max(0, Math.floor((b - Y0) / C)); j <= Math.min(ny - 1, Math.ceil((d - Y0) / C)); j++) for (let i = Math.max(0, Math.floor((a - X0) / C)); i <= Math.min(nx - 1, Math.ceil((c - X0) / C)); i++) if (!(g[j * nx + i] & bit) && S.inRing([X0 + (i + 0.5) * C, Y0 + (j + 0.5) * C], poly)) g[j * nx + i] |= bit; };
+  for (const r of rs) paint(r, 1);
+  const unpaint = poly => { const [a, b, c, d] = bb(poly); for (let j = Math.max(0, Math.floor((b - Y0) / C)); j <= Math.min(ny - 1, Math.ceil((d - Y0) / C)); j++) for (let i = Math.max(0, Math.floor((a - X0) / C)); i <= Math.min(nx - 1, Math.ceil((c - X0) / C)); i++) if (S.inRing([X0 + (i + 0.5) * C, Y0 + (j + 0.5) * C], poly)) g[j * nx + i] &= ~1; };
+  for (const e of rows) { if (e.parallel) continue; let caps = [], isl = []; try { caps = S.capsOf(e); isl = S.islandsOf(e); } catch { caps = []; isl = []; } for (const c of caps) if (c.poly?.length >= 3) unpaint(c.poly); // (planted: not paving, and not where the 26 ft is measured from)
+    if (isl.length) { const st = S.stalls(e), deg = (e.rot || 0) + (st.swap ? 90 : 0), u = [Math.cos(deg * Math.PI / 180), Math.sin(deg * Math.PI / 180)], v = [-u[1], u[0]], hw = S.stallPitch(e) / 2, hd = (e.sd || S.STALL.d) / 2; for (const q of isl) unpaint([[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([a, b]) => [q[0] + u[0] * a + v[0] * b, q[1] + u[1] * a + v[1] * b])); } }
+  for (const e of els) if (e.kind === 'drive' && !e.future) paint(sh(e), 2); for (const r of fl) paint(r, 4);
+  const dist = new Int32Array(nx * ny).fill(1e9), q = []; for (let k = 0; k < g.length; k++) if (g[k] & 1) { dist[k] = 0; q.push(k); }
+  for (let h = 0; h < q.length; h++) { const k = q[h], d = dist[k]; if (d >= R) continue; const i = k % nx, j = (k - i) / nx; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= nx || b >= ny) continue; const m = b * nx + a; if (dist[m] > d + 1) { dist[m] = d + 1; q.push(m); } } }
+  let n = 0; for (let k = 0; k < g.length; k++) { const v = g[k]; if (v & 1 || v & 4 || (v & 2 && dist[k] <= R)) n++; }
+  return n * C * C;
+}
+export function landStandard(els, total = null) { // (total: the lot and its planted part, measured once where only plantings change)
+  let n = 0, trees = 0, sf = 0;
+  for (const e of els) { if (e.kind !== 'parking' || e.rv || e.vac || e.future) continue; let k = 0; try { k = S.stallCentres(e).length; } catch { k = 0; } n += k; if (e.parallel) continue;
+    const ang = S.stallAng(e), dep = ang ? S.ANGLED[ang].d : (e.sd || S.STALL.d), pitch = S.stallPitch(e); let caps = [], isl = [];
+    try { caps = S.capsOf(e); isl = S.islandsOf(e); } catch { caps = []; isl = []; }
+    trees += caps.length + isl.length; sf += caps.reduce((t, c) => t + (c.poly?.length >= 3 ? Math.abs(S.ringArea(c.poly)) : 0), 0) + isl.length * pitch * dep; }
+  const all = total ?? lotArea(els) + sf;
+  return { n, trees, sf, total: all, meets: n < LAND_MIN || trees * LAND_PER_TREE >= n && sf >= (LAND_PCT + 0.2) / 100 * all };
+}
+// Stalls to spare spent on the landscape standard where a lot falls short of it: first planted end caps on the rows without them (two stalls a row, a tree each, the bare ends gone), then an
+// island every 10th stall instead of every 13th (e.isle), longest rows first, while the lot is short and the parking stays
+// at floor (what's required) or more. Square rows the engine laid out (lock / row) only. els changed in place.
+function plantSpare(plan, els, p, pk, floor = p.required) {
+  let st = landStandard(els); const lot = st.total; if (st.meets || p.provided <= floor) return { p, n: 0 };
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true;
+  const sq = e => e.kind === 'parking' && !e.parallel && !e.rv && !e.vac && !e.poly && !e.future && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null && +e.w > 0;
+  const agree = c => S.stalls(c).count === S.stallCentres(c).length;
+  const rows = () => els.filter(sq).map(e => ({ e, n: S.stalls(e).n })).sort((a, b) => b.n - a.n || String(a.e.id).localeCompare(String(b.e.id)));
+  let caps = 0, isles = 0;
+  const tryOne = (e, e2) => { if (!agree(e2) || S.stalls(e2).count >= S.stalls(e).count) return false; const i = els.indexOf(e); els[i] = e2; const p2 = pk(); if (p2.provided >= Math.max(floor, p2.required) && p2.required === p.required) { p = p2; st = landStandard(els, lot); return true; } els[i] = e; return false; };
+  for (const { e, n } of rows()) { if (st.meets) break; if (e.caps || n < 8 || !e.islands && !e.lock && !e.row) continue; if (tryOne(e, { ...e, caps: cap })) caps++; }
+  for (const { e, n } of rows()) { if (st.meets) break; if (!e.islands || S.isleOf(e) <= 10 || n < 10) continue; if (tryOne(e, { ...e, isle: 10 })) isles++; }
+  const n = caps + isles; if (!n) return { p, n };
+  return { p, n, note: 'Planting to the landscape standard (a tree every ' + LAND_PER_TREE + ' stalls, ' + LAND_PCT + '% of the lot planted): ' + [caps ? caps + ' parking row' + (caps > 1 ? 's' : '') + ' given planted ends' : '', isles ? isles + ' row' + (isles > 1 ? 's' : '') + ' an island every 10th stall' : ''].filter(Boolean).join(', ') + ', from stalls to spare (' + p.provided + ' for ' + p.required + ' required).' };
+}
+// Last in the run (after the end islands): a lot still short of the landscape standard spends its stalls to spare on it
+// (plantSpare), never below what's required. Tried and taken out (item 38): pruneSurplus trimming the far ends only
+// down to what planting would cost, or planting before it trims: more lots met the standard (49 -> 56 of 76) but the
+// spare the later passes need went (a second way in became a gated lane and the layout lost its rank, MF-garden-max
+// 204 -> 168 homes), or kept far stalls lengthened walks and moved rows into an entrance's throat.
+export function plantToStandard(plan, o, brief) {
+  if (!o?.elements?.length) return o;
+  const els = o.elements.slice(), pk = () => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking, p = pk(); if (p.required == null) return o;
+  const pl = plantSpare(plan, els, p, pk); if (!pl.n) return o;
+  return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), pl.note] };
+}
 export function pruneSurplus(plan, o, brief) {
   if (!o?.elements?.length) return o;
   const els = o.elements.slice(), isB = e => e.kind === 'building' && !e.future, B = () => els.filter(isB);
@@ -1111,9 +1174,10 @@ function rankKey(o, brief) {
   const placeMiss = (o.placements || []).filter(c => c.status === 'fail').length; // (where things were asked to go: a layout meeting more of it first)
   const paired = o.elements.reduce((t, e) => t + (e.kind === 'building' && +e.combined > 0 ? +e.combined : 0), 0); /* (an exact count met in whole stacks before one met by combining homes into larger ones, lib/bldgtemplates.mjs) */
   const off = brief.program.uses.filter(u => u.quantity.mode === 'exact' && u.quantity.unit === 'units' && u.quantity.value > 0).reduce((t, u) => t + Math.round(Math.abs((o.quantities.byUse[u.use]?.units || 0) - u.quantity.value) / u.quantity.value * 1000), 0); /* (an exact count no layout reaches: the nearest first) */
+  const gAsk = +brief.program.engine?.btCounts?.asked, gHave = o.elements.filter(e => e.kind === 'garage' && e.standalone).reduce((t, e) => t + S.garageStalls(e), 0), gOff = brief.program.engine?.btype === 'garage-standalone' && gAsk > 0 ? Math.round(Math.max(0, gAsk - gHave) / gAsk * 1000) : 0; /* (a stand-alone garage: the deck holding nearer the spaces asked first, item 39) */
   const qMiss = (v.checks.find(c => c.id === 'queues.stack.types' || c.id === 'queues.stack' && c.measured && typeof c.measured === 'object')?.features || []).length; /* (a building type's queues not drawn or short, lib/btsite.mjs: a layout holding more of them first; 0 on a plan with none) */
   const drawnQ = o.elements.filter(e => e.kind === 'drive' && SITE.QUEUE_TYPES[e.queue]).length; /* (a building type's lanes drawn: at the same yield, the layout with its porte-cochère or drop-off first, item 37) */
-  return [v.feasible ? 0 : 1, -met, off, formMiss, placeMiss, v.counts.fail, qMiss, v.counts.unknown, lane, paired, -yieldV, -drawnQ, Math.round(paving), o.geometryHash];
+  return [v.feasible ? 0 : 1, -met, off + gOff, formMiss, placeMiss, v.counts.fail, qMiss, v.counts.unknown, lane, paired, -yieldV, -drawnQ, Math.round(paving), o.geometryHash];
 }
 export const rankOf = rankKey;
 const cmp = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] < b[i]) return -1; if (a[i] > b[i]) return 1; } return 0; };
@@ -1168,7 +1232,7 @@ export function runBrief(briefIn, { now = null } = {}) {
   const { value: raw, stats } = CX.deterministic({ seed: brief.solver.seed, tickMs: brief.solver.tickMs }, () => {
     const wrapNote = 'No wrap fits this site: the garage a wrap needs (about 130 ft across and 120 ft deep inside the wings, with its ramp and cores) doesn’t fit with the wings round it, so these are the nearest layouts; on a small lot a courtyard on a parking podium ("courtyard on a podium") holds more.';
     const noWrap = o => brief.program.uses.some(u => u.form === 'mf-wrap') && !o.elements?.some(e => e.wrap && e.kind === 'garage') ? { ...o, tplNotes: [...(o.tplNotes || []), wrapNote] } : o; // (a wrap asked for that the site can't hold: said, not swapped silently)
-    const fit = (Ex, out, br = brief, pre = null) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br); const last = t1x => { const t2 = keepIfNoWorse(Ex.plan, t1x, pruneSurplus(Ex.plan, t1x, br), br); const t2g = garageEntries(Ex.plan, t2), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br), t10f = keepIfNoWorse(Ex.plan, t10, fundEndIslands(Ex.plan, t10, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10f), br); }; return angleMixed(Ex.plan, pre ? pre(t1) : t1, br, last); }); // (angled parking asked on a mixed plan: tried here, each try finished by the passes after) // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
+    const fit = (Ex, out, br = brief, pre = null) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br); const last = t1x => { const t2 = keepIfNoWorse(Ex.plan, t1x, pruneSurplus(Ex.plan, t1x, br), br); const t2g = garageEntries(Ex.plan, t2, Ex.program), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br), t10f = keepIfNoWorse(Ex.plan, t10, fundEndIslands(Ex.plan, t10, br), br), t10l = keepIfNoWorse(Ex.plan, t10f, plantToStandard(Ex.plan, t10f, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10l), br); }; return angleMixed(Ex.plan, pre ? pre(t1) : t1, br, last); }); // (angled parking asked on a mixed plan: tried here, each try finished by the passes after) // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
     let got = fit(E, lay1(E));
     if (capped && short(got)) { const E2 = B.toEngine(brief); E2.opts = { ...E2.opts, deeper: false }; got = got.concat(fit(E2, lay1(E2))); } // (the retry looks for a fuller layout: no deeper-pond copies of it)
     // a building type's lanes the layouts left no room for (a hotel's porte-cochère, a daycare's drop-off): laid out again
@@ -1176,6 +1240,11 @@ export function runBrief(briefIn, { now = null } = {}) {
     // need (docs/LAYOUT-ENGINE.md item 37); kept only where it costs the program nothing (below)
     const RES = SITE.laneReserve(E.program);
     if (RES.length && got.filter(o => !o.error && o.elements?.length).slice(0, 1).some(o => lanesMissing(E, o, RES))) { const E3 = reserveEngine(E, RES); got = got.concat(fit(E3, lay1(E3), brief, o => earlyLanes(E, o)).map(o => o.error ? o : { ...o, reserve: true })); }
+    // a stand-alone garage the lot drew shorter than it was sized (item 39): laid out again at the length drawn, the
+    // spaces asked in more levels (up to lib/btypes.mjs GARAGE_MAX) or a bay deeper; ranked with the rest (rankKey: the
+    // nearer the spaces asked, the better)
+    if (E.program.btype === 'garage-standalone') { const bl = got.filter(o => !o.error && o.elements?.length).map(o => o.elements.find(e => e.kind === 'building' && e.w > 0)).filter(Boolean).sort((a, b) => b.w * b.d - a.w * a.d)[0];
+      for (const q of (bl && BT.garageFit(E.program, bl.w, bl.d)) || []) { const E4 = { ...E, program: q }; got = got.concat(fit(E4, lay1(E4)).map(o => o.error ? o : { ...o, program: q })); } }
     return got;
   });
   const err = raw.find(o => o.error);
@@ -1186,7 +1255,7 @@ export function runBrief(briefIn, { now = null } = {}) {
     const asked = (brief.program.placements || []).map(p => ({ ...I.checkPlacement(lay, elements, o.program || E.program, p), how: p.how || 'checked' }));
     const { elements: _e, notes: _n, tplNotes: _t, error: _x, ...engine } = o; // the engine's own fields (score, recipe, frame…), kept for the editor
     return { ...engine, id: 'opt-' + (i + 1), engineOrder: i, name: o.name || 'Layout ' + (i + 1), geometryHash: geometryHash(elements), elements, program: o.program || E.program, params: o.params || E.plan.params, recipe: o.recipe ?? null, zones: o.zones || [], quantities: validation.quantities, validation, placements: asked,
-      notes: [...(brief.request?.assumed || []).map(a => /^(?:No (?:use|count|size)|Mixed use)/.test(a) ? 'Assumed: ' + a : a), ...asked.map(c => c.said + (c.status === 'fail' ? ' ' + (c.how === 'checked' && !steer.has(c.id) ? 'The engine has no control for this yet: it is measured and said here, not placed; move it by hand or say where else it may go.' : c.how === 'checked' ? 'The engine looked for layouts with it there; this one doesn’t have it (another option may say what having it costs).' : 'The engine was told, but this layout couldn’t fit it there; another option may.') : '')), ...BT.presetNotes(o.notes || [], prog0), ...(o.tplNotes || []), ...BT.typeNotes(prog0, elements), ...feat.notes, ...simpleShort(o, validation)] };
+      notes: [...(brief.request?.assumed || []).map(a => /^(?:No (?:use|count|size)|Mixed use)/.test(a) ? 'Assumed: ' + a : a), ...asked.map(c => c.said + (c.status === 'fail' ? ' ' + (c.how === 'checked' && !steer.has(c.id) ? 'The engine has no control for this yet: it is measured and said here, not placed; move it by hand or say where else it may go.' : c.how === 'checked' ? 'The engine looked for layouts with it there; this one doesn’t have it (another option may say what having it costs).' : 'The engine was told, but this layout couldn’t fit it there; another option may.') : '')), ...BT.presetNotes(o.notes || [], prog0), ...(o.tplNotes || []), ...BT.typeNotes(prog0, elements), ...feat.notes, ...simpleShort(o, validation)].flatMap(n => askedSaid(n, brief)) };
   });
   { // (the reserve run's options: only those that drew a lane the type needs and cost the program nothing next to the plain ones)
     const yieldOf = o => o.quantities.totals.units || o.quantities.totals.gfa / 1000, plain = options.filter(o => !o.reserve), pass = plain.filter(o => o.validation.status === 'pass'), top = Math.max(0, ...(pass.length ? pass : plain).map(yieldOf));
@@ -1212,6 +1281,17 @@ export function runBrief(briefIn, { now = null } = {}) {
     rankingHash: hashOf(keep.map(o => [o.rank, o.geometryHash])), options: keep };
 }
 
+// "Fits about N of the M units asked for" said against what the request asked (item 39): the engine is asked for a
+// little more than an exact count (toEngine's overshoot, so whole modules can be trimmed to it) and its note named that
+// number ("96 of the 135" for 120 asked); a stand-alone garage's floor area isn't what was asked (its spaces are, typeNotes)
+function askedSaid(n, brief) {
+  const eng = brief.program.engine || {};
+  if (eng.btype === 'garage-standalone' && /^Fits about [\d,]+ of the [\d,]+ sq ft asked for\.$/.test(n)) return [];
+  const m = /^Fits about (\d+) of the (\d+) units asked for\.$/.exec(n); if (!m) return [n];
+  const U = brief.program.uses.filter(u => u.quantity.unit === 'units' && ['exact', 'max', 'range'].includes(u.quantity.mode)); if (U.length !== 1 || brief.program.uses.filter(u => u.use !== 'amenity').length !== 1) return [n];
+  const A = U[0].quantity.mode === 'range' ? U[0].quantity.min : U[0].quantity.value; if (!(A > 0) || +m[2] === A) return [n];
+  return +m[1] >= A ? [] : ['Fits about ' + m[1] + ' of the ' + A + ' units asked for.'];
+}
 // a simple layout (lib/sitelayout.mjs fallback: the zone layouts didn't fit) short of the parking the brief requires: said
 // plainly, against the rule that governs (the engine's own note counts its use defaults; docs/LAYOUT-ENGINE.md item 33)
 function simpleShort(o, v) {
