@@ -2194,7 +2194,7 @@ export function tidyRequest(text) {
   t = t.replace(/(\d(?:\.\d+)?)\s*(?:parking )?(?:ratio|parking ratio)\b|\bparking ratio (?:of\s*)?(\d(?:\.\d+)?)/gi, (m, a, b) => (a || b) + (housing ? ' spaces per unit' : ' per 1000'));
   t = t.replace(/\b(apartments|units|townhomes|townhouses|duplexes|cottages|homes|lots)\s*(?:\((?:for[- ]sale|for[- ]rent)\)\s*|for[- ](?:sale|rent)\s*)?(?:x|×|:|#|qty|count|total(?: of)?)?\s*(\d{2,4})\b(?!\s*(?:-?\s*stor|floors?|levels?|ft|feet|foot|'|sf|sq|acres?|ac\b|%|per|spaces|stalls|car|k\b|,\d|x\s*\d|units?\b|apartments|homes))/gi, '$2 $1');
   t = t.replace(/\b(buffer(?:ing)?|next to|adjacent to|backing (?:up )?(?:on)?to|away from|screen(?:ing)?|protect(?:ing)?)\s+(?:the\s+)?(?:existing\s+|adjacent\s+|neighbou?ring\s+)?(?:single[- ]family (?:homes|houses|neighbou?rhood|residences?)|houses|neighbou?rs|residential neighbou?rhood|homes(?= (?:to|on|along|next|behind)))/gi, '$1 the neighbours');
-  if (!/\bapartments?\b|\bunits\b/i.test(t)) t = t.replace(/\b(?:senior|independent|assisted) living\b|\b(?:55\+|active adult) (?:community|living|housing)\b/gi, 'senior apartments');
+  // (senior, independent and assisted living are left as said: their building types read them, lib/btypes.mjs)
   return t;
 }
 // "twenty four" / "twenty-four" / "one hundred twenty" -> digits

@@ -647,6 +647,11 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    a fallback (the regional detention estimate makes the lake layouts fail; laid out directly they draw 48 homes round
    the lake; pre-existing); exact counts the land can't hold (240 mid-rise units, 96 duplex units on 10 ac) come back
    short as before.
+   With the building types (item 27): the words are tidied before lib/btypes.mjs applyType reads them (it still runs
+   last in guessProgram); senior / independent / assisted living are left as said so their presets read them; an open
+   request wins over a custom type only when the name the types read is no building ("the most money here"); a named
+   type with a size ("a 2-story trampoline park 30,000 sf") is never treated as open; "L-shaped 4-story apartments" no
+   longer reads as 4 apartments (a storey word after a hyphen). 65 bench cases unchanged against 4e25fa3.
 
 27. Done Nov 4 (building types from primitives). The owner: "a wide array of building types … very flexible and not a
    fixed set of options. maybe working primitives for various types that get modified?" Audit and model:

@@ -36,6 +36,16 @@ assert.equal(read('200 garden apartments with the pool in the center').arrangeme
 assert.equal(read('120 townhomes, buffer the single-family homes to the west').zones, undefined);
 assert.equal(read('160 apartments, dog park in the corner').zones, undefined, 'a dog park is the apartments’ own, not a commons zone');
 
+// ---- with the building types (lib/btypes.mjs): presets still read; an open request isn't a custom type ----
+{
+  const plan = planOf('R10'), q = t => B.briefFromRequest(t, plan).program.uses.map(u => u.use + ' ' + u.quantity.mode + (u.quantity.value != null ? ' ' + u.quantity.value : '')).join('; ');
+  assert.equal(read('a 6-story hotel with 120 keys').btype, 'hotel-limited'); assert.equal(read('3-story self storage 90,000 sf').btype, 'storage-multi');
+  assert.equal(read('a 2-story trampoline park 30,000 sf').btype, 'custom'); assert.equal(q('a 2-story trampoline park 30,000 sf'), 'other exact 30000', 'a named type with its size is not an open request');
+  assert.equal(read('L-shaped 4-story apartments').btype, 'mf-l'); assert.equal(q('L-shaped 4-story apartments'), 'multifamily maximize', '"4-story apartments" is not 4 apartments');
+  assert.equal(read('assisted living, 120 beds').btype, 'senior-al'); assert.equal(read('senior living').btype, 'senior-il');
+  assert.equal(q('whatever makes the most money here'), 'multifamily maximize', '"the most money here" is no building type');
+}
+
 // ---- where things go: the vocabulary ----
 const P = (t, uses) => I.placementsFromWords(t, uses).map(p => [p.subject, p.rel, p.edge || p.target || '', p.ft || ''].join(' ').trim());
 assert.deepEqual(P('retail along the main road with apartments behind', ['retail', 'multifamily']), ['retail front', 'multifamily behind retail']);
