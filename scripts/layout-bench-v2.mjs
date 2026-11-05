@@ -3,7 +3,7 @@
 // commit) the same requests also go through that checkout's engine the old way (lib/sitelayout.mjs layoutOptions on the
 // words' program, live clock) and are judged by the same validator: before / after on equal terms.
 //   node scripts/layout-bench-v2.mjs [--out build/bench-v2] [--base <dir>] [--only <id>] [--png]
-// Writes <out>/bench.json, <out>/bench.md and <out>/sheet.html (+ sheet.png with --png: Chrome at CHROME_PATH or the macOS default).
+// Writes <out>/bench.json, <out>/bench.md, <out>/plans.json (each case's site and top option, for scripts/parking-metrics.mjs) and <out>/sheet.html (+ sheet.png with --png: Chrome at CHROME_PATH or the macOS default).
 // The sites are synthetic test conditions (shapes in feet, the street on edge 0), not real parcels.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,6 +12,7 @@ import * as B from '../lib/layoutbrief.mjs';
 import * as RUN from '../lib/layoutrun.mjs';
 import * as V from '../lib/layoutcheck.mjs';
 import { planSVG } from '../lib/sitesheet.mjs';
+import { parkingMetrics } from './parking-metrics.mjs';
 
 const arg = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
 const OUT = arg('--out') || 'build/bench-v2', BASE = arg('--base'), ONLY = arg('--only'), PNG = process.argv.includes('--png');
@@ -115,8 +116,9 @@ for (const c of CASES) {
     const bt = Date.now(); let out = []; try { out = baseMods.L.layoutOptions({ ...p }, baseMods.SP.guessProgram(c.ask), {}); } catch (e) { row.baseError = e.message; }
     const cb = B.canonicalBrief(brief); row.base = { ms: Date.now() - bt, options: out.filter(o => o.elements?.length).map(o => ({ name: o.name, ...pick(V.validateLayout({ ...p, elements: o.elements, program: o.program }, cb)) })) };
   }
-  rows.push(row);
   const top = rec.options[0];
+  if (top) try { row.parking = parkingMetrics({ ...p, elements: top.elements }); } catch (e) { row.parking = { error: e.message }; } // (the top option's parking quality: scripts/parking-metrics.mjs)
+  rows.push(row);
   let svg = ''; try { if (top) svg = planSVG({ ...p, elements: top.elements, program: top.program }, { px: 520, pad: 18 }).svg; } catch (e) { svg = '<p>drawing failed: ' + e.message + '</p>'; }
   cards.push({ c, row, svg, top });
   console.log(c.id.padEnd(16), rec.outcome.padEnd(18), (top ? top.validation.status + ' ' + (top.quantities.totals.units ? top.quantities.totals.units + ' u' : top.quantities.totals.gfa + ' sf') + ' pk ' + top.quantities.parking.provided + '/' + top.quantities.parking.required : (rec.problems || []).map(x => x.msg).join('; ').slice(0, 80)).padEnd(40),
@@ -124,6 +126,7 @@ for (const c of CASES) {
 }
 const esc = s => String(s ?? '').replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 fs.writeFileSync(path.join(OUT, 'bench.json'), JSON.stringify(rows, null, 1));
+fs.writeFileSync(path.join(OUT, 'plans.json'), JSON.stringify(cards.map(({ c, top }) => ({ id: c.id, site: c.site, ask: c.ask, plan: plan(c.site), elements: top?.elements || [], program: top?.program || null, quantities: top?.quantities || null }))));
 const md = ['| Case | Family | Outcome | Top option | Fails | Unknown | Replay | Before (same validator) |', '|---|---|---|---|---|---|---|---|'].concat(rows.map(r => { const o = r.options[0]; return '| ' + [r.id, r.family, r.outcome, o ? o.status + ' · ' + (o.units ? o.units + ' units' : o.gfa.toLocaleString('en-US') + ' sf') + ' · parking ' + o.parking.join('/') : (r.problems[0] || '').slice(0, 70), o ? o.failed.join(', ') || '—' : '—', o ? o.unknown : '—', r.replayIdentical ? 'identical' : 'DIFFERS', r.base ? r.base.options.map(b => b.status + (b.failed.length ? ' (' + b.failed.join(', ') + ')' : '')).join('; ') || 'no options' : 'n/a'].join(' | ') + ' |'; }));
 fs.writeFileSync(path.join(OUT, 'bench.md'), md.join('\n') + '\n');
 const html = '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font:11px Arial;background:#fff;width:2240px}.g{display:grid;grid-template-columns:repeat(4,550px);gap:10px;padding:10px}.c{border:1px solid #ccc;padding:4px}.c svg{width:540px;height:auto;max-height:420px}.h{font-weight:bold}.f{color:#b00}.ok{color:#060}</style></head><body><div class="g">' +
@@ -133,4 +136,5 @@ if (PNG) { // CHROME_PATH, else Google Chrome where macOS keeps it
   const puppeteer = (await import('puppeteer-core')).default, exe = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   const b = await puppeteer.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] }), pg = await b.newPage(); await pg.setViewport({ width: 2240, height: 1200 });
   await pg.goto(pathToFileURL(path.resolve(OUT, 'sheet.html')).href); await pg.screenshot({ path: path.join(OUT, 'sheet.png'), fullPage: true }); await b.close(); }
+{ const sum = k => rows.reduce((t, r) => t + (+r.parking?.[k] || 0), 0); console.log('parking (top options, scripts/parking-metrics.mjs): ' + sum('stalls') + ' stalls, ' + sum('bareEnds') + ' bare row ends, ' + sum('deadEnd150') + ' dead-end aisles past 150 ft'); }
 console.log('\n' + rows.length + ' cases: ' + rows.filter(r => r.options[0]?.status === 'pass').length + ' top option passes, ' + rows.filter(r => r.replayIdentical).length + ' replay identical; ' + OUT + '/bench.md');

@@ -70,6 +70,7 @@ required, units, tolerance, affected pieces. Missing evidence is unknown, never 
 | site.trail | a walking trail through a building or parking row, or along a drive (warning) |
 | parking.count | required (brief rules, else use defaults labelled assumptions) vs provided (stalls counted from the drawing, garages, driveways); garage estimates make it unknown; accessible count per 2010 ADA 208.2 reported, placement unchecked |
 | parking.geometry | each drawn stall inside its row, the site, and clear of buildings |
+| parking.dead-end-aisle | warning: a parking aisle's stalls run no more than 150 ft past the last drive, turnaround or lot paving joining it (item 25) |
 | program.<use> | the measured quantity against the brief's meaning (a use absent from the plan is 0) |
 | program.buildings | units ≥ 400 gsf each; a templated building keeps its schedule and length |
 | locks | locked pieces unmoved (0.01 ft) |
@@ -169,7 +170,8 @@ joinCourtyard (wings within 25 ft round one court tagged as one building, corner
 (pools / courts / play / trash off buildings and paving; a pool may shrink to 75%) → exactByUnitSize (untemplated exact
 counts: homes 750–1,400 gross sf) → templates → trimHomes → fitParking → tidyPonds (corners under 35° cut, ≥ 90% of area)
 → pruneSurplus (unused parking rows and dead-end drives; then outer ring rows, keeping 5% spare) → addSecondAccess (pond set aside and cut back; a third way in
-for fire-code spacing) → tidyPonds again. Exact counts ask the engine for the count first and retry with more only when
+for fire-code spacing) → tidyPonds again → (Nov 4, item 25) aisleTurnarounds (a turnaround at a parking aisle's dead end
+past 150 ft) → rowEndIslands (stalls to spare become planted islands at row ends). Exact counts ask the engine for the count first and retry with more only when
 short. A bare number in Build is exact unless Leftover land was set by the user or the words.
 
 ## 9. Next tasks (in order)
@@ -551,3 +553,44 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    single-loaded square bay); the square layouts drawn by the older generator (lib/sitelayout.mjs
    attempt, apartments' guest rows) are not restriped; the engine's square-row count and its drawn stall centres can
    differ by one on a 13-stall row with end caps (found here, pre-existing, not changed: the validator follows the marks).
+
+25. Done Nov 4 (parking quality). The owner: parking layouts "refined and upgraded just like the building layout engine".
+   First measured, on the top option of all 44 bench cases (scripts/parking-metrics.mjs, reading the plans.json the bench
+   now writes; the bench also prints the totals): stalls per lot paving (sf a stall), paving under no row or drive, the
+   longest run of stalls with no island and runs past 15, row ends with no planted island, dead-end aisles, the walk from
+   each stall to the nearest wall of the building it serves (median, 90th percentile, max; the clubhouse left out),
+   accessible stalls placed against 2010 ADA 208.2 and how much farther they are than the nearest stalls, and tiny (1-4
+   stall), skewed and orphan rows. Findings: islands every 13th stall already (no run past 12); accessible stalls placed
+   to the count and next to the buildings; surplus paving near 0 (6% on RE-field-angled); tiny rows only townhome guest
+   pockets and skewed rows only along wedges' slanting lines (both by design). The worst, most visible problems:
+   (a) long dead-end parking aisles with no way to turn: 6 in 4 cases, up to 490 ft (LOT-flag-retail 473 ft and
+   WEDGE-hyp-midrise 490 ft: one aisle with the way in at its middle; MF-tower 185 ft; RE-grocery-angled 249 ft, an aisle
+   end left 18 ft clear of stalls, which lib/siteplan.mjs deadEnds takes as a way out but a 24 ft aisle is too narrow to
+   turn in); (b) bare row ends: 520 of the stall runs' ends had no planted island (the default square island style gave
+   the apartment and townhome rows none, lib/sitelayout.mjs layoutStack caps; common landscape codes end every row in one).
+   Fixes (lib/layoutrun.mjs, last in the run's repair chain, each kept only when no hard check gets worse):
+   aisleTurnarounds: where an aisle's stalls run more than 150 ft past the last drive, turnaround or lot paving joining it
+   (longDeadAisles; driveways not judged, their street end is a way out), a turnaround pad 20 ft along the aisle and
+   across the aisle and the stall rows either side (a T a car turns in; drawn as lot paving, kind field, not a fire lane)
+   past the rows' ends where the paving setback allows (no stall lost), else on the last stalls at the end (two each row),
+   only while the parking still meets what's required; lawn under it gives way, buildings, ponds, parks and other rows
+   never. rowEndIslands: the stalls still spare above what's required become planted end islands (the end stall each end
+   of a square row of 8 or more), longest rows first, never below what's required (pruneSurplus has already trimmed
+   to 3% over; this spends that margin on islands), and not on a row of a multiple of 13 stalls (its last island falls on
+   its end cap and the engine's count and the drawn marks part, the pre-existing difference item 24 noted; caught by
+   test/layoutrun.mjs's count check). New validator check parking.dead-end-aisle (a warning, geometry measured
+   independently from the drawn stall marks): stalls more than 150 ft past the last piece of the network joining the
+   aisle. A warning ranks an option below one without (counts.fail), so WEDGE-hyp-midrise now picks its looped field
+   (same 96 homes). Bench (top option, all 44 passing, no warnings, replay identical, no case lost homes or sf; parking
+   still meets the requirement everywhere): dead-end aisles past 150 ft 6 -> 0 (LOT-flag-retail 473 -> 0, 124/120 ->
+   120/120: one pad past the rows, one on the end stalls; WEDGE-hyp-midrise 490 -> 0, walk p90 407 -> 129 ft;
+   MF-tower 185 -> 0 and RE-grocery-angled 249 -> 0, both pads free); bare row ends 520 -> 364 (MF-garden-exact 9 -> 3,
+   MX-vertical 12 -> 0, MX-horizontal 38 -> 18, MF-courtyard 18 -> 9); stalls 8,466 -> 8,289 across the bench (only
+   stalls above the requirement: e.g. MF-garden-rot 650/634 -> 634/634); sf a stall up about 2% (the islands). Holdouts
+   unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests: test/parkingquality.mjs.
+   Still (next worst): bare row ends where the parking is exactly met (364, mostly parking-bound "as many as fit":
+   LOT-curved-apt 54, MF-garden-rot 46, LOT-wetland-apt 30; planting them costs stalls the homes need); long walks where
+   the land for parking is far from the buildings (WEDGE-tri-midrise p90 279 ft, max 377: the stalls beyond the pond;
+   MX-vertical p90 179); 380-450 sf a stall on small lots and where a loop drive carries no stalls (MF-garden-exact 393,
+   MF-tower 391); the engine's own deadEnds (plan warnings, openDeadEnds) still takes an aisle end 16 ft clear as a way
+   out; the 13n-stall cap count difference is avoided, not fixed.
