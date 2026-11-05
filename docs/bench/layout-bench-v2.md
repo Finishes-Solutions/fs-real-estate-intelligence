@@ -1,6 +1,6 @@
 | Case | Family | Outcome | Top option | Fails | Unknown | Replay | Before (same validator) |
 |---|---|---|---|---|---|---|---|
-| MF-garden-exact | multifamily | feasible | pass · 120 units · parking 194/192 | — | 2 | identical | n/a |
+| MF-garden-exact | multifamily | feasible | pass · 120 units · parking 193/192 | — | 2 | identical | n/a |
 | MF-garden-max | multifamily | feasible | pass · 204 units · parking 328/327 | — | 2 | identical | n/a |
 | MF-garden-rot | multifamily | feasible | pass · 396 units · parking 634/634 | — | 2 | identical | n/a |
 | MF-courtyard | multifamily | feasible | pass · 150 units · parking 240/240 | — | 2 | identical | n/a |
@@ -74,3 +74,5 @@
 | TY-pad-village | types | feasible | pass · 23,850 sf · parking 145/144 | — | 2 | identical | n/a |
 | TY-mix-hotel | types | feasible | pass · 86,000 sf · parking 201/201 | — | 2 | identical | n/a |
 | TY-mix-pads | types | feasible | pass · 60 units · parking 199/193 | — | 2 | identical | n/a |
+| PK-street-retail | retail | feasible | pass · 15,000 sf · parking 62/60 | — | 2 | identical | n/a |
+| PK-street-medical | office | feasible | pass · 20,000 sf · parking 103/100 | — | 2 | identical | n/a |

@@ -965,9 +965,11 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    As many as fit, duplexes (and triplexes / fourplexes on the duplex rows) now stand the brief's building separation
    apart, 10 ft at the least (lib/layoutbrief.mjs passes it for duplexes as for townhomes; a count asked for keeps 22 ft).
    Bench: MF-duplex 52 → 56, TY-triplex 48 → 54 (TY-fourplex redrawn, 48 as before).
-   Bench: 74 cases, 74 passing, no warnings, replay identical, 71 identical element for element, no case lost homes or
-   sf; parking totals unchanged (12,088 stalls, 216 bare row ends, 0 long dead ends). Engine version
-   rei-layout/2026.11.05.2. Corpus (words path, 120): 116 → 119 fully right (D02, D17, S19 newly right; D05 honestly
+   Bench (folded onto parking round 3, a113396): 76 cases, 76 passing, no warnings, replay identical, 73 identical
+   element for element (MF-duplex, TY-triplex, TY-fourplex changed as above), no case lost homes or sf; parking metrics
+   (scripts/parking-metrics.mjs) identical case for case (12,257 stalls, 222 bare row ends, 0 long dead ends). On the
+   74-case bench before the fold: the same three changed, 71 identical. The clubhouse at the back of a column and the
+   throat wrapper on the generator's rows (item 31) both apply. Engine version rei-layout/2026.11.05.4. Corpus (words path, 120): 116 → 119 fully right (D02, D17, S19 newly right; D05 honestly
    short, said). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests:
    test/layoutrun.mjs (combined pairs from a stuck trim, D17, the clubhouse at the back, the lake ring and the park ring,
    duplexes past what fits). Still: the ring on irregular sites, townhomes or duplexes round a lake, the clubhouse
