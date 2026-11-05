@@ -73,6 +73,14 @@
 | TY-garage | types | feasible | pass · 236,592 sf · parking 405/0 | — | 2 | identical | n/a |
 | TY-pad-village | types | feasible | pass · 23,850 sf · parking 145/144 | — | 2 | identical | n/a |
 | TY-mix-hotel | types | feasible | pass · 86,000 sf · parking 201/201 | — | 2 | identical | n/a |
-| TY-mix-pads | types | feasible | pass · 60 units · parking 199/193 | — | 2 | identical | n/a |
+| TY-mix-pads | types | feasible | pass · 60 units · parking 181/179 | — | 2 | identical | n/a |
 | PK-street-retail | retail | feasible | pass · 15,000 sf · parking 62/60 | — | 2 | identical | n/a |
 | PK-street-medical | office | feasible | pass · 20,000 sf · parking 103/100 | — | 2 | identical | n/a |
+| MX-guard-hotel25 | mixed_use | feasible | pass · 86,000 sf · parking 213/210 | — | 2 | identical | n/a |
+| MX-guard-hotel13 | mixed_use | feasible | pass · 86,000 sf · parking 211/210 | — | 2 | identical | n/a |
+| MX-angled | mixed_use | feasible | pass · 86,000 sf · parking 203/201 | — | 2 | identical | n/a |
+| MX-guard-angled | mixed_use | feasible | pass · 86,000 sf · parking 217/210 | — | 2 | identical | n/a |
+| TY-daycare-dropoff | types | feasible | pass · 7,442 sf · parking 30/30 | — | 2 | identical | n/a |
+| TY-hotel-porte | types | feasible | pass · 66,000 sf · parking 121/121 | — | 2 | identical | n/a |
+| TY-hotel-retail-sf | types | feasible | pass · 74,250 sf · parking 156/153 | — | 2 | identical | n/a |
+| TY-gas-queue | types | feasible | pass · 4,500 sf · parking 19/18 | — | 2 | identical | n/a |

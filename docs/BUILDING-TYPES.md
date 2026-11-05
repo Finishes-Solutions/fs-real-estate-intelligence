@@ -123,8 +123,6 @@ shops of a hotel over retail at the sf asked, and the counts in the Pro forma ar
   On a tight lot (a 120-key hotel on 2.9 acres with its parking all round, a 150-child daycare on 2.3 acres whose only
   drive is its parking aisle) there is no room and the notes say so (a porte-cochère and a daycare lane are judged only
   where drawn; a school's queue and bus loop and a bank zone's lane fail the queue check when missing).
-- A zone's own parking rule rides on the program (`btZones[].rule`, the shape of a single type's `btRule`); the engine
-  and the check still park a zone at its use's rule until the parking helper's per-use rule reads it.
 - A school or daycare named beside homes in one mixed request ("a school for 500 students and 100 townhomes") is not
   read as a zone of its type yet (only the pad words, "a daycare and a bank on pads in front of townhomes", make zones).
 - The car wash's stacking lanes still need a drive within 90 ft of a short end of its plot (round 2's own router).
@@ -223,8 +221,13 @@ a detention pond. The run's ranking (lib/layoutrun.mjs rankKey) puts a layout ho
 leaves the type's own lanes out of the paving per unit it compares.
 
 **A zone parks at its own type's rule.** Each `btZones` entry carries `rule` ({ key, v, source }, as a single type's
-`btRule`): a bank zone `parkingPer1000` 4, a daycare zone its 0.2 a child as a ratio. The engine and the check still park
-a zone at its use's rule (one rule a plan in the brief); the parking helper's per-use rule is the place to read it.
+`btRule`): a bank zone `parkingPer1000` 4, a daycare zone its 0.2 a child as a ratio. The brief's per-use rule
+(`rules.parkingByUse`, mixed-use parking's own, item 33) takes it: lib/layoutbrief.mjs briefFromProgram / typeZoneRules
+rule each zone of a type by its engine use (`{ per1000, type }`; a use shared with a zone of no type is left alone), and
+under a city's rules lib/layoutrun.mjs governingParking does the same with the city's count reserve. The engine lays the
+zone's stalls out for it (toEngine `opts.parkF`, which may now go below 1 for a type: the bank pad at 0.4 of the
+restaurant default) and the check counts it (quantities per1kOf). "a daycare and a bank on pads in front of townhomes":
+179 spaces required, not 193 (the bank at 4 a 1,000 sf, not a restaurant's 10).
 
 **A hotel over the shops asked.** "a 120-key hotel over 8,000 sf of retail": the shops are the 8,000 sf (shared over the
 hotel's buildings by footprint, `ground.sf`; lib/siteplan.mjs groundOf and the check's quantities read it), the rest of
@@ -237,4 +240,4 @@ were already on the hotel's row), as the Numbers panel and the CSV do.
 **Bench.** New cases TY-daycare-dropoff (ty46, 500 × 400 ft), TY-hotel-porte (ty62), TY-hotel-retail-sf (ty55),
 TY-gas-queue (ty23). Changed as intended: TY-school (both lanes, the field moved off the pond), TY-daycare (its play yard
 fenced; no room for the lane on 2.3 ac, said), TY-mix-pads (the bank's drive-thru, the daycare's fenced play yard),
-TY-hotel-retail (the layout with the porte-cochère now ranks first).
+TY-hotel-retail (the layout with the porte-cochère now ranks first). Folded onto mixed-use parking (00f842a): MX-guard-hotel25 and MX-angled gain the hotel zone's porte-cochère; TY-mix-pads parks its zones by type (181 / 179, was 199 / 193); 84 cases, all passing, no warnings.

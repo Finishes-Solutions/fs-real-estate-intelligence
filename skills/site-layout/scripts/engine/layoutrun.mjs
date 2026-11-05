@@ -33,7 +33,7 @@ import * as SITE from './btsite.mjs';
 import { restripeAngled } from './siteparking.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.05.5'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.6'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -1192,6 +1192,7 @@ export function governingParking(b, plan, program) {
       if (u.use === 'multifamily') { const v = r4(Math.max(S.normalizeProgram({ use: 'multifamily' }).perUnit, G.WALLER.mf.perUnit.value) * cf); if (!(by.multifamily?.perUnit >= v)) by.multifamily = { perUnit: v }; }
       else if (U.garage) continue; // (homes park in their garages and driveways: their own rule, no stall reserve)
       else if (u.use === 'hotel') { const pk = +pre0?.params?.perKey || 1, sk = +pre0?.params?.sfPerKey || (U.ratio > 0 ? 1000 / U.ratio : 550), v = { perKey: r4(pk * cf), sfPerKey: sk, per1000: r4(1000 / sk * pk * cf) }; if (!(by.hotel?.per1000 >= v.per1000)) by.hotel = v; }
+      else if (bt?.rule?.key === 'parkingPer1000' && +bt.rule.v >= 0) { const v = r4(+bt.rule.v * cf); if (!(by[u.use]?.per1000 >= v)) by[u.use] = { per1000: v, type: bt.btype }; } // (a zone of a building type at its type's rule with the city's reserve: a bank zone like a bank, not the restaurant pad it is laid out as)
       else { const v = r4((+z?.ratio > 0 ? +z.ratio : U.ratio ?? 3) * cf); if (!(by[u.use]?.per1000 >= v)) by[u.use] = { per1000: v }; }
     }
     for (const [u, r] of Object.entries(by)) src.push((S.USES[u]?.label || u) + ' ' + (r.perUnit != null ? r.perUnit + ' a home' + (u === 'multifamily' ? ' (Ord. No. 424: two a dwelling unit)' : '') : r.perKey != null ? r.perKey + ' a key' : r.per1000 + ' a 1,000 sf'));

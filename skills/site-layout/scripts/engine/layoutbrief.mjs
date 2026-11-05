@@ -155,6 +155,7 @@ export function briefFromProgram(program, plan, { text: raw = '', parser = 'stru
     const v = m && corr ? +m[1] : deep ? DEEP.dflt : null;
     if (v) for (const u of brief.program.uses.filter(u => u.use === 'multifamily')) { if (!u.form || u.form === 'mf-garden') u.form = 'mf-midrise'; if (DEEP.forms.includes(u.form)) u.depth = { value: Math.max(DEEP.min, Math.min(DEEP.max, v)), unit: 'ft', cls: 'assumption', source: 'the request: corridor buildings ' + v + ' ft deep, deeper than any reviewed corridor building (65 ft)' }; } }
   if (P.btRule && !P.zones && DEFAULT_RULES.values[P.btRule.key]) brief.rules.values[P.btRule.key] = { v: P.btRule.v, cls: 'assumption', source: String(P.btRule.source).slice(0, 300) }; // (a building type's parking rule, lib/btypes.mjs: the engine and the check count the same requirement)
+  { const by = typeZoneRules(P); if (by) brief.rules.values.parkingByUse = { v: by, cls: 'assumption', source: 'Each zone of a building type at its type’s own rule (lib/btypes.mjs presets): ' + Object.entries(by).map(([u, r]) => r.type + ' ' + r.per1000 + ' a 1,000 sf').join('; ') + '; the other uses at their own' }; } // (a zone of a building type parks at its type's rule, not its use's: a bank zone laid out as a restaurant pad at 4 a 1,000 sf, not 10)
   brief.site.stormwater = sm === 'underground' ? 'underground' : sm === 'none' ? 'offsite' : sm === 'detention' || sm === 'retention' ? 'onsite-pond' : null;
   understand(brief, P, plan, text);
   return brief;
@@ -370,7 +371,7 @@ export function toEngine(bIn, { overshoot = true } = {}) { // overshoot: ask a t
   // a home), and angled stalls asked for (they take more of a row: 60° about 1.2 times, 45° 1.4), as opts.parkF, a factor
   // a use on the stalls its zone lays out; the run then turns the aisles it can and takes the surplus back off
   if (!single) { const BU = b.rules?.values?.parkingByUse?.v || {}, ang = b.program.parking?.angle, af = ang === 45 ? 1.4 : PARKING_ANGLES.includes(ang) ? 1.2 : 1, pf = {};
-    for (const u of new Set(uses.map(x => x.use))) { const U = S.USES[u] || {}, r = BU[u], dflt = u === 'multifamily' ? S.normalizeProgram({ use: u }).perUnit : U.ratio, v = r ? (u === 'multifamily' ? r.perUnit : r.per1000) : null, f = (v > 0 && dflt > 0 ? Math.max(1, v / dflt) : 1) * (U.garage ? 1 : af); if (f > 1.0001) pf[u] = +f.toFixed(4); }
+    for (const u of new Set(uses.map(x => x.use))) { const U = S.USES[u] || {}, r = BU[u], dflt = u === 'multifamily' ? S.normalizeProgram({ use: u }).perUnit : U.ratio, v = r ? (u === 'multifamily' ? r.perUnit : r.per1000) : null, f = (v > 0 && dflt > 0 ? (r?.type ? v / dflt : Math.max(1, v / dflt)) : 1) * (U.garage ? 1 : af); if (Math.abs(f - 1) > 1e-4) pf[u] = +f.toFixed(4); } /* (a zone of a building type at its type's rule, r.type: below its use's default too, a bank zone at 4 a 1,000 sf not a restaurant's 10) */
     if (Object.keys(pf).length) opts.parkF = pf; }
   // the parking asked to go behind the building ("building up front, parking behind", "retail on the street, parking in
   // the rear"): the parking-field engine lays out the building at the street with its lot behind it (lib/siteparking.mjs
@@ -378,4 +379,15 @@ export function toEngine(bIn, { overshoot = true } = {}) { // overshoot: ask a t
   { const L = b.program.placements || [], pk = L.find(p => p.subject === 'parking'), fieldUse = ['retail', 'restaurant', 'office', 'medical', 'hotel', 'church'];
     if (pk ? ['behind', 'back'].includes(pk.rel) : L.some(p => fieldUse.includes(p.subject) && p.rel === 'front')) { opts.parkBack = true; mapping.push('Parking asked behind the building: the building at the street, its parking behind it, where the lot allows.'); } }
   return { plan, program: P, opts, mapping };
+}
+
+// the parking rule each zone of a building type asks for (lib/btypes.mjs zoneOf: btZones[].rule), by the zone's engine
+// use: { use: { per1000, type } } or null. A use whose zones carry different types takes the highest; a use with a zone of
+// no type isn't ruled here (its own default stands).
+export function typeZoneRules(P) {
+  const zs = Array.isArray(P?.zones) ? P.zones : [], bts = Array.isArray(P?.btZones) ? P.btZones : [], by = {};
+  for (const Z of bts) { const z = zs[Z.zone], r = Z.rule; if (!z || !r || r.key !== 'parkingPer1000' || !(+r.v >= 0)) continue;
+    if (zs.some((q, i) => q?.use === z.use && i !== Z.zone && !bts.some(x => x.zone === i && x.rule?.key === 'parkingPer1000'))) continue;
+    const v = Math.round(+r.v * 1e4) / 1e4; if (!(by[z.use]?.per1000 >= v)) by[z.use] = { per1000: v, type: Z.btype }; }
+  return Object.keys(by).length ? by : null;
 }

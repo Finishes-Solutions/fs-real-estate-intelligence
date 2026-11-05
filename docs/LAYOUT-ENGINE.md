@@ -1055,8 +1055,11 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    each side of each island row through the canopy, the cars waiting in the drive lanes past its ends (at least one an
    accessible island side: Huron and Seven Hills, OH; Durham, NC asks two a fueling position). (5) A bank zone's
    drive-thru lane (5 cars, round 2's rule); a daycare or school zone's play yard / field laid beside its building; each
-   `btZones` entry carries its type's parking rule (`rule`, as a single type's `btRule`: a bank zone 4 a 1,000 sf) for
-   the parking helper's per-use rule to read; the engine and the check still park a zone at its use's rule. (6) A hotel
+   `btZones` entry carries its type's parking rule (`rule`, as a single type's `btRule`: a bank zone 4 a 1,000 sf), and
+   it governs: lib/layoutbrief.mjs typeZoneRules puts it in the brief's per-use rule (`rules.parkingByUse`, item 33; with a
+   city's rules lib/layoutrun.mjs governingParking keeps the type and adds the reserve), toEngine lays the zone's stalls out
+   for it (`opts.parkF` may go below 1 for a type) and the check counts it: TY-mix-pads 199 / 193 → 181 / 179, the bank
+   at 4 a 1,000 sf not a restaurant's 10. (6) A hotel
    over the shops asked: "over 8,000 sf of retail" makes the shops 8,000 sf (`ground.sf`, read by lib/siteplan.mjs
    groundOf and the check's quantities), the rest of the ground floor the lobby, the keys those of the floors above.
    (7) The Pro forma section's area table lists beds, children, students and storage units. Checks (lib/layoutcheck.mjs
@@ -1066,13 +1069,15 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    lane against the parking and the street only), `site.grounds-dry` keeps a type's play pieces off the ponds. rankKey
    puts a layout holding more of its type's queues first and leaves the type's lanes out of its paving comparison. The 3D
    map keeps its plain coloured blocks (the lanes are flat paving; the plan marks PICK-UP, BUS LOADING, DROP-OFF,
-   ENTRANCE). Bench: 80 cases, 80 passing, no warnings, replay identical; 72 earlier cases identical element for element;
+   ENTRANCE). Bench (folded onto mixed-use parking, 00f842a): 84 cases, 84 passing, no warnings, replay identical; 74 earlier
+   cases identical element for element; MX-guard-hotel25 and MX-angled gain the hotel zone's porte-cochère (same layout);
    TY-school (queue, bus loop, the field moved off the pond), TY-daycare (its play yard fenced; no room for the lane on 2.3
-   ac, said), TY-mix-pads (the bank's drive-thru, the daycare zone's fenced play yard) and TY-hotel-retail (the same
+   ac, said), TY-mix-pads (the bank's drive-thru, the daycare zone's fenced play yard, parked by type) and TY-hotel-retail (the same
    layout with a porte-cochère) changed as intended (engine version rei-layout/2026.11.05.6); new TY-daycare-dropoff, TY-hotel-porte, TY-hotel-retail-sf,
    TY-gas-queue. Corpus (words path, 120): 119 / 120 fully right, as before. Holdouts unchanged (P18 fill 77, P35 fill-ug
    320, P36 fill 128, E054 podium-urban 172). Tests: test/btypes.mjs section 7 (realistic runs: each feature drawn, over
    open ground only, the queue numbers, the check catching a parking row across the queue and a missing bus loop, a tight
-   lot said and nothing broken, existing requests untouched). Still: the engine does not reserve room for the lanes (on
-   tight lots the porte-cochère and daycare lane are left off, said); zone parking by type waits on the parking helper; a
+   lot said and nothing broken, existing requests untouched) and section 8 (a zone parked and checked at its type's rule,
+   with and without a city's rules). Still: the engine does not reserve room for the lanes (on
+   tight lots the porte-cochère and daycare lane are left off, said); a
    school or daycare named beside homes is not read as a zone yet.

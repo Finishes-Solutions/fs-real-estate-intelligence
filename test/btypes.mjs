@@ -252,4 +252,21 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   // existing requests: no lane, no new element
   for (const a of ['2,500 sf restaurant with a drive-thru', 'exactly 28,000 sf retail in four buildings']) { ({ o } = run(a, a.startsWith('2,5') ? 210 : 900, a.startsWith('2,5') ? 230 : 500)); assert.ok(!o.elements.some(e => SITE.QUEUE_TYPES[e.queue] && e.queue !== 'bank'), 'nothing new: ' + a); }
 }
+
+// ---------- 8. a zone parks at its own type's rule (btZones[].rule into rules.parkingByUse), with and without a city's rules ----------
+{
+  const site = (w, h) => ({ origin: [-96.42, 30.38], ring: [[0, 0], [w, 0], [w, h], [0, h]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, elements: [] });
+  const ask = 'a daycare and a bank on pads in front of townhomes', b = B.briefFromRequest(ask, site(700, 520)), BU = b.rules.values.parkingByUse?.v;
+  assert.deepEqual(BU?.restaurant, { per1000: 4, type: 'bank' }, 'the bank zone (laid out as a restaurant pad) at the bank’s 4 a 1,000 sf, not 10');
+  assert.equal(BU?.other?.type, 'daycare'); assert.ok(Math.abs(BU.other.per1000 - 0.2 * 150 / 7.442) < 0.01, 'the daycare zone at 0.2 a child');
+  assert.equal(BU?.townhomes, undefined, 'a use of no type keeps its own rule');
+  const E = B.toEngine(b); assert.ok(E.opts.parkF.restaurant < 1, 'the engine lays the bank zone out at its type’s rule (below the restaurant default)');
+  const o = RUN.runBrief(b).options[0], need = Math.ceil(7442 / 1000 * BU.other.per1000 + 3.5 * 4 + 60 * 2.25 - 0.01);
+  assert.equal(o.validation.status, 'pass'); assert.equal(o.quantities.parking.required, need, 'the check counts the zones at their types’ rules'); assert.ok(o.quantities.parking.provided >= need);
+  assert.equal(B.typeZoneRules(S.guessProgram('a hotel with 120 keys and 20,000 sf of retail')), null, 'no rule a hotel zone or a plain use takes');
+  // under a city's rules: the governing per-use rule keeps the zone's type, with the city's count reserve
+  const gb = B.briefFromRequest(ask, site(700, 520)), prog = S.guessProgram(ask);
+  RUN.governingParking(gb, { ...site(700, 520), program: prog, __guard: { cf: 1.05, profile: 'waller' } }, prog);
+  assert.deepEqual(gb.rules.values.parkingByUse.v.restaurant, { per1000: 4.2, type: 'bank' }); assert.equal(gb.rules.values.parkingByUse.v.other.type, 'daycare');
+}
 console.log('btypes ok');
