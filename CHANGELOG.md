@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-04
 
+### 8:33 PM CT: Dense townhome layouts complete their detention pond (0552439)
+- **Ponds sized from the drawn plan:** a packed townhome layout covers more of the lot with roofs and paving than a typical one, so its pond is now redrawn to what the drawn plan needs (the same storm estimate the check uses) rather than a typical figure, and can take the full strip between the loop road and the lot line. The densest layouts now meet detention and win: 8 acres 123 homes (was 113), the flag lot 166 (was 147). The detention rule is unchanged.
+- All 41 test sites pass with no warnings; the full test suite passes.
+
 ### 7:31 PM CT: Townhomes: rows outside the loop road, parallel guest parking (e104d8a)
 - **Guest parking along the cross drives:** parallel guest spaces sit along the sides of the drives where only row ends face them, so rows no longer give up homes to parking bays between them. Accessible spaces stay in a regular bay.
 - **Rows outside the loop road:** where the strip between the loop road and the lot line is deep enough, a row of homes faces the road from the outside, on its own lots.
