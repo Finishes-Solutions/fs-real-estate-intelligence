@@ -1418,8 +1418,8 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    4:1, L, T, U, wedge, trapezoid, flag, curved frontage, a pipeline easement across, a wetland inside, a corner with two
    streets, rotated, skewed. No holdout outline. Each run sorted into one kind: ok, warning, program short (said or
    not), short of the yardstick, empty (said or not), a hard check failed, timeout, throw.
-   Before (engine .10): no throws or timeouts; 142 ok, 49 hard-check failures, 6 silent empty answers, 7 shortfalls not
-   said, 4 "unsupported" (event venues), 81 counts short but said. The fixes, each generic and in test/layoutsweep.mjs:
+   Before (main at 1cd688a, engine .11): no throws or timeouts; 139 ok, 50 hard-check failures, 6 silent empty answers, 7
+   shortfalls not said, 4 "unsupported" (event venues), 82 counts short but said. The fixes, each generic and in test/layoutsweep.mjs:
    (a) Flag lots (12 of 19 flag runs failed): the body is laid out with the whole cut line as its front, so its entry
    flared past the strip onto the neighbours' land (site.containment, access.entrance) or sat away from the strip
    (access.connectivity). lib/sitestem.mjs: a body entry within 2 ft of the site's lot lines is cut back 3 ft inside the
@@ -1437,16 +1437,17 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    4 ac square): a podium form now assumes 7 floors (5 over 2) and a tower on a podium 12, said in the mapping (186).
    (f) A podium garage's entrance could only be at the +u end of its back face (the ramp there): '+v-' / '-v-' put it at
    the other end, the ramp following (lib/siteplan.mjs garagePlan; lib/layoutrun.mjs garageEntries tries both).
-   access.garage on the sweep's podiums 3 -> 2.
+   With (e), 4 more podiums in the sweep; of all its podium runs 2 still have no drive to the garage entrance.
    (g) "180 studio apartments in 3-story garden buildings" read as two zones with no count between them (0 of 180): garden
    words describing the buildings no longer make a second apartment zone (lib/siteplan.mjs applyStudios).
    (h) Detached homes: the zone-band fallback drew one 5,000-8,500 sf box counted as one house or cottage; not offered
    for houses any more (said as no layout instead).
    Tried and taken out: drawing a stand-alone bank's drive-thru lane on a rows layout (fixed 2 queue warnings, but on the
    bench it outranked the pad layout and drew the box 1 sf smaller).
-   After (engine .12): 153 ok, 32 hard-check failures (hard-check hits 74 -> 37: containment 10 -> 0, entrance 10 -> 0,
-   connectivity 5 -> 0, overlap 2 -> 0, access.buildings 12 -> 8), 0 silent empty (14 said), 5 shortfalls the notes don't
-   name, 87 counts short but said. Bench (88): 88 passing, no warnings, replay identical, 88 identical element for element.
+   After (engine .12): 149 ok, 34 hard-check failures (hard-check hits 73 -> 40: containment 10 -> 1 (a car wash on a U
+   lot, failing before as well), entrance 10 -> 0, connectivity 4 -> 0, overlap 3 -> 1, access.buildings 11 -> 8), 0 silent
+   empty (14 said), 5 shortfalls the notes don't name, 87 counts short but said. Check failures by family: flag 12 -> 0.
+   Bench (88): 88 passing, no warnings, replay identical, 88 identical element for element with main.
    Corpus 119 / 120, types 31 / 33 as before. Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054
    podium-urban 172). Engine version rei-layout/2026.11.05.12.
    Still (docs/bench/layout-sweep.md, "Runs needing a look"): home rows on shallow strips (duplexes on a 2 ac 4:1 strip:
