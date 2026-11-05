@@ -56,6 +56,7 @@ const SITES = {
   ty34: [[0, 0], [500, 0], [500, 300], [0, 300]],
   ty38: [[0, 0], [500, 0], [500, 330], [0, 330]],
   ty43: [[0, 0], [520, 0], [520, 360], [0, 360]],
+  ty46: [[0, 0], [500, 0], [500, 400], [0, 400]],
   ty55: [[0, 0], [600, 0], [600, 400], [0, 400]],
   ty58: [[0, 0], [600, 0], [600, 420], [0, 420]],
   ty62: [[0, 0], [600, 0], [600, 450], [0, 450]],
@@ -158,7 +159,12 @@ const CASES = [
   { id: 'MX-guard-hotel25', family: 'mixed_use', site: 'wal25', guard: true, ask: 'a 120-key hotel and 20,000 sf of retail, parking behind the buildings' },
   { id: 'MX-guard-hotel13', family: 'mixed_use', site: 'wal13', guard: true, ask: 'a 120-key hotel and 20,000 sf of retail, parking behind the buildings' },
   { id: 'MX-angled', family: 'mixed_use', site: 'ty84', ask: 'a hotel with 120 keys and 20,000 sf of retail, angled parking' },
-  { id: 'MX-guard-angled', family: 'mixed_use', site: 'wal25', guard: true, ask: 'a 120-key hotel and 20,000 sf of retail, 60 degree angled parking' }
+  { id: 'MX-guard-angled', family: 'mixed_use', site: 'wal25', guard: true, ask: 'a 120-key hotel and 20,000 sf of retail, 60 degree angled parking' },
+  // building types round 3 (docs/LAYOUT-ENGINE.md item 35): the lanes and yards a type needs, lib/btlanes.mjs
+  { id: 'TY-daycare-dropoff', family: 'types', site: 'ty46', ask: 'a daycare for 150 children' },
+  { id: 'TY-hotel-porte', family: 'types', site: 'ty62', ask: 'a 6-story hotel with 120 keys' },
+  { id: 'TY-hotel-retail-sf', family: 'types', site: 'ty55', ask: 'a 120-key hotel over 8,000 sf of retail' },
+  { id: 'TY-gas-queue', family: 'types', site: 'ty23', ask: 'gas station with 12 pumps' }
 ];
 const plan = (id, guard = false) => { const st = SITES[id], ring = Array.isArray(st) ? st : st.ring; return { origin: guard ? [-95.93, 30.06] : [-96.42, 30.38], ring, front: 0, streets: st.streets || [], setbacks: { ...SB }, elements: (st.keep || []).map((k, i) => ({ id: 'ko' + (i + 1), kind: 'keepout', poly: k.ring, name: k.name, note: 'keep out', pinned: true })), ...(guard ? { params: { guard: { mode: 'on' } } } : {}) }; };
 // a guarded case's plan and brief, as the app makes them (lib/guardrails.mjs forLayout: the scenario's plan and program; runPlan's brief)

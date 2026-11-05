@@ -190,4 +190,66 @@ const polyArea = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.lengt
   const dcb = BT.presetBuilding('daycare'), fc = S.planFeatures({ ...site(400, 300), elements: [{ ...dcb, id: 'd1', x: 200, y: 150 }] });
   assert.ok(fc.features.some(f => f.properties.k === 'b3' && f.properties.use === 'civic' && f.properties.part === 'parapet'));
 }
+
+// ---------- 7. round 3: the lanes and yards a type needs (lib/btlanes.mjs, lib/btsite.mjs typeFeatures) ----------
+{
+  const SITE = await import('../lib/btsite.mjs'), V = await import('../lib/layoutcheck.mjs');
+  const site = (w, h) => ({ origin: [-96.42, 30.38], ring: [[0, 0], [w, 0], [w, h], [0, h]], front: 0, streets: [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, elements: [] });
+  const run = (ask, w, h) => { const b = B.briefFromRequest(ask, site(w, h)), rec = RUN.runBrief(b); return { b, rec, o: rec.options[0] }; };
+  const chk = (o, id) => o.validation.checks.find(c => c.id === id);
+  const inPoly = (p, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[i], q = r[j]; if ((a[1] > p[1]) !== (q[1] > p[1]) && p[0] < (q[0] - a[0]) * (p[1] - a[1]) / (q[1] - a[1]) + a[0]) c = !c; } return c; };
+  const along = P => { const out = []; for (let i = 0; i + 1 < P.length; i++) { const a = P[i], q = P[i + 1], L = Math.hypot(q[0] - a[0], q[1] - a[1]); for (let s = 0; s < L; s += 2) out.push([a[0] + (q[0] - a[0]) * s / L, a[1] + (q[1] - a[1]) * s / L]); } return out; };
+  // the queue estimates (sources in QUEUE_TYPES): 10% of an elementary school's students in cars, a bus a 60 riders, a car a 25 children
+  assert.equal(SITE.queueWant('school-car', { students: 600, level: 'elementary' }), 60); assert.equal(SITE.queueWant('school-bus', { students: 600 }), 5); assert.equal(SITE.queueWant('daycare', { children: 150 }), 6);
+  for (const k of Object.keys(SITE.QUEUE_TYPES)) assert.match(SITE.QUEUE_TYPES[k].src, /estimate/, k + ': marked an estimate');
+  assert.equal(S.guessProgram('elementary school for 600 students').btCounts.level, 'elementary');
+  // a school: a parent queue and a bus loop, each from a drive (or the street) to its curb beside the school and back out,
+  // apart from each other, over open ground only (never a building, parking, a pond or the play yard), the play yard and
+  // field on dry ground; the 3D map keeps the plain block (the lanes are flat paving)
+  let { o, rec } = run('elementary school for 600 students', 900, 700);
+  const car = o.elements.find(e => e.queue === 'school-car'), bus = o.elements.find(e => e.queue === 'school-bus'), sch = o.elements.find(e => e.btype === 'school');
+  assert.equal(o.validation.status, 'pass'); assert.ok(car && bus, 'both lanes drawn');
+  assert.equal(chk(o, 'queues.stack').status, 'pass'); assert.ok(chk(o, 'queues.stack').measured['school-car'] >= 60 && chk(o, 'queues.stack').measured['school-bus'] >= 5);
+  assert.equal(chk(o, 'queues.clear').status, 'pass'); assert.equal(chk(o, 'queues.apart').status, 'pass'); assert.notEqual(chk(o, 'site.grounds-dry')?.status, 'fail'); assert.equal(chk(o, 'eng.turning.car').status === 'fail', false);
+  const solid = o.elements.filter(e => ['building', 'parking', 'pond', 'play'].includes(e.kind) || e.kind === 'green' && e.part).map(e => S.shapeOf(e));
+  for (const L of [car, bus]) { const pts = along(L.path).slice(8, -8); assert.ok(!pts.some(p => solid.some(r => inPoly(p, r))), L.name + ': over open ground only'); assert.ok(pts.every(p => inPoly(p, site(900, 700).ring) || p[1] < 1), L.name + ': inside the lot'); }
+  assert.ok(o.notes.some(n => /^School: a parent drop-off/.test(n)) && o.notes.some(n => /^School: a bus loop/.test(n)));
+  assert.ok(RUN.replayRun(rec).identical, 'replay identical');
+  const fc = S.planFeatures({ ...site(900, 700), elements: o.elements, program: o.program });
+  assert.ok(fc.features.some(f => f.properties.id === sch.id && f.properties.k === 'building' && f.properties.use === 'civic'), 'the school a plain block coloured by type');
+  assert.ok(!fc.features.some(f => f.properties.id === car.id && /^b3|^c3/.test(f.properties.k)), 'the lane is no block');
+  // the independent check: a parking row laid across the parent queue, and the bus loop taken away
+  const mp = car.path[Math.floor(car.path.length / 2)], b0 = B.briefFromRequest('elementary school for 600 students', site(900, 700));
+  let bad = V.validateLayout({ ...site(900, 700), elements: [...o.elements, { id: 'xrow', kind: 'parking', x: mp[0], y: mp[1], w: 40, d: 40, rot: 0 }], program: o.program }, b0);
+  assert.equal(bad.checks.find(c => c.id === 'queues.clear').status, 'fail', 'a parking row across the queue is caught');
+  bad = V.validateLayout({ ...site(900, 700), elements: o.elements.filter(e => e !== bus), program: o.program }, b0);
+  assert.equal(bad.checks.find(c => c.id === 'queues.stack').status, 'fail'); assert.ok(bad.checks.find(c => c.id === 'queues.stack').features.includes('school-bus: not drawn'));
+  // a daycare: its play yard fenced beside the building and a drop-off lane along a face, from the drive and back
+  ({ o } = run('a daycare for 150 children', 500, 400));
+  assert.equal(o.validation.status, 'pass'); assert.ok(o.elements.some(e => e.kind === 'fence' && /Play yard fence/.test(e.note)));
+  const dl = o.elements.find(e => e.queue === 'daycare'); assert.ok(dl, 'drop-off lane'); assert.equal(chk(o, 'queues.stack').status, 'pass'); assert.equal(chk(o, 'queues.clear').status, 'pass');
+  // a hotel: a porte-cochère (a 24 ft drive-through lane under a canopy at the entrance)
+  ({ o, rec } = run('a 6-story hotel with 120 keys', 600, 450));
+  assert.equal(o.validation.status, 'pass'); const pc = o.elements.find(e => e.queue === 'porte'), cn = o.elements.find(e => e.porte);
+  assert.ok(pc && pc.width === 24 && cn && cn.kind === 'plaza', 'lane and canopy'); assert.equal(chk(o, 'queues.stack').status, 'pass'); assert.ok(RUN.replayRun(rec).identical);
+  // a tight lot: no room, said, nothing broken
+  ({ o } = run('a 6-story hotel with 120 keys', 420, 300));
+  assert.equal(o.validation.status, 'pass'); assert.ok(!o.elements.some(e => e.queue === 'porte') && o.notes.some(n => /no room .* porte-cochère/.test(n)));
+  // a hotel over the shops asked (not the whole ground floor)
+  ({ o } = run('a 120-key hotel over 8,000 sf of retail', 600, 400));
+  const hr = o.elements.filter(e => e.btype === 'hotel-over-retail');
+  assert.equal(o.validation.status, 'pass'); assert.ok(Math.abs(hr.reduce((t, e) => t + S.groundOf(e).gfa, 0) - 8000) <= 10, 'the shops the sf asked'); assert.equal(hr.reduce((t, e) => t + e.keys, 0), 120);
+  assert.ok(Math.abs(o.quantities.byUse.retail.gfa - 8000) <= 10); assert.ok(o.notes.some(n => /8,000 sf of shops on the ground floor \(as asked/.test(n)));
+  // a gas station: a lane each side of each island row, the waiting cars past the canopy's ends
+  ({ o } = run('gas station with 12 pumps', 330, 300));
+  const fq = o.elements.filter(e => e.queue === 'fuel'), cano = o.elements.find(e => e.kind === 'canopy');
+  assert.equal(o.validation.status, 'pass'); assert.equal(fq.length, cano.rows * 2); assert.equal(chk(o, 'queues.stack').status, 'pass'); assert.equal(chk(o, 'queues.clear').status, 'pass');
+  // zones: a bank zone gets its drive-thru lane, a daycare zone its fenced play yard; each zone carries its type's parking rule
+  const pz = S.guessProgram('a daycare and a bank on pads in front of townhomes');
+  assert.deepEqual([pz.btZones[1].rule.key, pz.btZones[1].rule.v], ['parkingPer1000', 4], 'a bank zone parks like a bank (the parking helper reads btZones[].rule)');
+  ({ o } = run('a daycare and a bank on pads in front of townhomes', 700, 520));
+  assert.equal(o.validation.status, 'pass'); assert.ok(o.elements.some(e => e.queue === 'bank')); assert.ok(o.elements.some(e => e.kind === 'play' && e.zone === 0)); assert.equal(chk(o, 'queues.stack').status, 'pass');
+  // existing requests: no lane, no new element
+  for (const a of ['2,500 sf restaurant with a drive-thru', 'exactly 28,000 sf retail in four buildings']) { ({ o } = run(a, a.startsWith('2,5') ? 210 : 900, a.startsWith('2,5') ? 230 : 500)); assert.ok(!o.elements.some(e => SITE.QUEUE_TYPES[e.queue] && e.queue !== 'bank'), 'nothing new: ' + a); }
+}
 console.log('btypes ok');

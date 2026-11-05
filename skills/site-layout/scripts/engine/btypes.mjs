@@ -213,7 +213,7 @@ const NEW = [
     when: (p, t) => /\b(?:elementary|middle|high|primary|secondary|charter|private|junior high|k-12|prep(?:aratory)?) school\b|\bschool (?:building|campus)\b|\ba school\b/.test(t) && !/school district|driving school|cooking school|dance school/.test(t),
     apply: (p, t, X, P) => { const lvl = /high school|secondary|k-12|prep/.test(t) ? 'high' : /middle|junior high/.test(t) ? 'middle' : 'elementary', Q = k => P.params[k][lvl], n = X.students || X.children || (X.sf ? Math.round(X.sf / Q('sfPerStudent')) : Q('students')), sf = X.sf || n * Q('sfPerStudent');
       const outdoor = lvl === 'high' ? [{ key: 'green', label: 'Playing field', w: 360, d: 210 }] : [{ key: 'play', label: 'Play yard', w: 120, d: 80 }, { key: 'green', label: 'Playing field', w: 240, d: 160 }];
-      return recipeProgram(p, { name: lvl[0].toUpperCase() + lvl.slice(1) + ' school', pattern: 'commons', buildings: [{ label: lvl[0].toUpperCase() + lvl.slice(1) + ' school', ...box(sf / (X.floors || Q('floors'))), floors: X.floors || Q('floors') }], outdoor, parking: { per: 'child', rate: Q('perStudent'), basis: n, label: 'students' }, figures: [n + ' students'] }, { students: n }); } },
+      return recipeProgram(p, { name: lvl[0].toUpperCase() + lvl.slice(1) + ' school', pattern: 'commons', buildings: [{ label: lvl[0].toUpperCase() + lvl.slice(1) + ' school', ...box(sf / (X.floors || Q('floors'))), floors: X.floors || Q('floors') }], outdoor, parking: { per: 'child', rate: Q('perStudent'), basis: n, label: 'students' }, figures: [n + ' students'] }, { students: n, level: lvl }); } }, // (level: the school's queue and bus loop, lib/btsite.mjs)
   { id: 'car-wash', label: 'Express car wash', short: 'Car wash', family: 'retail', primitive: 'tunnel', use: 'other', color: 'carwash',
     params: { length: 130, w: 32, vacuums: 20, cars: 12 }, count: 'sf', src: { cls: 'estimate', ref: 'a 110-130 ft express tunnel about 30 ft wide (lib/buildings.mjs express tunnel 110 ft), about 20 vacuum stalls; two 12 ft stacking lanes to the pay stations merging at the tunnel, at least 12 cars of stacking (express tunnels are commonly planned for 10-12 or more; local rules run 6-15: an estimate to confirm), an exit apron out of the tunnel' },
     when: (p, t) => /car ?wash|tunnel wash|express wash|auto ?wash/.test(t) && p.use !== 'fuel',
@@ -358,7 +358,10 @@ function zoneOf(z, clause) {
   const q = P.apply({ ...z }, clause, X, P), out = { ...z, use: q.use || z.use, name: z.name || P.short };
   if (q.gfa > 0) out.gfa = Math.round(q.gfa); if (q.units > 0) out.units = q.units; if (q.custom) { out.gfa = Math.round(CT.recipeGfa(q.custom)); out.use = 'other'; if (q.floors > 0) out.floors = q.floors; }
   if (q.btFloors && !out.floors) out.floors = q.btFloors;
-  return { z: out, bt: { btype: P.id, name: P.short, ...(q.btCounts && Object.keys(q.btCounts).length ? { counts: q.btCounts } : {}) } };
+  // (rule: the zone's own type's parking rule, { key, v, source } as a single type's btRule, for the parking helper's
+  // per-use rule to read: a bank zone parks like a bank, not the restaurant use it is laid out as)
+  const rule = withRule({ ...q, use: q.use || z.use }, P).btRule;
+  return { z: out, bt: { btype: P.id, name: P.short, ...(q.btCounts && Object.keys(q.btCounts).length ? { counts: q.btCounts } : {}), ...(rule ? { rule } : {}) } };
 }
 function zoneTypes(p0, t) {
   const cl = clausesOf(t), used = new Set(), zones = p0.zones.map(z => ({ ...z })), btZones = [];
@@ -430,7 +433,9 @@ function tagType(els, prog) {
     else if ((P.count === 'children' || P.count === 'students') && prog.btCounts?.[P.count]) { q[P.count] = Math.round(prog.btCounts[P.count] * (B1 > 0 ? g / B1 : 1)); parts.push(f0(q[P.count]) + ' ' + P.count, f0(g) + ' sf'); }
     else parts.push(f0(g) + ' sf');
     if (prog.mezzanine > 0) parts.push(f0(e.w * e.d * prog.mezzanine) + ' sf mezzanine');
-    if (P.id === 'hotel-over-retail' && prog.btGround && fl > 1) { q.ground = { use: prog.btGround.use || 'retail', floors: 1 }; q.keys = Math.max(1, Math.round(g * (fl - 1) / fl / (P.params.sfPerKey || 550))); parts[2] = f0(q.keys) + ' keys'; parts.push(f0(e.w * e.d) + ' sf of shops on the ground floor'); } // (a hotel over shops: the ground floor of the building as laid out is the shops, the floors above the hotel)
+    if (P.id === 'hotel-over-retail' && prog.btGround && fl > 1) { // (a hotel over shops: the shops on the ground floor, the floors above the hotel; the shops the sf asked, shared over the type's buildings by footprint, the rest of the ground floor the hotel's lobby; none asked: the whole ground floor)
+      const foot = e.w * e.d, F1 = els.filter(mine).reduce((s, x) => s + (x.poly ? 0 : x.w * x.d), 0), shop = prog.btGround.asked > 0 ? Math.min(foot, Math.round(prog.btGround.asked * (F1 > 0 ? foot / F1 : 1))) : foot;
+      q.ground = { use: prog.btGround.use || 'retail', floors: 1, ...(shop < foot - 1 ? { sf: shop } : {}) }; q.keys = Math.max(1, Math.round(g * (fl - 1) / fl / (P.params.sfPerKey || 550))); /* (the keys on the floors above; a ground floor not all shops is the hotel's lobby, not more rooms) */ parts[2] = f0(q.keys) + ' keys'; parts.push(f0(shop) + ' sf of shops on the ground floor' + (shop < foot - 1 ? ' (the rest the hotel’s lobby)' : '')); }
     q.note = RESI.includes(e.use || use) && e.note ? ((px ? px + ' · ' + e.units + ' units' : P.label) + ' · ' + e.note).slice(0, 160) : parts.filter(Boolean).join(' · '); // (homes keep the engine's line: front-load, garages ... are read from it)
     if (P.id === 'garage-standalone') { const { floors, units, gfa, ...rest } = q, gq = { ...rest, kind: 'garage', levels: fl, grid: true, standalone: true, name: 'Parking garage' + (nm?.[2] ? ' ' + nm[2] : '') }; gq.note = f0(S.garageStalls(gq)) + ' spaces · ' + fl + ' levels'; return gq; } // (a stand-alone garage: the parking structure itself, its spaces counted on the stall grid)
     return q;
@@ -444,7 +449,7 @@ export function typeNotes(prog, els = []) {
 function typeNotes1(prog, els) {
   const P = anyPreset(prog?.btype); if (!P) return [];
   const B = els.filter(e => (e.kind === 'building' || e.kind === 'garage') && e.btype === P.id), g = B.reduce((s, e) => s + gfaOf(e), 0), out = [];
-  const what = P.count === 'keys' ? f0(B.reduce((s, e) => s + (e.keys || 0), 0) || g / (P.params.sfPerKey || 550)) + ' keys at about ' + P.params.sfPerKey + ' gross sf a key' + (P.id === 'hotel-over-retail' ? ', over ' + f0(B.reduce((s, e) => s + e.w * e.d, 0)) + ' sf of shops on the ground floor' + (prog.btGround?.asked ? ' (' + f0(prog.btGround.asked) + ' sf asked: the ground floor is the hotel’s footprint)' : '') : '')
+  const what = P.count === 'keys' ? f0(B.reduce((s, e) => s + (e.keys || 0), 0) || g / (P.params.sfPerKey || 550)) + ' keys at about ' + P.params.sfPerKey + ' gross sf a key' + (P.id === 'hotel-over-retail' ? ((sh, ft) => ', over ' + f0(sh) + ' sf of shops on the ground floor' + (prog.btGround?.asked ? (sh < ft - 1 ? ' (as asked; the rest of the ' + f0(ft) + ' sf ground floor the hotel’s lobby)' : sh < prog.btGround.asked - 1 ? ' (' + f0(prog.btGround.asked) + ' sf asked: the ground floor holds ' + f0(ft) + ')' : ' (as asked)') : ''))(B.reduce((s, e) => s + (S.groundOf(e)?.gfa ?? e.w * e.d), 0), B.reduce((s, e) => s + e.w * e.d, 0)) : '')
     : P.count === 'spaces' ? f0(B.reduce((s, e) => s + S.garageStalls(e), 0)) + ' spaces on ' + (B[0]?.levels || 0) + ' levels' + (prog.btCounts?.asked && B.reduce((s, e) => s + S.garageStalls(e), 0) < prog.btCounts.asked ? ' (' + f0(prog.btCounts.asked) + ' asked: the lot holds a smaller deck)' : '')
     : P.count === 'beds' ? f0(B.reduce((s, e) => s + (e.units || 0), 0) * (prog.bedsPerUnit || P.params.bedsPerUnit || 1)) + ' beds in ' + f0(B.reduce((s, e) => s + (e.units || 0), 0)) + ' units'
       : P.count === 'children' ? f0(prog.btCounts?.children || 0) + ' children' : P.count === 'students' ? f0(prog.btCounts?.students || 0) + ' students'
