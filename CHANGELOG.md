@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 7:24 AM CT: Mixed-use plans parked right under a city's rules (6816a6f, fe7f6b8)
+- **Each use is parked by its own rule:** under Waller's rules a 120-key hotel with 20,000 sf of shops now needs 210 spaces (126 for the keys, 84 for the shops), not 380; homes at 2.1 a home, shops and offices at their own ratio, a hotel by its keys. The independent check counts each use the same way.
+- **The city's 5% reserve is counted once** (2.1 spaces a home, was 2.205).
+- **Angled parking on mixed plans:** asking for angled parking now angles the aisles that can be one-way (each meets a two-way drive at both ends) and the notes say how many turned and why the rest stayed straight.
+- **Small sites under strict detention rules lay out properly:** a hotel and shops on 13 acres no longer falls back to a simple layout that lost the hotel's type and parked short; the pond can sit beside or deeper (the notes say what depth was assumed, for the civil engineer to confirm), and if the simple layout is ever the last resort it keeps every building's type and says if it's short of parking.
+- 80 test sites, every one passing with no warnings; the full test suite passes.
+
 ### 6:34 AM CT: Homes round a central lake, exact counts met, clubhouse at the back (2b72db6, ef8639a)
 - **"Homes around a central lake"** rings a lake in the middle with a loop street and lots on both sides (85 homes on the 20-acre test lot, was 46 with the lake at the back); the lake holds the detention. "Homes around a central pool and clubhouse" puts a park with the clubhouse and pool in the middle. For now on near-rectangular lots and single-family homes.
 - **Exact counts met where the land allows:** "exactly 200 apartments" gives 200 (was 192), "240 mid-rise units" 240 (was 208). Where whole buildings overshoot, a few pairs of homes are combined into larger homes, and the notes say so; an option that meets the count with whole buildings is listed first.
