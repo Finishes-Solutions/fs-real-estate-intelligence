@@ -162,7 +162,7 @@ for (const t of tools) {
   assert.equal(t.inputSchema.type, 'object', t.name); assert.ok(t.description.length > 60, t.name + ' describes itself');
 }
 assert.ok(['address', 'apn', 'county', 'lat', 'lon', 'radius_mi', 'bbox', 'geojson'].every(k => tools.find(t => t.name === 'flood').inputSchema.properties[k]), 'one location input everywhere');
-assert.ok(JSON.stringify(tools).length < 85000, 'the tool list stays small'); // (both branches' tools: plan sets, renderings, parcel-by-parcel site plans, projects and the study together)
+assert.ok(JSON.stringify(tools).length < 95000, 'the tool list stays small'); // (both branches' tools: plan sets, renderings, parcel-by-parcel site plans, projects and the study, and the plan tools: plan_get / edit / pick / compare / check / numbers / export, site_report)
 console.log('mcp tools/list ok:', tools.length, 'tools');
 
 // every answer: compact, with sources; never secrets or internal URLs
