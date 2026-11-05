@@ -1081,3 +1081,59 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    with and without a city's rules). Still: the engine does not reserve room for the lanes (on
    tight lots the porte-cochère and daycare lane are left off, said); a
    school or daycare named beside homes is not read as a zone yet.
+
+36. Done Nov 5 (parking, round 4). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 84-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base 29d0f11), then fixed, most valuable first:
+   (a) Short walks decide between layouts that hold the same (lib/layoutrun.mjs walkP90, rankKey). The run ranked layouts
+   holding the same homes or floor area by paving alone, so a field on one side of the building won over one in front of
+   its doors for a few hundred square feet (TY-hotel-retail: p90 walk 246 ft). Now the 90th-percentile walk (stall to the
+   nearest wall of a building it serves, the metrics script's walk90) weighs in: every 2 ft past 200 ft counts as 1% more
+   paving, so the walk decides only where stalls stand far out and the paving is close. Yield, checks, asks and the rest
+   come first as before. Tried and taken out: the same penalty in the parking-field engine's own score
+   (lib/siteparking.mjs value0): its search never laid the alternatives out, nothing changed.
+   (b) Bare row ends paid for (lib/layoutrun.mjs fundEndIslands, after rowEndIslands in the run's last passes). Where the
+   parking is exactly met and a row meets a cross drive end to end, a row with free land past its end grows a stall width
+   at a time there (the new stall on the aisle, inside the paving setback, clear as growEndIslands' land is, no farther
+   from a building than the plan's 90th-percentile walk, never into an entrance's stacking length, never a new dead end),
+   and those stalls (or the one stall to spare, where rowEndIslands needs two) pay for the bare row's planted ends,
+   longest rows first; all or nothing a row, never below what's required. Tried and changed: letting the grown stall
+   stand as far as its own row's farthest (WEDGE-arc-1pk p90 119 -> 137 ft) or 15% past the 90th percentile (a different
+   throat on WEDGE-trap-midrise): both taken back to the 90th percentile.
+   (c) Angled parking asked for on a single-use plan the older generator drew (apartments' rows, lib/sitelayout.mjs and
+   lib/sitegen.mjs): it came back square, nothing said. angleMixed (item 33) now runs on single-use plans too (the
+   guardrails' 26 ft fire-lane aisles turnable, a one-way aisle never a fire lane, kept only where it parks the program and
+   fails no check that passes square), else the note says why: on the apartment layouts tried (guarded 13 and 25 ac,
+   unguarded 10 ac) the parking runs along the loop drives, which are the fire lanes, or angled rows would leave the
+   parking short, and it says so. A field-engine plan that already said why it is square is left alone. The guarded
+   single-use parking-field engine already lays angled fields (17 / 14 ft one-way aisles between 26 ft collectors):
+   checked on four guarded fields (retail, medical office, office at 45°, a hotel), all angled and passing.
+   (d) Landscaping measured (scripts/parking-metrics.mjs landPct, perTree, landStd): the planted end caps and islands as
+   drawn against the lot paving, and stalls a tree; landStd against a typical standard for lots of 20 stalls or more,
+   5% of the interior and a shade tree every 10 stalls (Redmond, WA RZC 21.32: 5% for 20-150 stalls, 7% past 150;
+   Chardon, OH ch. 1159: a shade tree every 10 spaces; codes vary, many start at 20 spaces). On the base 46 of 74 lots met
+   it; the wedges' strips (3-5%), the towers, the townhome guest pockets (no islands) and the data centre did not, so it is
+   measured, not a check.
+   Bench (84 cases, top option; base 29d0f11 -> after): all passing, no warnings, replay identical, no case lost homes or
+   floor area, parking met everywhere; 68 identical element for element. Bare row ends 236 -> 211 (MF-garden-max 8 -> 2,
+   TY-U-pool 7 -> 4, WEDGE-tri-1pk 3 -> 1, LOT-wetland-apt 8 -> 6, MX-guard-hotel13 6 -> 4); 90th-percentile walk summed
+   7,102 -> 6,880 ft (TY-hotel-retail 246 -> 204, the field in front of the hotel; MX-guard-angled 244 -> 142, its
+   central-boulevard layout, still 60° on 3 of 3 aisles, sf a stall 470 -> 409; TY-hotel-retail-sf 204 -> 126); max walk
+   summed 9,155 -> 8,956; landscape share summed 384.6 -> 390.9 points; stalls 13,437 -> 13,422 (only stalls over the
+   requirement, or planted); sf a stall summed 31,675 -> 31,656 (TY-hotel-retail 360 -> 377 and TY-hotel-retail-sf
+   371 -> 395, the price of the shorter walk); dead ends 8 -> 8; first drive across an entry inside the stacking length
+   28 -> 28 cases. Prompt corpus (offline, words path): 119 of 120 fully right, as before. Holdouts unchanged (P18 fill 77,
+   P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version rei-layout/2026.11.05.7. Tests:
+   test/parkingquality.mjs (a row hemmed in by drives paid for by a row with free land; none where no land is free;
+   walkP90), test/mixedparking.mjs (a single-use plan asked angled says why it stays square; one that already said is
+   left alone).
+   Still (next worst): WEDGE-tri-midrise's stalls beyond the pond (p90 255 ft): the generator's strips along the edges
+   (lib/sitegen.mjs alongEdges) leave the street strip's bar out to park the other two ("a bar left out to park the rest",
+   the smallest), so its bays at the street park buildings about 300 ft away; the 160 homes need those bays, so the fix is
+   bays beside the two bars (the pond moved onto the street strip's land), not another bar choice. WEDGE-trap-midrise p90
+   179 ft (the field at the far end). Bare ends where nothing is free and nothing spare (211; WEDGE-hyp-midrise 14,
+   WEDGE-tri-midrise 13, LOT-curved-apt 12). Paving on loop drives and small lots (MF-tower 376, TY-assisted 470 sf a
+   stall) and short entries on wedges (WEDGE-trap 15 ft, WEDGE-tri / arc 30 ft) and small pads (TY-daycare 30 ft: its 32
+   stalls take the turn off the entry drive at once; 50 ft is the yardstick's floor): not worked on this round. The
+   landscape standard: the wedges and towers short of 5%.

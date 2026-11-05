@@ -115,6 +115,28 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   // no land at either end (the paving setback and the drive): left as it was
   const tight = oneAisle(60, 880, { rowTo: 880 }); assert.equal(RUN.growEndIslands(tight.plan, { elements: tight.els.concat([{ ...blk, x: 95 }]), program: { use: 'retail' } }, tight.brief).elements.filter(e => e.caps).length, 0);
 }
+// round 4 (item 36): a bare row hemmed in at both ends by drives across it, the parking exactly met: another row with free
+// land past its end grows two stalls there and pays for the hemmed row's planted ends; the count stays, nothing worse
+{
+  const t = oneAisle(60, 600, { rowTo: 280 }), r0 = t.els.find(e => e.id === 'rowS'), x0 = r0.x - r0.w / 2, x1 = r0.x + r0.w / 2;
+  const els = t.els.concat([{ id: 'xa', kind: 'drive', x: x0 - 5, y: 125, w: 9.4, d: 30, rot: 0, name: '', note: '24 ft drive' }, { id: 'xb', kind: 'drive', x: x1 + 5, y: 125, w: 9.4, d: 30, rot: 0, name: '', note: '24 ft drive' }]);
+  const need = pk(t.plan, els, t.brief).provided; t.brief.rules.values.parkingPer1000 = { v: need / 30, cls: 'assumption', source: 'test' };
+  assert.equal(RUN.rowEndIslands(t.plan, { elements: els, program: { use: 'retail' } }, t.brief).elements, els, 'no stalls to spare');
+  const o = RUN.fundEndIslands(t.plan, { elements: els, program: { use: 'retail' } }, t.brief), S2 = o.elements.find(e => e.id === 'rowS'), N2 = o.elements.find(e => e.id === 'rowN');
+  assert.equal(S2.caps, 'square', 'the hemmed row ends in islands'); assert.ok(N2.w > r0.w + 17 && !N2.caps, 'the free row grew two stalls');
+  assert.equal(pk(t.plan, o.elements, t.brief).provided, need, 'the count stays');
+  assert.ok(PM.parkingMetrics({ ...t.plan, elements: o.elements }).bareEnds < PM.parkingMetrics({ ...t.plan, elements: els }).bareEnds);
+  const v = check(t.plan, o.elements, t.brief), v0 = check(t.plan, els, t.brief); assert.deepEqual(v.failed, v0.failed, 'no check worse');
+  assert.ok(o.tplNotes.some(n => /paid for by 2 stalls/.test(n)));
+  // no free land anywhere (a drive across the free row's far end too): nothing changes
+  const shut = els.concat([{ id: 'xc', kind: 'drive', x: x1 + 5, y: 175, w: 9.4, d: 30, rot: 0, name: '', note: '24 ft drive' }]);
+  assert.equal(RUN.fundEndIslands(t.plan, { elements: shut, program: { use: 'retail' } }, t.brief).elements, shut);
+}
+// the 90th-percentile walk and the ranking: a layout whose stalls stand far from the doors weighs as more paving
+{
+  const t = oneAisle(60, 880, { rowTo: 880 }); assert.ok(RUN.walkP90(t.els) > 0 && RUN.walkP90(t.els) < 300);
+  assert.equal(RUN.walkP90([{ kind: 'building', x: 0, y: 0, w: 100, d: 100, rot: 0 }, { kind: 'parking', x: 400, y: 0, w: 90, d: 18, rot: 0, row: 1, lock: true }]) > 300, true);
+}
 // the dead-end rules, shared constants for the engine and the validator: an end clear of stalls for 18 ft (a hammerhead)
 // is a way out, 16 ft is not; and an aisle whose stalls run past 150 ft needs a paved turnaround or a drive besides
 {

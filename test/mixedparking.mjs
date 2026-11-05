@@ -67,6 +67,11 @@ const judged = (g, o) => V.validateLayout({ ...g.plan, elements: o.elements, pro
   const said = RUN.angleMixed(plan, lone, brief); assert.ok(!said.elements.some(e => S.stallAng(e)), 'kept square'); assert.ok(said.tplNotes.some(t => /keeps square stalls on two-way aisles: its parking rows have no aisle/.test(t)));
   // not asked: untouched
   const nb = B.canonicalBrief(B.briefFromRequest('a hotel with 120 keys and 20,000 sf of retail', { ...plan, params: {} })); assert.equal(RUN.angleMixed(plan, lone, nb), lone);
+  // a single-use plan (item 36: the older generator's square rows, apartments' included) is tried too and says why not;
+  // one that already says why (the field engine's square fallback) is left alone
+  const sb = B.canonicalBrief(B.briefFromRequest('150 apartments with angled parking', { ...plan, params: {} })), one = { ...lone, program: { use: 'multifamily' } };
+  const s1 = RUN.angleMixed(plan, one, sb); assert.ok(s1.tplNotes.some(t => /Angled parking was asked for, but this layout keeps square stalls/.test(t)));
+  const told = { ...one, notes: ['Angled parking was asked for, but on this lot no layout with angled stalls parks the program.'] }; assert.equal(RUN.angleMixed(plan, told, sb), told);
 }
 // ---- (4) a small Waller site: zones, the hotel typed, parked to the requirement or saying why ----
 {

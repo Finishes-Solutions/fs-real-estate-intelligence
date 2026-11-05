@@ -25,11 +25,18 @@
 //   tiny            stall rows of 1-4 stalls (parallel guest stalls and RV stalls left out)
 //   skew            stall rows not square or parallel to the plan's main row direction (more than 3° off, mod 90°)
 //   orphan          stall rows with no drive or field paving along either long side
+//   landPct/perTree landscape inside the lot: the planted end caps and islands as drawn, a share of them and the lot paving,
+//                   and stalls per tree (one in each); landStd 1 where a lot of LAND_MIN stalls or more meets LAND_PCT % and a
+//                   tree every LAND_PER_TREE stalls, 0 where not, empty under LAND_MIN
 import fs from 'node:fs';
 import * as S from '../lib/siteplan.mjs';
 import { longDeadAisles, entryThroats, throatNeed } from '../lib/layoutrun.mjs';
 
 const RAD = Math.PI / 180;
+// a typical parking-lot landscape standard (planning yardstick; local codes vary): lots of LAND_MIN stalls or more plant
+// LAND_PCT % of the lot's interior and a shade tree every LAND_PER_TREE stalls (e.g. Redmond, WA RZC 21.32: 5% for 20-150
+// stalls, 7% past 150; Chardon, OH ch. 1159: a shade tree every 10 spaces; many codes start at 20 spaces)
+export const LAND_MIN = 20, LAND_PCT = 5, LAND_PER_TREE = 10;
 const pct = (a, p) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1) + 0.5))]; };
 const distTo = (p, r) => r.reduce((m, a, i) => Math.min(m, S.segDist(p, a, r[(i + 1) % r.length])), Infinity);
 const bbox = r => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of r) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return [x0, y0, x1, y1]; };
@@ -57,6 +64,10 @@ export function parkingMetrics(plan) {
   for (const e of rows) { if (e.parallel) continue; for (const c of S.capsOf(e)) if (c.poly?.length >= 3) unpaint(c.poly);
     const ax = axisOf(e), u = [Math.cos(ax.deg * RAD), Math.sin(ax.deg * RAD)], v = [-u[1], u[0]], hw = ax.pitch / 2, hd = ax.depth / 2;
     for (const q of S.islandsOf(e)) unpaint([[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([a, b]) => [q[0] + u[0] * a + v[0] * b, q[1] + u[1] * a + v[1] * b])); }
+  // landscape inside the lot: the planted end caps and islands (each with its tree), their area as drawn
+  let landSf = 0, trees = 0;
+  for (const e of rows) { if (e.parallel) continue; for (const c of S.capsOf(e)) if (c.poly?.length >= 3) { landSf += Math.abs(S.ringArea(c.poly)); trees++; }
+    const ax = axisOf(e); for (const q of S.islandsOf(e)) { landSf += ax.pitch * ax.depth; trees++; } }
   for (const e of drives) paint(S.outline(e), 2);
   for (const e of fields) paint(S.outline(e), 4);
   // drive cells within 26 ft of a row: the lot's aisles
@@ -69,6 +80,8 @@ export function parkingMetrics(plan) {
   for (let k = 0; k < grid.length; k++) { const g = grid[k]; if (!g) continue; pave++; if (g & 1 || g & 4 || (g & 2 && near[k])) lot++; if (!(g & 1) && !(g & 2)) surplus++; }
   const A = C * C;
   Object.assign(out, { paveSf: pave * A, lotSf: lot * A, sfStall: Math.round(lot * A / n), surplusSf: surplus * A, surplusPct: +(100 * surplus / Math.max(1, pave)).toFixed(1) });
+  Object.assign(out, { landSf: Math.round(landSf), landPct: +(100 * landSf / Math.max(1, lot * A + landSf)).toFixed(1), trees, perTree: trees ? +(n / trees).toFixed(1) : null });
+  out.landStd = n < LAND_MIN ? null : out.landPct >= LAND_PCT && out.perTree != null && out.perTree <= LAND_PER_TREE ? 1 : 0;
   // runs of stalls with no island between: stalls on one line (same direction, same offset across) a pitch apart
   const ninety = rows.filter(e => !e.parallel), islands = [];
   for (const e of ninety) { for (const c of S.capsOf(e)) islands.push(c.tree); for (const c of S.islandsOf(e)) islands.push(c); }
@@ -119,7 +132,7 @@ export function parkingMetrics(plan) {
   return out;
 }
 
-const COLS = [['stalls', 'Stalls'], ['sfStall', 'sf/stall'], ['surplusPct', 'Surplus %'], ['maxRun', 'Max run'], ['long', 'Runs >15'], ['bareEnds', 'Bare ends'], ['deadEnds', 'Dead ends'], ['deadEnd150', 'DE >150'], ['deadEndMax', 'DE max ft'], ['walkMed', 'Walk med'], ['walk90', 'Walk p90'], ['walkMax', 'Walk max'], ['walkBld90', 'Bldg p90'], ['walkBld200', 'Bldgs p90>200'], ['throat', 'Throat ft'], ['throatX', 'Throat x-drive'], ['throatNeed', 'Throat req'], ['entryStalls', 'Entry stalls'], ['adaPlaced', 'ADA'], ['adaNeed', 'ADA req'], ['adaExtra', 'ADA +ft'], ['tiny', 'Tiny rows'], ['skew', 'Skew rows'], ['orphan', 'Orphan rows']];
+const COLS = [['stalls', 'Stalls'], ['sfStall', 'sf/stall'], ['surplusPct', 'Surplus %'], ['landPct', 'Land %'], ['perTree', 'Stalls/tree'],['maxRun', 'Max run'], ['long', 'Runs >15'], ['bareEnds', 'Bare ends'], ['deadEnds', 'Dead ends'], ['deadEnd150', 'DE >150'], ['deadEndMax', 'DE max ft'], ['walkMed', 'Walk med'], ['walk90', 'Walk p90'], ['walkMax', 'Walk max'], ['walkBld90', 'Bldg p90'], ['walkBld200', 'Bldgs p90>200'], ['throat', 'Throat ft'], ['throatX', 'Throat x-drive'], ['throatNeed', 'Throat req'], ['entryStalls', 'Entry stalls'], ['adaPlaced', 'ADA'], ['adaNeed', 'ADA req'], ['adaExtra', 'ADA +ft'], ['tiny', 'Tiny rows'], ['skew', 'Skew rows'], ['orphan', 'Orphan rows']];
 export function metricsTable(res) {
   const head = '| Case | ' + COLS.map(c => c[1]).join(' | ') + ' |', sep = '|---|' + COLS.map(() => '---:').join('|') + '|';
   return [head, sep, ...res.map(r => '| ' + r.id + ' | ' + COLS.map(([k]) => r.m[k] ?? '—').join(' | ') + ' |')].join('\n');
