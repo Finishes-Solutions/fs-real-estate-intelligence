@@ -1300,3 +1300,54 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    bare ends where nothing is free and nothing spare (200; WEDGE-hyp-midrise 14, WEDGE-trap-midrise 14, LOT-curved-apt
    12); WEDGE-trap-midrise's field at the far end (p90 179 ft); 22 lots short of the landscape standard with no stalls to
    spare.
+
+39. Done Nov 5 (building-type drawing limits). The owner: "flexible building-type primitives that get modified into many
+   more building types, keeping the coloured 3D blocks" and "keep improving how every building type and lot shape fills
+   the land, with honest checks". The live scoring (docs/bench/prompt-eval.md round 4) read these requests right and the
+   drawing fell short; each was checked on the drawing, then fixed in the primitive or preset for every request of its
+   type, or found to be a land limit and said. docs/BUILDING-TYPES.md section 8. Holdouts used only as a final
+   non-regression check.
+   (a) Stand-alone garage ("parking garage for 500 cars", 2.3 ac: 171 spaces, the deck not on any drive). lib/btypes.mjs
+   garageSize: a third bay (186 ft) before a deck runs past 330 ft, then up to GARAGE_MAX 8 levels (an estimate; local
+   height limits govern); garageFit + lib/layoutrun.mjs runBrief: where the lot draws the deck shorter than sized, it is
+   laid out again at the length drawn with the levels that hold the spaces asked (or a bay deeper), ranked by the spaces
+   short (rankKey); garageEntries gives a stand-alone deck its entrance and a 24 ft drive as a podium's; lib/layoutcheck.mjs
+   judges a stand-alone garage's program line by spaces (at least those asked), not by the floor area that only sizes the
+   deck, and its "Fits about … sq ft" note is dropped. 513 spaces on 6 levels, every check passing.
+   (b) Data centre (no truck court asked: one was drawn). lib/sitelayout.mjs warehouse rows with `truck: false` (not flex)
+   draw a 24 ft service drive behind (a fire lane, kept reached; its links at both ends kept, a hammerhead where an end
+   meets nothing) instead of a 130 ft court; lib/sitegencom.mjs's loading-court arrangements sit out for it. Cold storage
+   keeps its court.
+   (c) Big box (125,000 sf on 10.3 ac drawn as two 85 ft shop rows, 109,802 sf). lib/siteparking.mjs (one additive line):
+   a program depth past the use's own depth list is laid out at that depth (and 40-120 ft deeper, or 40 shallower, where
+   that holds more): one box 263-420 ft deep. 110,352 sf: a land limit at 4 a 1,000 sf with the 0.97 ac pond, said
+   ("Room for 110,352 of the 125,000 sq ft asked for: the rest won't park …"). A fitness club (200 ft) the same.
+   (d) "U-shaped … round a central courtyard" (live: the closed ring). `courtShape` 'U' (or 'O' for "O-shaped", "closed
+   ring", "on all four sides") from the words (lib/btypes.mjs), kept by normalizeProgram, and lib/sitegen.mjs's courtyard
+   search tries only that shape; neither named, both as before. The scorer reads a court of wings joined at their corners
+   (joinCourtyard's group) as one building: three wings a U, four or more a ring.
+   (e) "A T-shaped mid-rise" (96 of 120): the shape preset now keeps the mid-rise's 4 floors when the words give none: 120.
+   (f) Point tower (16 stories, 220 units on 5.5 ac: 172). Land / arrangement limit: two 163 ft podiums beside the
+   clubhouse and pool in one row. Tried and taken out: a plate of at least 10,000 sf (the engine sizes towers linearly on a
+   240 ft podium; TY-point-tower fell 200 -> 153) and shorter podiums (one tower, fewer homes). Now said against the count
+   asked: "Fits about 172 of the 220 units asked for." (lib/layoutrun.mjs askedSaid: the note had named the engine's 1.12
+   overshoot, "of the 247").
+   (g) Words: "20 of them" / "in all" / "in total" read as the count (numbersOf); beside a type zone a homes zone takes the
+   count clause after its words ("apartments behind, 200 units": 200, was 432); a residential type (student, senior) named
+   beside shops of a size makes a zone each, the shops at the front where the words say ("a dorm with 400 beds and 20,000
+   sf of shops in front": 134 units / 402 beds and the shops; was the shops alone). An option's name says the front zone
+   it puts the pond beside ("pond beside the daycare", not "the shops").
+   Bench (88 cases): 88 passing, no warnings, replay identical; 83 identical element for element; changed as intended:
+   TY-datacenter (service drive, no court), TY-bigbox (one box 462 × 260 ft, was 706 × 170; 120,000 sf as before),
+   TY-fitness (167 × 240 ft, was 348 × 115; 40,000 sf), TY-garage (405 spaces as before), TY-daycare-homes (its name only);
+   no homes or floor area lost; parking metrics 13,521 -> 13,518 stalls, 207 -> 211 bare row ends, no dead ends past
+   150 ft. Corpus (words path): the 120 at 119 as before (D05 honestly short); types 26 -> 31 of 33 (TY20, TY28 the land
+   limits above, said); fresh types 8 -> 10 of 10. Live (gpt-6-luna, the 33 types once, 33 calls, about $0.06): 28 -> 30 of 33 (TY20 189
+   of 220 and TY28 the land limits, said; TY27 the model's own go-kart recipe drawn at 32,073 of at least 36,000 sf, not
+   among these misses). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054
+   podium-urban 172). Engine version rei-layout/2026.11.05.10. Tests: test/btypes.mjs section 9 (the garage on 2.3 ac with
+   its entrance, judged by spaces, replay; the data centre's service drive and no court, cold storage's court kept; the big
+   box one building at its depth with its shortfall said; U and O named; the T mid-rise; "Fits about" against the count
+   asked; the three word cases; the daycare option's name). Still: a 3-story T or L for an exact count comes up short with
+   land left (whole buildings, no trim to the count); a point tower's amenities could stand in its podium on a small lot; a
+   big box's parking field keeps the stacking-distance strip across the whole frontage.

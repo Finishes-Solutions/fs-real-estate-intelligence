@@ -1,10 +1,10 @@
 # Building types: inventory and the primitive model
 
 Nov 4 2026, branch `matthew/building-primitives`; round 2 Nov 5, branch `matthew/building-types-2` (section 6); round 3
-Nov 5, branch `matthew/building-types-3` (section 7). Concept planning only. Code: `lib/btypes.mjs` (types),
+Nov 5, branch `matthew/building-types-3` (section 7); drawing limits Nov 5, branch `matthew/type-limits` (section 8). Concept planning only. Code: `lib/btypes.mjs` (types),
 `lib/btsite.mjs` (the site features a type needs), `lib/btlanes.mjs` (lanes and yards routed over the open ground); tests:
 `test/btypes.mjs`, `test/btnumbers.mjs`; bench: the `TY-` cases in `scripts/layout-bench-v2.mjs`; engine notes:
-docs/LAYOUT-ENGINE.md items 27, 29 and 35.
+docs/LAYOUT-ENGINE.md items 27, 29, 35 and 39.
 
 ## 1. Audit: where building types were defined (before this work)
 
@@ -130,6 +130,10 @@ shops of a hotel over retail at the sf asked, and the counts in the Pro forma ar
 - Ground-floor uses other than shops under homes or a hotel.
 - Single-story drive-up storage on small lots can trip the fire-truck turning warning on its drive aisles (the storage
   layout's own, seen without the preset too); not on the bench.
+- (Section 8, item 39) Drawing limits still open: a 3-story T or L asked for an exact count comes up short with land left
+  (whole buildings, no trim to the count); a point tower on a small lot shares its row with the clubhouse and pool (a
+  tower's amenities could go in its podium); a big box at 4 a 1,000 sf parks on a field with a wide landscape strip at
+  the street (the parking engine's stacking distance across the whole frontage).
 
 ## 6. Round 2 (Nov 5): footprints, site features, queues, a type per zone, the editor
 
@@ -241,3 +245,25 @@ were already on the hotel's row), as the Numbers panel and the CSV do.
 TY-gas-queue (ty23). Changed as intended: TY-school (both lanes, the field moved off the pond), TY-daycare (its play yard
 fenced; no room for the lane on 2.3 ac, said), TY-mix-pads (the bank's drive-thru, the daycare's fenced play yard),
 TY-hotel-retail (the layout with the porte-cochère now ranks first). Folded onto mixed-use parking (00f842a): MX-guard-hotel25 and MX-angled gain the hotel zone's porte-cochère; TY-mix-pads parks its zones by type (181 / 179, was 199 / 193); 84 cases, all passing, no warnings.
+
+## 8. Drawing limits (Nov 5): what the live scoring found the drawings fell short on
+
+The live AI read these requests right (docs/bench/prompt-eval.md round 4); the drawing fell short. Each was checked on
+the drawing: either the land really can't hold it (the plan says the most that fits) or the primitive was drawn wrong
+(fixed in the primitive or preset, for every request of that type, not for the corpus case).
+
+| Request (corpus) | Before | Cause | Now |
+|---|---|---|---|
+| "parking garage for 500 cars" on 2.3 ac (TY30) | 171 spaces, the deck not connected to any drive | the deck was sized 417 × 124 ft (two bays, 5 levels) and drawn at the 223 ft the lot left; a stand-alone deck had no entrance drive | A third bay (186 ft) before a deck runs past 330 ft (500 cars: 280 × 186 ft, 5 levels); where the lot draws it shorter, the run lays it out again at the length drawn with as many levels as hold the spaces asked, up to 8 (`GARAGE_MAX`, about 85 ft; local height limits govern), or a bay deeper (`garageFit`, lib/layoutrun.mjs runBrief); its entrance and a 24 ft drive to the nearest drive as a podium's (garageEntries); judged by spaces, at least the number asked (the check's program line, not its floor area). 513 spaces on 6 levels, every check passing |
+| "hyperscale data center, 250,000 sf" on 40 ac (TY15) | a 130 ft truck court behind | the warehouse rows always drew a truck court, and the flex / warehouse generator's arrangements are all loading courts | No truck court (`truck: false`): a 24 ft service drive (fire lane, deliveries) round the back, linked at both ends or a hammerhead where an end meets nothing; the generator's loading-court arrangements sit out. The equipment yard behind as before. Cold storage keeps its court |
+| "a 125,000 sf home improvement store" on 10.3 ac (TY28) | two shop rows 646 × 85 ft, 109,802 sf | the parking-field engine laid it out at a shop row's depths (70-170 ft) | One box at its depth (300 ft, or 340-420 / 260 where that holds more: lib/siteparking.mjs takes a program depth past the use's own list); 110,352 sf. **Land limit**: at 4 a 1,000 sf with the 0.97 ac pond, the rest doesn't park, and the plan says so ("Room for 110,352 of the 125,000 sq ft asked for: the rest won't park …"). A fitness club (200 ft) gains the same |
+| "a U-shaped apartment building wrapped around a central courtyard, 140 units" (TY22) | live: the closed courtyard ring; words: a U of three wings, scored as a bar | the courtyard search tried the ring and the U alike, whatever the words named; the scorer read only a building's own form | A U named round a court (`courtShape: 'U'`) draws only the open U; a closed ring named ("O-shaped", "closed ring", "on all four sides") only the ring; neither named, both as before. The scorer reads a court of wings joined at their corners as one building: three wings a U, four or more a ring |
+| "a T-shaped mid-rise apartment building, 120 units" (FT10) | 96 units on 3 floors | the shape preset dropped "mid-rise" (the engine's 3 floors) | The mid-rise's 4 floors when the words give none: 120. Still: a 3-story T or L asked for an exact count comes up short with land left (96 of 120): the engine sizes whole buildings and can't trim a T or L to the count |
+| "a 16-story point tower, 220 units" on 5.5 ac (TY20) | 172 units | **land / arrangement limit**: two podiums of 163 ft fit beside the clubhouse and pool in one row, the plate 45% × 70% of each; a larger plate (tried: 10,000 sf at least) or shorter podiums lost units on TY-point-tower (200 → 153), so taken out | The note says it against the count asked: "Fits about 172 of the 220 units asked for." (it said "of the 247", the engine's overshoot) |
+| "live-work units along the street, 20 of them" (TY19) | as many as fit (80) | "20 of them" not read as a count | numbersOf reads "N of them / in all / in total" as the count |
+| "hotel at the front with 110 rooms, apartments behind, 200 units" (TY33) | 432 apartments | the count in a clause of its own was given to no zone | beside a type zone, a homes zone with no count takes the count clause that follows its words: 200 |
+| "a dorm with 400 beds and 20,000 sf of shops in front" (FT09) | shops alone | "dorm" isn't one of the words' uses | a residential type (student, senior) named beside shops of a size makes a zone each (the shops at the front where the words say): 134 units, 402 beds, 20,000 sf of shops |
+| "a daycare for 120 children beside 40 homes" (bench TY-daycare-homes) | "Side entry · pond beside the shops" | the option name assumed the front zone was shops | the front zone's name: "pond beside the daycare" (shops stay "the shops") |
+
+Bench, corpus, tests: docs/LAYOUT-ENGINE.md item 39.
+
