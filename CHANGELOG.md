@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 3:23 AM CT: Building types round 2: real outlines, queues, garages, a type per zone, add by type (e89e640, 629e8da, 51a5a8d, d9d45a9)
+- **Their own outlines:** T-shaped buildings, slim point towers, triplexes and fourplexes, and pad-site villages ("a pad-site village with 6 pads", "food hall pads").
+- **Queues drawn and checked:** express car washes with two stacking lanes into the tunnel (about 12 cars wanted; an estimate), bank and restaurant drive-thrus, and a fenced equipment yard behind a data centre. A new check fails a queue that sits on a drive, across parking or out into the street.
+- **Stand-alone parking garages** are drawn, plus full-service hotel and hotel-over-retail types.
+- **The numbers count what each type counts:** hotel keys, beds, children and students in the Numbers panel and its export.
+- **Mixed requests give each part its type:** "a 120-key hotel and 20,000 sf of retail", "a daycare and a bank on pads in front of townhomes".
+- **Add a building by type** in the editor: a searchable list of 51 types; the 3D map colours each by its type.
+- 74 test sites, every one passing with no warnings; the full test suite passes.
+
 ### 2:34 AM CT: Parking round 2: planted row ends, clear entrances, shorter walks, the city's parking rule governs (bc954ae, e69e956, f54a183, 451988e, f980f71)
 - **Planted islands at row ends without losing spaces:** where there is free land at a row's end, the row grows into it and both ends are planted. Bare row ends on the test sites went from 417 to 189.
 - **Clear entrance drives:** spaces no longer sit where cars would back out into an entrance drive near the street (50 ft for small lots, 75 ft up to 499 spaces, 100 ft above; a planning yardstick from access-management guidance). Spaces inside entrance drives on the test sites went from 60 to 12.
