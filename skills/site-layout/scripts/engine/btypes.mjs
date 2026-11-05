@@ -554,5 +554,6 @@ export function zonePreset(z, id, hint = {}) {
   const X = hintNumbers(P, hint), q = P.apply({ ...z, use: P.use }, VARIANT[hint.variant] || '', X, P), out = { ...z, use: q.use || z.use, name: z.name || P.short };
   if (q.gfa > 0) out.gfa = Math.round(q.gfa); if (q.units > 0) out.units = q.units; if (q.custom) { out.gfa = Math.round(CT.recipeGfa(q.custom)); out.use = 'other'; if (q.floors > 0) out.floors = q.floors; }
   if (q.btFloors && !out.floors) out.floors = q.btFloors;
-  return { z: out, bt: { btype: P.id, name: P.short, ...(q.btCounts && Object.keys(q.btCounts).length ? { counts: q.btCounts } : {}) } };
+  const rule = withRule({ ...q, use: q.use || z.use }, P).btRule; /* (the zone's own type's parking rule, as zoneOf gives it) */
+  return { z: out, bt: { btype: P.id, name: P.short, ...(q.btCounts && Object.keys(q.btCounts).length ? { counts: q.btCounts } : {}), ...(rule ? { rule } : {}) } };
 }
