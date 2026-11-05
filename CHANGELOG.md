@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 3:32 PM CT: Parking round 6: no dead paving, entry drives clear on small lots (63927b4, 4b2c07d)
+- **Paving nobody uses goes back to lawn:** pieces of a parking lot with no space and no drive on them (up to a fifth of some lots' paving) are now planted. A street-front retail lot went from 559 to 425 sf of paving per space; a full-service hotel 380 to 335; a big box 358 to 331.
+- **Clear entry drives on small lots:** the rows move back so the first cross-aisle is a full entry length from the street (50, 75 or 100 ft by lot size) with no spaces beside the entry over that length (a daycare lot 30 → 62 ft; a data centre, a pad village and a mixed lot 30 → 50 ft).
+- 55 of 76 test lots meet the landscape standard (was 54). 88 test sites pass with no warnings; the full test suite passes.
+
 ### 2:29 PM CT: Building types fill out properly: garages, T and U shapes, data centres, big boxes; a stray file removed (6e441e0, fdde683)
 - **A 500-car parking garage on 2.3 acres** is drawn with 513 spaces on 6 levels and an entrance drive (was 171), judged by its spaces.
 - **A T-shaped mid-rise** keeps its 4 floors and holds the 120 homes asked (was 96). **"U-shaped around a central courtyard"** draws an open U; a closed ring only when you name one.

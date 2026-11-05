@@ -253,4 +253,26 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   assert.equal(o2.validation.status, 'pass'); assert.ok(o2.quantities.totals.units >= 128);
   const th = RUN.entryThroats(trap, o2.elements, 50).filter(x => !x.e.emergency); assert.ok(th.length && Math.min(...th.map(x => x.cross)) >= 50, 'trap throat ' + th.map(x => x.cross));
 }
+// item 40: lot paving under no stall and no drive goes back to lawn (a field drawn as the field's box, a row trimmed off
+// it); paving under a row or an aisle, a sliver, and a turnaround pad stay
+{
+  const t = oneAisle(60, 880, { rowTo: 600 }), field = { id: 'fld', kind: 'field', x: 470, y: 150, w: 820, d: 60, rot: 0, name: '', note: 'Parking field paving' }, turn = { id: 'aisle-hamB', kind: 'field', x: 870, y: 150, w: 18, d: 60, rot: 0, turn: true, note: 'Turnaround · 60 ft' };
+  const els = t.els.concat([field, turn]), m0 = PM.parkingMetrics({ ...t.plan, elements: els });
+  const o = RUN.trimDeadPaving(t.plan, { elements: els, program: { use: 'retail' } }), m1 = PM.parkingMetrics({ ...t.plan, elements: o.elements });
+  assert.ok(m0.surplusSf > 8000 && m1.surplusSf < 0.2 * m0.surplusSf, 'surplus ' + m0.surplusSf + ' -> ' + m1.surplusSf); assert.ok(m1.sfStall < m0.sfStall);
+  assert.equal(m1.stalls, m0.stalls); assert.ok(o.elements.some(e => e.id === 'aisle-hamB' && e.w === 18), 'the turnaround stays');
+  const left = o.elements.filter(e => e.kind === 'field' && !e.turn); assert.ok(left.length >= 1 && left.every(e => e.poly?.length >= 3));
+  assert.ok((o.tplNotes || []).some(n => /under no stall and no drive/.test(n)));
+  // nothing dead: unchanged (the same object back)
+  const o2 = RUN.trimDeadPaving(t.plan, { elements: t.els, program: { use: 'retail' } }); assert.equal(o2.elements, t.els);
+}
+// item 40: a small lot's first aisle, at the paving setback, moves back into the spare depth so the way in meets no drive
+// for the stacking length (the bench's TY-daycare-dropoff and TY-pad-village sites; 30 ft before)
+{
+  for (const [ask, w, h] of [['a daycare for 150 children', 500, 400], ['a pad-site village with 6 pads', 600, 400]]) {
+    const p = { ...lot(w, h), elements: [] }, o = RUN.runBrief(B.briefFromRequest(ask, p)).options[0];
+    assert.equal(o.validation.status, 'pass'); const q = o.quantities.parking; assert.ok(q.provided >= q.required);
+    const th = RUN.entryThroats(p, o.elements, 50).filter(x => !x.e.emergency); assert.ok(th.length && Math.min(...th.map(x => x.cross)) >= 50, ask + ': throat ' + th.map(x => x.cross));
+  }
+}
 console.log('parking quality: ok');
