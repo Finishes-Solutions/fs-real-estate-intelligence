@@ -5,6 +5,14 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 6:34 AM CT: Homes round a central lake, exact counts met, clubhouse at the back (2b72db6, ef8639a)
+- **"Homes around a central lake"** rings a lake in the middle with a loop street and lots on both sides (85 homes on the 20-acre test lot, was 46 with the lake at the back); the lake holds the detention. "Homes around a central pool and clubhouse" puts a park with the clubhouse and pool in the middle. For now on near-rectangular lots and single-family homes.
+- **Exact counts met where the land allows:** "exactly 200 apartments" gives 200 (was 192), "240 mid-rise units" 240 (was 208). Where whole buildings overshoot, a few pairs of homes are combined into larger homes, and the notes say so; an option that meets the count with whole buildings is listed first.
+- **When a count doesn't fit,** the plan lays out about the most that does and says the number (96 duplexes on 10 acres: 78).
+- **"Clubhouse at the back"** keeps the full count (180 of 180, was 168).
+- **Duplex, triplex and fourplex rows** stand at the building separation in your rules under "as many as fit" (a duplex test lot 56 homes, was 52).
+- Request understanding 119 of 120 without the AI; 76 test sites pass with no warnings; the full test suite passes.
+
 ### 5:38 AM CT: Parking round 3: the building at the street with parking behind, entry drives set back (d09e938, 61b474d, 71268bb, 201e69e)
 - **"Retail on the street, parking in the rear" / "medical office at the front with parking behind it"** now lays the building at the front setback facing the street, with the drive along its side to the lot behind and no parking or pond between the building and the street. Any space between a building and the street now counts as a miss for that ask.
 - **Entry drives set back:** the first cross-aisle sits 50–100 ft in from the street where it costs no homes, with planted edges at the entrance (23 of 74 test sites still have a short entry, was 31). Some small lots use less paving per space.
