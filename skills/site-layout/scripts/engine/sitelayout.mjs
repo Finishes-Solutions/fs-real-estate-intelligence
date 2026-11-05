@@ -33,6 +33,7 @@ import { customOptions } from './customtypes.mjs';
 import * as P from './sitepods.mjs';
 import * as SN from './streetnet.mjs';
 import * as RS from './rulesheet.mjs';
+import * as HY from './hydrology.mjs';
 import * as PK from './siteparking.mjs';
 import * as ST from './sitestem.mjs';
 import * as CM from './sitecommunity.mjs';
@@ -871,16 +872,19 @@ function openLand(F, els, margin = {}) {
     };
     // a clean rectangle of about `want` sq ft, t cells in from the edge, as near `to` as fits (a summed-area table over
     // the cells far enough in; a few proportions from square to 1:3 each way)
-    const rectNear = (to, t, want) => {
+    const rectNear = (to, t, want, full = false, ok = null) => { // (ok: the rectangle has to pass it too, the nearest that does kept)
       const is = cells.map(q => q % nx), js = cells.map(q => (q - q % nx) / nx), lim = a => { let lo = Infinity, hi = -Infinity; for (const v of a) { if (v < lo) lo = v; if (v > hi) hi = v; } return [lo, hi]; }, [i0, i1] = lim(is), [j0, j1] = lim(js), W = i1 - i0 + 1, H = j1 - j0 + 1, I = new Int32Array((W + 1) * (H + 1)); // (loops, not Math.min(...cells): a 270-acre site has more cells than a worker's stack takes as arguments)
       for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const q = (j0 + j) * nx + i0 + i, v = dist.has(q) && dist.get(q) >= t ? 1 : 0; I[(j + 1) * (W + 1) + i + 1] = v + I[j * (W + 1) + i + 1] + I[(j + 1) * (W + 1) + i] - I[j * (W + 1) + i]; }
       const sum = (i, j, w, h) => I[(j + h) * (W + 1) + i + w] - I[j * (W + 1) + i + w] - I[(j + h) * (W + 1) + i] + I[j * (W + 1) + i];
       let best = null;
-      for (const a of [1, 1.5, 2, 3, 5, 8, 12, 1 / 1.5, 0.5, 1 / 3, 1 / 5, 1 / 8, 1 / 12]) { // up to a long strip along a band
-        const w = Math.max(3, Math.round(Math.sqrt(want * a) / c)), h = Math.max(3, Math.ceil(want / (w * c * c)));
+      // full: also the strip the whole way along the land far enough in, as wide (or deep) as the area needs; a strip
+      // between a loop's leg and the lot line is longer than 1:8, and a proportion that doesn't match it falls short
+      const shapes = [1, 1.5, 2, 3, 5, 8, 12, 1 / 1.5, 0.5, 1 / 3, 1 / 5, 1 / 8, 1 / 12].map(a => { const w = Math.max(3, Math.round(Math.sqrt(want * a) / c)); return [w, Math.max(3, Math.ceil(want / (w * c * c)))]; }); // up to a long strip along a band
+      if (full) { let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity; for (const q of cells) if (dist.get(q) >= t) { const i = q % nx, j = (q - i) / nx; if (i < a0) a0 = i; if (i > a1) a1 = i; if (j < b0) b0 = j; if (j > b1) b1 = j; } const Wt = a1 - a0 + 1, Ht = b1 - b0 + 1; if (Wt > 0 && Ht > 0) shapes.push([Math.max(3, Math.ceil(want / (Ht * c * c))), Ht], [Wt, Math.max(3, Math.ceil(want / (Wt * c * c)))]); }
+      for (const [w, h] of shapes) {
         for (let j = 0; j + h <= H; j++) for (let i = 0; i + w <= W; i++) if (sum(i, j, w, h) === w * h) {
           const cx = X0 + (i0 + i + w / 2) * c, cy = Y0 + (j0 + j + h / 2) * c, d = Math.hypot(cx - to[0], cy - to[1]);
-          if (!best || d < best.d) best = { d, b: [X0 + (i0 + i) * c, Y0 + (j0 + j) * c, X0 + (i0 + i + w) * c, Y0 + (j0 + j + h) * c] };
+          if (!best || d < best.d) { const b = [X0 + (i0 + i) * c, Y0 + (j0 + j) * c, X0 + (i0 + i + w) * c, Y0 + (j0 + j + h) * c]; if (!ok || ok(b)) best = { d, b }; }
         }
       }
       return best?.b || null;
@@ -933,10 +937,15 @@ function finishLand(F, els, spec, stats) {
     const beside = !!poly || wide;
     if (!poly && style !== 'organic') { // a clean rectangle near the buildings (or the middle of its band), not the piece's leftover shape
       const to = wide ? far : p.core;
-      for (const want of [left * 1.05, left * 0.9, left * 0.8]) { const b = p.rectNear(to, Math.max(2, Math.ceil(16 / p.c)), want); if (b && (wide || squat(box(...b))) && !solid.some(o => S.rectsOverlap({ poly: box(...b) }, o, 0.5))) { poly = box(...b); box0 = b; break; } } // (on spare land the pond goes at the far end, squat or not: never back in front of the shops)
+      const okR = b => (wide || squat(box(...b))) && !solid.some(o => S.rectsOverlap({ poly: box(...b) }, o, 0.5)), fits = want => { const b = spec.pondFine ? p.rectNear(to, Math.max(2, Math.ceil(16 / p.c)), want, true, okR) : p.rectNear(to, Math.max(2, Math.ceil(16 / p.c)), want); return b && okR(b) ? b : null; };
+      let fall = null; if (spec.pondFine) { // (a townhome try laid out again for its detention: the largest rectangle up to the need and a twentieth, not the next step down)
+        let b = fits(left * 1.05); if (!b) { let lo = 0.8, hi = 1.05; for (let it = 0; it < 7; it++) { const m = (lo + hi) / 2, bm = fits(left * m); if (bm) { b = bm; lo = m; } else hi = m; } if (!b) b = fits(left * 0.8); }
+        if (b && (b[2] - b[0]) * (b[3] - b[1]) >= left * 0.97) { poly = box(...b); box0 = b; } else fall = b; // (short of it: the strip followed below may hold more, the larger kept)
+      } else for (const want of [left * 1.05, left * 0.9, left * 0.8]) { const b = fits(want); if (b) { poly = box(...b); box0 = b; break; } } // (on spare land the pond goes at the far end, squat or not: never back in front of the shops)
       if (!poly) for (let k = 0, tt = t; k < 6 && !poly; k++, tt += 2) { // no rectangle holds enough (an L-shaped strip): follow the strip, with straight edges
         const sb = p.sub(tt); if (!sb || sb.ring.length < 4) break; const q = S.tidyRing(sb.ring, p.c * 1.6), qx = q.map(v => v[0]), qy = q.map(v => v[1]), compact = S.ringArea(q) / ((Math.max(...qx) - Math.min(...qx)) * (Math.max(...qy) - Math.min(...qy)) || 1) > 0.5 || !B.some(e => !HOMES.includes(e.use) && e.x > Math.min(...qx) && e.x < Math.max(...qx) && e.y > Math.min(...qy) && e.y < Math.max(...qy)); /* a straight strip, not a moat round a building */ if (q.length >= 4 && compact && squat(q) && !solid.some(o => S.rectsOverlap({ poly: q }, o, 0.5))) poly = q;
       }
+      if (fall && (!poly || S.ringArea(poly) < (fall[2] - fall[0]) * (fall[3] - fall[1]))) { poly = box(...fall); box0 = fall; }
     }
     for (let k = 0; k < 6 && !poly; k++, t += 2) {
       if (style !== 'organic') { const b = p.rect(Math.max(1, t - 1)); if (!b) break; const q = box(...b); if (squat(q) && !solid.some(o => S.rectsOverlap({ poly: q }, o, 0.5))) { poly = q; box0 = b; } continue; }
@@ -1140,7 +1149,7 @@ function attempt(plan, F, seq, prog, o) {
   if (prog.use === 'storage') { const D = r.els.filter(e => e.kind === 'drive').map(outL), n0 = r.els.length; // a drive-up row with no aisle at its doors can't be rented: gone
     r.els = r.els.filter(e => e.storage !== 'drive' || D.some(d => S.rectsOverlap({ poly: S.grow(outL(e), 3) }, { poly: d }, 0)));
     if (r.els.length < n0) { Object.assign(st, tally(r.els, prog)); st.need += o.xNeed || 0; st.stalls += o.xHave || 0; } }
-  const land = finishLand(F, r.els.concat(o.solid || [], ko.map(poly => ({ kind: 'building', use: 'amenity', poly }))), { parkBands: r.parkBands, pond: o.pond, reserve: resL, compact: (HOMES.includes(prog.use) || !!prog.zones?.some(z => HOMES.includes(z.use))) && !/^beside/.test(o.pondAt || ''), /* (a compact pond where homes are laid out: a strip along the back of a shopping center is as they're built; a pond beside the shops takes the land's far end) */ trail: prog.use === 'multifamily' || prog.use === 'townhomes' || !!o.mixed, amenity: spec.amenity, padUse: COMMERCIAL.includes(prog.use) || !!o.mixed, openSpace: !!o.openSpace, openAll: !!o.openAll, frontY: profile(F).b[0], future: o.footprint != null && st.footprint >= o.footprint * 0.97 || !!o.future, lakeName: o.lake || (prog.use === 'multifamily' && o.pond ? (PAR.storm?.mode === 'retention' ? 'Retention pond' : 'Detention pond') : '') }, st);
+  const land = finishLand(F, r.els.concat(o.solid || [], ko.map(poly => ({ kind: 'building', use: 'amenity', poly }))), { parkBands: r.parkBands, pond: o.pond, pondFine: !!o.pondFine, reserve: resL, compact: (HOMES.includes(prog.use) || !!prog.zones?.some(z => HOMES.includes(z.use))) && !/^beside/.test(o.pondAt || ''), /* (a compact pond where homes are laid out: a strip along the back of a shopping center is as they're built; a pond beside the shops takes the land's far end) */ trail: prog.use === 'multifamily' || prog.use === 'townhomes' || !!o.mixed, amenity: spec.amenity, padUse: COMMERCIAL.includes(prog.use) || !!o.mixed, openSpace: !!o.openSpace, openAll: !!o.openAll, frontY: profile(F).b[0], future: o.footprint != null && st.footprint >= o.footprint * 0.97 || !!o.future, lakeName: o.lake || (prog.use === 'multifamily' && o.pond ? (PAR.storm?.mode === 'retention' ? 'Retention pond' : 'Detention pond') : '') }, st);
   const els = r.els.concat(land, prog.use === 'storage' && prog.storage.fence && r.fenceY != null && r.els.some(e => e.storage === 'drive' || e.rv) ? fenceOf(F, r.els.concat(land), r.fenceY) : []); // (a climate building alone locks its own doors)
   return { F, r, els, st, pre, seq, o, slack, spec, res: resL };
 }
@@ -1457,7 +1466,8 @@ function repair(plan, els, keep = new Set()) {
   }
   const ok = reach(out), cut = out.filter(e => (e.kind === 'drive' || e.kind === 'truck' || e.kind === 'parking') && !ok.has(e.id) && e.note !== 'Drive-thru lane' && !keep.has(e.id));
   out = out.filter(e => !cut.includes(e));
-  return { els: out, cut: cut.length, bad: (last && !cut.length ? last : S.check({ ...plan, elements: out })).filter(i => i.level === 'bad') };
+  const guest = cut.filter(e => e.kind === 'parking' && e.note === 'Guest parking');
+  return { els: out, cut: cut.length, cutGuest: guest.length, cutGuestStalls: guest.reduce((t, e) => t + S.stalls(e).count, 0), bad: (last && !cut.length ? last : S.check({ ...plan, elements: out })).filter(i => i.level === 'bad') };
 }
 
 const OPTION_NAMES = { across: 'Rows facing the street', deep: 'Rows running back' };
@@ -1884,9 +1894,13 @@ function layoutCore(plan0, programIn, opts = {}) {
     const els = clearWays(adoptEntry(toPlanEls(F, a.els), pinned, opts.mainGone), pinned), entry = els.find(e => e.name === 'Main entry') || pinned.find(e => e.name === 'Main entry');
     nameAll(els, entry ? [entry.x, entry.y] : S.centroid(plan.ring), prog);
     const fx = repair(plan, S.seatAll({ ...plan, elements: els.concat(pinned.map(e => ({ ...e }))) }), keepIds); a.st = { ...tally(a.els, prog), pond: a.st.pond, pondNeed: a.st.pondNeed }; if (opts.xNeed > 0) a.st.need += opts.xNeed; // (the courts placed after still need their spaces)
+    // townhome guest stalls drawn at a row's end past where its lane turns the loop's corner face no drive and are cut: they
+    // no longer count toward the parking, and the try isn't marked down as if a drive had been cut off (it ranked a try
+    // with its pond made whole, TH-sub8 123 homes, below the one short of detention)
+    const gcut = prog.use === 'townhomes' ? fx.cutGuest || 0 : 0; if (gcut) a.st.stalls -= fx.cutGuestStalls;
     if (opts.debug) console.log((deep ? 'deep' : 'across'), pondAt, o.shift, o.win ? 'WIN ' + o.win.toFixed(2) : '', 'blocks', seq.blocks.map(b => b.fill[0]).join(''), 'aisles', a.r.live.map(r => r.i + ':' + Math.round(r.ea) + '-' + Math.round(r.eb)).join(' '), 'cons', a.r.cons.length, 'cut', fx.cut, 'bad', fx.bad.map(i => i.text).join(';'), 'st', JSON.stringify(a.st), 'notes', a.r.notes.join(';'));
     const club = prog.use !== 'multifamily' || !a.spec.amenity || fx.els.some(e => e.name === 'Clubhouse');
-    return { a, els: fx.els, bad: fx.bad.filter(i => !keepIds.has(i.id) || i.net), cut: fx.cut, recipe: { deep, seq, o, ...(F.wave ? { wave: waveOf(F0) } : {}), ...(align !== 'main' ? { align } : {}) }, key: (deep ? 'deep' : 'across') + (align !== 'main' ? '|street' : '') + '|' + pondAt + (o.win ? '|phase' : '') + (F.wave ? '|wave' : ''), wave: !!F.wave, win: o.win, score: score(a, prog, foot) * (club ? 1 : 0.94) + (COMMERCIAL.includes(prog.use) ? frontScore(plan, fx.els) : 0) + lowPond(plan, fx.els) - fx.bad.length * 500 - fx.cut * 40 + (o.win && a.st.footprint >= foot * 0.97 ? (1 - o.win) * 120 : 0), deep, pondAt, F0 }; // compact only counts when the whole program fits
+    return { a, els: fx.els, bad: fx.bad.filter(i => !keepIds.has(i.id) || i.net), cut: fx.cut, recipe: { deep, seq, o, ...(F.wave ? { wave: waveOf(F0) } : {}), ...(align !== 'main' ? { align } : {}) }, key: (deep ? 'deep' : 'across') + (align !== 'main' ? '|street' : '') + '|' + pondAt + (o.win ? '|phase' : '') + (F.wave ? '|wave' : ''), wave: !!F.wave, win: o.win, score: score(a, prog, foot) * (club ? 1 : 0.94) + (COMMERCIAL.includes(prog.use) ? frontScore(plan, fx.els) : 0) + lowPond(plan, fx.els) - fx.bad.length * 500 - (fx.cut - gcut) * 40 + (o.win && a.st.footprint >= foot * 0.97 ? (1 - o.win) * 120 : 0), deep, pondAt, F0 }; // compact only counts when the whole program fits
   };
   const pass = (depth, shifts, entries, limit = null, frames = [false, true]) => { for (const deep of prog.use === 'storage' ? [false] : frames) { // storage: the climate building and the gate face the street
     for (const wv of waves) {
@@ -1906,6 +1920,18 @@ function layoutCore(plan0, programIn, opts = {}) {
         // end loses its edges to the buffers and banks), so the try is laid out again with the reserve grown by what was
         // short, twice at most, each kept as a try of its own (the validator warns below 97% of the estimate)
         for (let k = 0, ak = a, ok = o; k < 2 && ak && prog.use === 'townhomes' && o.pondAt !== 'none' && ak.st.pondNeed > 0 && ak.st.pond < ak.st.pondNeed * 0.97; k++) { const o2 = { ...o, pondRes: Math.min(2.2, (ok.pondRes || 1) * ak.st.pondNeed / Math.max(1, ak.st.pond) * 1.05) }, a2 = attempt(plan, F, q.seq, prog, o2); if (a2) found.push(take(a2, q.seq, o2, deep, align, F0, pondAt)); ak = a2; ok = o2; } // opts.xNeed: spaces for pieces placed after (an AI-crafted type's courts)
+        // ... and the drawn plan's own detention: the reserve was sized to the use's typical impervious share (TR-55, 55% for
+        // townhomes), but rows packed end to end with their lanes, drives and guest stalls cover more (62% on 8 ac at 125
+        // homes), and the storage grows with it, so the validator, judging the drawn plan's own share, wants more than the
+        // engine aimed for (7% there): a pond whole by the engine's estimate still fell short, and the densest tries ranked
+        // below sparser ones. Where the drawn share asks for more, the try is also laid out again (three times at most, each
+        // a try of its own) with the pond sized to its own drawn impervious share and the reserve grown by what was short;
+        // the pond then takes the largest rectangle the strip holds up to that (pondFine), not the next step down (90%)
+        const needOf = els => { const par = plan.params || {}; if (!par.storm?.rain || win || opts.pod) return 0; const fut = els.filter(e => e.kind === 'green' && e.future).reduce((t, e) => t + S.elArea(e), 0), imp = HY.impOfElements(els, site, S.elArea); return Math.max(0, stormNeed(Math.min(devAc, (site - fut) / 43560), { ...par, storm: { ...par.storm, imp } }, prog, site / 43560).area - pondHave); };
+        for (let k = 0, ak = a, ok = o; k < 3 && ak && prog.use === 'townhomes' && o.pondAt !== 'none'; k++) {
+          const need = needOf(ak.els); if (!(need > o.pond) || ak.st.pond >= need * 0.97) break;
+          const want = need * 1.01, o2 = { ...o, pond: want, pondFine: true, pondRes: Math.min(2.2 * o.pond / want, ok.pond * (ok.pondRes || 1) / Math.max(1, ak.st.pond) * 1.03) /* (the reserve, o.pond × 1.2 × pondRes, grown by what the pond fell short, to 2.2 times the first one's at most) */ }, a2 = attempt(plan, F, q.seq, prog, o2);
+          if (a2) found.push(take(a2, q.seq, o2, deep, align, F0, pondAt)); ak = a2; ok = o2; }
         if (!a) continue; found.push(take(a, q.seq, o, deep, align, F0, pondAt));
         // townhomes as many as fit: the same try with the loop's legs pulled in from the lot lines a row's depth, its apron
         // and the setback, and a row of homes outside each (legRows); kept as a try of its own where it holds more homes

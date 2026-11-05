@@ -444,3 +444,31 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    dropped) and choosing the number of cross drives by how whole rows fill the blocks between them: both moved second
    entrances onto the pond and cost more homes than they gained. Still: the densest tries often fall short of the validator's
    detention check and rank below (TH-sub8 125, LOT-flag-th 167).
+
+22. Done Nov 4 (townhome ponds). Under "townhomes, as many as fit" the densest tries lost on detention (TH-sub8 125 homes
+   with its pond at 85% of the estimate lost to 113; LOT-flag-th 167 at 85% to 147). Diagnosed on the bench cases
+   (holdouts only as a non-regression check), three causes, none of them the reserve being clipped by rows or legs:
+   (a) the engine sized the pond (and its reserve) to the use's typical impervious share (TR-55 at 55% for townhomes),
+   while the validator judges the drawn plan's own share, and rows packed end to end with their lanes, drives and guest
+   stalls cover 62% (TH-sub8 at 124 homes: engine 24,808 sf, validator 26,471 sf): a pond whole by the engine's own
+   estimate was still under 97%, and the retry of item 20 (e), aimed at the engine's estimate, could never close it;
+   (b) the pond's rectangle came in steps of 105%, 90% and 80% of what was needed, in proportions up to 1:8, so in the
+   strip between the loop's end leg and the lot line (about 1:6.5) the reserve grown 4-20% left the pond at exactly 90%
+   (22,481 sf) until the reserve took a whole row of 5 homes (124 -> 119 -> 114); (c) the try with its pond made whole
+   (123 homes) had guest stalls at a row's end past where the lane turns the loop's corner; the run cut them as out of
+   reach and marked the try down 40 points as if a drive had been cut, below the 125 still short. Fixes
+   (lib/sitelayout.mjs): where the drawn share asks for more than the typical estimate, each townhome try is also laid
+   out again (three times at most, each a try of its own, the earlier retry kept as it was) with the pond sized to the
+   try's own drawn impervious share by the same TR-55 estimate (lib/hydrology.mjs impOfElements), the reserve grown by
+   what the pond fell short (to 2.2 times the first one's at most); in those tries the pond takes the largest rectangle
+   up to the need (a short search, the strip the whole way along the land among the shapes, the nearest one that clears
+   the buildings), and where that's still under 97% the strip followed along the land if it holds more (pondFine); guest
+   stalls cut as out of reach no longer count toward the parking and don't mark a townhome try down. Detention is judged
+   as before: the 97% threshold and the estimate are unchanged. Tried and taken out: finer pond steps in every try
+   (changed which first tries won and cost homes elsewhere), keeping guest stalls short of a lane's end (changed the
+   guest stalls carried along the rows: MF-townhomes 79 -> 78), and the drawn-share retry in place of the earlier one
+   (TH-corner6 83 -> 78: the earlier retry's larger reserve happened to rearrange the rows for more). Bench (top option,
+   all passing, no warnings, replay identical): TH-sub8 113 -> 123 (pond 103% of the drawn estimate), LOT-flag-th
+   147 -> 166 (99%), MF-townhomes 79 -> 80; other cases unchanged. Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36
+   fill 128, E054 podium-urban 172). Still: TH-sub8's 125 needs about 2 homes' worth of the end strip for its pond, and
+   giving up a whole end row (the smallest) to complete a pond nets out negative there (5 homes for 2).
