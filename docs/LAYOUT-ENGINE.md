@@ -825,13 +825,20 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    commercial use is named and no homes (never "$25k", "25k per unit"); " + 1 pad" reads as "and", not "or more".
    "trampoline park", "an indoor water park", "bowling alley" (bare): a building of an unknown type (the closest
    primitive), not a commons or an open request; "office park" is offices.
+   (f) Typed zones placed (with item 29): "a daycare and a bank on pads in front of townhomes" said "the restaurants
+   toward the street" (the bank zone's engine use) and nothing for the daycare. lib/layoutintent.mjs nameTypedZones: a
+   placement on a zone of a type the words named carries the type's name and zone, each other typed zone at that place
+   gets its own, and the check measures that zone's buildings: "the bank toward the street: done", "the daycare toward
+   the street: done". Folded onto building types round 2 and parking round 2 (74 bench cases: identical but
+   TY-mix-pads' notes).
    Scores (docs/bench/prompt-eval.md, words path, 120 requests): fully right 112 → 116 (spatial 30 → 34: S06, S13, S26,
    S31; vague, detailed and messy unchanged at 25, 32, 25), outcome checks 94% → 97%. Item 26's fresh 16: 15 → 16. Ten
    new requests written after this work, scored once (FRESH2): 8 of 10 (missed: "200,000 sf distribution building at
    the back of the site, docks facing west": at the back, docks facing south; "pond in the southeast corner": the
    engine's corner test passed a pond in the right third midway back, the scorer's stricter one didn't, so it wasn't
    said as unmet). AI path, live, spatial only (gpt-6-luna, 35 calls): fully right 29 → 32 of 35 (S06, S19, S31 missed).
-   Bench: 65 cases, every option and top plan identical to 5b39f65, all passing, no warnings, replay identical.
+   Bench: 65 cases, every option and top plan identical to 5b39f65; on the folded branch 74 cases, identical to d35bb9c
+   but TY-mix-pads' notes; all passing, no warnings, replay identical.
    Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests: test/prompts.mjs.
    Still said, not placed: a shop / office / medical building at the front (the parking-field engine,
    lib/siteparking.mjs, draws every building behind its parking); the lake in the middle; a way in off a side street is

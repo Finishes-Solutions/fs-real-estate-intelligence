@@ -23,7 +23,7 @@ import * as S from './siteplan.mjs';
 export const RELS = ['front', 'back', 'middle', 'corner', 'edge', 'near', 'behind', 'before', 'away', 'keep', 'facing', 'along', 'beside', 'between', 'around'];
 export const EDGES = ['front', 'back', 'side', 'neighbours', 'left', 'right', 'north', 'south', 'east', 'west', 'northeast', 'northwest', 'southeast', 'southwest'];
 export const PIECES = ['pool', 'clubhouse', 'playground', 'dog park', 'courts', 'pond', 'parking', 'truck court', 'entrance', 'open space', 'commons', 'buildings'];
-export const USE_SUBJECTS = ['retail', 'restaurant', 'office', 'medical', 'hotel', 'church', 'industrial', 'storage', 'fuel', 'multifamily', 'townhomes', 'duplex', 'sfr'];
+export const USE_SUBJECTS = ['retail', 'restaurant', 'office', 'medical', 'hotel', 'church', 'industrial', 'storage', 'fuel', 'multifamily', 'townhomes', 'duplex', 'sfr', 'other'];
 export const SUBJECTS = [...USE_SUBJECTS, ...PIECES];
 const COMPASS = { north: [0, 1], south: [0, -1], east: [1, 0], west: [-1, 0], northeast: [0.7071, 0.7071], northwest: [-0.7071, 0.7071], southeast: [0.7071, -0.7071], southwest: [-0.7071, -0.7071] };
 
@@ -133,6 +133,7 @@ export function cleanPlacement(p, i = 0) {
   if (EDGES.includes(p.edge)) out.edge = p.edge; if (SUBJECTS.includes(p.target)) out.target = p.target;
   if (+p.ft > 0 && +p.ft <= 2000) out.ft = Math.round(+p.ft); if (p.corner === true) out.corner = true;
   if (typeof p.text === 'string' && p.text.trim()) out.text = p.text.trim().slice(0, 120);
+  if (typeof p.name === 'string' && p.name.trim()) out.name = p.name.trim().slice(0, 40); if (Number.isInteger(p.zone) && p.zone >= 0) out.zone = p.zone;
   return out;
 }
 export function mergePlacements(...lists) {
@@ -144,6 +145,24 @@ export function validatePlacements(list) {
   const errs = []; if (list == null) return errs; if (!Array.isArray(list)) return ['program.placements must be a list'];
   list.forEach((p, i) => { if (!p || !SUBJECTS.includes(p.subject)) errs.push('program.placements.' + i + '.subject: one of ' + SUBJECTS.join(', ')); if (!p || !RELS.includes(p.rel)) errs.push('program.placements.' + i + '.rel: one of ' + RELS.join(', ')); if (p?.edge != null && !EDGES.includes(p.edge)) errs.push('program.placements.' + i + '.edge: one of ' + EDGES.join(', ')); if (p?.target != null && !SUBJECTS.includes(p.target)) errs.push('program.placements.' + i + '.target: one of ' + SUBJECTS.join(', ')); if (p?.ft != null && !(+p.ft > 0)) errs.push('program.placements.' + i + '.ft must be positive'); });
   return errs;
+}
+
+// a use placed among zones of building types the words named ("a daycare and a bank on pads in front of townhomes": the
+// bank's zone lays out as the engine's restaurant pad, the daycare as a building of its own): the placement names the
+// type said and its zone, and every other typed zone at that same place gets a placement of its own (so the notes say
+// "the bank" and "the daycare", never "the restaurants"). E: the engine program (zones, btZones). Changes pl in place.
+export function nameTypedZones(pl, E) {
+  const Z = Array.isArray(E?.zones) ? E.zones : null, T = Array.isArray(E?.btZones) ? E.btZones : null; if (!Z || !T || !T.length) return pl;
+  const whereOf = r => r === 'behind' ? 'back' : r === 'before' || r === 'along' ? 'front' : r;
+  for (const p of pl.slice()) {
+    if (!USE_SUBJECTS.includes(p.subject) || p.zone != null) continue;
+    const zi = Z.findIndex((z, i) => (z.use === p.subject || p.subject === 'restaurant' && z.use === 'retail') && T.some(t => t.zone === i)); if (zi < 0) continue;
+    const t = T.find(x => x.zone === zi); p.zone = zi; if (t?.name) p.name = t.name;
+    const w = whereOf(p.rel);
+    for (const x of T) { if (x.zone === zi || pl.some(q => q.zone === x.zone)) continue; const z = Z[x.zone]; if (!z || (z.place?.where || null) !== w || !USE_SUBJECTS.includes(z.use)) continue;
+      pl.push({ id: 'p' + (pl.length + 1), subject: z.use, rel: p.rel, ...(p.edge ? { edge: p.edge } : {}), ...(p.target ? { target: p.target } : {}), zone: x.zone, ...(x.name ? { name: x.name } : {}), text: p.text }); }
+  }
+  return pl;
 }
 
 // ---------- the site's edges and regions ----------
@@ -220,7 +239,7 @@ const ctr = list => { const pts = list.map(e => { const s = e.path && !e.poly ? 
 // ---------- does a drawing meet a placement? ----------
 // -> { status: pass | fail | n/a | unknown, said: a sentence for the notes }
 export function checkPlacement(plan, elements, program, p) {
-  const ring = plan.ring, F = siteFrame(ring, plan.front), name = describe(p), pcs = piecesOf(elements, p.subject, program);
+  const ring = plan.ring, F = siteFrame(ring, plan.front), name = describe(p), pcs0 = piecesOf(elements, p.subject, program), pcs = p.zone != null && pcs0.some(e => e.zone === p.zone) ? pcs0.filter(e => e.zone === p.zone) : pcs0; /* (a typed zone's own buildings) */
   const res = (status, why = '') => ({ id: p.id, status, said: name + (status === 'pass' ? ': done.' : status === 'fail' ? ': not met in this layout' + (why ? ' (' + why + ')' : '') + '.' : ': ' + why) });
   if (p.rel === 'keep' || p.rel === 'away') {
     const idx = edgesFor(ring, plan.front, plan.streets, p.edge || 'back'); if (!idx.length) return res('unknown', 'the site has no ' + (p.edge || '') + ' edge to measure from');
@@ -267,7 +286,7 @@ const compassOf = v => { const a = Math.atan2(v[1], v[0]) * 180 / Math.PI, k = M
 const whereIs = (F, c) => { const [u, v] = F.uv(c); return (v < 0.34 ? 'toward the street' : v > 0.66 ? 'toward the back' : 'midway back') + ', ' + (u < 0.34 ? 'on the left' : u > 0.66 ? 'on the right' : 'in the middle') + ' as seen from the street'; };
 const SUBJ_NAME = { multifamily: 'the apartments', townhomes: 'the townhomes', duplex: 'the duplexes', sfr: 'the homes', retail: 'the shops', restaurant: 'the restaurants', office: 'the offices', medical: 'the medical offices', hotel: 'the hotel', church: 'the church', industrial: 'the warehouse', storage: 'the storage', fuel: 'the gas station', buildings: 'the buildings', 'open space': 'open land', entrance: 'a way in' };
 export function describe(p) {
-  const s = SUBJ_NAME[p.subject] || 'the ' + p.subject, e = p.edge ? (p.edge === 'side' ? 'the side street' : p.edge === 'neighbours' ? 'the neighbours' : 'the ' + p.edge + (['front', 'back'].includes(p.edge) ? '' : ' side')) : '';
+  const s = p.name ? 'the ' + String(p.name).toLowerCase() : SUBJ_NAME[p.subject] || 'the ' + p.subject, e = p.edge ? (p.edge === 'side' ? 'the side street' : p.edge === 'neighbours' ? 'the neighbours' : 'the ' + p.edge + (['front', 'back'].includes(p.edge) ? '' : ' side')) : '';
   const how = { front: 'toward the street', back: 'at the back', middle: 'in the middle', corner: 'in the ' + (p.edge ? p.edge + ' ' : '') + 'corner', edge: p.subject === 'entrance' ? 'off ' + e : 'along ' + e, near: 'near the ' + (p.target || ''), behind: 'behind ' + (SUBJ_NAME[p.target] || 'the ' + (p.target || 'buildings')), before: 'in front of ' + (SUBJ_NAME[p.target] || 'the ' + (p.target || 'buildings')), away: 'no building within ' + (p.ft || AWAY_FT) + ' ft of ' + e, keep: (p.corner ? 'the ' + p.edge + ' corner kept open' : (p.ft || KEEP_FT) + ' ft kept open along ' + e), facing: 'facing ' + (p.edge === 'back' ? 'away from the street' : p.edge === 'front' ? 'the street' : p.edge), along: 'along the road', beside: 'beside ' + (p.target || ''), between: 'between two uses', around: 'around the ' + (p.target || 'commons') }[p.rel] || p.rel;
   return 'Asked: ' + (p.rel === 'away' || p.rel === 'keep' ? how : s + ' ' + how);
 }
@@ -285,7 +304,7 @@ export function applyPlacements(brief) {
     p.how = 'checked';
     // a use's place among several: the zone's place (lib/sitepods.mjs, lib/sitelayout.mjs bands read it)
     if (Z && USE_SUBJECTS.includes(p.subject)) {
-      const zi = Z.findIndex(z => z.use === p.subject || p.subject === 'restaurant' && z.use === 'retail');
+      const zi = p.zone != null && Z[p.zone] ? p.zone : Z.findIndex(z => z.use === p.subject || p.subject === 'restaurant' && z.use === 'retail');
       const role = p.rel === 'edge' || p.rel === 'facing' ? roleOf(ring, front, streets, p.edge) : null;
       const where = p.rel === 'behind' ? 'back' : p.rel === 'before' ? 'front' : ['front', 'back', 'middle', 'corner'].includes(p.rel) ? p.rel : p.rel === 'along' ? 'along' : role;
       if (zi >= 0 && where) { if (!Z[zi].place?.where) Z[zi].place = { where, road: null, next: [], side: null }; p.how = Z[zi].place.where === where || (where === 'front' && Z[zi].place.where === 'along') ? 'engine' : 'checked'; }

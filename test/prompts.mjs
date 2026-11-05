@@ -123,6 +123,10 @@ for (const id of FAST) {
   // a pond in two basins, one each end: not "the pond on the north end"
   const pd = (x, y, w) => ({ kind: 'pond', x, y, w, d: 100 }), q = { id: 'p', subject: 'pond', rel: 'edge', edge: 'north' };
   assert.equal(I.checkPlacement(plan, [pd(250, 820, 200), pd(250, 80, 160)], {}, q).status, 'fail'); assert.equal(I.checkPlacement(plan, [pd(250, 820, 300), pd(250, 80, 100)], {}, q).status, 'pass'); }
+// typed zones placed: the notes name the type said ("the bank", "the daycare"), each zone its own line, not "the restaurants"
+{ const b = B.briefFromRequest('a daycare and a bank on pads in front of townhomes', planOf('W20'));
+  assert.deepEqual(b.program.placements.map(p => I.describe(p)), ['Asked: the bank toward the street', 'Asked: the daycare toward the street']);
+  assert.ok(B.validateBrief(b).ok); }
 // sizes in thousands with no unit after them; a business named bare is a building, not a commons
 assert.equal(read('retial 25k + 1 pad').gfa, 25000, '"retail 25k" is square feet'); assert.equal(read('retial 25k + 1 pad').atLeast, undefined, '"+ 1 pad" is a pad more, not "25,000 sf or more"');
 assert.equal(read('whse ~150k, 1 acre det pond').gfa, 150000); assert.equal(read('retail with a $25k budget').gfa, undefined, 'money is not a size');
