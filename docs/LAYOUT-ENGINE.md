@@ -1183,3 +1183,67 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    reading): a data centre on 40 ac still drawn with a truck court (TY15), a 16-story point tower holding 189 of 220,
    "U-shaped … round a central courtyard" drawn as the courtyard ring not a U, a 125,000 sf big box fitting 109,802 on
    10 ac, a 500-car garage on 2.3 ac holding 171; FT10 a T-shaped mid-rise 88 of 120.
+
+
+37. Done Nov 5 (filling the land, round 4: the lake ring on any lot, room for a type's lanes, a school beside homes). The
+   owner: "keep improving how every building type and lot shape fills the land, with honest checks, no regressions". Holdouts
+   used only as a final non-regression check.
+   (a) The central-lake ring (item 32c) ran only for houses on near-rectangles. New lib/sitering.mjs ringPoly (wired in
+   lib/sitelayout.mjs ringAny): the site's outline simplified to its main lines (Douglas-Peucker, 14 ft: a curved street's
+   chords kept as a few straight runs), the loop's centre line that outline in by a lot's depth plus the verge and half the
+   street (per line: deeper where the lot line's setback needs it), legs under 50 ft merged into their neighbours, corners
+   sharper than 70° cut; each leg a straight street at its own angle (rotated rectangles). Lots are laid along both sides of
+   every leg, square to it, wherever a whole lot fits: inside the lot lines, clear of every street's right-of-way and every
+   other lot, outer lots outside the loop (an L's inside corner ran the leg's line into the middle), inner lots between the
+   loop and the middle, the home inside the setbacks from every lot line and its driveway on its own leg's street (corner
+   lots past a leg's end had homes 60+ ft from any street: the stranded-home pass dropped them). Inner rows on every leg, on
+   the longest legs while the middle stays whole and still holds the lake ("fit"), or none. The two ways in: every spot on a
+   street-facing leg where a drive square to it reaches the street, the pair farthest apart. The middle is a park; the lake
+   in it is the middle inset to the drawn plan's own detention (bisection), a walking trail round its shore. Homes: houses as
+   before (ringHomes, the home mix in turn); townhomes in the reviewed front-load row (th-frontload-row-2s: a garage and a
+   20 ft driveway each, rows of 3-6, the brief's separation between rows, a lot a home) with guest bays of 90° stalls off the
+   loop between rows wherever a quarter space a home is owed (and a last pass for what a count leaves owed); duplexes
+   front-load on their lots. A count asked for is a cap. Houses on a near-rectangle keep item 32's ringPieces (S19 identical);
+   townhomes and duplexes use ringPoly on any lot. On a lot under 12 ac with one use round the commons the ring is tried too
+   (the small-site path turned the lake into a lawn). Results (top option, every check passing, no warnings): houses round a
+   lake on a 19.8 ac L 54 (bands, the lake not in the middle) -> 83; on a 20.7 ac wedge 43 -> 89; townhomes round a lake on 20
+   ac 196 in bands (the lake at the back) -> 212 round the lake; on the wedge 189 -> 212; duplexes on 20 ac 106 -> 136, on the
+   L 118 -> 148; 120 townhomes round a lake exactly 120, parked. Still: a park with the clubhouse and pool in the middle only
+   on near-rectangles; an L whose arms are thinner than two lot depths and the loop (bench L12) gets no ring; on curve19 the
+   two ways in sit on the two front chords only (the rest of the arc is side lot lines), so access.remote warns there.
+   (b) Room for a type's lanes. The lanes (item 35) were routed after the layout over open ground, and on tight lots the
+   building is wrapped in its parking: 7 bench cases had no porte-cochère or drop-off lane (TY-hotel-keys, TY-extended-stay,
+   TY-hotel-full, TY-mix-hotel, MX-guard-hotel13, MX-guard-angled; TY-daycare). Now (lib/layoutrun.mjs runBrief) when the top
+   option misses a lane its type needs (lib/btsite.mjs laneReserve: a hotel's porte-cochère, a daycare's drop-off), the
+   layout is run again with the stalls a lane in place of a parking row takes laid out to spare (the type's ratio, or the
+   zone's parking factor, raised by them), and the type's lanes are drawn in that run before the parking is trimmed to the
+   need (fit's new pre step, earlyLanes): the regular router first, else lib/btsite.mjs rowLane, the lane where the row
+   across the walk from a face was (square in off the aisle, along the face, square back out; the row's stalls under it cut
+   by whole stalls), the engine's own check the last word. The run's own pass after the layout finds the lanes drawn
+   (porteCochere and daycareLanes skip a building that has its lane). Those options are kept only where they drew the lane,
+   pass when a plain option passes and hold as much as the best plain one; rankKey puts, at the same yield, the layout with
+   more of its type's lanes first. Six of the seven now draw it (MX-guard-hotel13 still doesn't: its top plain option is kept), same floor area, parked. A school's queue (50 cars for 500 students) is
+   too long for a row; its lanes still need open ground.
+   (c) "A school for 500 students and 100 townhomes", "a daycare for 120 children beside 40 homes" read as the homes alone
+   (the type silently dropped). lib/btypes.mjs civicZones: a school or daycare named in a clause of its own (split on and,
+   beside, next to, behind…; a clause naming homes too, "apartments with a daycare", "homes near a school", stays the homes)
+   beside a housing use is a zone of its own, at the front (its queue and buses off the street) unless the words put it at
+   the back, the homes in the rest, each zone parked at its own rule, its lanes and grounds by lib/btsite.mjs. A school zone
+   is one building (z.foot, the preset's footprint made squarer, lib/sitelayout.mjs zoneItems / buildingsIn `one`: it was
+   split into School A/B/C across the drives), its zone's land need counting its grounds and lanes; a school zone draws its
+   lanes before its grounds. On 40 ac: one school, parent queue (two lanes, doubling back) and bus loop, every check
+   passing; on 20 ac the school, its play yard and the townhomes pass but the queue and bus loop find no room (said;
+   queues.stack warns). Tried and taken out: laying the school out 150 ft deeper and cutting it back from its back face for
+   the lanes (the deeper block didn't fit a span between the drives and cost the school floor area).
+   (d) From the contact sheet: a 250-key full-service hotel came out as two hotels (Hotel A and B). Hotels are one building
+   (the hotel presets set buildings 1).
+   Bench: 88 cases (4 new: RING-L-homes 83 homes, RING-wedge-th 212, RING-L-duplex 148, TY-daycare-homes 40 homes and the
+   daycare with its fenced yard and drop-off lane), 88 passing, no warnings, replay identical; 77 of the 84 earlier cases
+   identical element for element; changed as intended: TY-hotel-keys, TY-extended-stay, TY-hotel-full (now one building),
+   TY-mix-hotel, MX-guard-angled (each gains its porte-cochère), TY-daycare (its drop-off lane), TY-hotel-retail (the same
+   porte-cochère on the reserve run's layout, 192 / 186 for 189 / 186). Parking metrics on the 84 earlier cases: 13,437 ->
+   13,445 stalls, 236 -> 232 bare row ends, 0 long dead ends. Corpus (words path, 120): 119 / 120 fully right, as before (D05
+   honestly short). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172).
+   Engine version rei-layout/2026.11.05.8. Tests: test/layoutrun.mjs (the ring on an L and a wedge with no overlapping homes,
+   lots or streets; townhomes and duplexes round a lake, a count capped; the rectangle ring unchanged; the porte-cochère and
+   drop-off on tight lots; a school or daycare beside homes as a zone).

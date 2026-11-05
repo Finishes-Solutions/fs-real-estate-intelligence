@@ -164,6 +164,35 @@ function firstGood(plan, els, B, spec, key, mk, base) {
 }
 const badOf = (plan, els) => S.check({ ...plan, elements: els }).filter(i => i.level === 'bad').map(i => i.text);
 
+// ---------- a lane where the parking row was (Nov 5, later) ----------
+// On a tight lot the type's building is wrapped in its parking, so no lane along a face reaches a drive over open ground.
+// Then, as built on such lots, the parking row across the walk from a face gives up the stalls along the lane and the lane
+// runs there, square in off the aisle beyond the row, along the face (the curb) and square back out to the aisle. Only in
+// a run that laid out stalls to spare for it (lib/layoutrun.mjs: the reserve run), so the parking still meets the need.
+// o: { w, off (lane's edge off the face), curb (ft of curb wanted), faceCost }. Returns { els, path, f, curb, leg, taken }
+// or null.
+export function rowLane(plan, els, B, o) {
+  if (!B || B.poly || !(B.w > 0 && B.d > 0)) return null;
+  const th = B.rot || 0, toL = p => rot([p[0] - B.x, p[1] - B.y], -th), toP = ([u, v]) => { const q = rot([u, v], th); return [+(B.x + q[0]).toFixed(2), +(B.y + q[1]).toFixed(2)]; };
+  const drives = els.filter(e => LN.GOAL(e)).map(e => { try { return S.shapeOf(e); } catch { return null; } }).filter(Boolean), base = badOf(plan, els), stalls = E => E.filter(e => e.kind === 'parking').reduce((t, e) => t + S.stalls(e).count, 0), n0 = stalls(els);
+  let best = null;
+  for (let f = 0; f < 4; f++) {
+    const F = LN.faceOf(B, f), at = (s, t) => toP([F.s[0] * s + F.n[0] * (F.fo + t), F.s[1] * s + F.n[1] * (F.fo + t)]), sOf = p => { const q = toL(p); return q[0] * F.s[0] + q[1] * F.s[1]; }, tOf = p => { const q = toL(p); return q[0] * F.n[0] + q[1] * F.n[1] - F.fo; };
+    // the row across the walk: a straight row parallel to the face, its near edge within 30 ft, facing the face's middle
+    const rows = els.filter(e => e.kind === 'parking' && !S.isFree(e) && !e.rv).map(e => { const c = S.corners(e), ts = c.map(tOf), ss = c.map(sOf); return { e, t0: Math.min(...ts), t1: Math.max(...ts), s0: Math.min(...ss), s1: Math.max(...ss) }; })
+      .filter(r => r.t0 > 0 && r.t0 <= 30 && r.t1 - r.t0 >= 16 && r.t1 - r.t0 <= 22 && r.s0 < -F.hl * 0.3 && r.s1 > F.hl * 0.3).sort((a, b) => a.t0 - b.t0);
+    const r = rows[0]; if (!r) continue;
+    const tl = o.off + o.w / 2, ta = r.t1 + 8; if (r.t1 < o.off + o.w + 1) continue; // (the room between the face and the aisle: the walk and the row)
+    if (!drives.some(d => S.inRing(at(0, ta), d))) continue; // (an aisle beyond the row)
+    const c = Math.min(o.curb, 2 * F.hl + 20), sa = Math.max(r.s0 + o.w / 2 + 2, -c / 2 - o.w / 2), sb = Math.min(r.s1 - o.w / 2 - 2, c / 2 + o.w / 2); if (sb - sa < Math.min(c, 2 * F.hl) * 0.8) continue;
+    const path = [at(sa, ta), at(sa, tl), at(sb, tl), at(sb, ta)], cut = [at(sa - o.w / 2 - 1, 0), at(sb + o.w / 2 + 1, 0), at(sb + o.w / 2 + 1, r.t1 + 1), at(sa - o.w / 2 - 1, r.t1 + 1)];
+    const out = S.cutRows(els, cut, 0), taken = n0 - stalls(out);
+    const cost = taken * 9 + (o.faceCost ? o.faceCost(f, F) : 0);
+    if (!best || cost < best.cost) best = { els: out, path, f, curb: sb - sa - o.w, leg: ta - tl, taken, cost, base };
+  }
+  return best;
+}
+
 // a school: the parent drop-off / pick-up queue along one face (doubling back in rows when the queue is longer than the
 // face) and the bus loop along another, apart from the cars; the play yard and fields are the recipe's own
 function schoolLanes(plan, els, B, counts, notes) {
@@ -197,9 +226,10 @@ function schoolLanes(plan, els, B, counts, notes) {
   return pick.on;
 }
 // a daycare: a drop-off lane along a face near the door, and the play yard fenced (the recipe's, or one laid beside it)
-function daycareLanes(plan, els, B, counts, notes, zone) {
+function daycareLanes(plan, els, B, counts, notes, zone, opt = {}) {
   const Q = QUEUE_TYPES.daycare, cars = queueWant('daycare', counts), fc = streetCost(plan, B), base = badOf(plan, els);
   let out = els;
+  if (els.some(e => e.id === B.id + '-dropoff')) return els; // (drawn already: the reserve run's, lib/layoutrun.mjs)
   // the play yard: the recipe's own beside the building, else (a daycare zone) one laid beside it on open ground
   let yard = out.find(e => e.kind === 'play' && e.custom && e.custom === B.custom && e.part === 'play');
   if (!yard) {
@@ -215,11 +245,15 @@ function daycareLanes(plan, els, B, counts, notes, zone) {
     return { add: [laneEl(B, 'dropoff', path, { w: 12, R: 20, name: 'Drop-off lane', queue: 'daycare', extra: { stack: held, windowAt: +t.windowAt.toFixed(1) } })], held };
   }, badOf(plan, out));
   if (dl) { out = dl.els; notes.push('Daycare: a drop-off lane from the drive along the building’s ' + (dl.t.f === 0 ? 'front' : dl.t.f === 2 ? 'back' : 'side') + ' and back out: ' + dl.made.held + ' cars (' + cars + ' wanted; ' + Q.src + ').'); }
-  else notes.push('Daycare: no room for a drop-off lane reaching a drive (' + cars + ' cars wanted); the parking nearest the door serves for drop-off.');
+  else { const rl = opt.rowLane ? rowLane(plan, out, B, { w: 12, off: 8, curb: cars * Q.car + 10, faceCost: fc }) : null, held = rl ? Math.max(0, Math.floor((rl.leg + rl.curb - 10) / Q.car + 1e-6)) : 0; // (the reserve run: in place of the row across the walk)
+    const got = rl && rl.els.concat([laneEl(B, 'dropoff', rl.path, { w: 12, R: 20, name: 'Drop-off lane', queue: 'daycare', extra: { stack: held, windowAt: +(rl.leg + rl.curb).toFixed(1) } })]);
+    if (got && !S.check({ ...plan, elements: got }).some(i => i.level === 'bad' && !rl.base.includes(i.text))) { out = got; notes.push('Daycare: a drop-off lane in off the parking aisle along the building’s ' + (rl.f === 0 ? 'front' : rl.f === 2 ? 'back' : 'side') + ' and back out, where ' + rl.taken + ' stalls of the row in front were (the layout parked for them): ' + held + ' cars (' + cars + ' wanted; ' + Q.src + ').'); }
+    else notes.push('Daycare: no room for a drop-off lane reaching a drive (' + cars + ' cars wanted); the parking nearest the door serves for drop-off.'); }
   return out;
 }
 // a hotel: a porte-cochère at the entrance, a drive-through lane under a canopy along the face toward the street
-function porteCochere(plan, els, B, notes) {
+function porteCochere(plan, els, B, notes, opt = {}) {
+  if (els.some(e => e.id === B.id + '-porte')) return els; // (drawn already: the reserve run's, lib/layoutrun.mjs)
   const Q = QUEUE_TYPES.porte, fc = streetCost(plan, B, 200), base = badOf(plan, els), SPAN = 60;
   const got = firstGood(plan, els, B, { w: 24, off: 6, sp: 60, R: 25, street: true, need: Q.cars * Q.car, maxRows: 0, curb: 100, ext: 10, window: 'mid', faceCost: fc }, 'porte', (t, path) => {
     const ring = LN.faceRect(B, t.f, -SPAN / 2, SPAN / 2, 0, 6 + 24 + 2), c = ring.reduce((s, p) => [s[0] + p[0] / 4, s[1] + p[1] / 4], [0, 0]);
@@ -228,6 +262,10 @@ function porteCochere(plan, els, B, notes) {
       { id: B.id + '-portecanopy', kind: 'plaza', poly: ring, x: +c[0].toFixed(2), y: +c[1].toFixed(2), name: 'Porte-cochère', note: 'Canopy over the drop-off lane at the entrance', porte: true }], held };
   }, base);
   if (got) { notes.push('Hotel: a porte-cochère at the entrance on the ' + (got.t.f === 0 ? 'front' : got.t.f === 2 ? 'back' : 'side') + ' (a 24 ft drive-through lane under a ' + SPAN + ' ft canopy, a lane to stop and one to pass, in from the drive and back out): ' + got.made.held + ' cars at the door (' + Q.cars + ' wanted; ' + Q.src + ').'); return got.els; }
+  if (opt.rowLane) { const rl = rowLane(plan, els, B, { w: 24, off: 6, curb: SPAN + 20, faceCost: fc }); // (the reserve run: in place of the row across the walk)
+    if (rl) { const ring = LN.faceRect(B, rl.f, -SPAN / 2, SPAN / 2, 0, 6 + 24 + 2), c = ring.reduce((s, p) => [s[0] + p[0] / 4, s[1] + p[1] / 4], [0, 0]), held = Math.max(0, Math.floor((rl.leg + rl.curb / 2 + SPAN / 2 - 16) / Q.car + 1e-6));
+      const out = rl.els.concat([laneEl(B, 'porte', rl.path, { w: 24, R: 25, name: 'Porte-cochère drive', queue: 'porte', extra: { stack: held, windowAt: +(rl.leg + rl.curb / 2 + SPAN / 2).toFixed(1) } }), { id: B.id + '-portecanopy', kind: 'plaza', poly: ring, x: +c[0].toFixed(2), y: +c[1].toFixed(2), name: 'Porte-cochère', note: 'Canopy over the drop-off lane at the entrance', porte: true }]);
+      if (!S.check({ ...plan, elements: out }).some(i => i.level === 'bad' && !rl.base.includes(i.text))) { notes.push('Hotel: a porte-cochère at the entrance on the ' + (rl.f === 0 ? 'front' : rl.f === 2 ? 'back' : 'side') + ' (a 24 ft drive-through lane under a ' + SPAN + ' ft canopy), in off the parking aisle where ' + rl.taken + ' stalls of the row in front were (the layout parked for them): ' + held + ' cars at the door (' + Q.cars + ' wanted; ' + Q.src + ').'); return out; } } }
   notes.push('Hotel: no room between the hotel and its parking for a porte-cochère reaching a drive; guests drop off from the parking aisle. Add one by hand where the land allows.');
   return els;
 }
@@ -298,7 +336,7 @@ function dryGrounds(plan, els, B, notes) {
   }
   return out;
 }
-function typeFeatures(plan, els, prog) {
+function typeFeatures(plan, els, prog, opt = {}) {
   if (!Array.isArray(els) || !prog) return { els, notes: [] };
   let out = els; const notes = [];
   const one = (btype, counts, Z) => {
@@ -306,9 +344,9 @@ function typeFeatures(plan, els, prog) {
     if ((btype === 'school' || btype === 'daycare') && Z == null) { const B = civic(out, Z, btype)[0]; if (B) out = dryGrounds(plan, out, B, notes); } // (after its lanes: the grounds moved to what is left)
   };
   const one0 = (btype, counts, Z) => {
-    if (btype === 'school') { const B = civic(out, Z, 'school').sort((a, b) => b.w * b.d - a.w * a.d)[0]; if (!B) return; if (Z != null && !out.some(e => e.kind === 'play' && e.zone === Z)) out = schoolGrounds(plan, out, B, counts || {}, notes); out = schoolLanes(plan, out, B, counts || {}, notes); }
-    else if (btype === 'daycare') { const B = civic(out, Z, 'daycare')[0]; if (B) out = daycareLanes(plan, out, B, counts || {}, notes, Z != null); }
-    else if (/^hotel-(?:limited|extended|full|over-retail)$/.test(btype)) { const B = civic(out, Z, btype).sort((a, b) => b.w * b.d - a.w * a.d)[0]; if (B && !B.poly && !B.form) out = porteCochere(plan, out, B, notes); }
+    if (btype === 'school') { const B = civic(out, Z, 'school').sort((a, b) => b.w * b.d - a.w * a.d)[0]; if (!B) return; out = schoolLanes(plan, out, B, counts || {}, notes); if (Z != null && !out.some(e => e.kind === 'play' && e.zone === Z)) out = schoolGrounds(plan, out, B, counts || {}, notes); } // (a school zone: its lanes first, then its grounds on what is left: the queue needs the room next to the building)
+    else if (btype === 'daycare') { const B = civic(out, Z, 'daycare')[0]; if (B) out = daycareLanes(plan, out, B, counts || {}, notes, Z != null, opt); }
+    else if (/^hotel-(?:limited|extended|full|over-retail)$/.test(btype)) { const B = civic(out, Z, btype).sort((a, b) => b.w * b.d - a.w * a.d)[0]; if (B && !B.poly && !B.form) out = porteCochere(plan, out, B, notes, opt); }
     else if (btype === 'bank' && Z != null) { const B = civic(out, Z, 'bank')[0]; if (B && !out.some(e => e.queue && e.kind === 'drive' && String(e.id).startsWith(B.id))) out = bankLane(plan, out, B, notes); }
   };
   if (prog.btype) one(prog.btype, prog.btCounts, null);
@@ -318,9 +356,18 @@ function typeFeatures(plan, els, prog) {
 }
 
 // ---------- after a run ----------
+// the lanes a type's buildings need that a lane in place of a parking row can give (a hotel's porte-cochère, a daycare's
+// drop-off): { stalls the run should lay out to spare for them, kinds }. A school's queue is too long for a row (its
+// lanes go on open ground or not at all). For lib/layoutrun.mjs's reserve run.
+export function laneReserve(prog) {
+  const one = (bt, c) => /^hotel-(?:limited|extended|full|over-retail)$/.test(bt) ? Math.ceil((60 + 20 + 2 * 24 + 4) / 9) + 2 : bt === 'daycare' ? Math.ceil((queueWant('daycare', c || {}) * QUEUE_TYPES.daycare.car + 10 + 2 * 12 + 4) / 9) + 2 : 0;
+  const out = []; if (prog?.btype) { const n = one(prog.btype, prog.btCounts); if (n) out.push({ use: prog.use, stalls: n, btype: prog.btype }); }
+  for (const Z of prog?.btZones || []) { const n = one(Z.btype, Z.counts), z = (prog.zones || [])[Z.zone]; if (n && z) out.push({ use: z.use, stalls: n, btype: Z.btype, zone: Z.zone }); }
+  return out;
+}
 // the type's site features on the option's elements: { els, notes } (the same array when the type needs none)
-export function siteFeatures(plan, els, prog) {
-  const a = siteFeatures0(plan, els, prog), b = typeFeatures(plan, a.els, prog); // (round 3: the lanes and yards each type and zone needs, lib/btlanes.mjs; none: the same array)
+export function siteFeatures(plan, els, prog, opt = {}) {
+  const a = siteFeatures0(plan, els, prog), b = typeFeatures(plan, a.els, prog, opt); // (round 3: the lanes and yards each type and zone needs, lib/btlanes.mjs; none: the same array)
   return b.els === a.els && !b.notes.length ? a : { els: b.els, notes: [...a.notes, ...b.notes] };
 }
 function siteFeatures0(plan, els, prog) {
