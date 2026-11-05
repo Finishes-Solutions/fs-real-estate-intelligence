@@ -529,12 +529,12 @@ function buildingsIn(F, band, b, sp) {
 const towerOn = floors => PAR.form === 'tower' && (floors || 1) >= 4;
 // a tower's floor area as a share of its podium's footprint times its floors (the footprint a sized program needs is
 // that much bigger)
-const towerAf = floors => { const e = { kind: 'building', x: 0, y: 0, w: 240, d: S.PODIUM.depth, floors, form: 'tower', podium: 2, parkLevels: 'auto' }; return S.gfaOf(e) / (240 * S.PODIUM.depth * floors); };
+const towerAf = floors => { const e = { kind: 'building', x: 0, y: 0, w: 240, d: S.PODIUM.depth, floors, form: 'tower', podium: 2, parkLevels: 'auto', ...(PAR.point ? { point: true } : {}) }; return S.gfaOf(e) / (240 * S.PODIUM.depth * floors); };
 // surface spaces an apartment building's footprint (sq ft) needs: its homes' spaces, less what a tower's podium parks
 // (measured on a typical podium, 240 ft long)
 function mfPer(prog) {
   const plain = prog.floors * 0.85 / prog.unitSf * prog.perUnit; if (!towerOn(prog.floors)) return plain;
-  const D = S.PODIUM.depth, e = { kind: 'building', x: 0, y: 0, w: 240, d: D, floors: prog.floors, form: 'tower', podium: 2, parkLevels: 'auto' }, A = 240 * D;
+  const D = S.PODIUM.depth, e = { kind: 'building', x: 0, y: 0, w: 240, d: D, floors: prog.floors, form: 'tower', podium: 2, parkLevels: 'auto', ...(PAR.point ? { point: true } : {}) }, A = 240 * D;
   return Math.max(plain * 0.04, (Math.floor(S.gfaOf(e) * (prog.eff || 0.85) / prog.unitSf) * prog.perUnit - S.podiumStalls(e)) / A);
 }
 // the building shape chosen under Site parameters: an L, a U round a courtyard (wings as deep as an apartment bar, or
@@ -542,7 +542,7 @@ function mfPer(prog) {
 // area, so buildings are drawn that much longer and a sized program still gets its floor area.
 function formOf(use, D, floors, len) {
   const f = PAR.form; if (!f || f === 'bar' || ['townhomes', 'duplex', 'sfr', 'amenity', 'restaurant', 'industrial', 'storage'].includes(use)) return { props: {}, af: 1 };
-  if (f === 'tower') { if ((floors || 1) < 4) return { props: {}, af: 1 }; const e = { kind: 'building', x: 0, y: 0, w: len, d: D, floors, form: 'tower', podium: 2, ...(use === 'multifamily' ? { parkLevels: 'auto' } : {}) }; return { props: { form: 'tower', podium: 2, ...(e.parkLevels ? { parkLevels: 'auto' } : {}) }, af: e.parkLevels ? 1 : S.gfaOf(e) / (len * D * floors) }; } // (a parking podium: the program's footprint is the podium's already, wantFoot) // (apartments: the podium parks the tower, S.PODIUM)
+  if (f === 'tower') { if ((floors || 1) < 4) return { props: {}, af: 1 }; const e = { kind: 'building', x: 0, y: 0, w: len, d: D, floors, form: 'tower', podium: 2, ...(use === 'multifamily' ? { parkLevels: 'auto' } : {}), ...(PAR.point ? { point: true } : {}) }; return { props: { form: 'tower', podium: 2, ...(e.parkLevels ? { parkLevels: 'auto' } : {}), ...(PAR.point ? { point: true } : {}) }, af: e.parkLevels ? 1 : S.gfaOf(e) / (len * D * floors) }; } // (a parking podium: the program's footprint is the podium's already, wantFoot) // (apartments: the podium parks the tower, S.PODIUM)
   const wing = use === 'multifamily' ? +PAR.bldgDepth || 60 : Math.max(40, D * 0.5), e = { kind: 'building', x: 0, y: 0, w: len, d: D, form: f, wing };
   return { props: { form: f, wing }, af: S.footArea(e) / (len * D) };
 }
@@ -563,7 +563,8 @@ let guestOwed = 0, thRows = []; const GUEST_TRIM = 6; // townhome guest spaces s
 function homesIn(F, i, b, A, bOb, part, live = null) {
   if (b.fill === 'sfr') return lotsIn(F, i, b, A, bOb, part, live);
   const FL = b.fill === 'homes' && (b.prog?.load === 'front') ? frontLoadT() : null; // a front-load townhome row: garages and front doors on the street, a driveway apron each
-  const out = [], n = A.length, th = b.fill === 'homes', D = FL ? FL.D : 40, apron = FL ? FL.apron : th ? 5 : 25, unitW = FL ? FL.unitW : th ? 24 : 64, gap = th ? (+PAR.homeGap > 0 ? +PAR.homeGap : 20) : 22, load = FL ? 'front-load' : 'rear-load';
+  const PX = b.fill === 'duplex' ? S.PLEX[b.prog?.plex] : null; // (a triplex or fourplex of its own, S.PLEX)
+  const out = [], n = A.length, th = b.fill === 'homes', D = FL ? FL.D : PX ? PX.d : 40, apron = FL ? FL.apron : th ? 5 : 25, unitW = FL ? FL.unitW : PX ? PX.w : th ? 24 : 64, gap = th ? (+PAR.homeGap > 0 ? +PAR.homeGap : 20) : 22, load = FL ? 'front-load' : 'rear-load';
   const bands = [];
   if (i > 0) { const y = A[i - 1].y + A[i - 1].w / 2 + apron; bands.push([y, y + D, 'down']); }
   if (i < n) { const y = A[i].y - A[i].w / 2 - apron; bands.push([y - D, y, 'up']); }
@@ -599,7 +600,7 @@ function homesIn(F, i, b, A, bOb, part, live = null) {
       const n = Math.min(8, Math.ceil(guestOwed - 0.3)); let xa = x > p ? x - gap + 6 : p;
       while (last && last.bl.units > 3 && q - xa < n * SW + 6 && (!fill || guestOwed >= GUEST_TRIM)) { last.bl.units -= 1; last.bl.w -= unitW; last.bl.x -= unitW / 2; last.bl.note = last.bl.units + ' units · ' + unitW + '×' + D + ' · ' + load; const lot = last.lots.pop(); out.splice(out.indexOf(lot), 1); if (lot.dw) out.splice(out.indexOf(lot.dw), 1); b.max += 1; x -= unitW; xa = x - gap + 6; }
       const m = Math.min(fill ? 8 : n, Math.floor((q - xa) / SW)); if (m >= (fill ? 2 : 1)) { stallsAt(xa, m); guestOwed -= m; } }
-    if (!th) while (x + unitW <= q && b.max > 0) { b.max -= 2; out.push({ kind: 'building', ...rectL(x, y0, x + unitW, y1), use: 'duplex', floors: b.floors || 2, units: 2, note: 'Front-load · private yards' }); x += unitW + gap; }
+    if (!th) while (x + unitW <= q && b.max > 0) { const nu = PX ? PX.units : 2; b.max -= nu; out.push({ kind: 'building', ...rectL(x, y0, x + unitW, y1), use: 'duplex', floors: PX ? PX.floors : b.floors || 2, units: nu, note: 'Front-load · private yards', ...(PX ? { plex: nu } : {}) }); x += unitW + gap; }
   }
   return out;
 }
@@ -1012,15 +1013,15 @@ const { stormNeed, stormAcres } = S; export const STORM = S.STORM; export { stor
 function sequences(use, prog, F, avail) {
   const out = [], fl = prog.floors, U = S.USES[use];
   if (use === 'multifamily') {
-    const D = towerOn(fl) ? S.PODIUM.depth : (+PAR.bldgDepth || 60) * (PAR.form === 'U' || PAR.form === 'L' ? 2 : 1), inB = { fill: 'bldg', use, D, floors: fl, rowsDown: true, rowsUp: true, h: 2 * ROW + 2 * WALK + D }, inP = { fill: 'park', rowsDown: true, rowsUp: true, h: 2 * ROW + 4 };
+    const D = towerOn(fl) ? S.PODIUM.depth : (+PAR.bldgDepth || 60) * (PAR.form === 'U' || PAR.form === 'L' || PAR.form === 'T' ? 2 : 1), inB = { fill: 'bldg', use, D, floors: fl, rowsDown: true, rowsUp: true, h: 2 * ROW + 2 * WALK + D }, inP = { fill: 'park', rowsDown: true, rowsUp: true, h: 2 * ROW + 4 };
     for (let na = 1; na <= 14; na++) for (const eb of [true, false]) for (const et of [true, false]) for (let np = 0; np < na; np++) {
       const inner = []; for (let k = 0; k < na - 1; k++) inner.push(np && (k + 1) % Math.max(1, Math.round((na - 1) / np)) === 0 && inner.filter(b => b.fill === 'park').length < np ? inP : inB);
       const bot = eb ? { fill: 'bldg', use, D, floors: fl, rowsUp: true, h: ROW + WALK + D } : { fill: 'none', rowsUp: true, h: ROW }, top = et ? { fill: 'bldg', use, D, floors: fl, rowsDown: true, h: ROW + WALK + D } : { fill: 'none', rowsDown: true, h: ROW };
       out.push({ blocks: [bot, ...inner, top], aisles: Array(na).fill(0).map(() => ({ w: AISLE, kind: 'aisle' })) });
     }
   } else if (use === 'townhomes' || use === 'duplex') {
-    const th = use === 'townhomes', FL = th && prog.load === 'front' ? frontLoadT() : null, aw = th ? 24 : 26; // (front-load: the E053 row, its apron, rear yards back to back)
-    const inner = FL ? FL.apron + FL.D + 30 + FL.D + FL.apron : th ? 5 + 40 + 36 + 40 + 5 : 25 + 40 + 40 + 40 + 25, edge = FL ? FL.apron + FL.D : (th ? 5 : 25) + 40;
+    const th = use === 'townhomes', FL = th && prog.load === 'front' ? frontLoadT() : null, aw = th ? 24 : 26, DD = !th && S.PLEX[prog.plex] ? S.PLEX[prog.plex].d : 40; // (front-load: the E053 row, its apron, rear yards back to back; DD: a triplex's or fourplex's depth, S.PLEX)
+    const inner = FL ? FL.apron + FL.D + 30 + FL.D + FL.apron : th ? 5 + 40 + 36 + 40 + 5 : 25 + DD + 40 + DD + 25, edge = FL ? FL.apron + FL.D : (th ? 5 : 25) + DD;
     for (let na = 1; na <= 16; na++) out.push({ blocks: [{ fill: use === 'townhomes' ? 'homes' : 'duplex', h: edge }, ...Array(na - 1).fill(0).map(() => ({ fill: th ? 'homes' : 'duplex', h: inner })), { fill: th ? 'homes' : 'duplex', h: edge }], aisles: Array(na).fill(0).map(() => ({ w: aw, kind: th ? 'lane' : 'street' })) });
   } else if (use === 'sfr') { // single-family lots on both sides of 28 ft streets (in a 50 ft right-of-way), backs of lots meeting
     // (a rule sheet's street and right-of-way). The lot depth asked for, else 115 ft and the 105 and 100 ft lots builders use as
@@ -1872,6 +1873,7 @@ function layoutCore(plan0, programIn, opts = {}) {
   const prog = S.normalizeProgram(programIn), plan = { ...plan0, setbacks: { ...S.SETBACKS, ...(plan0.setbacks || {}) } }, site = S.ringArea(plan.ring);
   useParams(plan); if (prog.storm) PAR.storm = { ...(PAR.storm || {}), mode: prog.storm }; // asked for in words: retention, underground…
   if (prog.form) PAR.form = prog.form; // the building shape the request names ("L-shaped")
+  if (prog.point && prog.form === 'tower') PAR.point = true; // a point tower: a slim tower on its podium (lib/btypes.mjs point-tower preset; S.towerOutline)
   if (prog.use === 'foodtrucks') return foodTruckCore(plan, prog, opts);
   if (prog.zones) { // shops and offices with no garage asked for: also try one, where it adds more leasable floor area than it costs
     const tm = CX.now(), a0 = withPods(plan, prog, opts, mixedOptions(plan, prog, opts), tm), a = SN.netWanted(plan, prog, opts) ? withNet(plan, prog, opts, a0) : a0, commercial = prog.zones.filter(z => COMMERCIAL.includes(z.use)).length && !prog.zones.some(z => HOMES.includes(z.use) || z.use === 'multifamily');
@@ -1977,7 +1979,7 @@ function layoutCore(plan0, programIn, opts = {}) {
   // building, paving or a pond on one is left out (the search keeps off them as it draws)
   const koShapes = (KO || []).map(e => S.shapeOf(e)).filter(r => r.length >= 3), clearOfKO = f => !koShapes.length || !(f.els || []).some(e => !['green', 'tree', 'lot', 'trail', 'fence', 'sign', 'keepout'].includes(e.kind) && !e.future && koShapes.some(k => { try { return S.rectsOverlap({ poly: S.shapeOf(e) }, { poly: k }, 0.5); } catch { return false; } }));
   if (towerOn(prog.floors) && prog.use === 'multifamily' && !prog.zones && !pinned.length && !opts.pod && opts.gallery !== false && (prog.arrangement === 'podium-court' || site < 3 * 43560)) { /* (asked for, or a small urban lot where the search's towers can't hold the count) */ try { found.push(...GEN.generate(plan, opts.askedUnits ? { ...prog, units: opts.askedUnits } : prog, { foot, pond }, { frameOf, profile, spans, finishLand, tally, score, take: takeCorner }, { budgetMs: 3000, podiumCourt: true }).filter(clearOfKO).slice(0, 4)); } catch (e) { if (globalThis.SP_DEBUG) console.log('podium court failed', e.stack); } } // a courtyard on the podium (5 over 2): the generator's, beside the search's towers
-  if ((GEN.covers(prog) || edgesOnly) && !towerOn(prog.floors) && !(prog.use === 'multifamily' && (PAR.form === 'U' || PAR.form === 'L')) && !pinned.length && /* (a building shape chosen in Settings, U or L: the generator draws bars, so it sits out) */ (!opts.pod && !opts.oldEngine || opts.gallery === true) && opts.gallery !== false) { try { found.push(...GEN.generate(plan, prog, { foot, pond }, { frameOf, profile, spans, finishLand, tally, score, take: takeCorner, style: { curveR: PAR.style.corners === 'square' ? 0 : 42, jog: PAR.jog !== false } }, { budgetMs: 4000, edgesOnly }).filter(clearOfKO).slice(0, 8)); } catch (e) { if (globalThis.SP_DEBUG) console.log('generator failed', e.stack); } } // the generator's best (lib/sitegen.mjs): courtyards, loops and rows the search doesn't make
+  if ((GEN.covers(prog) || edgesOnly) && !towerOn(prog.floors) && !(prog.use === 'multifamily' && (PAR.form === 'U' || PAR.form === 'L' || PAR.form === 'T')) && !pinned.length && /* (a building shape chosen in Settings, U or L: the generator draws bars, so it sits out) */ (!opts.pod && !opts.oldEngine || opts.gallery === true) && opts.gallery !== false) { try { found.push(...GEN.generate(plan, prog, { foot, pond }, { frameOf, profile, spans, finishLand, tally, score, take: takeCorner, style: { curveR: PAR.style.corners === 'square' ? 0 : 42, jog: PAR.jog !== false } }, { budgetMs: 4000, edgesOnly }).filter(clearOfKO).slice(0, 8)); } catch (e) { if (globalThis.SP_DEBUG) console.log('generator failed', e.stack); } } // the generator's best (lib/sitegen.mjs): courtyards, loops and rows the search doesn't make
   const usable = found.filter(f => !f.bad.length && f.els.some(e => e.kind === 'building')).sort((a, b) => b.score - a.score), pick = [];
   usable.forEach(parked);
   // two ways in the fire code wants half the site's diagonal apart (IFC D104.3): a layout whose main entry leaves a spot on

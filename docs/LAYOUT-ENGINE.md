@@ -755,3 +755,40 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    paving while the field stayed (TY-fitness 361 -> 447 sf a stall, TY-bigbox 341 -> 410): it now judges the paving's
    union, planted islands left out, and those cases are unchanged. TY-clinic-custom's walk p90 74 -> 106 ft comes from a
    different winning layout once the 13n rows count what they draw (12,000 -> 12,001 sf), not from the parking passes.
+
+29. Done Nov 5 (building types, round 2). The owner: "flexible building-type primitives that get modified into many more
+   building types, keeping the coloured 3D blocks". Round 1's leftovers (item 27), most valuable first; docs/BUILDING-TYPES.md
+   section 6. (1) Footprints of their own: a T is drawn as a T (lib/siteplan.mjs outline form 'T', overlap, footprint, the
+   plan-set outline and the engine's L / U paths take it; the editor's shape list too); a point tower is a slim tower on
+   its podium (`point`: 45% × 70% of the podium, the engine's tower sizing counting homes on that plate); triplexes and
+   fourplexes are buildings of their own (S.PLEX, 66 × 44 and 64 × 56 ft, estimates) on the duplex rows, the blocks as
+   deep as they need; a cluster-of-pads preset ("a pad-site village with 6 pads", "food hall pads"). (2) Site features a
+   type needs, lib/btsite.mjs: the type is laid out as a bigger box (`btEnvelope`; lib/layoutbrief.mjs toEngine draws the
+   envelope and spreads the type's spaces over it when it is cut back: one additive line) and after the run the box is
+   cut back to the building: an express car wash's tunnel with one way in from the nearest drive splitting into two
+   12 ft stacking lanes that merge round the far end into the tunnel, and an exit apron (runs out straight or turning
+   once, through landscape or a walk only; corners for a passenger car's turn; left off with a note when nothing reaches
+   a drive or the engine's own check objects); a data centre's fenced generator and cooling yard on the back quarter of
+   its plot. The bank's and restaurants' drive-thru lanes (lib/sitepad.mjs) are reused and now checked. New soft checks
+   in lib/layoutcheck.mjs: queues.clear (each queue lane's centre line every 2 ft where cars wait, from where it leaves
+   its drive or its drawn queue start to its window: no point on another drive, a parking row or outside the property
+   line) and queues.stack (12 cars for a car wash, an estimate from common express-tunnel planning, local rules 6-15; 5 a
+   lane for a bank, estimate; 8 behind the order point for a restaurant, the engine's rule); a parking row laid across a
+   car wash lane is caught in test/btypes.mjs. (3) A stand-alone parking garage drawn (a two-bay deck sized on the stall
+   grid; the garage is the program, its levels its floor area: layoutcheck quantities counts a `standalone` garage as its
+   use's building); a full-service hotel preset; a hotel over retail (the hotel's floors over a ground floor of shops, the
+   parking rule the two blended). (4) The pro forma and Numbers count keys from the buildings (an extended stay is no
+   longer re-counted at 550 sf a key), beds, children, students and storage units (lib/proforma.mjs; test/btnumbers.mjs).
+   (5) A type per zone: a mixed request's zones take the preset their part of the words names (`btZones`), and types named
+   on pads in front of another use become front zones ("a daycare and a bank on pads in front of townhomes"); each zone
+   parks at its use's own rule. (6) The editor's Add panel: "Add a building by type", a searchable list of the 51 presets
+   with their colours, adding BT.presetBuilding at its usual size; the 3D map shows the block coloured by type with its
+   parapet and floor lines. Bench: 74 cases, 74 pass, no warnings, replay identical; the 44 earlier non-type cases
+   identical element for element; TY-fourplex (fourplexes of their own), TY-datacenter (its yard), TY-carwash (moved to
+   2.3 ac: lanes, exit and vacuum stalls drawn) changed as intended; TY-student came out as the mirror image of the same
+   layout (200 units, 361/360: the tagged buildings' new count fields change the tie order of equal options); 9 new
+   cases (TY-T-apts, TY-point-tower, TY-triplex, TY-hotel-full, TY-hotel-retail, TY-garage, TY-pad-village, TY-mix-hotel,
+   TY-mix-pads). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Still: a school's
+   bus loop and parent drop-off, a daycare's drop-off lane, a hotel's porte-cochère and a gas station's queue at the
+   pumps are not drawn; a bank as a zone has no drive-thru lane; zones park at their use's rule; recipe types as zones
+   are the building alone; the car wash's lanes need a drive within 90 ft of its plot's end.

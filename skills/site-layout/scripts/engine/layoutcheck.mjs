@@ -15,6 +15,7 @@
 import * as S from './siteplan.mjs';
 import polyclip from './vendor/polyclip.mjs';
 import * as TURN from './turning.mjs';
+import { QUEUE_NEED } from './btsite.mjs';
 
 export const VALIDATOR_VERSION = 'rei.validate/1';
 export const TOL = { len: 0.5, area: 1, touch: 1.0, lock: 0.01 }; // ft, sq ft, ft (pieces meet), ft (a locked piece unmoved)
@@ -317,6 +318,33 @@ export function validateLayout(layout, brief = null) {
       features: long.map(x => id(x.a) + ' ' + x.len + ' ft').slice(0, 30), basis: 'assumption', rule: 'A parking aisle\'s stalls run no more than 150 ft past the last drive, turnaround or open paving joining it (planning practice; IFC D103.4\'s length for a dead end without a turnaround)' });
   }
 
+  // 10b. queues (drive-thru lanes, a car wash's stacking lanes): the cars waiting in them stay off the drive aisles, the
+  // parking and the street, and there are as many as the building type asks for (lib/btsite.mjs QUEUE_NEED). Measured
+  // along each lane's centre line every 2 ft where cars wait: past where it leaves its drive (half its width and 4 ft, or
+  // where the lane says its queue starts) up to its window (or its last 4 ft), no point inside another drive, a parking row
+  // or outside the property line.
+  {
+    const QL = els.filter(e => e.kind === 'drive' && e.note === 'Drive-thru lane' && Array.isArray(e.path) && e.path.length > 1 && !e.future);
+    const EP = brief?.program?.engine || layout.program || {}, dt = (EP.extras || []).includes('drivethru'), bt = EP.btype || (dt && ['retail', 'restaurant'].includes(EP.use) ? 'ret-drive-through' : null), need = QUEUE_NEED[bt] || null; // (a drive-thru asked for with no type: the restaurant's rule)
+    const wantQ = need && (bt === 'car-wash' || dt);
+    if (QL.length || wantQ) {
+      const other = els.filter(e => (e.kind === 'drive' && e.note !== 'Drive-thru lane' || e.kind === 'truck' || e.kind === 'parking') && !e.future), blocked = [];
+      for (const q of QL) {
+        const P = q.path, w = +q.width || 12, len = P.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0), pts = [];
+        let at = 0; for (let i = 0; i + 1 < P.length; i++) { const a = P[i], b = P[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let s = 0; s < L; s += 2) pts.push({ p: [a[0] + (b[0] - a[0]) * s / L, a[1] + (b[1] - a[1]) * s / L], d: at + s }); at += L; }
+        const q0 = Math.max(w / 2 + 4, +q.queueFrom || 0), q1 = Math.min(len - 4, +q.windowAt > 0 ? +q.windowAt : len), mid = pts.filter(x => x.d > q0 && x.d < q1); // (where cars wait: from where it leaves the drive, or where its queue starts as drawn, to its window)
+        const onDrive = mid.filter(x => other.some(o => (!bx.get(o) || (b => x.p[0] >= b[0] - 1 && x.p[0] <= b[2] + 1 && x.p[1] >= b[1] - 1 && x.p[1] <= b[3] + 1)(bx.get(o))) && sh.get(o).some(r => inPoly(x.p, r)))), off = ring?.length >= 3 ? mid.filter(x => !inPoly(x.p, ring)) : [];
+        if (onDrive.length) blocked.push(id(q) + ': ' + onDrive.length * 2 + ' ft of its queue on a drive or parking near ' + onDrive[0].p.map(v => Math.round(v)).join(', '));
+        if (off.length) blocked.push(id(q) + ': ' + off.length * 2 + ' ft of its queue outside the property line (in the street)');
+      }
+      add({ id: 'queues.clear', title: 'Queues clear of the drive aisles, the parking and the street', hard: false, status: !QL.length ? 'n/a' : blocked.length ? 'fail' : 'pass', measured: blocked.length, required: 0, units: 'queue lanes in the way', features: blocked.slice(0, 20), basis: 'geometry',
+        rule: 'Each drive-thru or stacking lane, past where it leaves its drive, runs on its own paving: none of its centre line (sampled every 2 ft) inside another drive, a parking row or outside the property line' });
+      const wash = QL.filter(e => e.queue === 'carwash'), cars = bt === 'car-wash' ? wash.reduce((t, e) => t + Math.floor(e.path.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - e.path[i][0], p[1] - e.path[i][1]), 0) / 20 + 1e-6), 0) : QL.length ? Math.min(...QL.map(e => +e.stack || 0)) : 0;
+      if (wantQ) add({ id: 'queues.stack', title: 'Queue holds the cars the building type asks for', hard: false, status: !QL.length ? 'fail' : cars >= need.cars ? 'pass' : 'fail', measured: cars, required: need.cars, units: 'cars (' + need.what + ')', basis: 'assumption',
+        rule: (bt === 'car-wash' ? 'The car wash’s stacking lanes measured along their centre lines, 20 ft a car' : 'The drive-thru lane’s stacking behind its order point or window as drawn, 20 ft a car') + '; ' + need.cars + ' wanted: ' + need.src, note: !QL.length ? 'No queue lane drawn.' : '' });
+    }
+  }
+
   // 11. the program, by what each quantity means
   for (const u of brief?.program?.uses || []) {
     const same = (brief.program.uses || []).filter(x => x.use === u.use).length, zoned = u.zone != null && (q.byZone[u.zone] || same > 1); // a mixed plan: this use's own zone (by the zone its buildings carry); a use with no zone tags and no twin: its use's total
@@ -491,6 +519,7 @@ export function quantities(layout, brief = null) {
     let nU = 0, est = false; if (['multifamily', 'townhomes', 'duplex', 'sfr'].includes(u)) { if (e.units != null) nU = +e.units; else if (u === 'multifamily') { nU = Math.floor(gfa * (P.eff || 0.85) / (P.unitSf || 900)); est = true; } else nU = 1; }
     g.units += nU; g.unitsEstimated = g.unitsEstimated || est; if (gz) { gz.buildings++; gz.footprint += fa; gz.gfa += gfa; gz.units += nU; gz.unitsEstimated = gz.unitsEstimated || est; gz.use = u; }
   }
+  for (const e of els.filter(x => x.kind === 'garage' && x.standalone && !x.future)) { const fa = shapesOf(e).reduce((t, r) => t + area(r), 0), g = U(e.use || base); g.buildings++; g.footprint += fa; g.gfa += fa * (+e.levels || 1); } // a stand-alone parking garage that is the program (lib/btypes.mjs): its levels are its floor area; its spaces are counted below as a garage's
   for (const g of Object.values(byUse)) { g.footprint = Math.round(g.footprint); g.gfa = Math.round(g.gfa); }
   // stalls drawn: each one inside its row, inside the site and not under a building
   const stall = { ...{ w: 9, d: 18, aisle: 24 }, ...(R.stall?.v || {}) }, B = els.filter(e => e.kind === 'building' && !e.future).map(e => shapesOf(e)).flat(), stray = [];

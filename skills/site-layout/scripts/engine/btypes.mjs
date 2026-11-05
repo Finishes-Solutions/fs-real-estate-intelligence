@@ -22,6 +22,8 @@
 // 'engine' (the engine's own planning default), 'standard' (a published rule or a widely used planning figure, named)
 // or 'estimate' (no reviewed reference: a planning estimate to confirm). Concept planning only.
 import * as CT from './customtypes.mjs';
+import * as S from './siteplan.mjs';
+import * as WASH from './btsite.mjs';
 
 export const BTYPES_VERSION = '2026-11-04.1';
 
@@ -36,14 +38,14 @@ export const PRIMITIVES = {
   L: { label: 'L', note: 'Two wings at a corner', engine: 'element form L (lib/siteplan.mjs outline)', params: ['length', 'depth', 'wing', 'floors'], outline: p => wings('L', num(p.length, 200), num(p.depth, 130), num(p.wing, 65), num(p.wing, 65)) },
   U: { label: 'U', note: 'Three wings round a court open to the front', engine: 'element form U (lib/siteplan.mjs outline), lib/sitegen.mjs courtyard1 (U)', params: ['length', 'depth', 'wing', 'floors'], outline: p => wings('U', num(p.length, 260), num(p.depth, 170), num(p.wing, 65), num(p.wing, 65)) },
   courtyard: { label: 'Courtyard (O)', note: 'A closed ring of wings round a court, a gateway in the street wing', engine: 'lib/sitegen.mjs courtyard1 (ring), joinCourtyard', params: ['length', 'depth', 'wing', 'floors', 'gate'], outline: p => { const w = num(p.length, 300), d = num(p.depth, 240), k = num(p.wing, 65); return [...R(w, d), ...R(w - 2 * k, d - 2 * k).reverse()]; }, holes: true },
-  T: { label: 'T', note: 'A bar with a wing off its middle (drawn as an L by the engine)', engine: 'not drawn: the L is the closest', params: ['length', 'depth', 'wing', 'floors'], mapsTo: 'L', outline: p => { const w = num(p.length, 240), d = num(p.depth, 65), k = num(p.wing, 60), s = num(p.stem, 90); return [[-w / 2, d / 2 - 0], [-w / 2, -d / 2 + 0], [-k / 2, -d / 2], [-k / 2, -d / 2 - s], [k / 2, -d / 2 - s], [k / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2]].reverse(); } },
+  T: { label: 'T', note: 'A bar along the back with a wing off its middle toward the front', engine: 'element form T (lib/siteplan.mjs outline)', params: ['length', 'depth', 'wing', 'floors'], outline: p => { const W = num(p.length, 240) / 2, D = num(p.depth, 130) / 2, t = num(p.wing, 65), k = Math.min(W * 0.8, num(p.wing, 65)); return [[-k / 2, -D], [k / 2, -D], [k / 2, D - t], [W, D - t], [W, D], [-W, D], [-W, D - t], [-k / 2, D - t]]; } },
   'tower-podium': { label: 'Tower on podium', note: 'A podium (parking and amenities) with a tower on part of it', engine: 'lib/sitelayout.mjs form "tower", lib/siteplan.mjs PODIUM', params: ['length', 'depth', 'floors', 'podium', 'towerShare'], outline: p => R(num(p.length, 200), num(p.depth, 128)) },
   'point-tower': { label: 'Point tower', note: 'A compact tower on a small podium', engine: 'form "tower" with a short podium', params: ['length', 'depth', 'floors'], mapsTo: 'tower-podium', outline: p => R(num(p.length, 120), num(p.depth, 120)) },
   wrap: { label: 'Wrap', note: 'Wings on three sides of a parking garage', engine: 'lib/sitegen.mjs wrapOf', params: ['wing', 'floors', 'levels'], outline: p => { const w = num(p.length, 300), d = num(p.depth, 250), k = num(p.wing, 65); return [[-w / 2, -d / 2], [-w / 2 + k, -d / 2], [-w / 2 + k, d / 2 - k], [w / 2 - k, d / 2 - k], [w / 2 - k, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]]; } },
   'podium-court': { label: 'Courtyard on a podium', note: 'A U of wings over a parking podium (5 over 2)', engine: 'lib/sitegen.mjs podiumCourt', params: ['floors', 'podium'], outline: p => R(num(p.length, 300), num(p.depth, 240)) },
   row: { label: 'Row', note: 'Homes side by side in a row (townhomes, tuck-under, stacked, live-work)', engine: 'lib/sitelayout.mjs townhome rows, lib/sitegen.mjs tuckOf', params: ['unitW', 'depth', 'units', 'floors'], outline: p => R(num(p.unitW, 24) * num(p.units, 6), num(p.depth, 40)) },
   detached: { label: 'Detached', note: 'A house, cottage or tiny home on a lot or pad', engine: 'lib/streetnet.mjs lots, lib/sitecommunity.mjs', params: ['w', 'd', 'floors', 'lotW'], outline: p => R(num(p.w, 42), num(p.d, 40)) },
-  plex: { label: 'Small multiplex', note: 'Two to four homes in one house-scaled building', engine: 'duplex buildings (lib/sitelayout.mjs)', params: ['units', 'w', 'd', 'floors'], outline: p => R(num(p.w, 44), num(p.d, 40)) },
+  plex: { label: 'Small multiplex', note: 'Two to four homes in one house-scaled building', engine: 'duplex rows (lib/sitelayout.mjs homesIn) with lib/siteplan.mjs PLEX footprints', params: ['units', 'w', 'd', 'floors'], outline: p => R(num(p.w, 64), num(p.d, 56)) },
   'big-box': { label: 'Big box', note: 'One deep building: a warehouse, an anchor store, a fitness club, a data centre', engine: 'lib/sitelayout.mjs warehouse / one-building rows', params: ['length', 'depth', 'clear', 'truck'], outline: p => R(num(p.length, 400), num(p.depth, 300)) },
   'cross-dock': { label: 'Cross-dock', note: 'A deep building with dock doors and a truck court on both long sides', engine: 'lib/sitegencom.mjs crossDock', params: ['length', 'depth'], outline: p => R(num(p.length, 312), num(p.depth, 800)) },
   'flex-bay': { label: 'Flex bays', note: 'A shallow building of small bays, a grade-door drive behind', engine: 'lib/sitelayout.mjs industrial flex (80-120 ft deep)', params: ['length', 'depth', 'mezzanine'], outline: p => R(num(p.length, 300), num(p.depth, 100)) },
@@ -70,8 +72,8 @@ export const PARKING_RELATIONS = ['surface', 'tuck-under', 'podium', 'wrap', 'ga
 
 // colour keys of the new presets' blocks (lib/planmap.mjs USE_COL and lib/sitesheet.mjs carry them); a preset without one
 // is coloured by its engine use
-export const TYPE_COLORS = { senior: '#c99a5b', student: '#d3a24f', civic: '#7d8fb8', bank: '#8f6a4e', fitness: '#c25b52', bigbox: '#b8613a', cold: '#7fa3b5', datacenter: '#6b7f8c', carwash: '#5a97b0', livework: '#a8745a', flex: '#9a8466' };
-export const TYPE_LABELS = { senior: 'Senior living', student: 'Student housing', civic: 'School / daycare', bank: 'Bank', fitness: 'Fitness club', bigbox: 'Big-box store', cold: 'Cold storage', datacenter: 'Data center', carwash: 'Car wash', livework: 'Live-work', flex: 'Flex' };
+export const TYPE_COLORS = { senior: '#c99a5b', student: '#d3a24f', civic: '#7d8fb8', bank: '#8f6a4e', fitness: '#c25b52', bigbox: '#b8613a', cold: '#7fa3b5', datacenter: '#6b7f8c', carwash: '#5a97b0', livework: '#a8745a', flex: '#9a8466', pads: '#c47a4a', garage: '#8d9399' };
+export const TYPE_LABELS = { senior: 'Senior living', student: 'Student housing', civic: 'Schools and daycares', bank: 'Bank', fitness: 'Fitness club', bigbox: 'Big-box store', cold: 'Cold storage', datacenter: 'Data center', carwash: 'Car wash', livework: 'Live-work', flex: 'Flex', pads: 'Pad buildings', garage: 'Parking garage' };
 
 // ---------- presets ----------
 // existing: the engine's own type (its numbers the engine's; nothing in the program changes). src: where its numbers come from.
@@ -116,17 +118,25 @@ const EXISTING = [
 const box = foot => { const w = Math.min(600, Math.round(Math.sqrt(foot * 2))), d = Math.min(400, Math.round(foot / w)); return { w, d }; };
 // apartment forms the engine already draws from reviewed templates (garden, mid-rise, courtyard ...): named with a housing
 // type ("senior apartments, mid-rise"), the form's own path is kept and the type adds nothing
+// a hotel over shops ("a 120-key hotel over retail", "hotel above ground-floor retail")
+const HOTEL_OVER = /\bhotel\b.{0,40}\b(?:over|above|on top of|atop)\b.{0,30}\b(?:retail|shops|storefronts)\b|\bhotel with (?:\S+ ){0,3}ground[- ]floor (?:retail|shops)\b|\b(?:retail|shops) (?:below|under(?:neath)?) (?:a |the )?hotel\b/;
+// a stand-alone garage's size: two 62 ft bays deep, as long as its spaces need on the engine's stall grid (S.garageGrid:
+// ramps, stairs and the entry taken out each level), a level more rather than past 330 ft, past it only at 6 levels (the recipe's most)
+function garageSize(spaces, levels, d) {
+  for (const top of [330, 420]) for (let L = Math.max(2, Math.min(6, levels)); L <= 6; L++) for (let w = 120; w <= top; w += 9) { const n = S.garageGrid(w, d, L); if (n >= spaces) return { w, d, levels: L, spaces: n }; }
+  return { w: 420, d, levels: 6, spaces: S.garageGrid(420, d, 6) };
+}
 const MF_FORM = /\b(?:mid[- ]?rise|garden|courtyard|podium|wrap|tuck[- ]?under|tower|walk[- ]?ups?|corridor|breezeway|stacked|town ?(?:home|house)s?)\b/;
 const NEW = [
   { id: 'hotel-limited', label: 'Limited-service hotel', short: 'Hotel', family: 'lodging', primitive: 'bar', use: 'hotel', color: null,
     params: { floors: 4, depth: 65, floorH: 11, sfPerKey: 550, perKey: 1, core: 'double-loaded', parking: 'surface' }, count: 'keys',
     src: { cls: 'standard', ref: 'about 1 space a room (common zoning for hotels; the engine’s 1.82 a 1,000 sf at 550 sf a key); 500-600 gross sf a key is typical of limited-service prototypes (estimate)' },
-    when: (p, t, X) => p.use === 'hotel' && !/extended[- ]stay|residence inn|suites hotel|all[- ]suites?/.test(t) && (X.keys > 0 || /\b(?:limited|select|focused)[- ]service\b/.test(t)),
+    when: (p, t, X) => p.use === 'hotel' && !/extended[- ]stay|residence inn|suites hotel|all[- ]suites?|\bfull[- ]service\b|convention hotel|resort hotel|luxury hotel|upscale hotel|conference hotel/.test(t) && !HOTEL_OVER.test(t) && (X.keys > 0 || /\b(?:limited|select|focused)[- ]service\b/.test(t)),
     apply: (p, t, X, P) => { if (X.keys && !X.sf) p.gfa = X.keys * P.params.sfPerKey; return p; } },
   { id: 'hotel-extended', label: 'Extended-stay hotel', short: 'Extended stay', family: 'lodging', primitive: 'bar', use: 'hotel', color: null,
     params: { floors: 4, depth: 66, floorH: 11, sfPerKey: 650, perKey: 1, core: 'double-loaded', parking: 'surface' }, count: 'keys',
     src: { cls: 'estimate', ref: 'about 650 gross sf a key (studio suites with kitchens, larger than a limited-service room); 1 space a key (common zoning)' },
-    when: (p, t) => /extended[- ]stay|residence inn|suites hotel|all[- ]suites? hotel/.test(t) && (p.use === 'hotel' || p.use === 'other'),
+    when: (p, t) => /extended[- ]stay|residence inn|suites hotel|all[- ]suites? hotel/.test(t) && (p.use === 'hotel' || p.use === 'other') && !HOTEL_OVER.test(t),
     apply: (p, t, X, P) => { p.use = 'hotel'; if (X.keys && !X.sf) p.gfa = X.keys * P.params.sfPerKey; if (!p.gfa) p.gfa = 100 * P.params.sfPerKey; if (!X.floors) p.btFloors = P.params.floors; p.depth = P.params.depth; p.ratio = +(1000 / P.params.sfPerKey * P.params.perKey).toFixed(2); return p; } },
   { id: 'storage-multi', label: 'Multi-story self storage', short: 'Self storage', family: 'storage', primitive: 'storage-campus', use: 'storage',
     params: { floors: 3, climateOnly: true }, count: 'sf', src: { cls: E, ref: 'lib/siteplan.mjs STORAGE (72% rentable in a climate-controlled building); one building, no drive-up rows when only its size is given' },
@@ -164,9 +174,9 @@ const NEW = [
     when: (p, t) => /\blive[- ]work\b|\bshop ?houses?\b|\bshophouses?\b|\bwork[- ]live\b/.test(t),
     apply: (p, t, X, P) => { p.use = 'townhomes'; if (X.units) p.units = X.units; if (!X.floors) p.btFloors = P.params.floors; delete p.compare; return p; } },
   { id: 'plex', label: 'Small multiplexes (triplex / fourplex)', short: 'Multiplex', family: 'multifamily', primitive: 'plex', use: 'duplex', form: null,
-    params: { floors: 2, units: 4 }, count: 'units', note: 'Triplexes and fourplexes are drawn as duplex buildings (2 homes each); a fourplex is two side by side. A fourplex footprint of its own is not drawn yet.', src: { cls: E, ref: 'drawn as the engine’s duplex buildings (2 homes each, 2 floors): a fourplex is two of them side by side; homes counted as drawn' },
+    params: { floors: 2, units: 4 }, count: 'units', src: { cls: 'estimate', ref: 'a house-scaled building of its own (lib/siteplan.mjs PLEX): a fourplex 64 × 56 ft, two flats over two, a triplex 66 × 44 ft, three homes side by side, 2 floors (missing-middle multiplexes run about 50-70 ft wide); laid out on lots and parked as the engine’s front-load duplexes (a garage and a driveway space a home)' },
     when: (p, t) => /\b(?:fourplex(?:es)?|four-?plex(?:es)?|quadplex(?:es)?|quadruplex(?:es)?|triplex(?:es)?|small multiplex(?:es)?|multiplex(?:es)?|missing[- ]middle)\b/.test(t) && ['other', 'duplex', 'multifamily'].includes(p.use) && !/apartment|garden|mid[- ]?rise|town ?ho/.test(t),
-    apply: (p, t, X) => { p.use = 'duplex'; if (X.units) p.units = X.units; delete p.compare; return p; } },
+    apply: (p, t, X) => { p.use = 'duplex'; p.plex = /\btri(?:plex|-plex)/.test(t) && !/four|quad/.test(t) ? 3 : 4; if (X.units) p.units = X.units; delete p.compare; return p; } },
   { id: 'flex-mezz', label: 'Flex with mezzanine', short: 'Flex', family: 'flex', primitive: 'flex-bay', use: 'industrial', color: 'flex',
     params: { mezzanine: 0.25, depths: [80, 100, 120], floorH: 28 }, count: 'sf', src: { cls: 'estimate', ref: 'a mezzanine over a quarter of each bay (office or storage) unless the words give a share; counted beside the floor area, not in it; 24 ft clear (28 ft floor to roof) typical of flex' },
     when: (p, t) => p.use === 'industrial' && /\bflex\b/.test(t) && (/mezzanine/.test(t) || /\d{2,3}\s*(?:ft|feet|foot|')\s*[- ]?deep/.test(t)),
@@ -176,9 +186,9 @@ const NEW = [
     when: (p, t) => /cold storage|refrigerated (?:warehouse|distribution|storage)|freezer (?:warehouse|building)|cold chain/.test(t),
     apply: (p, t, X, P) => { p.use = 'industrial'; delete p.storage; delete p.flex; if (X.sf) p.gfa = X.sf; if (!X.ratio) p.ratio = P.params.ratio; if (p.truck !== false) p.truck = true; return p; } },
   { id: 'data-center', label: 'Data centre shell', short: 'Data center', family: 'industrial', primitive: 'big-box', use: 'industrial', color: 'datacenter',
-    params: { floorH: 32, ratio: 0.2, truck: false }, count: 'sf', src: { cls: 'estimate', ref: 'a one-story shell about 32 ft to the roof, 0.2 spaces a 1,000 sf (few staff), no truck court (a loading dock or two); the generator and cooling yard is not drawn' },
+    params: { floorH: 32, ratio: 0.2, truck: false }, count: 'sf', src: { cls: 'estimate', ref: 'a one-story shell about 32 ft to the roof, 0.2 spaces a 1,000 sf (few staff), no truck court (a loading dock or two); a fenced generator and cooling yard along its back a quarter of the footprint (estimate: rows of 2-3 MW gensets and chillers with their clearances run 40-80 ft deep along one side)' }, site: { yard: 0.25 },
     when: (p, t) => /\bdata ?cent(?:er|re)s?\b|\bhyperscale\b|\bcolocation (?:facility|building|center)\b|\bserver farm\b/.test(t),
-    apply: (p, t, X, P) => { p.use = 'industrial'; delete p.anchor; if (X.sf) p.gfa = X.sf; if (!X.ratio) p.ratio = P.params.ratio; p.truck = false; p.buildings = p.buildings || 1; return p; } },
+    apply: (p, t, X, P) => { p.use = 'industrial'; delete p.anchor; if (X.sf) p.gfa = X.sf; if (!X.ratio) p.ratio = P.params.ratio; p.truck = false; p.buildings = p.buildings || 1; p.btEnvelope = { f: +(1 / (1 - P.site.yard)).toFixed(4), carve: true }; p.btSite = { kind: 'yard', share: P.site.yard }; return p; } }, // (drawn a third bigger, its yard cut back out of the back after the run: lib/btsite.mjs)
   { id: 'fitness', label: 'Fitness club', short: 'Fitness', family: 'retail', primitive: 'big-box', use: 'retail', color: 'fitness',
     params: { sf: 40000, ratio: 5, depth: 200, floorH: 20 }, count: 'sf', src: { cls: 'estimate', ref: '35,000-45,000 sf for a full-size club; 5 spaces a 1,000 sf (health clubs park heavier than retail)' },
     when: (p, t) => (p.use === 'retail' || p.use === 'other') && /fitness (?:center|centre|club)|\bgym\b|health club|athletic club/.test(t),
@@ -205,13 +215,44 @@ const NEW = [
       const outdoor = lvl === 'high' ? [{ key: 'green', label: 'Playing field', w: 360, d: 210 }] : [{ key: 'play', label: 'Play yard', w: 120, d: 80 }, { key: 'green', label: 'Playing field', w: 240, d: 160 }];
       return recipeProgram(p, { name: lvl[0].toUpperCase() + lvl.slice(1) + ' school', pattern: 'commons', buildings: [{ label: lvl[0].toUpperCase() + lvl.slice(1) + ' school', ...box(sf / (X.floors || Q('floors'))), floors: X.floors || Q('floors') }], outdoor, parking: { per: 'child', rate: Q('perStudent'), basis: n, label: 'students' }, figures: [n + ' students'] }, { students: n }); } },
   { id: 'car-wash', label: 'Express car wash', short: 'Car wash', family: 'retail', primitive: 'tunnel', use: 'other', color: 'carwash',
-    params: { length: 130, w: 32, vacuums: 20 }, count: 'sf', note: 'The car wash’s stacking lanes to the pay stations are not drawn; check the queue (about 10-15 cars) against the local rule.', src: { cls: 'estimate', ref: 'a 110-130 ft express tunnel about 30 ft wide (lib/buildings.mjs express tunnel 110 ft), about 20 vacuum stalls; the stacking lanes to the pay stations are not drawn' },
+    params: { length: 130, w: 32, vacuums: 20, cars: 12 }, count: 'sf', src: { cls: 'estimate', ref: 'a 110-130 ft express tunnel about 30 ft wide (lib/buildings.mjs express tunnel 110 ft), about 20 vacuum stalls; two 12 ft stacking lanes to the pay stations merging at the tunnel, at least 12 cars of stacking (express tunnels are commonly planned for 10-12 or more; local rules run 6-15: an estimate to confirm), an exit apron out of the tunnel' },
     when: (p, t) => /car ?wash|tunnel wash|express wash|auto ?wash/.test(t) && p.use !== 'fuel',
-    apply: (p, t, X, P) => recipeProgram(p, { name: 'Express car wash', pattern: 'pads', buildings: [{ label: 'Car wash tunnel', w: X.length || P.params.length, d: P.params.w, floors: 1 }], parking: { per: 'pad', rate: X.vacuums || P.params.vacuums, label: 'tunnels' }, figures: [(X.vacuums || P.params.vacuums) + ' vacuum stalls'] }, {}) },
-  { id: 'garage-standalone', label: 'Stand-alone parking garage', short: 'Parking garage', family: 'parking', primitive: 'garage', use: 'other', status: 'unsupported',
-    params: { levels: 5, sfPerSpace: 330 }, count: 'spaces', src: { cls: 'standard', ref: 'about 300-350 gross sf a space in a structured deck' },
+    apply: (p, t, X, P) => { const L = Math.max(70, Math.min(180, X.length || P.params.length)), Wt = P.params.w, env = WASH.envelope(L, Wt), vac = X.vacuums || P.params.vacuums;
+      const q = recipeProgram(p, { name: 'Express car wash', pattern: 'pads', buildings: [{ label: 'Car wash tunnel', w: env.w, d: env.d, floors: 1 }], parking: { per: 'pad', rate: vac, label: 'tunnels' }, figures: [vac + ' vacuum stalls'] }, {});
+      return { ...q, gfa: L * Wt, ratio: +(vac / (L * Wt) * 1000).toFixed(4), btEnvelope: { f: +(env.w * env.d / (L * Wt)).toFixed(5), carve: true }, btSite: { kind: 'carwash', L, Wt, cars: X.cars || P.params.cars } }; } }, // (drawn in an envelope that holds its stacking lanes, cut back to the tunnel after the run: lib/btsite.mjs)
+  { id: 'garage-standalone', label: 'Stand-alone parking garage', short: 'Parking garage', family: 'parking', primitive: 'garage', use: 'other', color: 'garage',
+    params: { levels: 5, spaces: 400, d: 124, floorH: 10.5 }, count: 'spaces',
+    src: { cls: 'standard', ref: 'a two-bay deck about 124 ft wide (two 62 ft double-loaded bays: 18 ft stalls on a 24 ft aisle, 9 ft wide), its spaces counted on the engine’s stall grid each level (ramps, stairs and the entry taken out: lib/siteplan.mjs garagePlan), 10 ft a level (11 ft on the ground); about 300-350 gross sf a space is typical' },
     when: (p, t) => p.garage && p.use === 'other' && !p.gfa && /\bparking (?:garage|structure|deck)\b/.test(t) && !/apartment|retail|office|hotel|homes?|shops?/.test(t),
-    apply: p => p }
+    apply: (p, t, X, P) => { const want = X.spaces || P.params.spaces, g = garageSize(want, X.floors || P.params.levels, P.params.d);
+      const q = recipeProgram(p, { name: 'Parking garage', pattern: 'pads', buildings: [{ label: 'Parking garage', w: g.w, d: g.d, floors: g.levels, count: 1 }], parking: { per: 'pad', rate: 0, label: 'garages' }, figures: [g.spaces + ' spaces on ' + g.levels + ' levels'] }, { spaces: g.spaces, asked: want, levels: g.levels });
+      delete q.garage; return { ...q, ratio: 0 }; } },
+  // a full-service hotel and a hotel over shops (the hotel's floors over a ground floor of retail)
+  { id: 'hotel-full', label: 'Full-service hotel', short: 'Hotel', family: 'lodging', primitive: 'bar', use: 'hotel', color: null,
+    params: { floors: 8, depth: 70, floorH: 11, sfPerKey: 1000, perKey: 1.2, keys: 200, core: 'double-loaded', parking: 'surface' }, count: 'keys',
+    src: { cls: 'estimate', ref: 'about 900-1,100 gross sf a key (rooms with a restaurant, bar, ballroom and meeting rooms, a full back of house), 8 floors, 1.2 spaces a key (1 a room plus the meeting and restaurant space; local rules vary)' },
+    when: (p, t) => p.use === 'hotel' && /\bfull[- ]service\b|convention hotel|resort hotel|luxury hotel|upscale hotel|conference hotel/.test(t) && !HOTEL_OVER.test(t),
+    apply: (p, t, X, P) => { const keys = X.keys || (X.sf ? Math.round(X.sf / P.params.sfPerKey) : P.params.keys); p.gfa = X.sf || keys * P.params.sfPerKey; if (!X.floors) p.btFloors = P.params.floors; p.depth = P.params.depth; if (!X.ratio) p.ratio = +(1000 / P.params.sfPerKey * P.params.perKey).toFixed(3); return p; } },
+  { id: 'hotel-over-retail', label: 'Hotel over retail', short: 'Hotel', family: 'lodging', primitive: 'bar', use: 'hotel', color: null,
+    params: { floors: 5, depth: 65, floorH: 11, sfPerKey: 550, perKey: 1, keys: 120, retailRatio: 4 }, count: 'keys',
+    src: { cls: 'estimate', ref: 'a limited-service hotel’s floors (about 550 gross sf a key, 1 space a key) over a ground floor of shops the building’s footprint (4 spaces a 1,000 sf, the engine’s retail rule); the parking rule given to the check is the two blended over the whole building' },
+    when: (p, t) => (p.use === 'hotel' || p.use === 'retail' && /\bhotel\b/.test(t)) && HOTEL_OVER.test(t),
+    apply: (p, t, X, P) => { const keys = X.keys || P.params.keys, gfa = keys * P.params.sfPerKey, rsf = X.sf && X.sf < gfa ? X.sf : null;
+      const H = X.floors ? Math.max(2, X.floors - 1) : rsf ? Math.max(3, Math.min(12, Math.round(gfa / rsf))) : P.params.floors - 1, foot = gfa / H, need = keys * P.params.perKey + foot / 1000 * P.params.retailRatio;
+      const q = { ...p, use: 'hotel', gfa, floors: H + 1, depth: P.params.depth, ratio: +(need / (gfa + foot) * 1000).toFixed(4), btGround: { use: 'retail', floors: 1, ...(rsf ? { asked: rsf } : {}) }, btEnvelope: { f: +((H + 1) / H).toFixed(5) } }; delete q.zones; delete q.btFloors; return q; } }, // (the hotel's floor area asked; the building drawn whole, H + 1 floors, its ground floor the shops after the run: tagElements)
+  // a point tower: a slim tower on a small parking podium
+  { id: 'point-tower', label: 'Point tower', short: 'Tower', family: 'multifamily', primitive: 'point-tower', use: 'multifamily', form: 'mf-tower-podium',
+    params: { floors: 12, podium: 2, plate: [0.45, 0.7] }, count: 'units',
+    src: { cls: 'estimate', ref: 'a tower about 45% of its podium’s length and 70% of its depth (a 9,000-11,000 sf floor plate on a typical podium), on the engine’s tower-on-podium path (lib/siteplan.mjs PODIUM, towerOutline); 12 floors when the words give none' },
+    when: (p, t) => /\bpoint[- ]towers?\b|\bslender (?:residential )?towers?\b|\bslim towers?\b/.test(t) && ['multifamily', 'other'].includes(p.use),
+    apply: (p, t, X, P) => { p.use = 'multifamily'; p.form = 'tower'; p.point = true; if (!X.floors) p.btFloors = P.params.floors; if (X.units) p.units = X.units; delete p.compare; return p; } },
+  // freestanding pads in a cluster: a pad-site village, food hall pads (several small buildings round shared parking)
+  { id: 'pad-village', label: 'Cluster of pads', short: 'Pad', family: 'retail', primitive: 'cluster', use: 'other', color: 'pads',
+    params: { pads: 5, sf: { village: 4000, food: 2500 }, ratio: { village: 6, food: 10 } }, count: 'sf',
+    src: { cls: 'estimate', ref: '2,500-4,500 sf freestanding pads (restaurants, a coffee shop, a clinic, a bank), 5 unless the words give a number; parking 6 a 1,000 sf for a mix of pads (10 for food pads: the engine’s restaurant rule)' },
+    when: (p, t) => /\bpad[- ]?site village\b|\bpad village\b|\bvillage of pads\b|\bcluster of (?:\w+ )?pads\b|\bfood hall pads?\b|\bfood (?:hall )?pad village\b/.test(t),
+    apply: (p, t, X, P) => { const k = /\bfood\b/.test(t) ? 'food' : 'village', n = Math.max(2, Math.min(12, X.pads || P.params.pads)), sf = X.sf ? Math.max(1200, Math.min(12000, Math.round(X.sf / n))) : P.params.sf[k], ratio = X.ratio || P.params.ratio[k], d = Math.round(Math.sqrt(sf / 1.4));
+      return recipeProgram(p, { name: k === 'food' ? 'Food hall pads' : 'Pad-site village', pattern: 'pads', buildings: [{ label: 'Pad', w: Math.round(sf / d), d, floors: 1, count: n }], parking: { per: '1000sf', rate: ratio }, figures: [n + ' pads of about ' + f0(sf) + ' sf'] }, { pads: n }); } }
 ].map(p => ({ ...p, existing: false }));
 
 // the uses the words' program may already have for a new preset to take it over (a shopping center with a bank pad or a
@@ -237,7 +278,9 @@ export function numbersOf(text) {
   let r;
   if ((r = m(/(\d+(?:\.\d+)?)\s*(k|thousand)?\s*\+?\s*(?:sf|sq\.?\s*ft|square[- ]f(?:ee|oo)t)/))) X.sf = +r[1] * (r[2] ? 1000 : 1);
   if ((r = m(/(\d+)[- ]?(?:stor(?:y|ies|ey)|floors?(?![- ]?plans?)|levels?)\b/))) X.floors = +r[1];
-  if ((r = m(/(\d+)\s*(?:keys|(?:guest ?)?rooms|suites)\b/))) X.keys = +r[1];
+  if ((r = m(/(\d+)\s*(?:keys|(?:guest ?)?rooms|suites)\b/) || m(/(\d+)[- ](?:key|room)\b/))) X.keys = +r[1];
+  if ((r = m(/(\d+)\s*(?:parking\s+)?(?:spaces|stalls|cars)\b(?!\s*(?:a|per|an)\s)/))) X.spaces = +r[1];
+  if ((r = m(/(\d+)\s*(?:[a-z-]+\s+){0,2}pads\b/))) X.pads = +r[1];
   if ((r = m(/(\d+)\s*(?:beds?)\b(?!\s*(?:room|unit|apartment|home|suite))/)) && +r[1] >= 8) X.beds = +r[1];
   if ((r = m(/(\d+)[- ]?(?:bed(?:room)?s?)\s*(?:a|per|each)?\s*(?:unit|apartment)/)) && +r[1] <= 6) X.bedsPerUnit = +r[1];
   if ((r = m(/(\d+)\s*(?:children|kids|child|infants|toddlers)\b/))) X.children = +r[1];
@@ -271,8 +314,11 @@ function unknownName(t) {
 // The program with the type the words name applied. Several uses (zones) are left as they are: each zone keeps the
 // engine's own type (not yet per zone). Returns the program unchanged when no new preset or shape is named.
 export function applyType(p0, text) {
-  if (!p0 || typeof p0 !== 'object' || p0.zones?.length > 1 || p0.custom || p0.parcels) return p0;
-  const t = String(text || '').toLowerCase(), X = numbersOf(t), P = NEW.find(q => q.when(p0, t, X)), notes = [];
+  if (!p0 || typeof p0 !== 'object' || p0.custom || p0.parcels) return p0;
+  if (p0.zones?.length > 1) return zoneTypes(p0, String(text || '').toLowerCase());
+  const t = String(text || '').toLowerCase(), X = numbersOf(t);
+  { const z = padZones(p0, t); if (z) return z; } // (types on pads in front of another use: a zone each)
+  const P = NEW.find(q => q.when(p0, t, X)), notes = [];
   if (P) {
     let p = P.apply({ ...p0 }, t, X, P);
     if (P.status === 'unsupported') { notes.push(P.label + ' is not drawn yet (it is laid out only beside other uses); the closest layout is shown.'); return { ...p0, btNotes: notes }; }
@@ -286,9 +332,8 @@ export function applyType(p0, text) {
   if ((sh || pool) && (p0.use === 'multifamily' || p0.use === 'other' && !p0.gfa && (pool || /\bbuildings?\b/.test(t)))) {
     const p = { ...p0 };
     if (p.use !== 'multifamily') { p.use = 'multifamily'; delete p.compare; notes.push('No use named: a building ' + (pool ? 'round a pool' : 'of that shape') + ' read as apartments (an assumption: say the use to change it).'); }
-    if (sh === 'T') { notes.push('A T-shaped building is drawn as an L, the closest primitive the engine draws.'); p.form = 'L'; }
     if (pool && sh !== 'L') { p.arrangement = 'courtyard'; delete p.form; return { ...p, btype: 'mf-courtyard-u', btNotes: notes }; }
-    p.form = p.form || sh; return { ...p, btype: p.form === 'L' ? 'mf-l' : 'mf-u', btForm: 'multifamily', btNotes: notes };
+    p.form = sh === 'T' ? 'T' : p.form || sh; return { ...p, btype: p.form === 'L' ? 'mf-l' : p.form === 'T' ? 'mf-t' : 'mf-u', btForm: 'multifamily', btNotes: notes };
   }
   // words naming no type the engine knows: the closest primitive (a bar facing its parking) at the size and floors said,
   // the generic parking rule unless the words give one
@@ -300,21 +345,57 @@ export function applyType(p0, text) {
   }
   return p0;
 }
+// ---------- a type per zone ----------
+// A mixed request's zones each take the preset their part of the words names ("a 120-key hotel and 20,000 sf of retail":
+// the hotel zone sized by its keys). Only what a zone of the engine's own uses can carry is kept (its use, floor area,
+// homes, floors and name); the zone parks at its use's own rule (one rule a plan in the brief and the check). Recipes (a
+// daycare's play yard, a school's fields) are a single type's; a zone of one is the building alone, sized by its count.
+const ZONE_OK = new Set(['hotel-limited', 'hotel-extended', 'hotel-full', 'bank', 'mob', 'clinic', 'fitness', 'big-box', 'senior-il', 'senior-al', 'student', 'cold-storage', 'daycare', 'school', 'live-work']);
+const clausesOf = t => t.split(/,|;|\band\b|\bplus\b|\bnext to\b|\bin front of\b|\bbehind\b|\bbeside\b|\balong\b/).map(s => s.trim()).filter(Boolean);
+// a zone's preset from its clause: { zone, btype, name, counts } and the zone as the preset sizes it, or null
+function zoneOf(z, clause) {
+  const X = numbersOf(clause), P = NEW.find(q => ZONE_OK.has(q.id) && q.when({ ...z }, clause, X)); if (!P) return null;
+  const q = P.apply({ ...z }, clause, X, P), out = { ...z, use: q.use || z.use, name: z.name || P.short };
+  if (q.gfa > 0) out.gfa = Math.round(q.gfa); if (q.units > 0) out.units = q.units; if (q.custom) { out.gfa = Math.round(CT.recipeGfa(q.custom)); out.use = 'other'; if (q.floors > 0) out.floors = q.floors; }
+  if (q.btFloors && !out.floors) out.floors = q.btFloors;
+  return { z: out, bt: { btype: P.id, name: P.short, ...(q.btCounts && Object.keys(q.btCounts).length ? { counts: q.btCounts } : {}) } };
+}
+function zoneTypes(p0, t) {
+  const cl = clausesOf(t), used = new Set(), zones = p0.zones.map(z => ({ ...z })), btZones = [];
+  zones.forEach((z, i) => { if (!z || z.use === 'garage') return;
+    for (const [k, c] of cl.entries()) { if (used.has(k)) continue; const got = zoneOf(z, c); if (!got) continue; used.add(k); zones[i] = got.z; btZones.push({ zone: i, ...got.bt }); break; } });
+  return btZones.length ? { ...p0, zones, btZones } : p0;
+}
+// types named on pads in front of (or along the street before) a single other use ("a daycare and a bank on pads in front
+// of townhomes"): a zone for each, at the front, and the main use behind
+function padZones(p0, t) {
+  if (!/\b(?:in front of|on (?:pads|outparcels)|pads? along)\b/.test(t) || !p0.use || p0.use === 'other') return null;
+  const cl = clausesOf(t), extra = [];
+  for (const c of cl) for (const P of NEW) if (ZONE_OK.has(P.id) && P.use !== p0.use && !extra.some(x => x.bt.btype === P.id)) { const z0 = { use: P.use === 'restaurant' ? 'other' : P.use }, got = zoneOf(z0, c); if (got && got.bt.btype === P.id) { extra.push(got); break; } }
+  if (!extra.length) return null;
+  const { units, gfa, floors, ...top } = p0, main = { use: p0.use, ...(units ? { units } : {}), ...(gfa ? { gfa } : {}), ...(floors ? { floors } : {}) };
+  const zones = [...extra.map(x => ({ ...x.z, place: { where: 'front', road: null, next: [], side: null } })), main];
+  return { ...top, use: zones[0].use, zones, btZones: extra.map((x, i) => ({ zone: i, ...x.bt })), btNotes: ['The ' + extra.map(x => x.bt.name.toLowerCase()).join(' and ') + ' laid out as zones of their own at the front, the ' + (S.USES[p0.use]?.label || p0.use).toLowerCase() + ' behind; each zone parks at its use’s own rule.'] };
+}
+
 // the type's parking rule, handed to the brief as its rule (lib/layoutbrief.mjs briefFromProgram): the engine and the
 // independent check then count the same requirement. Spaces a home for homes, else spaces a 1,000 sf.
 const RESI = ['multifamily', 'townhomes', 'duplex', 'sfr'];
+// (the btRuleV a preset may set: a rule other than its program's own number)
 function withRule(p, P) {
-  const home = RESI.includes(p.use), v = home ? p.perUnit : p.ratio; if (!(+v >= 0) || v == null) return p;
+  const home = RESI.includes(p.use), v = p.btRuleV ?? (home ? p.perUnit : p.ratio); if (!(+v >= 0) || v == null) return p;
+  const { btRuleV, ...q } = p; p = q; // (btRuleV: a rule other than the engine's ratio, a hotel over shops' blended over the whole building)
   return { ...p, btRule: { key: home ? 'parkingPerUnit' : 'parkingPer1000', v: +v, source: P.label + ' preset (lib/btypes.mjs): ' + P.src.ref } };
 }
 // the type fields of the program a run started from, on the program an option came back with (the engine may hand back
 // a copy without them)
-export const BT_KEYS = ['btype', 'btName', 'btNotes', 'btFloorH', 'btCounts', 'bedsPerUnit', 'mezzanine'];
-export const withType = (prog, from) => !from?.btype || prog?.btype ? prog : { ...prog, ...Object.fromEntries(BT_KEYS.filter(k => from[k] != null).map(k => [k, from[k]])) };
+export const BT_KEYS = ['btype', 'btName', 'btNotes', 'btFloorH', 'btCounts', 'btGround', 'btSite', 'btEnvelope', 'btZones', 'bedsPerUnit', 'mezzanine'];
+export const withType = (prog, from) => !(from?.btype || from?.btZones) || prog?.btype || prog?.btZones ? prog : { ...prog, ...Object.fromEntries(BT_KEYS.filter(k => from[k] != null).map(k => [k, from[k]])) };
 // the shape presets applyType makes for apartments (not in PRESETS' word list: they come from the shape words)
 export const SHAPE_PRESETS = {
   'mf-l': { id: 'mf-l', label: 'L-shaped apartments', short: 'Apartments', primitive: 'L', use: 'multifamily', params: { wing: 65 }, count: 'units', src: { cls: E, ref: 'element form L (lib/siteplan.mjs outline); homes from floor area at the engine’s 900 sf (no reviewed L-shaped building)' } },
   'mf-u': { id: 'mf-u', label: 'U-shaped apartments', short: 'Apartments', primitive: 'U', use: 'multifamily', params: { wing: 65 }, count: 'units', src: { cls: E, ref: 'element form U (lib/siteplan.mjs outline); homes from floor area at the engine’s 900 sf (no reviewed U-shaped building)' } },
+  'mf-t': { id: 'mf-t', label: 'T-shaped apartments', short: 'Apartments', primitive: 'T', use: 'multifamily', params: { wing: 65 }, count: 'units', src: { cls: E, ref: 'element form T (lib/siteplan.mjs outline): a double-loaded bar with a wing off its middle; homes from floor area at the engine’s 900 sf (no reviewed T-shaped building)' } },
   'mf-courtyard-u': { id: 'mf-courtyard-u', label: 'Apartments round a pool court', short: 'Apartments', primitive: 'U', use: 'multifamily', params: { wing: 65 }, count: 'units', src: { cls: E, ref: 'lib/sitegen.mjs courtyard1 (a U open to the street or a closed ring, the pool in the court)' } },
   custom: { id: 'custom', label: 'Custom type', short: null, primitive: 'bar', use: 'other', params: {}, count: 'sf', src: { cls: 'estimate', ref: 'the closest primitive (a bar) at the size asked' } }
 };
@@ -326,35 +407,92 @@ const gfaOf = e => (e.poly ? 0 : e.w * e.d) * (e.floors || 1);
 // each building of the program's type tagged with the preset (btype), its block colour key (tc) and floor height, and its
 // count on the line under its name. No type on the program: the elements as they were (the same array).
 export function tagElements(els, prog) {
+  if (!Array.isArray(els)) return els;
+  let out = els;
+  for (const Z of prog?.btZones || []) out = out.map(e => e.kind === 'building' && e.zone === Z.zone && e.use !== 'amenity' ? tagType([e], { use: e.use, btype: Z.btype, ...(Z.counts ? { btCounts: Z.counts } : {}) })[0] : e); // (a type per zone: each zone's buildings as its preset's)
+  return prog?.btype ? tagType(out, prog) : out;
+}
+function tagType(els, prog) {
   const P = anyPreset(prog?.btype); if (!P || !Array.isArray(els)) return els;
   const use = prog.use, short = P.short || prog.btName || P.label, fh = prog.btFloorH || null, custom = prog.custom?.name || null;
+  const mine = e => e.kind === 'building' && (e.use || use) === use && e.use !== 'amenity' && e.storage !== 'office', B1 = els.filter(mine).reduce((s, e) => s + gfaOf(e), 0); // (children or students shared over the type's buildings by floor area)
   return els.map(e => {
     if (custom && e.custom === custom && /AI-sized/.test(e.note || '')) e = { ...e, note: e.note.replace(/\s*·\s*AI-sized/, ' · preset (estimate)') }; // (a preset's recipe, not the AI's sizing)
     if (e.kind !== 'building' || (e.use || use) !== use || e.use === 'amenity' || e.storage === 'office') return e;
     const g = gfaOf(e), fl = e.floors || 1, q = { ...e, btype: P.id };
     if (P.color) q.tc = P.color; if (fh) q.floorH = fh;
     const nm = /^(?:Building|Bldg|Apt Bldg|Pad|Warehouse|Townhome (Row))\b\s*(.*)$/.exec(e.name || ''); if (nm && short) q.name = (short + (nm[1] ? ' row' : '') + ' ' + nm[2]).trim();
+    const px = e.plex === 3 ? 'Triplex' : e.plex === 4 ? 'Fourplex' : null; if (px) q.name = String(e.name || '').replace(/^Duplex\b/, px); // (a multiplex of its own: lib/siteplan.mjs PLEX)
     const parts = [P.label === short ? null : P.label, fl + '-story'];
-    if (P.count === 'keys') parts.push(f0(g / (P.params.sfPerKey || 550)) + ' keys');
-    else if (P.count === 'beds' && e.units) parts.push(f0(e.units * (prog.bedsPerUnit || P.params.bedsPerUnit || 1)) + ' beds · ' + f0(e.units) + ' units');
+    if (P.count === 'keys') { q.keys = Math.max(1, Math.round(g / (P.params.sfPerKey || 550))); parts.push(f0(q.keys) + ' keys'); }
+    else if (P.count === 'beds' && e.units) { q.beds = Math.round(e.units * (prog.bedsPerUnit || P.params.bedsPerUnit || 1)); parts.push(f0(q.beds) + ' beds · ' + f0(e.units) + ' units'); }
     else if (P.count === 'units' && e.units) parts.push(f0(e.units) + ' units');
-    else if ((P.count === 'children' || P.count === 'students') && prog.btCounts?.[P.count]) parts.push(f0(prog.btCounts[P.count]) + ' ' + P.count, f0(g) + ' sf');
+    else if ((P.count === 'children' || P.count === 'students') && prog.btCounts?.[P.count]) { q[P.count] = Math.round(prog.btCounts[P.count] * (B1 > 0 ? g / B1 : 1)); parts.push(f0(q[P.count]) + ' ' + P.count, f0(g) + ' sf'); }
     else parts.push(f0(g) + ' sf');
     if (prog.mezzanine > 0) parts.push(f0(e.w * e.d * prog.mezzanine) + ' sf mezzanine');
-    q.note = RESI.includes(e.use || use) && e.note ? (P.label + ' · ' + e.note).slice(0, 160) : parts.filter(Boolean).join(' · '); // (homes keep the engine's line: front-load, garages ... are read from it)
+    if (P.id === 'hotel-over-retail' && prog.btGround && fl > 1) { q.ground = { use: prog.btGround.use || 'retail', floors: 1 }; q.keys = Math.max(1, Math.round(g * (fl - 1) / fl / (P.params.sfPerKey || 550))); parts[2] = f0(q.keys) + ' keys'; parts.push(f0(e.w * e.d) + ' sf of shops on the ground floor'); } // (a hotel over shops: the ground floor of the building as laid out is the shops, the floors above the hotel)
+    q.note = RESI.includes(e.use || use) && e.note ? ((px ? px + ' · ' + e.units + ' units' : P.label) + ' · ' + e.note).slice(0, 160) : parts.filter(Boolean).join(' · '); // (homes keep the engine's line: front-load, garages ... are read from it)
+    if (P.id === 'garage-standalone') { const { floors, units, gfa, ...rest } = q, gq = { ...rest, kind: 'garage', levels: fl, grid: true, standalone: true, name: 'Parking garage' + (nm?.[2] ? ' ' + nm[2] : '') }; gq.note = f0(S.garageStalls(gq)) + ' spaces · ' + fl + ' levels'; return gq; } // (a stand-alone garage: the parking structure itself, its spaces counted on the stall grid)
     return q;
   });
 }
 // what the option's notes say about the type: which preset and primitive, its numbers and where they come from
 export function typeNotes(prog, els = []) {
+  const zn = (prog?.btZones || []).flatMap(Z => typeNotes1({ use: null, btype: Z.btype, ...(Z.counts ? { btCounts: Z.counts } : {}) }, els.filter(e => e.zone === Z.zone)));
+  return [...zn, ...(prog?.btype ? typeNotes1(prog, els) : prog?.btZones ? prog.btNotes || [] : [])];
+}
+function typeNotes1(prog, els) {
   const P = anyPreset(prog?.btype); if (!P) return [];
-  const B = els.filter(e => e.kind === 'building' && e.btype === P.id), g = B.reduce((s, e) => s + gfaOf(e), 0), out = [];
-  const what = P.count === 'keys' ? f0(g / (P.params.sfPerKey || 550)) + ' keys at about ' + P.params.sfPerKey + ' gross sf a key'
+  const B = els.filter(e => (e.kind === 'building' || e.kind === 'garage') && e.btype === P.id), g = B.reduce((s, e) => s + gfaOf(e), 0), out = [];
+  const what = P.count === 'keys' ? f0(B.reduce((s, e) => s + (e.keys || 0), 0) || g / (P.params.sfPerKey || 550)) + ' keys at about ' + P.params.sfPerKey + ' gross sf a key' + (P.id === 'hotel-over-retail' ? ', over ' + f0(B.reduce((s, e) => s + e.w * e.d, 0)) + ' sf of shops on the ground floor' + (prog.btGround?.asked ? ' (' + f0(prog.btGround.asked) + ' sf asked: the ground floor is the hotel’s footprint)' : '') : '')
+    : P.count === 'spaces' ? f0(B.reduce((s, e) => s + S.garageStalls(e), 0)) + ' spaces on ' + (B[0]?.levels || 0) + ' levels' + (prog.btCounts?.asked && B.reduce((s, e) => s + S.garageStalls(e), 0) < prog.btCounts.asked ? ' (' + f0(prog.btCounts.asked) + ' asked: the lot holds a smaller deck)' : '')
     : P.count === 'beds' ? f0(B.reduce((s, e) => s + (e.units || 0), 0) * (prog.bedsPerUnit || P.params.bedsPerUnit || 1)) + ' beds in ' + f0(B.reduce((s, e) => s + (e.units || 0), 0)) + ' units'
       : P.count === 'children' ? f0(prog.btCounts?.children || 0) + ' children' : P.count === 'students' ? f0(prog.btCounts?.students || 0) + ' students'
         : P.count === 'units' ? f0(B.reduce((s, e) => s + (e.units || 0), 0)) + ' units' : f0(Math.round(g / 10) * 10) + ' sf';
   out.push('Building type: ' + (P.id === 'custom' ? (prog.btName || 'custom') + ' (custom)' : P.label) + ', the ' + (PRIMITIVES[P.primitive]?.label || P.primitive) + ' primitive: ' + what + (prog.mezzanine > 0 ? ' plus ' + f0(B.reduce((s, e) => s + e.w * e.d, 0) * prog.mezzanine) + ' sf of mezzanine (' + Math.round(prog.mezzanine * 100) + '% of the footprint, not in the floor area)' : '') + '. Numbers: ' + P.src.ref + (P.src.cls === 'estimate' ? ' (estimate: no reviewed reference)' : '') + '.');
   return out.concat(prog.btNotes || []);
 }
+// the engine's notes on a preset drawn through a recipe (lib/customtypes.mjs) said as the preset's, not the AI's
+export function presetNotes(notes, prog) {
+  if (!prog?.btype || !prog.custom || !Array.isArray(notes)) return notes || [];
+  return notes.map(n => String(n).replace(/^(.+) is an AI-crafted type \((.+)\): its sizes are the AI’s, not a product sheet\.$/, '$1 is drawn from its building-type preset ($2): planning estimates, not a product sheet.').replace(/^Spaces needed by the AI’s rule: /, 'Spaces needed by the preset’s rule: ').replace(/= -0 spaces/, '= 0 spaces'));
+}
 // a building's colour key on the plan and the 3D map: its type's, else its use
 export const colorKey = e => e?.tc && TYPE_COLORS[e.tc] ? e.tc : e?.use;
+
+// ---------- the editor's preset picker ----------
+// a building of a preset at its usual size (src/siteplan.js Add panel: "Add a building by type"): the element the plan
+// draws, its engine use (so the plan's checks, parking and numbers read it as that use), w × d ft, floors, and the type's
+// colour key and floor height, so the 3D map shows the block coloured by type. Sizes: the preset's own numbers where it
+// has them (a 120-key hotel at 550 sf a key on 4 floors, two garden stacks, six townhomes), else a typical building of
+// the type (estimate). [w, d, floors, extra fields]
+export const STORAGE_UNIT_SF = 110; // net rentable sf an average self-storage unit (a planning estimate: unit mixes run about 90-130 sf on average)
+const SIZE = {
+  'mf-garden': [150, 60, 3, { units: 24 }], 'mf-garden-studio': [150, 60, 3, { units: 36 }], 'mf-walkup': [150, 60, 3, { units: 24 }], 'mf-midrise': [250, 65, 4],
+  'mf-courtyard': [260, 170, 4, { form: 'U' }], 'mf-wrap': [300, 250, 5, { form: 'U' }], 'mf-tuck-under': [120, 42, 2, { units: 6 }], 'mf-podium-courtyard': [300, 240, 7, { form: 'U' }],
+  'mf-podium': [200, 128, 5], 'mf-tower-podium': [200, 128, 8, { form: 'tower', podium: 2 }], 'mf-townhome': [144, 40, 3, { units: 6 }], 'mf-stacked-townhome': [120, 42, 4, { units: 12 }],
+  'mf-plex': [44, 40, 2, { units: 2 }], 'mf-cottage-btr': [37, 45, 1, { units: 1 }], 'sfr-subdivision': [42, 40, 2, { units: 1 }],
+  'ret-inline': [200, 100, 1], 'ret-anchored': [250, 200, 1], 'ret-restaurant': [86, 70, 1], 'ret-drive-through': [60, 45, 1], office: [180, 110, 2], medical: [120, 100, 1], hotel: [250, 65, 4],
+  church: [160, 100, 1], venue: [120, 60, 1], 'ind-warehouse': [520, 240, 1], 'ind-cross-dock': [600, 312, 1], 'flex-multi-tenant': [300, 100, 1], storage: [300, 110, 3], fuel: [75, 60, 1], foodtrucks: [60, 40, 1],
+  'mx-vertical': [250, 65, 5, { ground: { use: 'retail', floors: 1 } }],
+  'hotel-limited': [254, 65, 4], 'hotel-extended': [246, 66, 4], 'storage-multi': [300, 100, 3], 'storage-single': [200, 40, 1], mob: [200, 100, 2], clinic: [60, 100, 1],
+  'senior-al': [220, 65, 3], 'senior-il': [250, 65, 4], student: [280, 65, 4], 'live-work': [144, 40, 3, { units: 6 }], plex: [64, 56, 2, { units: 4, plex: 4 }], 'flex-mezz': [300, 120, 1],
+  'cold-storage': [600, 300, 1], 'data-center': [400, 250, 1], fitness: [200, 200, 1], 'big-box': [400, 300, 1], bank: [70, 50, 1], daycare: [110, 70, 1], school: [390, 195, 1], 'car-wash': [130, 32, 1]
+};
+// the presets the picker lists, each with the words a search matches
+export function presetCatalog() {
+  return PRESETS.filter(p => SIZE[p.id]).map(p => ({ id: p.id, label: p.label, family: p.family, use: p.use, tc: p.color && TYPE_COLORS[p.color] ? p.color : null, color: TYPE_COLORS[p.color] || null, src: p.src.cls, words: (p.label + ' ' + (p.short || '') + ' ' + p.family + ' ' + p.use + ' ' + (p.aka || '')).toLowerCase() }));
+}
+export function presetBuilding(id) {
+  const P = presetOf(id), z = SIZE[id]; if (!P || !z) return null;
+  const [w, d, floors, extra = {}] = z, e = { kind: 'building', use: P.use, w, d, floors, btype: P.id, name: P.short || P.label, ...JSON.parse(JSON.stringify(extra)) };
+  if (P.color && TYPE_COLORS[P.color]) e.tc = P.color;
+  if (P.params.floorH && !P.existing) e.floorH = P.params.floorH;
+  if (P.use === 'multifamily' && e.units == null) e.units = Math.max(1, Math.floor(w * d * floors * 0.85 / (P.params.unitSf || 900)));
+  if (P.count === 'keys') e.keys = Math.max(1, Math.round(w * d * floors / (P.params.sfPerKey || 550)));
+  if (P.count === 'beds' && e.units) e.beds = Math.round(e.units * (P.params.bedsPerUnit || 1));
+  if (id === 'daycare') e.children = Math.round(w * d * floors / P.params.sfPerChild);
+  if (id === 'school') e.students = Math.round(w * d * floors / P.params.sfPerStudent.elementary);
+  e.note = [P.label, floors + '-story', e.keys ? e.keys + ' keys' : e.beds ? e.beds + ' beds' : e.children ? e.children + ' children' : e.students ? e.students + ' students' : e.units > 1 ? e.units + ' units' : f0(w * d * floors) + ' sf'].join(' · ');
+  return e;
+}
