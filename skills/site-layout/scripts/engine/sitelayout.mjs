@@ -1979,7 +1979,7 @@ function layoutCore(plan0, programIn, opts = {}) {
   // building, paving or a pond on one is left out (the search keeps off them as it draws)
   const koShapes = (KO || []).map(e => S.shapeOf(e)).filter(r => r.length >= 3), clearOfKO = f => !koShapes.length || !(f.els || []).some(e => !['green', 'tree', 'lot', 'trail', 'fence', 'sign', 'keepout'].includes(e.kind) && !e.future && koShapes.some(k => { try { return S.rectsOverlap({ poly: S.shapeOf(e) }, { poly: k }, 0.5); } catch { return false; } }));
   if (towerOn(prog.floors) && prog.use === 'multifamily' && !prog.zones && !pinned.length && !opts.pod && opts.gallery !== false && (prog.arrangement === 'podium-court' || site < 3 * 43560)) { /* (asked for, or a small urban lot where the search's towers can't hold the count) */ try { found.push(...GEN.generate(plan, opts.askedUnits ? { ...prog, units: opts.askedUnits } : prog, { foot, pond }, { frameOf, profile, spans, finishLand, tally, score, take: takeCorner }, { budgetMs: 3000, podiumCourt: true }).filter(clearOfKO).slice(0, 4)); } catch (e) { if (globalThis.SP_DEBUG) console.log('podium court failed', e.stack); } } // a courtyard on the podium (5 over 2): the generator's, beside the search's towers
-  if ((GEN.covers(prog) || edgesOnly) && !towerOn(prog.floors) && !(prog.use === 'multifamily' && (PAR.form === 'U' || PAR.form === 'L' || PAR.form === 'T')) && !pinned.length && /* (a building shape chosen in Settings, U or L: the generator draws bars, so it sits out) */ (!opts.pod && !opts.oldEngine || opts.gallery === true) && opts.gallery !== false) { try { found.push(...GEN.generate(plan, prog, { foot, pond }, { frameOf, profile, spans, finishLand, tally, score, take: takeCorner, style: { curveR: PAR.style.corners === 'square' ? 0 : 42, jog: PAR.jog !== false } }, { budgetMs: 4000, edgesOnly }).filter(clearOfKO).slice(0, 8)); } catch (e) { if (globalThis.SP_DEBUG) console.log('generator failed', e.stack); } } // the generator's best (lib/sitegen.mjs): courtyards, loops and rows the search doesn't make
+  if ((GEN.covers(prog) || edgesOnly) && !towerOn(prog.floors) && !(prog.use === 'multifamily' && (PAR.form === 'U' || PAR.form === 'L' || PAR.form === 'T')) && !pinned.length && /* (a building shape chosen in Settings, U or L: the generator draws bars, so it sits out) */ (!opts.pod && !opts.oldEngine || opts.gallery === true) && opts.gallery !== false) { try { found.push(...GEN.generate(plan, prog, { foot, pond }, { frameOf, profile, spans, finishLand, tally, score, take: takeCorner, style: { curveR: PAR.style.corners === 'square' ? 0 : 42, jog: PAR.jog !== false } }, { budgetMs: 4000, edgesOnly, ...(opts.asks ? { asks: opts.asks.hints } : {}) }).filter(clearOfKO).filter((f, i, all) => i < 8 || opts.asks && askKept(plan, prog, all, f, opts.asks))); /* (with places asked: the generator's best two that meet them as well, lib/layoutintent.mjs) */ } catch (e) { if (globalThis.SP_DEBUG) console.log('generator failed', e.stack); } } // the generator's best (lib/sitegen.mjs): courtyards, loops and rows the search doesn't make
   const usable = found.filter(f => !f.bad.length && f.els.some(e => e.kind === 'building')).sort((a, b) => b.score - a.score), pick = [];
   usable.forEach(parked);
   // two ways in the fire code wants half the site's diagonal apart (IFC D104.3): a layout whose main entry leaves a spot on
@@ -1997,6 +1997,7 @@ function layoutCore(plan0, programIn, opts = {}) {
   for (const f of usable) if (pick.length < N && good(f) && (pick.length < 3 || f.parked) && !pick.includes(f) && !pick.some(p => same(f, p))) pick.push(f); // then other good versions
   if (+prog.entrances >= 2 && pick.length && !pick.some(f => f.remote)) { const r = usable.find(f => f.remote && f.parked && f.score >= top - Math.abs(top) * 0.15 && !pick.some(p => look(p.els) === look(f.els))); if (r) { r.notes = (r.notes || []).concat(['The main entry off centre, so a second way in fits far enough from it (fire code spacing: half the site’s diagonal).']); pick.splice(Math.min(pick.length, Math.min(3, N)) - 1, pick.length >= Math.min(3, N) ? 1 : 0, r); } }
   for (const f of usable) if (pick.length < N && (pick.length < 3 || f.parked) && !pick.includes(f) && !pick.some(p => same(f, p))) pick.push(f);
+  if (opts.asks && !pinned.length && !opts.pod) askPick(plan, prog, usable, pick, opts.asks, f => f.parked);
   // the real boulevard (two lanes and a planted median) where the program's entry is one: the same layout again with it,
   // kept unless it costs more than 2% of the units (or floor area), parking that was met, or a check; else the narrow
   // entry stays and the notes say what the boulevard would have cost ("Always a boulevard" keeps it whatever it costs)
@@ -2062,6 +2063,25 @@ function layoutCore(plan0, programIn, opts = {}) {
   if (SN.netWanted(plan, prog, opts) && PAR.streets !== 'network') out = withNet(plan, prog, opts, out); // subdivision streets, ranked with these (lib/streetnet.mjs)
   const want = Math.max(1, Math.min(3, opts.count || 3)); // (one asked for: no simple layouts padded in beside it, which the fire-access ranking then put first)
   return out.length >= want || pinned.length || opts.pod ? out : out.concat(fallback(plan, prog, want - out.length)); // (a pod: no simple layouts, lib/sitepods.mjs says when one doesn't lay out)
+}
+// the generator's layouts past the eight taken that meet more of the asks than the eight do (two at most)
+function askKept(plan, prog, all, f, asks) {
+  const miss = g => g.askMiss ??= asks.misses(plan, g.els, prog), m0 = Math.min(Infinity, ...all.slice(0, 8).map(miss));
+  if (miss(f) >= m0) return false; const better = all.slice(8).filter(g => miss(g) < m0); return better.indexOf(f) >= 0 && better.indexOf(f) < 2;
+}
+// where the request placed things the generators have no control for (the pond, the parking, the clubhouse, the docks,
+// a way in, a single use: lib/layoutintent.mjs asksFor): the candidates drawn that miss the fewest of those asks (parked,
+// no broken rule; those holding as much as the picks first, then the best score; two at most) join the options handed
+// back, first, when the picks miss more (or only one of them meets every ask). Beside the picks, not instead of them:
+// the run ranks them all (placements met after feasibility and the program). Candidates are compared, never changed.
+function askPick(plan, prog, usable, pick, asks, ok = () => true) {
+  const miss = f => f.askMiss ??= asks.misses(plan, f.els, prog), m0 = pick.length ? Math.min(...pick.map(miss)) : Infinity;
+  if (m0 === 0 && pick.filter(f => miss(f) === 0).length >= 2) return pick;
+  const yieldOf = f => f.a?.st?.units || f.a?.st?.gfa || 0, top = Math.max(0, ...pick.map(yieldOf)), short = f => Math.max(0, top - yieldOf(f)) / Math.max(1, top) > 0.02 ? 1 : 0; /* (an exact count: the picks hold it; as many as fit: the most) */
+  const cand = usable.filter(f => !pick.includes(f) && !f.bad?.length && ok(f) && (miss(f) < m0 || m0 === 0 && miss(f) === 0)).sort((a, b) => miss(a) - miss(b) || short(a) - short(b) || b.score - a.score), add = [];
+  for (const f of cand) { if (add.length >= 2 || miss(f) > miss(cand[0])) break; if (!add.some(g => g.key === f.key && yieldOf(g) === yieldOf(f))) add.push(f); }
+  if (add.length) pick.unshift(...add);
+  return pick;
 }
 // ---------- pods (lib/sitepods.mjs) ----------
 // a mixed site laid out in pods as well as in bands: where several built uses, homes or apartments among them, share a
@@ -2187,6 +2207,7 @@ function fieldCore(plan, programIn, prog, opts) {
   const pick = [], same = (f, p) => look(f.els) === look(p.els), nm = f => (f.deep ? 'd' : 'a') + (f.win ? 'w' : '') + f.pondAt; // (nm: what the option's name says)
   const pass = differ => { for (const f of usable) if (pick.length < N && !pick.includes(f) && (!pick.length || f.parked || !pick[0].parked) && !pick.some(p => same(f, p) || differ(f, p))) pick.push(f); };
   pass((f, p) => p.key === f.key || nm(p) === nm(f)); pass((f, p) => p.key === f.key); pass(() => false); // different arrangements under different names first
+  if (opts.asks && !pinned.length && !opts.pod) askPick(plan, prog, usable, pick, opts.asks, f => f.parked); // (where things were asked to go: the candidates meeting it too)
   const footOf = q => q.max ? null : q.gfa ? q.gfa / q.floors : null, pondOf = f => f.a.st.pondNeed || 0;
   let out = pick.map(f => { const o = optionOf(plan, f, f.prog, footOf(f.prog), pondOf(f)), mine = f.notes.some(t => /^Room for [\d,]+ of the [\d,]+ sq ft/.test(t)); return { ...o, notes: mine ? o.notes.filter(t => !/^Fits about/.test(t)) : o.notes, program: { ...f.prog } }; }); // (its own note says how much fits and why)
   if (prog.use === 'retail' && !pinned.length && !opts.noCorner && !opts.pod && anchorOf(prog)) { // an anchored center (lib/sitecenter.mjs): first when the words ask for an anchor
@@ -2433,7 +2454,7 @@ export function mixedOptions(plan, prog, opts = {}) {
     zl.forEach((x, k) => { const g = x.items[0]; if (x.z.use === 'garage' && k > 0 && COMMERCIAL.includes(zl[k - 1].z.use)) Object.assign(g, { with: zl[k - 1].zi, withUse: zl[k - 1].z.use, withFloors: S.normalizeProgram({ use: zl[k - 1].z.use, floors: zl[k - 1].z.floors }).floors }); }); // the garage's row also holds the zone it serves
     if (fillAt >= 0) { // the unsized homes: as many more rows as the depth left holds
       const k = order.indexOf(fillAt), x = zl[k], hOf = its => its.reduce((t, it) => t + (it.t ? it.w : it.h), 0), pair = x.items.slice(0, 2), ph = hOf(pair);
-      let room = (P.b[1] - P.b[0]) - zl.reduce((t, y) => t + hOf(y.items), 0) + 60 * scale - 60 - pondRes; while (ph > 0 && room >= ph * 0.75) { /* rows usually come out a little shorter than planned; a smaller scale tries one fewer */ x.items.push(...pair.map(o => ({ ...o }))); room -= ph; } for (let j = 0; j < bonus; j++) x.items.push(...pair.map(o => ({ ...o }))); /* and the rows a try found room for */ fillPh = ph;
+      let room = (P.b[1] - P.b[0]) - zl.reduce((t, y) => t + hOf(y.items), 0) + 60 * scale - 60 - pondRes; while (ph > 0 && room >= ph * (0.75 + 0.25 * Math.min(1, (1 - scale) / 0.45))) { /* rows usually come out a little shorter than planned; a smaller scale tries one fewer (the overshoot allowed shrinks to none by scale 0.55: 60 ft a scale step alone never dropped a pair 250 ft deep, so a lake's band a little narrower than the detention estimate's left a pair of streets that never fit at any scale and the plan fell back to a simple layout) */ x.items.push(...pair.map(o => ({ ...o }))); room -= ph; } for (let j = 0; j < bonus; j++) x.items.push(...pair.map(o => ({ ...o }))); /* and the rows a try found room for */ fillPh = ph;
       if (zones[fillAt].use !== 'multifamily') x.fill = true;
     }
     // too deep for the lot: zones of one row each share a row, side by side (never the street zone)

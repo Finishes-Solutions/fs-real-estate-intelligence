@@ -172,3 +172,17 @@ export const FRESH = [
   { id: 'FS3', cat: 'spatial', site: 'R10', ask: '160 apartments, keep a 40 ft tree buffer on the east side', want: { uses: ['multifamily'], place: [['open space', 'keep', 'east']] }, out: [['away', 'buildings', 'east', 39]] },
   { id: 'FS4', cat: 'spatial', site: 'R10', ask: '200 apartments, dog park at the back', want: { uses: ['multifamily'], place: [['dog park', 'back']] }, out: [['in', 'dog park', 'back']] }
 ];
+// written after round 2 (the engine honouring the pond's, the parking's, the clubhouse's, the docks' and a single use's
+// place: LAYOUT-ENGINE.md item 30), never tuned to, scored once (node scripts/prompt-corpus.mjs --fresh2)
+export const FRESH2 = [
+  { id: 'FP1', cat: 'spatial', site: 'R10', ask: '170 apartments, put the detention at the front by the road', want: { uses: ['multifamily'], place: [['pond', 'front']] }, out: [['in', 'pond', 'front']] },
+  { id: 'FP2', cat: 'spatial', site: 'E10', ask: '190 apartments with the pond on the south end', want: { uses: ['multifamily'], place: [['pond', 'edge', 'south']] }, out: [['in', 'pond', 'south']] },
+  { id: 'FP3', cat: 'spatial', site: 'R10', ask: '150 apartments, parking tucked behind the buildings', want: { uses: ['multifamily'], place: [['parking', 'behind', 'buildings']] }, out: [['nearer', 'buildings', 'parking', 'front']] },
+  { id: 'FP4', cat: 'spatial', site: 'B40', ask: '200,000 sf distribution building at the back of the site, docks facing west', want: { uses: ['industrial'], place: [['industrial', 'back'], ['truck court', 'facing', 'west']] }, out: [['in', 'industrial', 'back'], ['facing', 'truck court', 'west']] },
+  { id: 'FP5', cat: 'spatial', site: 'W20', ask: '220 apartments, clubhouse near the entrance', want: { uses: ['multifamily'], place: [['clubhouse', 'near', 'entrance']] }, out: [['near', 'clubhouse', 'entrance', 150]] },
+  { id: 'FP6', cat: 'spatial', site: 'C8', ask: '160 apartments with access off the side street', want: { uses: ['multifamily'], place: [['entrance', 'edge', 'side']] }, out: [['entrance', 'side']] },
+  { id: 'FP7', cat: 'messy', site: 'R5', ask: 'office 35k, 2 stories', want: { uses: ['office'], q: { office: ['exact', 35000] }, floors: { office: 2 } }, out: [['built']] },
+  { id: 'FP8', cat: 'vague', site: 'R5', ask: 'bowling alley', want: { uses: ['other'] }, out: [['built']] },
+  { id: 'FP9', cat: 'spatial', site: 'D6', ask: '70 townhomes with the pond in the back', want: { uses: ['townhomes'], place: [['pond', 'back']] }, out: [['in', 'pond', 'back']] },
+  { id: 'FP10', cat: 'spatial', site: 'R10', ask: '200 apartments, pond in the southeast corner', want: { uses: ['multifamily'], place: [['pond', 'corner', 'southeast']] }, out: [['in', 'pond', 'corner']] }
+];

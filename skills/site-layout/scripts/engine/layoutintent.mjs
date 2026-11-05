@@ -248,12 +248,18 @@ export function checkPlacement(plan, elements, program, p) {
   if (p.rel === 'facing') {
     const tg = piecesOf(elements, 'buildings', program).filter(e => p.subject !== 'truck court' || ['industrial', 'storage'].includes(e.use || program?.use)); if (!tg.length) return res('unknown', 'no building to face from');
     const want = p.edge === 'back' ? F.into : p.edge === 'front' ? F.nf : COMPASS[p.edge] || null; if (!want) return res('unknown', 'no direction');
-    // every building it serves faces that way (a court shared between two buildings faces each of them a different way)
-    const dirs = tg.map(g => { const b = ctr([g]), d = [c[0] - b[0], c[1] - b[1]], L = Math.hypot(d[0], d[1]) || 1; return [d[0] / L, d[1] / L]; }), bad = dirs.find(d => d[0] * want[0] + d[1] * want[1] <= 0.5);
+    // every building it serves faces that way, each toward its own court (the nearest; a court shared between two buildings
+    // faces each of them a different way)
+    const own = g => { const sh = S.shapeOf(g); return pcs.slice().sort((a, b) => S.gapBetween(sh, S.shapeOf(a)) - S.gapBetween(sh, S.shapeOf(b)))[0]; };
+    const dirs = tg.map(g => { const b = ctr([g]), k = pcs.length > 1 ? ctr([own(g)]) : c, d = [k[0] - b[0], k[1] - b[1]], L = Math.hypot(d[0], d[1]) || 1; return [d[0] / L, d[1] / L]; }), bad = dirs.find(d => d[0] * want[0] + d[1] * want[1] <= 0.5);
     return !bad ? res('pass') : res('fail', 'it faces ' + compassOf(bad) + (tg.length > 1 ? ' from one of the buildings it serves' : ''));
   }
   if (['beside', 'between', 'around'].includes(p.rel)) return res('unknown', 'laid out by the engine’s zones; not measured');
   const reg = regionOf(plan, p); if (!reg) return res('unknown', 'no way to measure it on this site');
+  // a pond in several basins: two thirds of its area where asked (a basin each end isn't "the pond on the north end")
+  if (p.subject === 'pond' && pcs.length > 1) { const A = pcs.map(e => Math.max(1, S.elArea ? S.elArea(e) : 1)), tot = A.reduce((a, b) => a + b, 0), inA = pcs.reduce((t, e, i) => t + (reg.ok(ctr([e])) ? A[i] : 0), 0);
+    if (inA < tot * 0.67) return res('fail', Math.round(100 * inA / tot) + '% of the pond is there; the rest is ' + whereIs(F, ctr(pcs.filter(e => !reg.ok(ctr([e]))))));
+    return res('pass'); }
   return reg.ok(c) ? res('pass') : res('fail', 'it is ' + whereIs(F, c));
 }
 export const KEEP_FT = 60, AWAY_FT = 50, NEAR_FT = 150;
@@ -305,6 +311,38 @@ export function applyPlacements(brief) {
   }
   return notes;
 }
+// ---------- steering the search: the asks the engine meets by choosing among the layouts it draws ----------
+// The pond's, the parking's, the clubhouse's and the truck court's place, a way in off a named street and a single use's
+// place have no control of their own in the generators; each generator does draw them in several places (a pond band at
+// the front, back or an end; parking rows ahead of or behind the buildings; the clubhouse by the entry or in the middle;
+// docks on one side or the other). lib/sitelayout.mjs layoutOptions (opts.asks) counts the asks each candidate misses
+// and puts the one missing fewest among the options it hands back, so the run's ranking (placements met, after
+// feasibility and the program) can choose it. Only asks measured and said (how 'checked'): the zones' places are the
+// engine's own, and pools, playgrounds and dog parks are moved after the layout.
+export function steered(placements) {
+  return (placements || []).filter(p => p && (p.how === 'checked' || p.how == null) && p.rel !== 'keep' && p.rel !== 'away' && !['beside', 'between', 'around'].includes(p.rel)
+    && (['pond', 'parking', 'clubhouse', 'truck court', 'entrance', 'commons'].includes(p.subject) || USE_SUBJECTS.includes(p.subject)));
+}
+// -> null (nothing to steer) or { list, misses(plan, els, program) -> number of the asks the drawing misses, hints }
+// hints: what the generators can be told outright (where a single use goes, which way its docks face, where the pond goes)
+export function asksFor(placements, { ring, front } = {}) {
+  const list = steered(placements); if (!list.length) return null;
+  const misses = (plan, els, program) => { let n = 0; for (const p of list) { const r = checkPlacement(plan, els || [], program || {}, p); if (r.status === 'fail') n++; } return n; };
+  const hints = {};
+  for (const p of list) {
+    if (USE_SUBJECTS.includes(p.subject) && ['front', 'back', 'middle'].includes(p.rel)) hints.useAt = p.rel;
+    if (p.subject === 'truck court' && p.rel === 'facing' && p.edge) hints.docks = p.edge;
+    if (p.subject === 'pond') hints.pond = p.rel === 'near' && p.target === 'entrance' ? 'front' : ['front', 'back', 'middle'].includes(p.rel) ? p.rel : p.rel === 'edge' || p.rel === 'corner' ? (p.edge || 'back') : null;
+    if (p.subject === 'clubhouse' && ['front', 'back', 'middle'].includes(p.rel)) hints.club = p.rel;
+    if (p.subject === 'parking' && ['before', 'behind', 'front', 'back'].includes(p.rel)) hints.parking = p.rel === 'before' || p.rel === 'front' ? 'front' : 'back';
+  }
+  // a compass side as the frame's: the street along the bottom, x along it (lib/sitelayout.mjs frameOf); 'start' / 'end'
+  // the ends of the street edge
+  if (ring && Number.isInteger(front)) { const F = siteFrame(ring, front), side = e => { const v = COMPASS[e]; if (!v) return e; const dIn = v[0] * F.into[0] + v[1] * F.into[1], dR = v[0] * F.right[0] + v[1] * F.right[1]; return Math.abs(dIn) >= Math.abs(dR) ? (dIn > 0 ? 'back' : 'front') : (dR > 0 ? 'right' : 'left'); };
+    if (hints.pond) hints.pond = side(hints.pond); if (hints.docks) hints.docks = side(hints.docks); }
+  return { list, misses, hints };
+}
+
 // an edge word as a zone's place (the engine's zones know front and back, not compass sides)
 function roleOf(ring, front, streets, edge) {
   if (edge === 'front' || edge === 'back') return edge;

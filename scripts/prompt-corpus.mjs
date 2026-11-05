@@ -2,17 +2,18 @@
 // path: lib/layoutbrief.mjs briefFromRequest) and laid out (lib/layoutrun.mjs runBrief), the reading checked against
 // what was meant and the best layout against what was asked (where things went, counts, sizes). The geometry checks here
 // are the scorer's own (not lib/layoutintent.mjs), so a layout isn't judged by the code that placed it.
-//   node scripts/prompt-corpus.mjs [--fresh] [--only S0] [--cat spatial] [--out docs/bench/prompt-eval.md] [--json file] [--png dir]
+//   node scripts/prompt-corpus.mjs [--fresh | --fresh2] [--only S0] [--cat spatial] [--out docs/bench/prompt-eval.md] [--json file] [--png dir]
 // Writes the score table per category (reading, outcome, unmet asks said in the notes) and a line per failed check.
-// --fresh: the requests written after the parser was tuned (FRESH), to see how the reading carries to new wording.
+// --fresh: the requests written after the parser was tuned (FRESH), to see how the reading carries to new wording;
+// --fresh2: those written after round 2 (the places honoured, LAYOUT-ENGINE.md item 30).
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as B from '../lib/layoutbrief.mjs';
 import * as RUN from '../lib/layoutrun.mjs';
 import * as S from '../lib/siteplan.mjs';
-import { SITES, CASES as ALL, FRESH } from '../test/fixtures/prompt-corpus.mjs';
-const CASES = process.argv.includes('--fresh') ? FRESH : ALL;
+import { SITES, CASES as ALL, FRESH, FRESH2 } from '../test/fixtures/prompt-corpus.mjs';
+const CASES = process.argv.includes('--fresh2') ? FRESH2 : process.argv.includes('--fresh') ? FRESH : ALL;
 
 export const CATS = ['vague', 'detailed', 'messy', 'spatial'];
 export const planOf = id => { const s = SITES[id]; return { origin: [-96.42, 30.38], ring: s.ring, front: s.front, streets: s.streets || [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, elements: [] }; };

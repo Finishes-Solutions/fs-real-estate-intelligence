@@ -107,7 +107,26 @@ for (const id of FAST) {
   assert.deepEqual([...row.reading, ...row.outcome].filter(x => !x.ok).map(x => x.name + ' → ' + x.got), [], id + ' “' + c.ask + '”');
   for (const p of rec.brief.program.placements || []) assert.ok(rec.options[0].notes.some(n => n.startsWith(I.describe(p))), id + ': the plan says what became of “' + I.describe(p) + '”');
 }
-// an ask the engine can't place is said, never dropped
-{ const c = CASES.find(x => x.id === 'S06'), { rec } = runWords(c), n = rec.options[0].notes.filter(x => /^Asked: the truck court facing east/.test(x));
-  assert.equal(n.length, 1); assert.ok(/done\.|not met/.test(n[0]), n[0]); }
+// asks with no control of their own (the pond, the docks, a single use's place): the engine compares the layouts it
+// draws on them (lib/layoutintent.mjs asksFor, lib/sitelayout.mjs askPick) and the generators draw the places asked
+{ const c = CASES.find(x => x.id === 'S06'), { rec, row } = runWords(c), n = rec.options[0].notes.filter(x => /^Asked: the truck court facing east/.test(x));
+  assert.equal(n.length, 1); assert.ok(/done\./.test(n[0]), n[0]); assert.ok(row.ok, 'S06: the warehouse at the back, its docks facing east');
+  assert.ok(rec.options[0].notes.includes('Asked: the warehouse at the back: done.'));
+  const r13 = runWords(CASES.find(x => x.id === 'S13')); assert.ok(r13.row.ok, 'S13: the pond in front'); assert.ok(r13.rec.options[0].elements.some(e => e.kind === 'pond')); }
+{ const plan = planOf('E10'), A = I.asksFor([{ id: 'p1', subject: 'pond', rel: 'edge', edge: 'north', how: 'checked' }, { id: 'p2', subject: 'truck court', rel: 'facing', edge: 'east', how: 'checked' }, { id: 'p3', subject: 'pool', rel: 'middle', how: 'moved' }, { id: 'p4', subject: 'open space', rel: 'keep', edge: 'north', how: 'engine' }], plan);
+  assert.deepEqual(A.list.map(p => p.id), ['p1', 'p2'], 'only the asks measured and said are steered'); assert.deepEqual([A.hints.pond, A.hints.docks], ['right', 'front'], 'compass sides as the frame’s (street on the east: north is on the right)');
+  assert.equal(I.asksFor([{ id: 'p1', subject: 'pool', rel: 'middle', how: 'moved' }], plan), null, 'nothing to steer: no asks handed to the engine');
+  // each building faces its own court: two warehouses, each with its apron on its east side
+  const bl = (x, y) => ({ kind: 'building', use: 'industrial', x, y, w: 200, d: 400 }), tk = (x, y) => ({ kind: 'truck', x, y, w: 60, d: 400 }), els = [bl(100, 400), tk(230, 400), bl(400, 400), tk(530, 400)];
+  assert.equal(I.checkPlacement(plan, els, { use: 'industrial' }, { id: 'p', subject: 'truck court', rel: 'facing', edge: 'east' }).status, 'pass');
+  assert.equal(I.checkPlacement(plan, [bl(100, 400), tk(230, 400), tk(-30, 400)], { use: 'industrial' }, { id: 'p', subject: 'truck court', rel: 'facing', edge: 'east' }).status, 'pass', 'its nearest court');
+  // a pond in two basins, one each end: not "the pond on the north end"
+  const pd = (x, y, w) => ({ kind: 'pond', x, y, w, d: 100 }), q = { id: 'p', subject: 'pond', rel: 'edge', edge: 'north' };
+  assert.equal(I.checkPlacement(plan, [pd(250, 820, 200), pd(250, 80, 160)], {}, q).status, 'fail'); assert.equal(I.checkPlacement(plan, [pd(250, 820, 300), pd(250, 80, 100)], {}, q).status, 'pass'); }
+// sizes in thousands with no unit after them; a business named bare is a building, not a commons
+assert.equal(read('retial 25k + 1 pad').gfa, 25000, '"retail 25k" is square feet'); assert.equal(read('retial 25k + 1 pad').atLeast, undefined, '"+ 1 pad" is a pad more, not "25,000 sf or more"');
+assert.equal(read('whse ~150k, 1 acre det pond').gfa, 150000); assert.equal(read('retail with a $25k budget').gfa, undefined, 'money is not a size');
+assert.equal(read('200 apartments + 40 townhomes').zones?.length, 2);
+assert.equal(read('trampoline park').btype, 'custom'); assert.equal(read('an indoor water park').btype, 'custom'); assert.equal(read('office park').use, 'office');
+assert.equal(read('homes around a central park').zones?.[0]?.use, 'amenity', 'a park the homes go round is still a commons');
 console.log('prompts: ok (' + Math.round((Date.now() - t0) / 1000) + ' s)');

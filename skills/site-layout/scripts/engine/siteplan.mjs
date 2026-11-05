@@ -2149,7 +2149,8 @@ const TINY_RE = /tiny[- ]?homes?|tiny[- ]house|park[- ]models?|micro[- ]?homes?/
 export const homeKindOf = t => { const a = TINY_RE.test(t), b = MOBILE_RE.test(t); return a && b ? 'mixed' : a ? 'tiny' : b ? 'manufactured' : COTTAGE_RE.test(t) && !/\b(?:apartments?|town ?(?:home|house)s?|duplex(?:es)?)\b/.test(t) ? 'cottage' : null; }; // (build-to-rent cottages: their own community, unless the words are for apartments, townhomes or duplexes)
 const KIND_WORDS = [['sfr', new RegExp(TINY_RE.source + '|' + MOBILE_RE.source)], ['foodtrucks', /food[- ]?trucks?|truck stalls?|mobile (?:food|vendors?)/], ['fuel', /gas station|fuel(?:ing)? (?:station|center|centre|pumps?|positions?|canopy)|filling station|petrol|c-store|convenience store|gas pumps?|\b\d+\s*(?:fuel |gas )?(?:pumps|mpds?|dispensers)\b|quik ?trip|\bqt\b|buc-?ee'?s|racetrac|\bwawa\b|truck stop|travel (?:center|centre|plaza)/], ['storage', /self[- ]?storage|mini[- ]?storage|mini[- ]?warehouse|storage (?:units|facility|center|buildings?)|climate[- ]controlled (?:storage|units|building)|drive[- ]?up (?:storage|units)|(?:rv|boat)(?: (?:and|&|or) (?:rv|boat))? storage/], ['industrial', /warehouse|industrial|distribution|logistics|flex|manufactur|cross[- ]?dock|storage yard/], ['townhomes', /town ?ho(?:me|use)s?|row ?homes?/],
   ['duplex', /duplex|cottages?|bungalows?/], ['multifamily', /apartment|multi-?family|senior living|\bmf\b/],
-  ['amenity', /commons|amenit|\bpark\b|\blake\b|pickleball|pavilion|playground|dog park|community (?:center|space)|green ?space|open space|event lawn/],
+  // ("a trampoline park", "an indoor water park": a business in its own building, not a commons; "an office park": offices)
+  ['amenity', /commons|amenit|(?<!\b(?:trampoline|water|adventure|amusement|theme|bounce|jump|ninja|indoor|play|office|business|corporate|medical|retail|tech|research) )\bpark\b|\blake\b|pickleball|pavilion|playground|dog park|community (?:center|space)|green ?space|open space|event lawn/],
   ['sfr', /single[- ]family|\bsfr\b|houses\b|subdivision|residential (?:neighbou?rhood|community|lots)|n[ei]{1,2}ghbou?rhood|homes on (?:their own )?lots|for[- ]sale homes|detached (?:[a-z0-9-]+ ){0,3}(?:homes|houses)|build[- ]to[- ]rent (?:[a-z0-9-]+ ){0,2}(?:homes|houses|communit)|\bbtr\b|\b1[- ]stor(?:y|ey) (?:[a-z0-9-]+ ){0,2}homes|rental homes/], // after the commons: "a community center at the back of the neighborhood" is the commons
   ['hotel', /hotel|motel|\binn\b|extended[- ]stay|hospitality/], ['venue', /wedding (?:venue|pavilion|barn|chapel)|event (?:venue|center|centre|pavilion|barn|hall|space)|banquet hall|reception (?:hall|venue)|conference (?:pavilion|venue)/], ['church', /church|chapel|sanctuary|house of worship|worship center|mosque|synagogue|temple\b/],
   ['medical', /medical|clinic|dental|urgent care|hospital|surgery/], ['restaurant', /restaurant|qsr|drive[- ]?thru|coffee|fast food|cafe/], ['office', /office/],
@@ -2208,6 +2209,10 @@ export function tidyRequest(text) {
     .replace(/(\d(?:\.\d+)?)\s*(?:spaces?|stalls?)?\s*\/\s*(?:unit|du|apt|apartment|door|home)\b/gi, '$1 spaces per unit')
     .replace(/\b(per|\/|an?)\s*1,?000\s*(?:sf|square feet|gsf|gross sf|nsf)\b/gi, '$1 1000');
   const housing = /\b(?:apartments?|units|townhomes?|homes|multi-?family|residential|senior)\b/i.test(t);
+  // a size in thousands with no unit after it ("retail 25k + 1 pad", "whse 150k"): square feet when the request names a
+  // commercial use and no homes (never money: "$25k"; never a count of something else: "25k per unit", "25k cars")
+  if (!housing && /\b(?:retail|office|warehouse|industrial|medical|shops?|flex|commercial|restaurant|grocery|distribution|storage)\b/i.test(t)) t = t.replace(/(?<![$\d.,])(\d+(?:\.\d+)?)\s*k\b(?!\s*(?:sf|sq|square|per|\/|dollars|budget|cars|trips|vpd|adt|units?|homes|apartments))/gi, '$1k sf');
+  t = t.replace(/\s\+\s+(?=(?:\d+|an?|one|two|three)\s+[a-z])/gi, ' and '); // ("25k sf + 1 pad": and, not "25,000 sf or more")
   t = t.replace(/(\d(?:\.\d+)?)\s*(?:parking )?(?:ratio|parking ratio)\b|\bparking ratio (?:of\s*)?(\d(?:\.\d+)?)/gi, (m, a, b) => (a || b) + (housing ? ' spaces per unit' : ' per 1000'));
   t = t.replace(/\b(apartments|units|townhomes|townhouses|duplexes|cottages|homes|lots)\s*(?:\((?:for[- ]sale|for[- ]rent)\)\s*|for[- ](?:sale|rent)\s*)?(?:x|×|:|#|qty|count|total(?: of)?)?\s*(\d{2,4})\b(?!\s*(?:-?\s*stor|floors?|levels?|ft|feet|foot|'|sf|sq|acres?|ac\b|%|per|spaces|stalls|car|k\b|,\d|x\s*\d|units?\b|apartments|homes))/gi, '$2 $1');
   t = t.replace(/\b(buffer(?:ing)?|next to|adjacent to|backing (?:up )?(?:on)?to|away from|screen(?:ing)?|protect(?:ing)?)\s+(?:the\s+)?(?:existing\s+|adjacent\s+|neighbou?ring\s+)?(?:single[- ]family (?:homes|houses|neighbou?rhood|residences?)|houses|neighbou?rs|residential neighbou?rhood|homes(?= (?:to|on|along|next|behind)))/gi, '$1 the neighbours');
@@ -2273,7 +2278,10 @@ function applyPlaza(p, text) {
   if (p.use === 'retail' || !p.zones) { p.plaza = true; p.court = court; } p.arrangement = 'plaza';
   return p;
 }
-export function guessProgram(text) { text = useWords(tidyRequest(text)); return BT.applyType(oneCommunity(applyTownhomeLots(applyStudios(applyPlaza(guessProgram0(text), text), text), text), wordsToDigits(text)), text); } // (BT.applyType: the building type the words name, lib/btypes.mjs; existing types unchanged)
+export function guessProgram(text) { text = useWords(tidyRequest(text)); return BT.applyType(oneCommunity(applyTownhomeLots(applyStudios(applyPlaza(guessProgram0(text), text), text), text), wordsToDigits(text)), bareName(text)); } // (BT.applyType: the building type the words name, lib/btypes.mjs; existing types unchanged)
+// a business named bare, no article and nothing else ("trampoline park", "bowling alley"): read as "a trampoline park",
+// so the building type step names it (an unknown type, the closest primitive) instead of an open request for housing
+const bareName = t => /^\s*(?!an?\b|one\b|the\b)[a-z][a-z-]+(?:\s+[a-z][a-z-]+){0,2}\s+(?:park|alley|arena|center|centre|hall|gym|studio|club|rink|range|facility|museum|theater|theatre|venue|lanes)\s*$/i.test(t) ? 'a ' + t.trim() : t;
 // the words a program is read from: where things go said in them is read apart (lib/layoutintent.mjs placementsFromWords),
 // so "the pool in the center" isn't a shopping center, "keep the trees on the north side" or "a 50 ft buffer" isn't a
 // commons to lay out, and a dog park isn't a park zone
