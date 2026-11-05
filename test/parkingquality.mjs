@@ -115,6 +115,28 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   // no land at either end (the paving setback and the drive): left as it was
   const tight = oneAisle(60, 880, { rowTo: 880 }); assert.equal(RUN.growEndIslands(tight.plan, { elements: tight.els.concat([{ ...blk, x: 95 }]), program: { use: 'retail' } }, tight.brief).elements.filter(e => e.caps).length, 0);
 }
+// round 4 (item 36): a bare row hemmed in at both ends by drives across it, the parking exactly met: another row with free
+// land past its end grows two stalls there and pays for the hemmed row's planted ends; the count stays, nothing worse
+{
+  const t = oneAisle(60, 600, { rowTo: 280 }), r0 = t.els.find(e => e.id === 'rowS'), x0 = r0.x - r0.w / 2, x1 = r0.x + r0.w / 2;
+  const els = t.els.concat([{ id: 'xa', kind: 'drive', x: x0 - 5, y: 125, w: 9.4, d: 30, rot: 0, name: '', note: '24 ft drive' }, { id: 'xb', kind: 'drive', x: x1 + 5, y: 125, w: 9.4, d: 30, rot: 0, name: '', note: '24 ft drive' }]);
+  const need = pk(t.plan, els, t.brief).provided; t.brief.rules.values.parkingPer1000 = { v: need / 30, cls: 'assumption', source: 'test' };
+  assert.equal(RUN.rowEndIslands(t.plan, { elements: els, program: { use: 'retail' } }, t.brief).elements, els, 'no stalls to spare');
+  const o = RUN.fundEndIslands(t.plan, { elements: els, program: { use: 'retail' } }, t.brief), S2 = o.elements.find(e => e.id === 'rowS'), N2 = o.elements.find(e => e.id === 'rowN');
+  assert.equal(S2.caps, 'square', 'the hemmed row ends in islands'); assert.ok(N2.w > r0.w + 17 && !N2.caps, 'the free row grew two stalls');
+  assert.equal(pk(t.plan, o.elements, t.brief).provided, need, 'the count stays');
+  assert.ok(PM.parkingMetrics({ ...t.plan, elements: o.elements }).bareEnds < PM.parkingMetrics({ ...t.plan, elements: els }).bareEnds);
+  const v = check(t.plan, o.elements, t.brief), v0 = check(t.plan, els, t.brief); assert.deepEqual(v.failed, v0.failed, 'no check worse');
+  assert.ok(o.tplNotes.some(n => /paid for by 2 stalls/.test(n)));
+  // no free land anywhere (a drive across the free row's far end too): nothing changes
+  const shut = els.concat([{ id: 'xc', kind: 'drive', x: x1 + 5, y: 175, w: 9.4, d: 30, rot: 0, name: '', note: '24 ft drive' }]);
+  assert.equal(RUN.fundEndIslands(t.plan, { elements: shut, program: { use: 'retail' } }, t.brief).elements, shut);
+}
+// the 90th-percentile walk and the ranking: a layout whose stalls stand far from the doors weighs as more paving
+{
+  const t = oneAisle(60, 880, { rowTo: 880 }); assert.ok(RUN.walkP90(t.els) > 0 && RUN.walkP90(t.els) < 300);
+  assert.equal(RUN.walkP90([{ kind: 'building', x: 0, y: 0, w: 100, d: 100, rot: 0 }, { kind: 'parking', x: 400, y: 0, w: 90, d: 18, rot: 0, row: 1, lock: true }]) > 300, true);
+}
 // the dead-end rules, shared constants for the engine and the validator: an end clear of stalls for 18 ft (a hammerhead)
 // is a way out, 16 ft is not; and an aisle whose stalls run past 150 ft needs a paved turnaround or a drive besides
 {
@@ -156,8 +178,48 @@ assert.equal(S.rowStallCount(13, true, 'square'), 11); assert.equal(S.rowStallCo
   assert.equal(b.rules.values.parkingPerUnit.v, 2.1); assert.equal(b.rules.values.parkingPerUnit.cls, 'verified');
   const off = RUN.governingParking(B.briefFromProgram(prog, { ...plan, params: {} }, { text: ask, parser: 'app' }), { ...plan, params: {} }, prog); assert.equal(off.rules.values.parkingPerUnit.v, null, 'guardrails off: the engine default');
   const r = RUN.runPlan(plan, prog, {}, { ask }); assert.ok(r.options.length);
-  for (const o of r.options) { const q = V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking; assert.equal(q.required, 252); assert.ok(q.provided >= 252, o.name + ': ' + q.provided); assert.equal(o.check.status, 'pass'); }
+  // (every option judged at 2.1 a home and parking it; the top one holds the 120 asked and passes. Nov 5, item 31: with the
+  // entry throats set back, the two garden layouts park exactly the same and the run keeps one, so a lower option may
+  // be a shorter courtyard, still parked at the governing rule)
+  for (const o of r.options) { const v = V.validateLayout({ ...plan, elements: o.elements, program: o.program }, cb), q = v.quantities.parking; assert.equal(q.required, Math.ceil(v.quantities.totals.units * 2.1 - 1e-9), o.name); assert.ok(q.provided >= q.required, o.name + ': ' + q.provided); assert.equal(v.checks.find(c => c.id === 'parking.count').status, 'pass', o.name); }
+  { const o = r.options[0], q = V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking; assert.equal(q.required, 252); assert.ok(q.provided >= 252); assert.equal(o.check.status, 'pass'); }
   const r0 = RUN.runPlan({ ...plan, params: {} }, prog, {}, { ask }), short = r0.options.find(o => V.quantities({ ...plan, elements: o.elements, program: o.program }, cb).parking.provided < 252);
   if (short) { const v = V.validateLayout({ ...plan, elements: short.elements, program: short.program }, cb); assert.equal(v.checks.find(c => c.id === 'parking.count').status, 'fail', 'parked at 1.6 a home: short of the city’s count'); }
+}
+// round 3 (docs/LAYOUT-ENGINE.md item 31): the building at the street with its parking behind, when asked (the ask's
+// hint, lib/layoutintent.mjs asksFor: parking 'back'); not offered unasked on a lot where it isn't better
+{
+  const L = await import('../lib/sitelayout.mjs'), CX = await import('../lib/enginectx.mjs');
+  const plan = { ...lot(520, 360), elements: [] }, brief = B.canonicalBrief(B.briefFromRequest('15,000 sf retail', plan)), E = B.toEngine(brief);
+  const asks = { list: [], misses: () => 0, hints: { parking: 'back' } };
+  const run = o => CX.deterministic({ seed: 't' }, () => L.layoutOptions(E.plan, E.program, o)).value;
+  const asked = run({ ...E.opts, asks }), top = asked[0], bs = top.elements.filter(e => e.kind === 'building'), rows = top.elements.filter(e => e.kind === 'parking');
+  assert.match(top.name, /^Building at the street, parking behind/); assert.ok(top.notes.some(t => /at the street with its parking behind it, as asked/.test(t)));
+  const by = Math.max(...bs.map(b => b.y)); assert.ok(rows.length && rows.every(r => r.y > by), 'every stall row behind the building');
+  const v = V.validateLayout({ ...E.plan, elements: top.elements, program: top.program }, brief); assert.equal(v.status, 'pass'); assert.ok(v.quantities.parking.provided >= v.quantities.parking.required);
+  const ent = top.elements.filter(e => S.isEntrance(e)); assert.ok(ent.length && ent.every(e => !bs.some(b => S.rectsOverlap({ poly: S.shapeOf(e) }, { poly: S.shapeOf(b) }, 0))), 'the way in beside the building');
+  const plain = run(E.opts); assert.ok(!plain.some(o => /^Building at the street/.test(o.name)), 'not offered unasked where it is not better');
+}
+// end to end, the words: the run lays the building at the street and every stall behind its street face (the check
+// counts a stall between a building and the street as a miss)
+{
+  const I = await import('../lib/layoutintent.mjs');
+  for (const [w, h, ask] of [[520, 360, 'retail on the street, parking in the rear, 15,000 sf'], [600, 400, '20,000 sf medical office at the front with parking behind it']]) {
+    const plan = { ...lot(w, h), elements: [] }, rec = RUN.runBrief(B.briefFromRequest(ask, plan)), o = rec.options[0];
+    assert.equal(o.validation.status, 'pass', ask); assert.match(o.name, /^Building at the street, parking behind/, ask);
+    assert.ok(o.placements.length && o.placements.every(c => c.status === 'pass'), ask + ': ' + o.placements.map(c => c.said).join(' '));
+    const conv = RUN.runBrief(B.briefFromRequest(ask.replace(/,? ?parking (in the rear|behind it)/, '').replace(/ on the street| at the front/, ''), plan)).options[0]; // (the same program, no place said: the usual field in front)
+    assert.equal(I.checkPlacement(plan, conv.elements, conv.program, { id: 'x', subject: 'parking', rel: 'behind', target: 'buildings' }).status, 'fail', 'a field in front of the building is not parking behind it');
+  }
+}
+// the entry's throat: the generator's rows set the first drive across the way in back to the stacking length, and a
+// parking field's paving stops beside the entry drive (the first aisle is the first drive across)
+{
+  for (const [w, h, ask, need] of [[900, 500, 'exactly 120 garden apartments, 3 stories', 50], [520, 360, 'medical office building 40,000 sf', 75]]) {
+    const plan = { ...lot(w, h), elements: [] }, rec = RUN.runBrief(B.briefFromRequest(ask, plan)), o = rec.options[0];
+    assert.equal(o.validation.status, 'pass', ask);
+    const t = RUN.entryThroats(plan, o.elements, need).filter(x => !x.e.emergency); assert.ok(t.length, ask);
+    assert.ok(Math.min(...t.map(x => x.cross)) >= need - 1, ask + ': first drive across the entry ' + t.map(x => x.cross).join(','));
+  }
 }
 console.log('parking quality: ok');

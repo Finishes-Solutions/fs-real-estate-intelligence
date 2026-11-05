@@ -285,7 +285,7 @@ function build(C, cand) {
   if (!deep && W > 400) { const n = Math.max(1, Math.round(W / 330) - 1); for (let k = 1; k <= n; k++) spines.push(xL + W * k / (n + 1)); }
   // the entry: across, straight up from the street to the first aisle (on a spine when there is one); deep, in from the
   // street on the left on an aisle's line
-  const { ew } = P; let entry = null, thr, Rc = P.Rc;
+  const { ew } = P; let entry = null, thr, Rc = P.Rc, thrBox = null;
   for (const rc of [P.Rc, 15, 8]) { // curb returns: 25 ft, tighter where the frontage is short
     Rc = rc;
     if (!deep) {
@@ -299,7 +299,7 @@ function build(C, cand) {
         const fitsE = poly => entryFits(F, poly, ob.concat(inWay)), poly = H.entryPoly(x, yl, yr, a0.y + aw / 2, ew, Rc, fitsE), q = { kind: 'drive', poly, ...(poly.cl ? { cl: poly.cl } : {}), name: 'Main entry', note: ew + ' ft driveway', entry: true, at: x }; if (fitsE(q.poly)) { e = q; break; }
       }
       if (!e) continue;
-      entry = e; rowOb.push({ p: box(x - ew / 2 - P.Rc - sw - 2, Math.min(yl, yr) - 5, x + ew / 2 + P.Rc + sw + 2, a0.y - aw / 2 - 0.5), g: 0 }); // (the throat: no stall beside it, whatever its curb returns)
+      entry = e; thrBox = [x - ew / 2 - P.Rc - sw - 2, Math.min(yl, yr) - 5, x + ew / 2 + P.Rc + sw + 2, a0.y - aw / 2 - 0.5]; rowOb.push({ p: box(...thrBox), g: 0 }); // (the throat: no stall beside it, whatever its curb returns)
       if (e.cl) rowOb.push({ p: S.throatZone(e.poly, e.cl, a0.y - aw / 2 - 0.5 - Math.min(yl, yr), sw + 2), g: 0 }); // (and where it turns off a slanting street, square to the street)
       if (spines.length) { const k = spines.reduce((b, s, i) => Math.abs(s - x) < Math.abs(spines[b] - x) ? i : b, 0); spines[k] = x; }
     } else {
@@ -414,7 +414,14 @@ function build(C, cand) {
   const pondEl = cand.pond ? (() => { const [x0, y0, x1, y1] = cand.pond.rect; if (cand.pond.poly) return { kind: 'pond', poly: cand.pond.poly, labelAt: S.centroid(cand.pond.poly), name: C.pondName, note: C.pondNote }; return { kind: 'pond', ...rectL(x0, y0, x1, y1), ...(P.PAR.style?.ponds === 'rounded' ? { shape: 'round' } : {}), name: C.pondName, note: C.pondNote }; })() : null;
   // 7. the paving under each field: its whole band between the collectors (the gaps at row ends and aisle ends are paved,
   // as on a civil sheet; lib/siteplan.mjs fieldsOf is the same idea for a lot drawn by hand). Counted once (metrics).
-  const fieldEls = fields.filter(f => f.aisles.length).map(f => { const l = Math.min(...f.aisles.map(a => a.l)), r = Math.max(...f.aisles.map(a => a.r)); return r - l > 30 && f.y1 - f.y0 > 30 ? { kind: 'field', ...rectL(l, f.y0, r, f.y1), name: '', note: 'Parking field paving' } : null; }).filter(Boolean);
+  // (across: the main entry's throat is planted, not paved, beside the entry drive up to the first aisle — the paving under
+  // the field stops at its sides, so the first drive across the way in is the first aisle, the stacking length in from
+  // the street; docs/LAYOUT-ENGINE.md item 31)
+  const tb = !deep && thrBox ? thrBox : null;
+  const fieldEls = fields.filter(f => f.aisles.length).flatMap(f => { const l = Math.min(...f.aisles.map(a => a.l)), r = Math.max(...f.aisles.map(a => a.r)); if (!(r - l > 30 && f.y1 - f.y0 > 30)) return [];
+    const fe = (x0, y0, x1, y1) => ({ kind: 'field', ...rectL(x0, y0, x1, y1), name: '', note: 'Parking field paving' });
+    if (!tb || tb[3] <= f.y0 + 1 || tb[1] >= f.y1 || tb[0] <= l + 1 || tb[2] >= r - 1) return [fe(l, f.y0, r, f.y1)];
+    const ym = Math.min(f.y1, tb[3]); return [fe(l, f.y0, tb[0], ym), fe(tb[2], f.y0, r, ym), ...(f.y1 - ym > 1 ? [fe(l, ym, r, f.y1)] : [])].filter(e => e.w > 2 && e.d > 2); });
   const els = [...fieldEls, ...ents, ...drives, ...lanes, ...B.filter(e => !e.ghost), ...pads.filter(e => e.kind === 'patio'), ...rows, ...(pondEl ? [pondEl] : [])];
   const stalls = rows.reduce((t, e) => t + S.stalls({ ...e, rot: 0 }).count, 0);
   return { els, B: B.filter(e => !e.ghost), ghosts: B.filter(e => e.ghost), rows, drives, aisles, service, fields, rowsB, pads: pads.filter(e => e.kind === 'building'), xL: xL0, xR: xR0, yLo, yHi, thr, stalls, entry, ents, W, spines: spineX };
@@ -457,13 +464,14 @@ function trashOn(C, r, prog, X) {
 // their ends when opts.clear(poly) says the land is paveable and it's clear of rows and buildings (a drive across the
 // end of the field, as civil sheets draw one), so those aisles can turn too.
 // els: rectangles in any one frame (rot shared). Returns { els, n, of } (n: aisles turned, of: the square aisles there were).
+// opts.wide: aisles up to 26 ft (a fire-lane aisle) turn too; opts.only(aisle): only the aisles it says yes to.
 export function restripeAngled(els0, ang, opts = {}) {
   let els = els0;
   const A = S.angledDims(ang), RAD = Math.PI / 180, axis = e => { const r = (+e.rot || 0) * RAD, long = +e.w >= +e.d; return { u: long ? [Math.cos(r), Math.sin(r)] : [-Math.sin(r), Math.cos(r)], L: Math.max(+e.w, +e.d), W: Math.min(+e.w, +e.d), long }; };
   const isAisle = e => e.kind === 'drive' && !e.oneWay && !e.poly && !e.path && /drive aisle/.test(e.note || '') && +e.w > 0 && +e.d > 0;
   const two = els.filter(e => (e.kind === 'drive' || e.kind === 'truck') && !e.oneWay && !/drive-?thru|bypass|one[- ]way/i.test((e.name || '') + ' ' + (e.note || '')));
   const rowsOf = list => list.filter(e => e.kind === 'parking' && e.row && !e.poly && !e.ang && !e.parallel && !e.rotL && +e.w > 0 && +e.d > 0 && Math.abs(+e.d - S.STALL.d) < 0.6); let rows = rowsOf(els);
-  const aisles = els.filter(isAisle).map(a => ({ a, ...axis(a) })).filter(q => q.long && Math.abs(q.W - S.STALL.aisle) < 0.6);
+  const aisles = els.filter(isAisle).map(a => ({ a, ...axis(a) })).filter(q => q.long && (Math.abs(q.W - S.STALL.aisle) < 0.6 || opts.wide && q.W > S.STALL.aisle && q.W < 26.6)); // (opts.wide: the guardrails' 26 ft fire-lane aisles too, lib/layoutrun.mjs angleMixed)
   const touches = (p, e) => S.rectsOverlap({ poly: p }, e, 0); const out = new Map(); let n = 0;
   const vOf = (q, pt) => (pt[0] - q.a.x) * -q.u[1] + (pt[1] - q.a.y) * q.u[0], tOf = (q, pt) => (pt[0] - q.a.x) * q.u[0] + (pt[1] - q.a.y) * q.u[1];
   const met = (q, sg) => { const at = (t, v) => [q.a.x + q.u[0] * t - q.u[1] * v, q.a.y + q.u[1] * t + q.u[0] * v], probe = [at(sg * (q.L / 2 - 3), -q.W / 2 + 2), at(sg * (q.L / 2 + 3), -q.W / 2 + 2), at(sg * (q.L / 2 + 3), q.W / 2 - 2), at(sg * (q.L / 2 - 3), q.W / 2 - 2)]; return two.some(o => o !== q.a && touches(probe, o)); };
@@ -489,7 +497,7 @@ export function restripeAngled(els0, ang, opts = {}) {
       }
     }
   }
-  const list = aisles.filter(q => [-1, 1].every(sg => met(q, sg)));
+  const list = aisles.filter(q => [-1, 1].every(sg => met(q, sg)) && (!opts.only || opts.only(q.a))); // (opts.only: just these aisles)
   if (!list.length) return { els, n: 0, of: aisles.length };
   const q0 = list[0]; list.sort((p, q) => vOf(q0, [p.a.x, p.a.y]) - vOf(q0, [q.a.x, q.a.y]));
   list.forEach((q, k) => {
@@ -594,8 +602,27 @@ export function fieldOptions(plan, programIn, prog0, opts, H) {
     if (withP.length >= n) return withP;
     return withP.concat(fieldOptions(plan, programIn, prog0, { ...opts, noPads: true }, H).filter(o => !keys.has(o.key)).slice(0, n - withP.length).map(o => ({ ...o, notes: ['Without the ' + prog0.pads + ' pad site' + (prog0.pads > 1 ? 's' : '') + ' asked for: another way to lay the program out on this lot.', ...o.notes] })));
   }
-  const r = fieldOptions1(plan, programIn, prog0, opts, H); if (opts.openOK || r.some(o => o.parked)) return r;
+  const r = fieldOptions1(plan, programIn, prog0, opts, H); if (opts.openOK || r.some(o => o.parked)) return streetFront(plan, programIn, prog0, opts, H, r);
   return r.concat(fieldOptions1(plan, programIn, prog0, { ...opts, openOK: true }, H).map(o => ({ ...o, notes: ['No room on this lot for a drive round both ends of the aisles: they stop at one end with room to turn.', ...o.notes] })));
+}
+// The building at the street, its parking behind it (docs/LAYOUT-ENGINE.md item 31): the form-based / urban arrangement,
+// storefronts on the sidewalk and the way in beside the building to the field at the back. Laid out as a brief's
+// "parking behind the buildings" is (briefRows: the street row, then the field), on the side (lib/enginectx.mjs aside:
+// its own clock and random stream, so the search above finds exactly what it did). Asked for (lib/layoutintent.mjs
+// asksFor: hints.parking 'back', or the use placed at the front): every such layout that parks the program joins the
+// options, first; not asked: offered only where it parks the program, holds as much floor area as the best layout
+// found and outscores it.
+function streetFront(plan, programIn, prog0, opts, H, out) {
+  if (opts.brief || opts.streetTried || opts.quick || (opts.count === 1 && opts.budgetMs === 0) || opts.pinned?.length || opts.pod || prog0?.pads || programIn?.pads || prog0?.zones || !FIELD_USES.includes(prog0?.use)) return out;
+  const h = opts.asks?.hints || {}, asked = !!opts.parkBack || h.parking === 'back' || h.useAt === 'front' && !h.parking;
+  let s; try { s = CX.aside('street-front', () => fieldOptions1(plan, programIn, prog0, { ...opts, brief: { parking: 'back' }, relaxed: 'as-asked', streetTried: true, budgetMs: opts.budgetMs }, H)); } catch { return out; }
+  s = s.filter(o => o.parked && o.briefOK && !o.openEnds); if (!s.length) return out;
+  const parked = out.filter(o => o.parked), best = parked.length ? Math.max(...parked.map(o => o.score)) : -Infinity, gBest = Math.max(0, ...parked.map(o => o.gM || 0));
+  const tag = o => ({ ...o, key: 'street|' + o.key, street: true, label: 'Building at the street, parking behind', recipe: { ...o.recipe, street: true }, notes: [asked ? 'The building at the street with its parking behind it, as asked (the way in beside the building).' : 'The building at the street with its parking behind it: on this lot that arrangement parks the program and holds the most (the way in beside the building).', ...(o.notes || [])] });
+  const front = o => o.score - Math.max(0, (o.recipe?.D || 0) - 100) * 3; // (a storefront on the street: a shallow, wide building first, its face along the sidewalk)
+  if (asked) return s.slice().sort((a, b) => front(b) - front(a)).slice(0, 3).map(o => tag({ ...o, score: Math.max(o.score, best + 1) })).concat(out).sort((a, b) => b.parked - a.parked || b.score - a.score);
+  const win = s.filter(o => o.score > best && (o.gM || 0) >= gBest * 0.999);
+  return win.length ? win.slice(0, 2).map(tag).concat(out).sort((a, b) => b.parked - a.parked || b.score - a.score) : out;
 }
 function fieldOptions1(plan, programIn, prog0, opts, H) {
   // pad sites the program asks for ("a retail center with 2 pad sites"; 'auto': as many as a site that size usually has)
@@ -679,7 +706,8 @@ function briefFoot(brief, prog) {
 function search(plan, prog, X) {
   const { P, H, pinB, brief, foot } = X;
   const A0 = H.pondNeed(plan, prog, foot, X.pinned), A = A0 < 3000 ? 0 : A0;
-  const pondWant = brief?.pond === 'none' || !A ? [null] : brief?.pond ? [brief.pond === 'side' ? 'end' : brief.pond, 'vault'] : ['back', 'front', 'end', 'vault']; // (vault: no pond, the detention underground: where a pond would cost the building)
+  const pondWant = brief?.pond === 'none' || !A ? [null] : brief?.pond ? [brief.pond === 'side' ? 'end' : brief.pond, 'vault'] : ['back', 'front', 'end', 'vault'];
+  if (brief?.parking === 'back' && !brief.pond) { const k = pondWant.indexOf('front'); if (k >= 0) pondWant.splice(k, 1); } // (the building at the street: no pond between its storefront and the sidewalk) // (vault: no pond, the detention underground: where a pond would cost the building)
   // frames: the lot's own lines and the street's (when they differ); square with a building placed by hand
   const da = Math.abs(((H.frontAngle(plan) - S.mainAngle(plan.ring)) % 90 + 135) % 90 - 45), aligns = da > 4 ? ['main', 'front'] : ['main'];
   const rc = plan.recipe?.pf ? plan.recipe : null, pin = pinB.slice().sort((p, q) => S.footArea(q) - S.footArea(p))[0];
@@ -890,7 +918,7 @@ function stacks1(C, prog, X, pond, pondSide, ang, asked) {
           if (share.some(v => v === 0)) continue; // (an empty building row: a shorter stack does that)
           rowsN2.forEach((b, i) => { b.bl = Array.from({ length: share[i] }, () => ({ use, floors, props: fm.props, len })); b.gap = R.gap; });
         }
-        const wB = Math.max(...rowsN2.map(b => b.bl.reduce((t, q) => t + q.len, 0) + (b.bl.length - 1) * R.gap)) + 2 * P.gs + cols + ow;
+        const wB = Math.max(...rowsN2.map(b => b.bl.reduce((t, q) => t + q.len, 0) + (b.bl.length - 1) * R.gap)) + 2 * P.gs + cols + ow + (pat.brief && bRows.front.length && !deep ? P.ew + 2 * P.Rc + 24 : 0); // (a row at the street: room beside it for the way in to the field behind)
         const per = w => { const n2 = Math.floor((w - ow - cols - 2 - (P.off || 0)) / (P.pw || P.sw)); return Math.max(0, n2 - Math.floor(n2 / 13) - (ang ? 0 : 2)); }; // (an angled row: its slanted ends, no end caps)
         const lost = drivethru ? 8 * rowsN2.reduce((t, b) => t + b.bl.length, 0) : 0; // (a drive-thru lane takes stalls out of the row in front of its restaurant)
         let wP = Infinity; for (let w = ow + cols + 8 * P.sw; w <= Wtop + ow + P.cw + 1; w += P.sw) { const t = rowsN * per(w) + outerN; if (t - S.adaLoss(t) * (ang && !outer ? 2 : 1) >= need0 * 1.02 + 2 + lost) { wP = w; break; } }
@@ -923,6 +951,9 @@ function briefDepths(brief, R) { const d = (brief?.buildings || []).map(b => b.d
 // how good a laid-out try is (before it's finished): the most floor area the parking carries (as much as fits), or the
 // floor area asked for, parked, on the least land
 function value(c, r, prog, X) {
+  const v = value0(c, r, prog, X); return X.brief?.parking === 'back' && !c.C.deep && c.pat === 'brief' ? v - Math.max(0, c.D - 100) * 3 : v; // (the building at the street: a shallow, wide storefront along the sidewalk before a deep box)
+}
+function value0(c, r, prog, X) {
   const sp = r.stalls - S.adaLossOf(r.rows, r.stalls), gfa = r.B.reduce((t, e) => t + S.gfaOf(e), 0), need = needOf(r.B, prog) + (X.pt.need || 0) - (X.pt.stalls || 0) + X.xNeed;
   if (X.foot == null) { const g = Math.min(need > sp ? gfa * sp / need : gfa, X.cap ? X.cap * X.floors : Infinity); return g / 100 - (need > sp ? 0 : (sp - need) / Math.max(1, need) * 20); }
   if (sp < need) return -1e6 + sp;

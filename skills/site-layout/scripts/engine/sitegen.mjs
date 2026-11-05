@@ -99,6 +99,8 @@ function rowsBack(R, p, fl, T) {
     const C1 = R.col('pave', x, x + ROW + AISLE + ROW); if (!C1) return null; const y0 = Math.max(yF, C1[0]), y1 = p.cut === 'back' ? C1[1] - (C1[1] - y0) * R.pondShare : C1[1] - R.pondDepth;
     els.push(rowV(y0, y1 - AISLE - 2, x, 1)); x += ROW; cols.push(x); els.push(drive(x, y0 - 6, x + AISLE, y1)); x += AISLE; els.push(rowV(y0, y1 - AISLE - 2, x, -1)); x += ROW; backs.push(y1);
     if (i < nC) { x += WALK; const Cb = R.col('build', x, x + T.D); if (!Cb) return null; const by0 = Math.max(Cb[0], yF + 4), by1 = Math.min(y1 - AISLE - WALK, Cb[1] - 4), court = i === (p.amenity === 'center' || p.amenity === 'back' ? Math.floor((nC - 1) / 2) : 0); const L = by1 - by0, n = Math.max(1, Math.floor((L + T.gap) / (T.minL + T.gap))), len = Math.min(T.maxL, (L - (n - 1) * T.gap) / n), tot = n * len + (n - 1) * T.gap, s = by0 + (L - tot) / 2; if (len < T.minL) return null;
+      if (court && p.amenity === 'back') { /* the clubhouse asked at the back: at the column's back end, the column's buildings as many as fit in front of it (not a whole building given up for it) */ const cy = by1 - 40; els.push(...amenity(x + T.D / 2, cy, { w: 50, d: 60 })); const e1 = cy - 57 - T.gap, L2 = e1 - by0, n2 = Math.floor((L2 + T.gap) / (T.minL + T.gap)), len2 = n2 > 0 ? Math.min(T.maxL, (L2 - (n2 - 1) * T.gap) / n2) : 0;
+        for (let k = 0; k < n2 && len2 >= T.minL; k++) els.push(bld(x, by0 + k * (len2 + T.gap), x + T.D, by0 + k * (len2 + T.gap) + len2, { floors: fl })); x += T.D + WALK; continue; }
       for (let k = 0; k < n; k++) { if (court && k === (p.amenity === 'center' ? Math.floor((n - 1) / 2) : p.amenity === 'back' ? n - 1 : 0)) { els.push(...amenity(x + T.D / 2, s + k * (len + T.gap) + len / 2, { w: 50, d: 60 })); continue; } els.push(bld(x, s + k * (len + T.gap), x + T.D, s + k * (len + T.gap) + len, { floors: fl })); }
       x += T.D + WALK; }
   }
@@ -326,7 +328,7 @@ function alongEdges(F, R, p, fl, T, front) {
     const isFront = ln.ks.includes(front), bIn = Math.max(...ln.ks.map(i => F.build[i]), 0.5) + sag + (ln.ks.length > 1 ? 6 : 0), pIn = Math.max(...ln.ks.map(i => F.pave[i]), 0.5) + sag + (ln.ks.length > 1 ? 6 : 0);
     // the strip across: [t0, t1] bands, the bars and the paving
     // p.bays double-loaded bays of parking (a row, the aisle, a row), the bars at the line (or, along the street, behind the bays)
-    let nBays = p.bays; const bays = t0 => { const rows = [], aisles = []; let t = t0; for (let i = 0; i < nBays; i++) { rows.push([t, t + ROW, sg]); aisles.push([t + ROW, t + ROW + AISLE]); rows.push([t + ROW + AISLE, t + 2 * ROW + AISLE, -sg]); t += 2 * ROW + AISLE; } return { rows, aisles, end: t }; };
+    let nBays = p.bays; const bays = t00 => { const t0 = isFront && p.thr ? Math.max(t00, p.thr - ROW) : t00; /* (p.thr: along the street, the first aisle that far in, the entry's throat clear: generate's throat pass) */ const rows = [], aisles = []; let t = t0; for (let i = 0; i < nBays; i++) { rows.push([t, t + ROW, sg]); aisles.push([t + ROW, t + ROW + AISLE]); rows.push([t + ROW + AISLE, t + 2 * ROW + AISLE, -sg]); t += 2 * ROW + AISLE; } return { rows, aisles, end: t }; };
     // the most bays (up to p.bays) that still leave a run long enough for a bar: a wedge's lines converge, so a strip
     // along one may have room for fewer bays than the others
     // where even one bay won't fit beside the strips before it (a narrow wedge), a strip of bars alone, set a walk off an
@@ -527,7 +529,19 @@ export function generate(plan, prog, ctx, H, opts = {}) {
   // fire code asks for a second way in (IFC D106.1, the validator's access.second) is also offered cut back to 200 by whole
   // modules, the longest bar first: a wedge's one street seldom gives two ways in far enough apart (D104.3), and the gated
   // emergency lane the run adds instead ranks below real entrances, so the full layout lost to one with a building fewer
+  // the entry's throat (docs/LAYOUT-ENGINE.md item 31): rows facing the street and rows running back are drawn with the
+  // first aisle / the front drive the stacking length in from the street (lib/layoutrun.mjs throatNeed: 75 ft for a lot of
+  // 200 stalls or more, else 50) where the land allows it at no cost in homes (the buildings drawn hold as many as with
+  // it at the paving setback), else as before; the land in front is lawn. Every layout of the grid is drawn the same
+  // way, so near-twins stay twins.
+  const thrNeed = (Number.isFinite(target) ? target : ctx.foot ? Math.floor(ctx.foot * fl * 0.85 / prog.unitSf) : 0) * (prog.ratio || 1.6) >= 200 ? 75 : 50;
+  const estU = m => m.els.filter(e => e.kind === 'building' && e.use === 'multifamily').reduce((t, e) => t + Math.floor(e.w * e.d * fl * 0.85 / prog.unitSf), 0);
+  const asGood = (m1, m0) => { if (estU(m1) < estU(m0)) return false; const t1 = H.tally(m1.els, prog), t0 = H.tally(m0.els, prog); return t1.stalls + (t1.garages || 0) >= Math.min(t1.need, t0.stalls + (t0.garages || 0)); }; // (as many homes, parked as well)
+  const thr = (fn, R0, p, T, off) => { let m0 = null; try { m0 = fn(R0, p, fl, T); } catch { m0 = null; } if (!m0 || opts.noThroat) return m0;
+    for (const need of thrNeed > 50 ? [thrNeed, 50] : [50]) { const vF = R0.front + need - off; if (vF <= R0.vF + 0.5) return m0; let m1 = null; try { m1 = fn({ ...R0, vF }, p, fl, T); } catch { m1 = null; } if (m1 && asGood(m1, m0)) return m1; }
+    return m0; };
   const edgeTry = p => { let made = null; try { made = alongEdges(F, R, p, fl, TY[p.type], F.front); } catch (e) { D('edges threw', e.message); }
+    if (made && !opts.noThroat) for (const need of thrNeed > 50 ? [thrNeed, 50] : [50]) { let m1 = null; try { m1 = alongEdges(F, R, { ...p, thr: need }, fl, TY[p.type], F.front); } catch { m1 = null; } if (m1 && asGood(m1, made)) { made = { ...m1, key: made.key }; break; } } // (a strip along the street: its first aisle the entry's stacking length in, where that costs no homes)
     const est = m => m.els.filter(e => e.kind === 'building' && e.use === 'multifamily').reduce((t, e) => t + Math.floor(e.w * e.d * fl * 0.85 / prog.unitSf), 0), u0 = made ? est(made) : 0;
     tryOne(made, p); if (Number.isFinite(target) || !(u0 > SECOND_WAY_AT && u0 <= SECOND_WAY_AT * 1.5)) return;
     let m2 = null; try { m2 = alongEdges(F, R, p, fl, TY[p.type], F.front); } catch { m2 = null; } if (!m2) return; // (drawn again: tryOne trims the first in place)
@@ -542,7 +556,7 @@ export function generate(plan, prog, ctx, H, opts = {}) {
   else { if (odd) for (const type of ['bar', 'garden']) for (const edges of [2, 3]) for (const nbays of [1, 2, 3]) for (const flip of [0, 1]) for (const fb of [false, true]) { const p = { type, edges, bays: nbays, flip, ...(fb ? { frontBars: true } : {}) }; edgeTry(p); }
     const lean = !!opts.edgesOnly; // (as many as fit: the rows only, the amenity by the entry; each drawn full and parked down is costly on a big lot, and courtyards and loops don't chase the count)
     for (const type of ['bar', 'garden']) for (const rows of [1, 2, 3, 4, 5, 6, 7]) for (const amen of [...(lean ? ['entry'] : ['entry', 'center']), ...(opts.asks?.club === 'back' ? ['back'] : [])]) /* ('back': the clubhouse asked at the back, lib/layoutintent.mjs) */ for (const cut of ['none', 'left', 'right', ...(opts.asks?.pond === 'front' ? ['front'] : [])]) for (const ent of [1, 2]) { if (CX.now() - t0 > budget) break;
-    const p = { type, rows, amenity: amen, cut, entrances: ent }; tryOne(rowsFacing(R, p, fl, TY[type]), p); if (rows >= 1) { const pl = { ...p, lead: true }; tryOne(rowsFacing(R, pl, fl, TY[type]), pl); } if (cut !== 'left') tryOne(rowsBack(R, { ...p, cut: cut === 'right' ? 'back' : 'none' }, fl, TY[type]), { ...p, cut: cut === 'right' ? 'back' : 'none' }); }
+    const p = { type, rows, amenity: amen, cut, entrances: ent }; tryOne(thr(rowsFacing, R, p, TY[type], ROW), p); if (rows >= 1) { const pl = { ...p, lead: true }; tryOne(rowsFacing(R, pl, fl, TY[type]), pl); } if (cut !== 'left') tryOne(thr(rowsBack, R, { ...p, cut: cut === 'right' ? 'back' : 'none' }, TY[type], 0), { ...p, cut: cut === 'right' ? 'back' : 'none' }); }
   if (!lean) for (const rws of [1, 2]) { if (rws === 2 && out.some(f => /courtyard/i.test(f.label) && f.units >= target * 0.97)) break; // (a second row of courts only when one row can't hold the program)
     for (const shape of ['O', 'U']) for (const rings of [1, 2, 3]) for (const aspect of [0.8, 1, 1.25, 1.5]) for (const ent of [2, 1]) { const p = { type: 'wing', shape, rings, rws, aspect, entrances: ent }; tryOne(courtyard(R, p, fl, TY.wing, ctx.foot), p); } }
   if (!lean) for (const type of ['garden', 'bar']) for (const len of type === 'garden' ? [110, 140] : [160, 200, 260]) for (const size of [0.7, 0.85, 1]) for (const turn of ['square', 'angled']) for (const ent of [1, 2]) { if (CX.now() - t0 > budget) break; const p = { type, len, size, turn, entrances: ent }; let made = null; try { made = loop(R, p, fl, TY[type], ctx.foot, target, prog); } catch (e) { D('loop threw', e.message); } tryOne(made, p); }

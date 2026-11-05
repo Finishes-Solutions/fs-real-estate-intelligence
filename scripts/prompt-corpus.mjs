@@ -12,10 +12,13 @@ import { pathToFileURL } from 'node:url';
 import * as B from '../lib/layoutbrief.mjs';
 import * as RUN from '../lib/layoutrun.mjs';
 import * as S from '../lib/siteplan.mjs';
-import { SITES, CASES as ALL, FRESH, FRESH2 } from '../test/fixtures/prompt-corpus.mjs';
-const CASES = process.argv.includes('--fresh2') ? FRESH2 : process.argv.includes('--fresh') ? FRESH : ALL;
+import { queueOf } from '../lib/btsite.mjs';
+import { SITES, CASES as ALL, FRESH, FRESH2, TYPES, FRESH3 } from '../test/fixtures/prompt-corpus.mjs';
+// --types: the building-type requests (LAYOUT-ENGINE.md item 34); --full: the 120 and the types; --fresh3: the types written after tuning
+export const pickSet = argv => argv.includes('--fresh3') ? FRESH3 : argv.includes('--types') ? TYPES : argv.includes('--full') ? [...ALL, ...TYPES] : argv.includes('--fresh2') ? FRESH2 : argv.includes('--fresh') ? FRESH : ALL;
+const CASES = pickSet(process.argv);
 
-export const CATS = ['vague', 'detailed', 'messy', 'spatial'];
+export const CATS = ['vague', 'detailed', 'messy', 'spatial', 'types'];
 export const planOf = id => { const s = SITES[id]; return { origin: [-96.42, 30.38], ring: s.ring, front: s.front, streets: s.streets || [], setbacks: { front: 25, side: 10, rear: 20, paving: 10 }, elements: [] }; };
 
 // ---------- the reading ----------
@@ -44,6 +47,8 @@ export function readingChecks(c, brief) {
   for (const [k, v] of Object.entries(w.form || {})) { const u = useQ(k); add('form ' + k, u?.form === v, u?.form); }
   if (w.anchor) { const u = useQ('retail'); add('anchor', near(u?.anchor?.value ?? E.anchor, w.anchor, { rel: 0.02 }), u?.anchor?.value ?? E.anchor); }
   if (w.pondAc) { const ac = S.ringArea(brief?.site?.ring || [[0, 0]]) / 43560, pct = E.detentionPct; add('pond acres', pct != null && near(pct * ac / 100, w.pondAc, { rel: 0.1 }), pct); }
+  if (w.btype) { const ids = [].concat(w.btype), got = E.btype || null; add('type', ids.includes(got), got); } // (the building-type preset the program carries; null in a list: none)
+  if (w.btZones) { const got = (E.btZones || []).map(z => z.btype); add('zone types', w.btZones.every(id => got.includes(id)), got.join(',')); }
   if (w.assumed) add('says what it assumed', (brief?.request?.assumed || []).length > 0, (brief?.request?.assumed || []).length);
   for (const [s, rel, arg] of w.place || []) {
     const pl = brief?.program?.placements || [], eq = RELS_EQ[rel] || [rel];
@@ -70,7 +75,7 @@ const cen = list => { const c = list.map(e => S.centroid(shp(e))); return [c.red
 const club = e => e.kind === 'building' && (e.use === 'amenity' || /club|leasing|community cent/i.test(e.name || ''));
 function pieces(o, s) {
   const els = o.elements || [], use = e => e.use || o.program?.use;
-  const by = { pool: e => e.kind === 'pool', clubhouse: club, playground: e => e.kind === 'play', 'dog park': e => /dog/i.test(e.name || ''), pond: e => e.kind === 'pond', parking: e => e.kind === 'parking', 'truck court': e => e.kind === 'truck', buildings: e => e.kind === 'building' && !club(e) && !e.future };
+  const by = { 'equipment yard': e => /equipment yard/i.test(e.name || ''), field: e => e.kind === 'green' && /field/i.test(e.name || '') || /field/i.test(e.name || '') && e.kind !== 'building', pool: e => e.kind === 'pool', clubhouse: club, playground: e => e.kind === 'play', 'dog park': e => /dog/i.test(e.name || ''), pond: e => e.kind === 'pond', parking: e => e.kind === 'parking', 'truck court': e => e.kind === 'truck', buildings: e => e.kind === 'building' && !club(e) && !e.future };
   return els.filter(by[s] || (e => e.kind === 'building' && !club(e) && !e.future && (use(e) === s || s === 'restaurant' && e.pad)));
 }
 function frameUV(plan) { const r = plan.ring, nf = outward(r, plan.front), into = [-nf[0], -nf[1]], rt = [into[1], -into[0]], D = r.map(p => p[0] * into[0] + p[1] * into[1]), A = r.map(p => p[0] * rt[0] + p[1] * rt[1]);
@@ -102,6 +107,12 @@ export function outcomeChecks(c, plan, rec) {
     else if (t === 'near') { const A = pieces(o, a), Bp = b === 'entrance' ? S.entrancesOf(o.elements) : pieces(o, b); const dm = A.length && Bp.length ? Math.min(...A.flatMap(x => Bp.map(y => S.gapBetween(S.shapeOf(x), y.kind === 'drive' && y.path && !y.poly ? y.path : S.shapeOf(y))))) : Infinity; add(nm, dm <= d, Math.round(dm), true); }
     else if (t === 'clear') { const v = DIR[a.slice(0, 5)], h = DIR[a.slice(5)], r = plan.ring, k0 = r.slice().sort((p1, p2) => (p2[0] * h[0] + p2[1] * v[1] + p2[1] * h[1] + p2[0] * v[0]) - (p1[0] * h[0] + p1[1] * v[1] + p1[1] * h[1] + p1[0] * v[0]))[0];
       const hit = (o.elements || []).filter(x => ['building', 'parking', 'drive', 'pond'].includes(x.kind) && !(x.kind === 'drive' && x.entry)).some(x => shp(x).some(p => Math.hypot(p[0] - k0[0], p[1] - k0[1]) < b)); add(nm, !hit, k0.join(','), true); }
+    else if (t === 'btype') add(nm, (o.elements || []).some(x => (x.kind === 'building' || x.kind === 'garage') && x.btype === a), [...new Set((o.elements || []).map(x => x.btype).filter(Boolean))].join(',') || 'none');
+    else if (t === 'count') { const B = (o.elements || []).filter(x => x.kind === 'building' && !club(x) && !x.future), v = a === 'buildings' ? B.length : a === 'spaces' ? (o.elements || []).filter(x => x.kind === 'garage' && x.standalone).reduce((s, x) => s + S.garageStalls(x), 0) : B.reduce((s, x) => s + (+x[a] || 0), 0);
+      add(nm, b === 'exact' ? Math.abs(v - d) <= Math.max(2, d * 0.03) : b === 'min' ? v >= d : b === 'max' ? v <= d && v > 0 : false, v); }
+    else if (t === 'shape') { const B = (o.elements || []).filter(x => x.kind === 'building' && !club(x)); add(nm, B.some(x => a === 'point' ? x.point && x.form === 'tower' : a === 'plex4' ? x.plex === 4 : a === 'plex3' ? x.plex === 3 : x.form === a), [...new Set(B.map(x => x.point ? 'point' : x.plex ? 'plex' + x.plex : x.form || 'bar'))].join(',')); }
+    else if (t === 'queue') { const Q = queueOf(o.elements); add(nm, Q.some(x => x.cars >= a), Q.map(x => x.kind + ' ' + x.cars).join(',') || 'none'); }
+    else if (t === 'none') add(nm, pieces(o, a).length === 0, pieces(o, a).length);
     else add(nm, false, 'unknown check');
   }
   return out;
@@ -115,7 +126,7 @@ export function scoreCase(c, brief, rec) {
 export function table(rows, title = 'Words path') {
   const line = cat => { const R = rows.filter(r => cat === 'all' || r.cat === cat), rd = R.flatMap(r => r.reading), oc = R.flatMap(r => r.outcome), un = R.reduce((s, r) => s + r.unmet, 0), sd = R.reduce((s, r) => s + r.said, 0), pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
     return '| ' + [cat, R.length, pct(rd.filter(x => x.ok).length, rd.length), pct(oc.filter(x => x.ok).length, oc.length), R.filter(r => r.ok).length + ' / ' + R.length, un ? sd + ' / ' + un : '—'].join(' | ') + ' |'; };
-  return ['**' + title + '**', '', '| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |', '|---|---|---|---|---|---|', ...CATS.map(line), line('all')].join('\n');
+  return ['**' + title + '**', '', '| Category | Requests | Reading checks met | Outcome checks met | Requests fully right | Unmet place asks said in the notes |', '|---|---|---|---|---|---|', ...CATS.filter(c => rows.some(r => r.cat === c)).map(line), line('all')].join('\n');
 }
 export function failures(rows) {
   return rows.filter(r => !r.ok).map(r => '- ' + r.id + ' “' + r.ask + '”: ' + [...r.reading.filter(x => !x.ok).map(x => x.name + ' (got ' + x.got + ')'), ...r.outcome.filter(x => !x.ok).map(x => x.name + ' (got ' + x.got + ')')].join('; '));

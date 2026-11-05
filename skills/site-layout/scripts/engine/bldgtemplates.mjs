@@ -80,8 +80,13 @@ export function applyTemplates(plan, o, brief) {
         // an exact count a whole module would undershoot (250 from 12-home stacks: 252, not 240): the last few homes are
         // combined in pairs into larger homes (a two-bed and a one-bed into a three-bed), in the biggest buildings, at most
         // one pair a floor of a stack; the schedule records it (combined), so the check still reconciles the building
-        if (q.mode === 'exact' && cand.every(e => templateOf(e.template).module.unitsPerFloor * e.floors > over)) {
-          let left = over; for (const e of cand.slice().reverse()) { if (!left) break; const k = Math.min(left, e.modules * e.floors - (e.combined || 0)); if (k <= 0) continue;
+        // (also when the modules left can't come off without undershooting: every building at its fewest modules and
+        // each holding more than the excess, the excess within a tenth of the count: 216 drawn for 200 from 24-home bars
+        // gave 192 by taking a whole bar off; 16 pairs combined give 200 in the same buildings)
+        const perOf = e => templateOf(e.template).module.unitsPerFloor * e.floors, pairs = cand.reduce((t, e) => t + e.modules * e.floors - (e.combined || 0), 0);
+        const stuck = q.mode === 'exact' && over <= Math.ceil(cap * 0.1) && over <= pairs && !cand.some(e => e.modules > templateOf(e.template).minModules && perOf(e) <= over) && cand.every(e => e.units > over);
+        if (q.mode === 'exact' && (stuck || cand.every(e => perOf(e) > over))) {
+          let left = over; const order = cand.slice().reverse(); for (const [j, e] of order.entries()) { if (!left) break; const k = Math.min(left, e.modules * e.floors - (e.combined || 0), stuck ? Math.ceil(left / (order.length - j)) : Infinity); /* (many pairs: spread over the buildings, not all in one) */ if (k <= 0) continue;
             e.combined = (e.combined || 0) + k; e.units -= k; e.tplUnits = e.units; left -= k; e.note = templateOf(e.template).label + ' · ' + e.modules + ' × ' + templateOf(e.template).module.label + ' · ' + e.units + ' units (' + e.combined + ' pair' + (e.combined > 1 ? 's' : '') + ' of homes combined into larger homes)'; }
           if (!left) { notes.push((uses.length > 1 ? (u.name || u.form) + ': ' : '') + 'exactly ' + cap + ' units: ' + over + ' pair' + (over > 1 ? 's' : '') + ' of homes combined into larger homes (whole stacks give ' + (cap + over) + ').'); break; }
         }
@@ -122,7 +127,8 @@ function shrink(e, t) {
   // keep one end where it was (the end nearer the start of its row), so the gap to the next building grows, never shrinks
   const dx = along === 'w' ? -sh * Math.cos(a) : sh * Math.sin(a), dy = along === 'w' ? -sh * Math.sin(a) : -sh * Math.cos(a);
   e.x = +(e.x + dx).toFixed(2); e.y = +(e.y + dy).toFixed(2); e[along] = newL; e.modules--; e.units = unitsOfB(t, e.modules, e.floors); e.tplUnits = e.units; e.tplL = newL;
-  e.note = t.label + ' · ' + e.modules + ' × ' + t.module.label + ' · ' + e.units + ' units';
+  e.note = t.label + ' · ' + e.modules + ' × ' + t.module.label + ' · ' + e.units + ' units' + (t.userDepth ? ' · estimate: deeper than any reviewed corridor building' : t.stacked ? ' · estimate: two 2-story homes stacked in each reviewed townhome bay' : ''); // (a module off: still said to be an estimate where it is one, as applyTemplates says it)
+  if (e.stacked) e.stacked = { ...e.stacked, bays: e.modules }; // (the bays the drawing shows follow)
 }
 
 // Attached and paired homes asked for as an exact, maximum or ranged count: whole homes come off the ends of the

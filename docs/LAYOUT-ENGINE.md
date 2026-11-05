@@ -844,3 +844,408 @@ short. A bare number in Build is exact unless Leftover land was set by the user 
    lib/siteparking.mjs, draws every building behind its parking); the lake in the middle; a way in off a side street is
    met where the way-in step adds one, not steered (entrances are added after the candidates are compared); the corner
    test is looser than the scorer's.
+
+31. Done Nov 5 (parking, round 3). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 74-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base d35bb9c), then fixed, most valuable first:
+   (a) The building at the street, its parking behind (lib/siteparking.mjs streetFront). The parking-field engine always
+   drew the building behind its field; form-based and urban codes often want the storefront on the sidewalk and the lot
+   at the back. It is now a candidate, laid out as a brief's "parking behind the buildings" is (briefRows: the street
+   row, then the field, the way in beside the building), on the side (lib/enginectx.mjs aside: its own clock and random
+   stream, so the search finds exactly what it did before). Asked for in words ("building up front, parking behind",
+   "retail on the street, parking in the rear": parking placed behind or at the back, or a shop / office / medical /
+   restaurant / hotel / church placed at the front; lib/layoutbrief.mjs toEngine sets opts.parkBack, and
+   lib/layoutintent.mjs asksFor's hints.parking 'back' is read too where the spatial-asks work is folded in): every such
+   layout that parks the program joins the field options first (three at most), named "Building at the street, parking
+   behind" and saying "as asked": the building at the front setback (the build-to line) facing the street with its walk,
+   a shallow, wide storefront preferred over a deep box (lib/siteparking.mjs value: 3 points a foot past 100 ft deep),
+   no detention pond between it and the street, the way in along its side to the lot behind, the collectors (fire
+   lanes) up both sides. Not asked: offered only where it parks the program, holds as much floor area as the best layout
+   found and outscores it (on the bench it never does, so no case changed by it). A compact street row now leaves room
+   beside the building for the way in (before, the brief path failed for a 15,000 sf shop row on 4.3 ac: every
+   candidate too narrow for the entry). The check is strict (lib/layoutintent.mjs checkPlacement frontStalls): parking
+   asked behind / at the back fails when any stall sits between a building's street face and the street within its
+   frontage (a field in front: TY-mob 101 stalls, RE-strip 59), and "at the back" passes when the lot is behind the
+   buildings with none in front. Bench cases PK-street-retail (4.3 ac, "retail on the street, parking in the rear,
+   15,000 sf") and PK-street-medical (5.5 ac, "20,000 sf medical office at the front with parking behind it"): the
+   street layout first, both asks met, passing with no warnings. Checked also with the spatial-asks branch merged in a
+   scratch branch ("12,000 sf retail building up front with parking behind", "a 6,000 sf restaurant up front, parking in
+   back": the street layout first, asks met).
+   (b) Entry throats. The first drive across the main entry sat inside the stacking length (lib/layoutrun.mjs
+   throatNeed: 50 / 75 / 100 ft) on 31 of 74 cases. Two causes. In the parking-field engine the field's paving ran under
+   the strip beside the entry drive (no stalls there, but open paving a car could cut across, 30-57 ft in); it now stops
+   at the strip's sides, which are planted (lib/siteparking.mjs build: the throat box cut out of the first field's
+   paving), so the first drive across is the first aisle at the engine's stacking distance. In the generator
+   (lib/sitegen.mjs) rows facing the street, rows running back and the strips along a wedge's street line put their
+   first aisle or front drive at the paving setback (10-28 ft in); each is now drawn with it the stacking length in
+   (75 ft where the homes asked need 200 stalls or more, else 50; alongEdges p.thr for a strip along the street) where
+   that costs no homes and parks them as well (the same buildings' homes, the stalls the homes need or as many as
+   before), else as before, the land in front lawn. Every layout of the grid is drawn the same way. Tried first and
+   changed: a pass after the grid that redrew the kept layouts and swapped them in (or offered them beside): it broke
+   the grid's near-twins apart (one of a pair set back, the other not), which changed what the search picked: a prompt
+   corpus request ("160 apartments, clubhouse in the middle of the site", S32) lost its layout with the clubhouse in
+   the middle, and a strip along a wedge's street line came out parked down 16 homes (WEDGE-tri-midrise) until the
+   parking was compared too. test/parkingquality.mjs's guarded run (Waller rules): its two 3-row garden layouts now
+   park exactly the same and the run keeps one as twins, so its third option is a 108-home courtyard; the test now
+   checks every option is judged and parked at 2.1 a home and that the top one holds the 120 and passes (it checked
+   every option for 252 stalls). Found on the way (lib/bldgtemplates.mjs shrink, pre-existing): a module taken off a
+   templated building dropped its "estimate" note and left the stacked bays at the old count (MF-stacked, once the
+   throats moved its layout); both now follow.
+   (c) Tried and taken out: a new bay by the buildings for stranded parking (a 24 ft spur aisle off a drive's free side,
+   rows both sides, an 18 ft turning end, stalls within 150 ft of a building, the farthest stalls taken out for it). On
+   WEDGE-tri-midrise (38 stalls beyond the pond, p90 255 ft) and TY-hotel-retail no such bay fits anywhere (no candidate
+   even without the walk limit): the land by the buildings is full and the pond holds the rest, so the fix belongs to the
+   generator's pond and bay placement, not a pass after it. Also taken out: running the stalls-along-drives pass for
+   paving alone where walks are already short (over 400 sf a stall): no case improved (MF-tower's loop legs are curved
+   paths or entrances; the far rows trimmed leave their drives).
+   (d) One-way aisles with 90° stalls: not used, by design. A 90° stall needs the same 22-24 ft to back out of whether
+   the traffic runs one way or two (ULI / NPA "The Dimensions of Parking"), so a one-way 90° field saves no paving and
+   adds wrong-way conflicts; one-way circulation earns its place only with angled stalls (item 24: 17 / 14 ft aisles).
+   Bench (74 original cases, top option; base d35bb9c → after): all passing, no warnings, replay identical, no case lost
+   homes or floor area, parking met everywhere; 48 identical element for element. Cases whose first drive across the
+   entry is inside the stacking length 31 → 23 (MF-garden-exact 28 → 50 ft, MF-stacked 46 → 96, MF-midrise 46 → 50,
+   WEDGE-hyp-1pk 13 → 100, RE-strip 54 → 72, TY-mob, TY-fitness, TY-hotel-full and RE-field-angled 55-57 → 75,
+   TY-student 46 → 75, TY-bigbox 82 → 100, TY-unknown 30 → 50); sf a stall summed 27,627 → 27,491 (MF-stacked 375 → 340,
+   MF-garden-exact 370 → 352, RE-strip 356 → 340, TY-unknown 450 → 431, TY-fitness 361 → 352, TY-mob 383 → 374);
+   90th percentile walk summed 5,804 → 5,803 ft (MF-garden-exact 59 → 48, TY-hotel-keys 113 → 82; MF-stacked 18 → 59,
+   its layout now the one with buildings along the street); stalls 12,088 → 12,087; bare row ends 216 → 222
+   (MF-garden-exact 0 → 5: its columns now end on the set-back front drive); stalls in a throat 15 → 15; dead ends
+   8 → 8. Two new cases (PK-street-*), 76 of 76 passing. Prompt corpus (offline, words path): 112 → 113 of 120 fully
+   right. Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version
+   rei-layout/2026.11.05.3. Tests: test/parkingquality.mjs (the street arrangement asked and not asked; throats on a
+   generated garden layout and a medical office field).
+   Still (next worst): WEDGE-tri-midrise's stalls beyond the pond (p90 255 ft: the generator's pond and bay placement);
+   the wedges' entries (WEDGE-trap 15 ft, WEDGE-tri / arc 30 ft: the entry meets a slanted strip's bay, not a strip along
+   the street); TY-hotel-retail's one-sided field (p90 246 ft); bare row ends where rows meet a cross drive end to end
+   (222); small pads' aisles meeting the entry from the side (TY-daycare 30 ft); 370-475 sf a stall on loop drives and
+   small lots (MF-tower 376, TY-assisted 470).
+
+32. Done Nov 5 (filling the land, round 3: exact counts, homes round a central lake, the clubhouse at the back). The
+   owner: "keep improving how every building type and lot shape fills the land, with honest checks, no regressions".
+   Each target checked first on the corpus (`scripts/prompt-corpus.mjs`, words path) and the bench; holdouts used only
+   as a final non-regression check.
+   (a) Exact counts short when the land could hold them. D17 "200 apartments, 3 stories, … underground detention" came
+   back with 192 and D02 "240 units in 4-story mid-rise buildings" with 208. The land wasn't the limit: the generator drew
+   216 (and 256) and lib/bldgtemplates.mjs applyTemplates trimmed toward the count by taking a whole building off when
+   every building was already at its fewest modules (a 24-home bar for 16 homes over: 192). Fix: when no module can come
+   off without undershooting, every building holds more than the excess, and the excess is within a tenth of the count,
+   the excess is met by combining pairs of homes into larger ones (the existing mechanism, at most one pair a floor of a
+   stack, recorded on the building as `combined` so the validator still reconciles it), spread over the buildings, never
+   all in one. The note says it ("exactly 200 units: 16 pairs of homes combined into larger homes (whole stacks give
+   216)"). Ranking (lib/layoutrun.mjs rankKey): an option meeting the count in whole stacks ranks before one meeting it
+   by combining; an exact count met only by combining still triggers the run's fuller retry (else S02, S10 and S24 lost
+   the search's whole-stack layouts that the retry had found). D17 192 → 200, D02 208 → 240, both passing every check.
+   (b) D05 "96 duplex units on a private street": the land can't hold 48 duplexes with their lots, streets and pond on
+   10.3 ac (the densest layout found is 78). The plan now says so with the real most: a duplex count past what fits is
+   laid out as many as fit, as townhomes already were (lib/sitelayout.mjs layoutChoices), and an exact count no option
+   reaches ranks the nearest first (rankKey `off`). Notes: "96 duplex units won’t fit here …; this is about the most that
+   does: 78." (was 64, while "as many as fit" found 68).
+   (c) "Homes around a central lake" (S19) was drawn as a band of lake at the back. New arrangement, lib/sitering.mjs
+   ringPieces (wired in lib/sitelayout.mjs ringOptions, beside the mixed bands): when the words put single-family homes
+   round the commons in the middle and nothing else is built, a loop street rings the middle with lots on both sides (an
+   outer row backing onto the lot lines, an inner row backing onto the middle; tried with the inner rows on all four
+   sides, front and back only, or none), two ways in down the loop's sides (as far apart as the frontage allows), the
+   corners at the entries planted, and the middle a lake holding the detention with a walking trail round it (a pavilion
+   and playground on its front lawn where they fit within reach of the loop). The pond is sized to the drawn plan's own
+   detention estimate (S.stormOf, as the validator judges it); a try whose middle can't hold it isn't offered. With a pool
+   or clubhouse asked ("homes around a central park with a clubhouse and pool", "homes around a central pool and
+   clubhouse": the reading now makes that a commons in the middle, lib/siteplan.mjs HOMES_POOL), the middle is a park with
+   the clubhouse and pool at its centre, a drive in from the loop with a stall row each side, and the pond in two basins
+   either side. The arrangement asked for is always among the options (first unless it holds well under the bands'
+   homes). S19: 46 homes, the lake at the back → 85 homes, the lake in the middle (1.71 ac, detention passing), all
+   checks passing. Near-rectangular sites only for now (the frame's land at least 97% of its box).
+   (d) The clubhouse asked at the back held 168 of 180: in the rows running back the back building of a column gave way
+   whole to it. Now the clubhouse sits at the back end of its column and the column's buildings are as many as fit in
+   front of it (lib/sitegen.mjs rowsBack); the generator's extra candidates for an ask (askKept) count twins that differ
+   only in their ways in once and take those holding as much as the top eight first. "180 apartments with the clubhouse
+   at the back": top option 180, clubhouse at the back, every check passing (was option 3, 168, short and failing
+   detention).
+   (e) The most visible as-many-as-fit waste on the bench: duplex rows 22 ft apart (an 86 ft pitch for a 64 ft duplex).
+   As many as fit, duplexes (and triplexes / fourplexes on the duplex rows) now stand the brief's building separation
+   apart, 10 ft at the least (lib/layoutbrief.mjs passes it for duplexes as for townhomes; a count asked for keeps 22 ft).
+   Bench: MF-duplex 52 → 56, TY-triplex 48 → 54 (TY-fourplex redrawn, 48 as before).
+   Bench (folded onto parking round 3, a113396): 76 cases, 76 passing, no warnings, replay identical, 73 identical
+   element for element (MF-duplex, TY-triplex, TY-fourplex changed as above), no case lost homes or sf; parking metrics
+   (scripts/parking-metrics.mjs) identical case for case (12,257 stalls, 222 bare row ends, 0 long dead ends). On the
+   74-case bench before the fold: the same three changed, 71 identical. The clubhouse at the back of a column and the
+   throat wrapper on the generator's rows (item 31) both apply. Engine version rei-layout/2026.11.05.4. Corpus (words path, 120): 116 → 119 fully right (D02, D17, S19 newly right; D05 honestly
+   short, said). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests:
+   test/layoutrun.mjs (combined pairs from a stuck trim, D17, the clubhouse at the back, the lake ring and the park ring,
+   duplexes past what fits). Still: the ring on irregular sites, townhomes or duplexes round a lake, the clubhouse
+   ring's parking counted toward guests; "homes around a central pool" for apartments stays the resort loop.
+
+33. Done Nov 5 (mixed use under a city's rules). Found by an agent test through the MCP server ("a 120-key hotel and
+   20,000 sf of retail, parking behind the buildings" on a mocked 24.8 ac Waller parcel), reproduced on synthetic
+   Waller-like sites (the plan's guardrails on: the 5% count reserve, detention at 1 ac-ft a developed acre 4 ft deep,
+   26 ft fire-lane aisles) through the app's path (lib/guardrails.mjs forLayout, then lib/layoutrun.mjs runPlan):
+   (a) The governing rule is per use. governingParking (item 28e) laid the program's one top-level ratio (the first
+   zone's: retail, 4 a 1,000 sf with the reserve) on every use counted by floor area, so the 66,000 sf hotel was judged
+   at the shops' ratio: 362 spaces required (380 with (b)) where about 210 was right, and every option failed
+   parking.count. A mixed plan is now governed use by use (the brief's rules.parkingByUse): apartments at the city's
+   two a home with the reserve (2.1, Ord. 424, verified), a hotel by its keys at its type's rule (lib/btypes.mjs
+   perKey: one a key, 1.05 with the reserve; its sfPerKey, 550, for a hotel whose keys aren't stated), shops, offices
+   and the rest at their use's ratio (the zone's own where it has one, else the engine's: the city has no verified
+   commercial ratio) with the reserve; townhomes, duplexes and houses keep their own rule (garages: no stall reserve,
+   as the effective plan does). The independent check counts the same way (lib/layoutcheck.mjs quantities: a use's
+   parkingByUse rule first, a hotel's keys as its typed buildings state them). Single-use plans are unchanged.
+   (b) The reserve once. The app and the MCP hand runPlan the effective plan and program already (G.forLayout: the
+   program's ratios carry the reserve), and governingParking ran G.effective on them again: 2.205 a home, 4.41 a
+   1,000 sf. A plan marked __guard is now taken as it is, and a governed brief is marked (rules.guarded) and left alone
+   on a second call. runPlan's brief is its own function now (briefForPlan), which the bench uses for guarded cases.
+   (c) The zones lay their rows out for that rule. The mixed engine's zones parked at their use's default and trimmed
+   to it (lib/sitelayout.mjs zoneItems, tally), so a guarded mixed plan came out a few stalls short of the reserve
+   unless a later pass found them. lib/layoutbrief.mjs toEngine now hands it opts.parkF (a factor a use: the governing
+   rule over the engine's default, 1.05 for Waller's shops and hotel), which zoneItems and tally apply.
+   (d) Angled parking on a mixed plan. The mixed engine never read the angle: square stalls, nothing said (item 24's
+   machinery runs on single-use fields only). lib/layoutrun.mjs angleMixed now turns the mixed layout's aisles that a
+   two-way drive joins at both ends one-way with angled rows (lib/siteparking.mjs restripeAngled, which takes the
+   guardrails' 26 ft fire-lane aisles too with opts.wide, and a subset of aisles with opts.only): every subset, the
+   most aisles first, kept where it still parks the program and fails no check that passes square (hard or not); each
+   try is finished through the run's last passes (curb returns, rows along drives, turnarounds) and kept only if the
+   finished plan fails nothing the square one, finished the same way, passes (on the 8.4 ac bench lot the all-aisles
+   try lost the fire truck's turns once the curb returns went in). The zones lay out 1.2 times the stalls for 60° (1.4
+   for 45°, opts.parkF) so the angled rows have them; the surplus comes back off after. The notes say how many aisles
+   turned and why the rest stay square, or why none did (no aisle joined at both ends, the parking short, a check
+   broken).
+   (e) Small Waller sites. On 13.0 ac the zone bands and a pond across the back don't stack in the depth (393 ft of
+   rows and about 230 ft of pond in 577 ft), and the mixed engine's other places for the pond (an end, both ends, the
+   land left open, part of it) were tried only for homes, so it fell back to the simple layouts: no zones (the hotel
+   lost its type and keys), 202-204 parked. Shops, offices and a hotel with no homes now get those tries too (a layout
+   counts only with a building of each), and the simple layouts are the last resort: there each building keeps the
+   zone of its use (so the hotel keeps its type), and a run's simple option short of the governing count says so
+   (parks N of the M required). With the deeper-pond tries the app and the MCP ask for, the top option is a 6 ft pond
+   (3.3 ac for the same 13.0 ac-ft instead of 4.5): every zone in full, 120 keys, 211 of 210 parked, passing; at the
+   plan's 4 ft only, the zone layouts hold about 89% of the program and say that a deeper pond or underground storage
+   for part of the volume would make room. Also: a hotel zone short of its size was named "undefined" in the notes;
+   now its use's name.
+   Before → after (the app's path, top option): 24.8 ac guarded: 214 / 380 required, failing → 213 / 210, passing;
+   24.8 ac guarded, 60° asked: square, 214 / 380, nothing said → 60° on 3 of 3 aisles, 217 / 210, passing, said;
+   8.4 ac, angled asked (no guardrails): square (201 / 201), nothing said → 60° on 1 of 4 aisles, 203 / 201, the rest
+   square and why; 13.0 ac guarded (deeper tries on): simple layout, hotel untyped, 202 / 380 → 6 ft pond, typed hotel with 120
+   keys, 211 / 210, passing. Bench: four new cases (MX-guard-hotel25, MX-guard-hotel13, MX-angled, MX-guard-angled),
+   80 of 80 passing, no warnings, replay identical; the 76 earlier cases' top options identical element for element.
+   Prompt corpus (offline, words path): 119 of 120 fully right (D05 misses, as on the base). Folded onto item 32: its ring layout named a zone through ZONE_NAME, which (e) had renamed; the name is kept and (e) uses a local copy (S19 had come out with no layout). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128,
+   E054 podium-urban 172). Engine version rei-layout/2026.11.05.5. Tests: test/mixedparking.mjs (the rules per use and
+   the check's count on a drawn hotel with and without its keys; the reserve once through an effective plan; angled
+   rows on the guarded 24.8 ac run and the note when none can turn; the 13 ac run with and without the deeper tries;
+   the simple layouts keeping their zones).
+   Still: a guarded single-use field asked for angled parking keeps square stalls on its 26 ft fire-lane aisles (only
+   the mixed pass uses restripeAngled's opts.wide); the 4 ft-only 13 ac layouts stop at about 89% of the program (an
+   underground vault for part of the volume, vaultWhereNoPond, isn't tried as a way to fit more of it).
+
+35. Done Nov 5 (building types, round 3: the site features each type needs). The owner: "flexible building-type
+   primitives that get modified into many more building types, keeping the coloured 3D blocks". Round 2's leftovers (item
+   29), most valuable first; docs/BUILDING-TYPES.md section 7. New lib/btlanes.mjs: a lane along one face of the type's
+   building (its curb), doubling back in rows outward (a serpentine, a car's U-turn each turn) when the queue is longer
+   than the face, its two open ends routed over the open ground to the nearest drive on a 4 ft grid in the building's
+   frame (turns cost 40 ft; the last stretch straight for the lane's turning radius; landscape, walks and land held for
+   later only, never a building or its corners, parking, a pond, a play piece, another lane or the side / rear paving
+   buffer; a bus loop and a porte-cochère may take a driveway of their own to the street, 60 ft from another); every face,
+   direction and row count tried, the engine's own check (lib/siteplan.mjs check) the last word; no room, said in the
+   notes. lib/btsite.mjs typeFeatures (after round 2's car wash / yard, the same array when no type needs anything):
+   (1) a school's parent drop-off / pick-up queue (12 ft, or two lanes side by side merging at the curb when one can't
+   hold it) and its own bus loop (24 ft), on different faces, apart, tried in both orders; the queue 10% of an elementary
+   school's students in cars (charter-school pick-up studies; South Carolina DOT recommends about 900-1,500 ft of stacking
+   for an elementary school), 8% middle, 5% high, 25 ft a car (FHWA); half the students on buses (a third at a high
+   school), 60 a bus, the loop holding every bus, 45 ft a bus (estimates); a play yard or field the layout left on the
+   detention pond moved to open ground beside the school after the lanes. (2) A daycare's drop-off lane (a car a 25
+   children, at least 4, estimate) and its play yard fenced. (3) A hotel's porte-cochère: a 24 ft drive-through lane under
+   a 60 ft canopy at the entrance (3 cars, estimate; the canopy a flat plaza piece). (4) A gas station's pump lanes: one
+   each side of each island row through the canopy, the cars waiting in the drive lanes past its ends (at least one an
+   accessible island side: Huron and Seven Hills, OH; Durham, NC asks two a fueling position). (5) A bank zone's
+   drive-thru lane (5 cars, round 2's rule); a daycare or school zone's play yard / field laid beside its building; each
+   `btZones` entry carries its type's parking rule (`rule`, as a single type's `btRule`: a bank zone 4 a 1,000 sf), and
+   it governs: lib/layoutbrief.mjs typeZoneRules puts it in the brief's per-use rule (`rules.parkingByUse`, item 33; with a
+   city's rules lib/layoutrun.mjs governingParking keeps the type and adds the reserve), toEngine lays the zone's stalls out
+   for it (`opts.parkF` may go below 1 for a type) and the check counts it: TY-mix-pads 199 / 193 → 181 / 179, the bank
+   at 4 a 1,000 sf not a restaurant's 10. (6) A hotel
+   over the shops asked: "over 8,000 sf of retail" makes the shops 8,000 sf (`ground.sf`, read by lib/siteplan.mjs
+   groundOf and the check's quantities), the rest of the ground floor the lobby, the keys those of the floors above.
+   (7) The Pro forma section's area table lists beds, children, students and storage units. Checks (lib/layoutcheck.mjs
+   10c / 10d, soft): `queues.stack` measures each kind's queue on the drawing against lib/btsite.mjs queueWant (a school's
+   queue and bus loop and a bank zone's lane fail when missing; a porte-cochère, daycare lane and pump lanes are judged
+   where drawn), `queues.apart` keeps the bus loop off the parents' lane, `queues.clear` covers the new lanes (a pump
+   lane against the parking and the street only), `site.grounds-dry` keeps a type's play pieces off the ponds. rankKey
+   puts a layout holding more of its type's queues first and leaves the type's lanes out of its paving comparison. The 3D
+   map keeps its plain coloured blocks (the lanes are flat paving; the plan marks PICK-UP, BUS LOADING, DROP-OFF,
+   ENTRANCE). Bench (folded onto mixed-use parking, 00f842a): 84 cases, 84 passing, no warnings, replay identical; 74 earlier
+   cases identical element for element; MX-guard-hotel25 and MX-angled gain the hotel zone's porte-cochère (same layout);
+   TY-school (queue, bus loop, the field moved off the pond), TY-daycare (its play yard fenced; no room for the lane on 2.3
+   ac, said), TY-mix-pads (the bank's drive-thru, the daycare zone's fenced play yard, parked by type) and TY-hotel-retail (the same
+   layout with a porte-cochère) changed as intended (engine version rei-layout/2026.11.05.6); new TY-daycare-dropoff, TY-hotel-porte, TY-hotel-retail-sf,
+   TY-gas-queue. Corpus (words path, 120): 119 / 120 fully right, as before. Holdouts unchanged (P18 fill 77, P35 fill-ug
+   320, P36 fill 128, E054 podium-urban 172). Tests: test/btypes.mjs section 7 (realistic runs: each feature drawn, over
+   open ground only, the queue numbers, the check catching a parking row across the queue and a missing bus loop, a tight
+   lot said and nothing broken, existing requests untouched) and section 8 (a zone parked and checked at its type's rule,
+   with and without a city's rules). Still: the engine does not reserve room for the lanes (on
+   tight lots the porte-cochère and daycare lane are left off, said); a
+   school or daycare named beside homes is not read as a zone yet.
+
+36. Done Nov 5 (parking, round 4). The owner: "keep refining and upgrading it as much as the buildings: angled and straight
+   layouts, one-way and two-way circulation, islands and landscaping, no long dead ends, short walks to the door,
+   efficient paving, good entries and drive aisles". Measured first on the 84-case bench (top option of each case,
+   scripts/parking-metrics.mjs, base 29d0f11), then fixed, most valuable first:
+   (a) Short walks decide between layouts that hold the same (lib/layoutrun.mjs walkP90, rankKey). The run ranked layouts
+   holding the same homes or floor area by paving alone, so a field on one side of the building won over one in front of
+   its doors for a few hundred square feet (TY-hotel-retail: p90 walk 246 ft). Now the 90th-percentile walk (stall to the
+   nearest wall of a building it serves, the metrics script's walk90) weighs in: every 2 ft past 200 ft counts as 1% more
+   paving, so the walk decides only where stalls stand far out and the paving is close. Yield, checks, asks and the rest
+   come first as before. Tried and taken out: the same penalty in the parking-field engine's own score
+   (lib/siteparking.mjs value0): its search never laid the alternatives out, nothing changed.
+   (b) Bare row ends paid for (lib/layoutrun.mjs fundEndIslands, after rowEndIslands in the run's last passes). Where the
+   parking is exactly met and a row meets a cross drive end to end, a row with free land past its end grows a stall width
+   at a time there (the new stall on the aisle, inside the paving setback, clear as growEndIslands' land is, no farther
+   from a building than the plan's 90th-percentile walk, never into an entrance's stacking length, never a new dead end),
+   and those stalls (or the one stall to spare, where rowEndIslands needs two) pay for the bare row's planted ends,
+   longest rows first; all or nothing a row, never below what's required. Tried and changed: letting the grown stall
+   stand as far as its own row's farthest (WEDGE-arc-1pk p90 119 -> 137 ft) or 15% past the 90th percentile (a different
+   throat on WEDGE-trap-midrise): both taken back to the 90th percentile.
+   (c) Angled parking asked for on a single-use plan the older generator drew (apartments' rows, lib/sitelayout.mjs and
+   lib/sitegen.mjs): it came back square, nothing said. angleMixed (item 33) now runs on single-use plans too (the
+   guardrails' 26 ft fire-lane aisles turnable, a one-way aisle never a fire lane, kept only where it parks the program and
+   fails no check that passes square), else the note says why: on the apartment layouts tried (guarded 13 and 25 ac,
+   unguarded 10 ac) the parking runs along the loop drives, which are the fire lanes, or angled rows would leave the
+   parking short, and it says so. A field-engine plan that already said why it is square is left alone. The guarded
+   single-use parking-field engine already lays angled fields (17 / 14 ft one-way aisles between 26 ft collectors):
+   checked on four guarded fields (retail, medical office, office at 45°, a hotel), all angled and passing.
+   (d) Landscaping measured (scripts/parking-metrics.mjs landPct, perTree, landStd): the planted end caps and islands as
+   drawn against the lot paving, and stalls a tree; landStd against a typical standard for lots of 20 stalls or more,
+   5% of the interior and a shade tree every 10 stalls (Redmond, WA RZC 21.32: 5% for 20-150 stalls, 7% past 150;
+   Chardon, OH ch. 1159: a shade tree every 10 spaces; codes vary, many start at 20 spaces). On the base 46 of 74 lots met
+   it; the wedges' strips (3-5%), the towers, the townhome guest pockets (no islands) and the data centre did not, so it is
+   measured, not a check.
+   Bench (84 cases, top option; base 29d0f11 -> after): all passing, no warnings, replay identical, no case lost homes or
+   floor area, parking met everywhere; 68 identical element for element. Bare row ends 236 -> 211 (MF-garden-max 8 -> 2,
+   TY-U-pool 7 -> 4, WEDGE-tri-1pk 3 -> 1, LOT-wetland-apt 8 -> 6, MX-guard-hotel13 6 -> 4); 90th-percentile walk summed
+   7,102 -> 6,880 ft (TY-hotel-retail 246 -> 204, the field in front of the hotel; MX-guard-angled 244 -> 142, its
+   central-boulevard layout, still 60° on 3 of 3 aisles, sf a stall 470 -> 409; TY-hotel-retail-sf 204 -> 126); max walk
+   summed 9,155 -> 8,956; landscape share summed 384.6 -> 390.9 points; stalls 13,437 -> 13,422 (only stalls over the
+   requirement, or planted); sf a stall summed 31,675 -> 31,656 (TY-hotel-retail 360 -> 377 and TY-hotel-retail-sf
+   371 -> 395, the price of the shorter walk); dead ends 8 -> 8; first drive across an entry inside the stacking length
+   28 -> 28 cases. Prompt corpus (offline, words path): 119 of 120 fully right, as before. Holdouts unchanged (P18 fill 77,
+   P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Engine version rei-layout/2026.11.05.7. Tests:
+   test/parkingquality.mjs (a row hemmed in by drives paid for by a row with free land; none where no land is free;
+   walkP90), test/mixedparking.mjs (a single-use plan asked angled says why it stays square; one that already said is
+   left alone).
+   Still (next worst): WEDGE-tri-midrise's stalls beyond the pond (p90 255 ft): the generator's strips along the edges
+   (lib/sitegen.mjs alongEdges) leave the street strip's bar out to park the other two ("a bar left out to park the rest",
+   the smallest), so its bays at the street park buildings about 300 ft away; the 160 homes need those bays, so the fix is
+   bays beside the two bars (the pond moved onto the street strip's land), not another bar choice. WEDGE-trap-midrise p90
+   179 ft (the field at the far end). Bare ends where nothing is free and nothing spare (211; WEDGE-hyp-midrise 14,
+   WEDGE-tri-midrise 13, LOT-curved-apt 12). Paving on loop drives and small lots (MF-tower 376, TY-assisted 470 sf a
+   stall) and short entries on wedges (WEDGE-trap 15 ft, WEDGE-tri / arc 30 ft) and small pads (TY-daycare 30 ft: its 32
+   stalls take the turn off the entry drive at once; 50 ft is the yardstick's floor): not worked on this round. The
+   landscape standard: the wedges and towers short of 5%.
+34. Done Nov 5 (the live AI understands building types). The owner: "the AI understands vague, detailed and spatial site
+   plan requests so results return what was asked and what is best (scored on a prompt corpus, offline and live)" and
+   "flexible building-type primitives … many more building types". Items 27 and 29 gave the words path 56 presets; the
+   AI's program step (api/siteplan.js) named none of them, and the app's normalising of its program dropped every
+   type field, so on the live AI path a hotel's keys, a daycare's children, a data centre's yard or a car wash's
+   stacking lanes never reached the engine (types category, live, before: 1 of 33 fully right).
+   (a) Corpus first. 33 building-type requests (test/fixtures/prompt-corpus.mjs TYPES, category `types`) written with
+   their expected reading before anything was tuned: hotels with keys (limited, extended stay, full service, over
+   retail), multi-story and drive-up storage, a medical office building, an urgent care, assisted living by beds,
+   student housing by beds, a daycare by children, schools by students (middle, K-8), a car wash, a credit union with
+   drive-up lanes, a data centre, cold storage, flex with a mezzanine, fourplexes, live-work, a point tower, L / U / T
+   apartments, a pad village, a big box, a gym, a stand-alone garage, independent senior living, three mixes with a type
+   a zone, and one type no preset knows (an indoor go-kart track). The scorer (scripts/prompt-corpus.mjs) checks the
+   preset read (`type`, `zone types`) and on the best layout a building of the preset, what it counts (keys, beds,
+   children, students, buildings, garage spaces), the shape (L, U, T, point tower, triplex / fourplex), a queue lane
+   holding the cars asked and pieces absent (`--types`, `--full`, `--fresh3`).
+   (b) The program step. A short presets table generated from lib/btypes.mjs (presetTable: id, what it is, the words
+   that name it, its use, what it counts, its usual numbers and parking; 28 lines, about 4,000 characters) in the
+   instructions; `buildingType` { preset, count, bedsPerUnit, mezzanine, variant } and each zone's `preset` / `count`
+   in the schema; `form` takes T. The model's choice goes through the words' own code (lib/btypes.mjs applyPreset,
+   zonePreset: each preset's apply, the words' numbers first and the model's counts filling what the words leave out; a
+   shape through applyType's shape step), in api/siteplan.js typedFrom; the words' preset stands when the model names
+   none. A preset's usual floors stand unless the words give floors (the model's guess is dropped), the words' size
+   stands over a size the model cut "to fit", homes are counted from beds, and a recipe preset's own recipe (a
+   daycare's play yard, a school's field) wins over the model's. A type no preset covers keeps the model's own recipe,
+   and the model says in its assumptions that no preset matched; a recipe of the model's own with no preset named (a
+   team's saved type reused) is kept even where the words name a preset. The app runs the API's program as it comes
+   (no re-normalising), so the type fields reach the engine.
+   (c) Live misreadings fixed (after the first full run): a "courtyard building" the model called U-shaped keeps the
+   engine's courtyard form (a shape preset only when the words name no form or name the shape); a count the model
+   picked inside the range asked stays the range (lib/layoutbrief.mjs useFromProgram); apartments the model answered as
+   a mix with a commons zone for their own pool are one use (the pool's place kept); a freestanding coffee shop with a
+   drive-thru is a restaurant (instructions).
+   Scores (docs/bench/prompt-eval.md round 4): live, gpt-6-luna, the full 153: types 1 → 28 of 33 fully right (reading
+   45% → 100%, outcome 29% → 93%); the original 120 118 → 116 in the final full run, the four misses then (D09, S02 model
+   variance, fixed and re-run right; D05, S06 as before). Words path: the 120 unchanged at 119, types 26 of 33 (the
+   words path was not tuned). Ten fresh type requests written after tuning, scored once: live 9 of 10, words 8 of 10.
+   About 475 calls in all (about $0.87 at gpt-6-luna prices, counted from the replies' tokens). Bench: 76 cases, all
+   passing, no warnings, replay identical, element for element the same as 22d0519. Holdouts unchanged (P18 fill 77,
+   P35 fill-ug 320, P36 fill 128, E054 podium-urban 172). Tests: test/prompts.mjs (mocked replies through the mapping:
+   an inn by rooms, a daycare by children over the model's recipe, a K-8 school, cold storage and a data centre over the
+   model's numbers, dorms by beds, quadplexes, a slim tower, an L, a hotel zone by keys, the go-kart track's own recipe,
+   a team's saved daycare kept, the words' preset when the model names none, the live fixes). Still missed, live and words alike (the engine, not the
+   reading): a data centre on 40 ac still drawn with a truck court (TY15), a 16-story point tower holding 189 of 220,
+   "U-shaped … round a central courtyard" drawn as the courtyard ring not a U, a 125,000 sf big box fitting 109,802 on
+   10 ac, a 500-car garage on 2.3 ac holding 171; FT10 a T-shaped mid-rise 88 of 120.
+
+
+37. Done Nov 5 (filling the land, round 4: the lake ring on any lot, room for a type's lanes, a school beside homes). The
+   owner: "keep improving how every building type and lot shape fills the land, with honest checks, no regressions". Holdouts
+   used only as a final non-regression check.
+   (a) The central-lake ring (item 32c) ran only for houses on near-rectangles. New lib/sitering.mjs ringPoly (wired in
+   lib/sitelayout.mjs ringAny): the site's outline simplified to its main lines (Douglas-Peucker, 14 ft: a curved street's
+   chords kept as a few straight runs), the loop's centre line that outline in by a lot's depth plus the verge and half the
+   street (per line: deeper where the lot line's setback needs it), legs under 50 ft merged into their neighbours, corners
+   sharper than 70° cut; each leg a straight street at its own angle (rotated rectangles). Lots are laid along both sides of
+   every leg, square to it, wherever a whole lot fits: inside the lot lines, clear of every street's right-of-way and every
+   other lot, outer lots outside the loop (an L's inside corner ran the leg's line into the middle), inner lots between the
+   loop and the middle, the home inside the setbacks from every lot line and its driveway on its own leg's street (corner
+   lots past a leg's end had homes 60+ ft from any street: the stranded-home pass dropped them). Inner rows on every leg, on
+   the longest legs while the middle stays whole and still holds the lake ("fit"), or none. The two ways in: every spot on a
+   street-facing leg where a drive square to it reaches the street, the pair farthest apart. The middle is a park; the lake
+   in it is the middle inset to the drawn plan's own detention (bisection), a walking trail round its shore. Homes: houses as
+   before (ringHomes, the home mix in turn); townhomes in the reviewed front-load row (th-frontload-row-2s: a garage and a
+   20 ft driveway each, rows of 3-6, the brief's separation between rows, a lot a home) with guest bays of 90° stalls off the
+   loop between rows wherever a quarter space a home is owed (and a last pass for what a count leaves owed); duplexes
+   front-load on their lots. A count asked for is a cap. Houses on a near-rectangle keep item 32's ringPieces (S19 identical);
+   townhomes and duplexes use ringPoly on any lot. On a lot under 12 ac with one use round the commons the ring is tried too
+   (the small-site path turned the lake into a lawn). Results (top option, every check passing, no warnings): houses round a
+   lake on a 19.8 ac L 54 (bands, the lake not in the middle) -> 83; on a 20.7 ac wedge 43 -> 89; townhomes round a lake on 20
+   ac 196 in bands (the lake at the back) -> 212 round the lake; on the wedge 189 -> 212; duplexes on 20 ac 106 -> 136, on the
+   L 118 -> 148; 120 townhomes round a lake exactly 120, parked. Still: a park with the clubhouse and pool in the middle only
+   on near-rectangles; an L whose arms are thinner than two lot depths and the loop (bench L12) gets no ring; on curve19 the
+   two ways in sit on the two front chords only (the rest of the arc is side lot lines), so access.remote warns there.
+   (b) Room for a type's lanes. The lanes (item 35) were routed after the layout over open ground, and on tight lots the
+   building is wrapped in its parking: 7 bench cases had no porte-cochère or drop-off lane (TY-hotel-keys, TY-extended-stay,
+   TY-hotel-full, TY-mix-hotel, MX-guard-hotel13, MX-guard-angled; TY-daycare). Now (lib/layoutrun.mjs runBrief) when the top
+   option misses a lane its type needs (lib/btsite.mjs laneReserve: a hotel's porte-cochère, a daycare's drop-off), the
+   layout is run again with the stalls a lane in place of a parking row takes laid out to spare (the type's ratio, or the
+   zone's parking factor, raised by them), and the type's lanes are drawn in that run before the parking is trimmed to the
+   need (fit's new pre step, earlyLanes): the regular router first, else lib/btsite.mjs rowLane, the lane where the row
+   across the walk from a face was (square in off the aisle, along the face, square back out; the row's stalls under it cut
+   by whole stalls), the engine's own check the last word. The run's own pass after the layout finds the lanes drawn
+   (porteCochere and daycareLanes skip a building that has its lane). Those options are kept only where they drew the lane,
+   pass when a plain option passes and hold as much as the best plain one; rankKey puts, at the same yield, the layout with
+   more of its type's lanes first. All but MX-guard-hotel13 now draw it (there the reserve run's layouts held less; its plain option is kept, the
+   lane said missing), same floor area, parked. A school's queue (50 cars for 500 students) is
+   too long for a row; its lanes still need open ground.
+   (c) "A school for 500 students and 100 townhomes", "a daycare for 120 children beside 40 homes" read as the homes alone
+   (the type silently dropped). lib/btypes.mjs civicZones: a school or daycare named in a clause of its own (split on and,
+   beside, next to, behind…; a clause naming homes too, "apartments with a daycare", "homes near a school", stays the homes)
+   beside a housing use is a zone of its own, at the front (its queue and buses off the street) unless the words put it at
+   the back, the homes in the rest, each zone parked at its own rule, its lanes and grounds by lib/btsite.mjs. A school zone
+   is one building (z.foot, the preset's footprint made squarer, lib/sitelayout.mjs zoneItems / buildingsIn `one`: it was
+   split into School A/B/C across the drives), its zone's land need counting its grounds and lanes; a school zone draws its
+   lanes before its grounds. On 40 ac: one school, parent queue (two lanes, doubling back) and bus loop, every check
+   passing; on 20 ac the school, its play yard and the townhomes pass but the queue and bus loop find no room (said;
+   queues.stack warns). Tried and taken out: laying the school out 150 ft deeper and cutting it back from its back face for
+   the lanes (the deeper block didn't fit a span between the drives and cost the school floor area).
+   (d) From the contact sheet: a 250-key full-service hotel came out as two hotels (Hotel A and B). Hotels are one building
+   (the hotel presets set buildings 1).
+   Bench: 88 cases (4 new: RING-L-homes 83 homes, RING-wedge-th 212, RING-L-duplex 148, TY-daycare-homes 40 homes and the
+   daycare with its fenced yard and drop-off lane), 88 passing, no warnings, replay identical (folded onto parking round 4, 71d7ce2); 77 of the 84
+   earlier cases identical element for element; changed as intended: TY-hotel-keys, TY-extended-stay, TY-hotel-full (now
+   one building), TY-mix-hotel, TY-hotel-retail, TY-hotel-retail-sf (each gains its porte-cochère: the last two had lost it on
+   71d7ce2), TY-daycare (its drop-off lane). Parking metrics on the 84 earlier cases: 13,422 -> 13,433 stalls, 211 -> 207 bare
+   row ends, 8 -> 6 dead ends (none past 150 ft), landscape standard met as before (47); the 90th-percentile walks a little
+   longer summed over the cases (6,880 -> 6,980 ft: the lanes take the stalls nearest the door). Corpus (words path, 120): 119 / 120 fully right, as before (D05
+   honestly short). Holdouts unchanged (P18 fill 77, P35 fill-ug 320, P36 fill 128, E054 podium-urban 172).
+   Engine version rei-layout/2026.11.05.8. Tests: test/layoutrun.mjs (the ring on an L and a wedge with no overlapping homes,
+   lots or streets; townhomes and duplexes round a lake, a count capped; the rectangle ring unchanged; the porte-cochère and
+   drop-off on tight lots; a school or daycare beside homes as a zone).

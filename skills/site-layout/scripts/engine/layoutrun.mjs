@@ -30,9 +30,10 @@ import * as BT from './btypes.mjs';
 import * as I from './layoutintent.mjs';
 import * as G from './guardrails.mjs';
 import * as SITE from './btsite.mjs';
+import { restripeAngled } from './siteparking.mjs';
 
 export const RUN_SCHEMA = 'rei.run/1';
-export const ENGINE_VERSION = 'rei-layout/2026.11.05.1'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
+export const ENGINE_VERSION = 'rei-layout/2026.11.05.8'; // bump when a change to lib/site*.mjs or lib/streetnet.mjs moves geometry
 export const versions = () => ({ engine: ENGINE_VERSION, validator: V.VALIDATOR_VERSION, caps: CAPS_VERSION, templates: T.TEMPLATES_VERSION, brief: B.BRIEF_SCHEMA });
 
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
@@ -910,6 +911,57 @@ export function rowEndIslands(plan, o, brief) {
   if (!done) return o;
   return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), done + ' parking row' + (done > 1 ? 's' : '') + ' end in planted islands (stalls to spare): ' + p.provided + ' for ' + p.required + ' required.'] };
 }
+// Bare row ends paid for elsewhere (docs/LAYOUT-ENGINE.md item 36). Where the parking is exactly met, a row that meets a
+// cross drive end to end can't grow onto free land (growEndIslands) and there are no stalls to spare (rowEndIslands). But
+// another row may have free land past its end: it grows a stall width at a time there (only where the new stall fronts
+// the aisle, inside the paving setback, clear as growEndIslands' land is, and no farther from a building than that row's
+// farthest stall), and each two stalls gained become the planted ends of a bare row (longest first). Never below what's
+// required, never a new dead end; all or nothing for each row planted.
+export function fundEndIslands(plan, o, brief) {
+  const ring = plan.ring || []; if (!o?.elements?.length || ring.length < 3) return o;
+  let inner; try { inner = S.insetRing(ring, S.edgeRules(ring, plan.front, { ...S.SETBACKS, ...(plan.setbacks || {}) }, plan.streets).map(r => Math.max(0.5, r.pave) - 0.5)); } catch { return o; }
+  if (!inner || inner.length < 3) return o;
+  const els = o.elements.slice(), pk = () => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking;
+  let p = pk(); if (p.required == null) return o;
+  const cap = (plan.params?.style?.islands ?? 'square') === 'square' ? 'square' : true, dead = () => { try { return S.deadEnds(els, 1).length; } catch { return 0; } }, d0 = dead();
+  const inThroat = () => { try { return entryThroats(plan, els, throatNeed(p.provided)).reduce((t, x) => t + x.stalls.length, 0); } catch { return 0; } }, th0 = inThroat(); /* (never a stall more inside an entrance's stacking length) */
+  const lawn = x => x.kind === 'green' && !S.isPark(x), free = ['lot', 'zone'];
+  const Bs = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), Bsv = Bs.filter(e => e.use !== 'amenity'), B = (Bsv.length ? Bsv : Bs).map(e => S.outline(e)); if (!B.length) return o;
+  const walk = p0 => Math.min(...B.map(b => b.reduce((m, a, i) => Math.min(m, S.segDist(p0, a, b[(i + 1) % b.length])), Infinity)));
+  const sq = e => e.kind === 'parking' && !e.parallel && !e.rv && !e.vac && !e.poly && !e.future && !S.stallAng(e) && (e.lock || e.row) && e.stallRot == null && +e.w > 0;
+  const agree = c => S.stalls(c).count === S.stallCentres(c).length;
+  const takers = els.filter(e => sq(e) && !e.caps && S.stalls(e).n >= 8 && agree({ ...e, caps: cap })).sort((a, b) => S.stalls(b).n - S.stalls(a).n || String(a.id).localeCompare(String(b.id)));
+  if (!takers.length) return o;
+  const w90 = walkP90(els);
+  // one stall width more on a donor row's free end: the row as it would be, or null
+  const grow1 = e => { if (!(+e.d <= 19) || S.stalls(e).swap || !(S.stalls(e).n >= 6)) return null; const sw = S.stallPitch(e), r = (e.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-u[1], u[0]], W = +e.w, D = +e.d;
+    const at = (t, s) => [e.x + u[0] * t + v[0] * s, e.y + u[1] * t + v[1] * s], box = (t0, t1, s0, s1) => [at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)];
+    const others = els.filter(x => x !== e && !x.future && !lawn(x) && !free.includes(x.kind)).map(x => x.kind === 'building' ? S.grow(S.shapeOf(x), 5) : S.shapeOf(x));
+    const clear = pd => pd.every(pt => S.inRing(pt, inner)) && !others.some(z => S.rectsOverlap({ poly: S.grow(pd, -0.3) }, { poly: z }, 0));
+    const aisle = e.row ? Math.sign(e.row) : 0, net = els.filter(x => (x.kind === 'drive' || x.kind === 'field') && !x.future).map(x => S.shapeOf(x));
+    const fronts = (t0, t1) => aisle && [[t0 + 1, D / 2 + 2], [(t0 + t1) / 2, D / 2 + 3], [t1 - 1, D / 2 + 2]].every(([t, s]) => { const pt = at(t, aisle * s); return net.some(z => S.inRing(pt, z)); });
+    const far = Math.max(...S.stallCentres(e).map(walk));
+    for (const sg of [1, -1]) { const t0 = sg > 0 ? W / 2 : -W / 2 - sw; if (!clear(box(t0, t0 + sw, -D / 2, D / 2)) || !fronts(sg > 0 ? t0 - sw : t0, sg > 0 ? t0 + sw : t0 + 2 * sw)) continue;
+      const c = at(sg * sw / 2, 0), e2 = { ...e, x: +c[0].toFixed(2), y: +c[1].toFixed(2), w: +(W + sw).toFixed(2) };
+      const endC = S.stallCentres(e2).reduce((m, q) => { const t = sg * ((q[0] - e.x) * u[0] + (q[1] - e.y) * u[1]); return !m || t > m.t ? { q, t } : m; }, null)?.q; /* (the stall at the grown end: within the plan's 90th-percentile walk, so the walk doesn't lengthen) */
+      if (S.stalls(e2).count !== S.stalls(e).count + 1 || !agree(e2) || Math.max(...S.stallCentres(e2).map(walk)) > far + 1 || !endC || walk(endC) > w90) continue;
+      return e2; }
+    return null; };
+  let done = 0, grown = 0;
+  for (const t of takers) {
+    const i0 = els.indexOf(t); if (i0 < 0 || els[i0].caps) continue;
+    const snap = els.slice(); let g = 0;
+    // stalls to spare first, then donors, a stall width at a time, until the planted ends can be paid for
+    const capped = { ...t, caps: cap }, cost = S.stalls(t).count - S.stalls(capped).count;
+    while (p.provided - g - cost < p.required) { let hit = false;
+      for (let k = 0; k < els.length; k++) { const e = els[k]; if (e === t || !sq(e)) continue; const e2 = grow1(e); if (!e2) continue; els[k] = e2; if (dead() > d0 || inThroat() > th0) { els[k] = e; continue; } hit = true; g--; break; } // (g counts down: stalls gained)
+      if (!hit) break; }
+    els[els.indexOf(t)] = capped; const p2 = pk();
+    if (p2.provided >= p2.required && p2.provided >= p.required && dead() <= d0) { p = p2; done++; grown -= g; } else { els.length = 0; els.push(...snap); }
+  }
+  if (!done) return o;
+  return { ...o, elements: els, tplNotes: [...(o.tplNotes || []), done + ' more parking row' + (done > 1 ? 's' : '') + ' end in planted islands' + (grown ? ', paid for by ' + grown + ' stall' + (grown > 1 ? 's' : '') + ' added where other rows had free land at their ends' : ' (the stall to spare)') + '.'] };
+}
 
 function keepIfNoWorse(plan, was, now, brief) {
   if (now === was) return was;
@@ -938,6 +990,44 @@ function afterCut(els, gone, cut, B) {
       return parts.map((r, k) => S.fieldPiece(r.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]), k ? f.id + '-' + k : f.id, { name: f.name, note: f.note })); } catch { return [f]; } });
   const all = kept.concat(fields); for (const g of gone) giveBackLand(all, S.grow(g, 30), g, 40);
   return { all, dropped };
+}
+// Angled parking asked for on a mixed-use plan (docs/LAYOUT-ENGINE.md item 33). The mixed layout (lib/sitelayout.mjs
+// zones) draws square rows on two-way aisles and never read the angle, so the plan came back square and said nothing.
+// Its aisles that a two-way drive joins at both ends are turned one-way with angled rows (lib/siteparking.mjs
+// restripeAngled, the field engine's machinery; the guardrails' 26 ft fire-lane aisles too), neighbouring ones running
+// opposite ways: all of them where that still parks the program and breaks no check that passed (fire reach included:
+// a one-way aisle is no fire lane), else as many as can be, else none. Whatever is drawn, the notes say how many aisles
+// turned and why the rest stay square. Before the surplus is pruned, so the angled rows have the spare stalls to give.
+export function angleMixed(plan, o, brief, finish = x => x) {
+  const want = brief?.program?.parking?.angle; if (!o?.elements?.length || !B.PARKING_ANGLES.includes(want)) return finish(o);
+  const mixed = brief.program.uses.length > 1 || o.program?.zones?.length > 1; // (single-use plans too, docs/LAYOUT-ENGINE.md item 36: the older generator's square rows, apartments' included, under the guardrails' 26 ft fire-lane aisles as well; a field engine plan that already said why it is square is left alone)
+  if (o.elements.some(e => e.kind === 'parking' && S.stallAng(e)) || !mixed && [...(o.notes || []), ...(o.tplNotes || [])].some(t => /Angled parking/.test(t))) return finish(o);
+  const chk = x => V.validateLayout({ ...plan, elements: x.elements, program: x.program || o.program || {} }, brief), pk = els => V.quantities({ ...plan, elements: els, program: o.program || {} }, brief).parking, p0 = pk(o.elements), passed = new Set(chk(o).checks.filter(c => c.status === 'pass').map(c => c.id));
+  const word = want === 'angled' ? 'Angled parking' : 'Angled parking at ' + want + '°', note = (x, t) => ({ ...x, tplNotes: [...(x.tplNotes || []), t] });
+  let of = 0, tries = 0, short = false, broke = false, turnable = false; const ok = [];
+  for (const ang of want === 'angled' ? [60, 45] : [want]) {
+    const all = restripeAngled(o.elements, ang, { wide: true }); of = Math.max(of, all.of); if (!all.n) continue; turnable = true;
+    // the aisles it can turn; every subset of them, the most aisles first (at most 40 tried), kept where it still parks the
+    // program and fails no check that passes now (hard or not: the fire truck's turns too)
+    const cand = o.elements.filter(e => all.els.some(x => x.oneWay && x.id === e.id));
+    for (let k = cand.length; k >= 1; k--) {
+      const subs = []; const pick = (i, acc) => { if (subs.length >= 40) return; if (acc.length === k) { subs.push(acc); return; } for (let j = i; j < cand.length; j++) pick(j + 1, acc.concat([cand[j]])); }; pick(0, []);
+      const here = [];
+      for (const sub of subs) { if (tries++ > 40) break; const ids = new Set(sub.map(e => e.id)), r = restripeAngled(o.elements, ang, { wide: true, only: a => ids.has(a.id) }); if (!r.n) continue;
+        const p = pk(r.els); if (p.required != null && p.provided < p.required) { short = true; continue; }
+        if (chk({ elements: r.els }).checks.some(c => c.status === 'fail' && passed.has(c.id))) { broke = true; continue; }
+        here.push({ now: { ...o, elements: r.els }, p: p.provided, n: r.n, ang }); }
+      ok.push(...here.sort((x, y) => y.p - x.p));
+    }
+  }
+  // each through the run's last passes (they add curb returns, rows along drives and turnarounds the angle changes), the
+  // first that fails nothing the square plan, finished the same way, passes (at most six finished)
+  let sq = null; const square = () => sq || (sq = finish(o)), sqPass = () => new Set(chk(square()).checks.filter(c => c.status === 'pass').map(c => c.id));
+  let pass0 = null, late = null;
+  for (const t of ok.slice(0, 6)) { const f = finish(t.now), lost = chk(f).checks.filter(c => c.status === 'fail' && (pass0 || (pass0 = sqPass())).has(c.id)); if (lost.length) { late = late || lost; continue; }
+    const why = short && !broke && !late ? 'as angled stalls there would leave the parking short of the ' + p0.required + ' required.' : short ? 'as angling them too would leave the parking short of the ' + p0.required + ' required or break a check that passes with them square.' : 'as turning them would break a check that passes with them square (a one-way aisle isn’t a fire lane).';
+    return note(f, 'Angled parking, as asked: ' + t.ang + '° stalls on ' + t.n + ' of the ' + of + ' parking aisles, made one-way (the arrows), neighbouring aisles running opposite ways' + (t.n < of ? '; the rest stay square on two-way aisles, ' + why : '.')); }
+  return note(square(), word + ' was asked for, but this layout keeps square stalls on two-way aisles: ' + (!turnable ? 'its parking rows have no aisle of the field’s width that a two-way drive joins at both ends (a one-way aisle must, so cars never meet a dead end).' : late ? 'with its aisles one-way it fails a check the square layout passes (' + late.map(c => c.title || c.id).slice(0, 2).join('; ') + ').' : short && !broke ? 'angled stalls take more of a row than square ones, and with them the rows here can’t park the ' + p0.required + ' spaces required.' : 'turning its aisles one-way would break a check that passes now (a one-way aisle isn’t a fire lane: a building could be left beyond the fire lane’s reach, or the fire truck without its turns)' + (short ? ', or leave the parking short of the ' + p0.required + ' required.' : '.')));
 }
 export function pruneSurplus(plan, o, brief) {
   if (!o?.elements?.length) return o;
@@ -995,11 +1085,23 @@ function infeasibleBound(brief) {
 
 // rank: feasible first; then the program met; then fewer unknowns; then the yield the brief maximizes; then less paving;
 // then the geometry hash (a fixed, arbitrary tie-break)
+// The walk from the parking (docs/LAYOUT-ENGINE.md item 36): the 90th-percentile stall's distance to the nearest wall of
+// a building it serves (the clubhouse, garages and future pads left out; scripts/parking-metrics.mjs walk90), ft.
+export const WALK_FAR = 200;
+export function walkP90(els) {
+  const B = els.filter(e => e.kind === 'building' && !e.future && !e.ghost && e.use !== 'garage'), served = B.filter(e => e.use !== 'amenity'), bl = (served.length ? served : B).map(e => S.outline(e)); if (!bl.length) return 0;
+  const bb = bl.map(r => { const xs = r.map(p => p[0]), ys = r.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }), ds = [];
+  for (const e of els) { if (e.kind !== 'parking' || e.rv || e.vac || e.future) continue; let cs = []; try { cs = S.stallCentres(e); } catch { cs = []; }
+    for (const p of cs) { let m = Infinity; bl.forEach((r, i) => { const b = bb[i]; if (Math.hypot(Math.max(b[0] - p[0], 0, p[0] - b[2]), Math.max(b[1] - p[1], 0, p[1] - b[3])) >= m) return; for (let k = 0; k < r.length; k++) m = Math.min(m, S.segDist(p, r[k], r[(k + 1) % r.length])); }); ds.push(m); } }
+  if (!ds.length) return 0; ds.sort((a, b) => a - b); return ds[Math.min(ds.length - 1, Math.floor(0.9 * (ds.length - 1) + 0.5))];
+}
 function rankKey(o, brief) {
   const v = o.validation, prog = v.checks.filter(c => c.id.startsWith('program.u')), met = prog.filter(c => c.status === 'pass').length;
   const maxi = brief.program.uses.filter(u => ['maximize', 'min', 'max', 'range'].includes(u.quantity.mode)); // more is better up to any cap (a cap's excess already fails the program check)
   const yieldV = maxi.reduce((s, u) => s + (u.quantity.unit === 'units' ? o.quantities.byUse[u.use]?.units || 0 : o.quantities.byUse[u.use]?.gfa || 0), 0);
-  const paving = o.quantities.pavedSfGross / Math.max(1, o.quantities.totals.units || o.quantities.totals.gfa / 1000 || 1);
+  const typeLanes = o.elements.filter(e => e.kind === 'drive' && SITE.QUEUE_TYPES[e.queue] && Array.isArray(e.path)).reduce((s, e) => s + (+e.width || 12) * e.path.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - e.path[i][0], p[1] - e.path[i][1]), 0), 0); /* (a building type's own lanes, lib/btsite.mjs: what the type needs, not paving that ranks a layout down) */
+  const paving0 = (o.quantities.pavedSfGross - typeLanes) / Math.max(1, o.quantities.totals.units || o.quantities.totals.gfa / 1000 || 1);
+  const paving = paving0 * (1 + Math.max(0, walkP90(o.elements) - WALK_FAR) / 200); /* (stalls far from the doors: each 2 ft the 90th-percentile walk runs past 200 ft weighs as 1% more paving, so of layouts holding the same, the one with the field by the buildings wins unless it paves much more; item 36) */
   // the form asked for, delivered: a courtyard request ranks its courtyard layouts above plain bars (other forms are
   // drawn by their own engine path and always are what was asked)
   const formMiss = brief.program.uses.filter(u => u.form === 'mf-cottage-btr' && o.elements.filter(e => e.cottage).length >= 12 && !o.elements.some(e => e.kind === 'building' && e.use === 'amenity') || u.form === 'mf-courtyard' && !o.elements.some(e => e.court) || u.form === 'mf-wrap' && !o.elements.some(e => e.wrap && e.kind === 'garage') || u.form === 'mf-tuck-under' && !o.elements.some(e => +e.tuck > 0) || u.form === 'ind-cross-dock' && !o.elements.some(e => e.kind === 'building' && e.crossDock) || u.form === 'mf-podium-courtyard' && !o.elements.some(e => e.upper === 'U') || u.form === 'ret-drive-through' && !o.elements.some(e => e.kind === 'drive' && (e.windowAt || /drive-thru/i.test(e.name || '')))).length; // (the form asked for: a courtyard's wings, a drive-thru's lane)
@@ -1007,7 +1109,11 @@ function rankKey(o, brief) {
   // it meets a side or rear line, an easement from the neighbour)
   const lane = o.elements.some(e => e.emergency) ? 1 : 0;
   const placeMiss = (o.placements || []).filter(c => c.status === 'fail').length; // (where things were asked to go: a layout meeting more of it first)
-  return [v.feasible ? 0 : 1, -met, formMiss, placeMiss, v.counts.fail, v.counts.unknown, lane, -yieldV, Math.round(paving), o.geometryHash];
+  const paired = o.elements.reduce((t, e) => t + (e.kind === 'building' && +e.combined > 0 ? +e.combined : 0), 0); /* (an exact count met in whole stacks before one met by combining homes into larger ones, lib/bldgtemplates.mjs) */
+  const off = brief.program.uses.filter(u => u.quantity.mode === 'exact' && u.quantity.unit === 'units' && u.quantity.value > 0).reduce((t, u) => t + Math.round(Math.abs((o.quantities.byUse[u.use]?.units || 0) - u.quantity.value) / u.quantity.value * 1000), 0); /* (an exact count no layout reaches: the nearest first) */
+  const qMiss = (v.checks.find(c => c.id === 'queues.stack.types' || c.id === 'queues.stack' && c.measured && typeof c.measured === 'object')?.features || []).length; /* (a building type's queues not drawn or short, lib/btsite.mjs: a layout holding more of them first; 0 on a plan with none) */
+  const drawnQ = o.elements.filter(e => e.kind === 'drive' && SITE.QUEUE_TYPES[e.queue]).length; /* (a building type's lanes drawn: at the same yield, the layout with its porte-cochère or drop-off first, item 37) */
+  return [v.feasible ? 0 : 1, -met, off, formMiss, placeMiss, v.counts.fail, qMiss, v.counts.unknown, lane, paired, -yieldV, -drawnQ, Math.round(paving), o.geometryHash];
 }
 export const rankOf = rankKey;
 const cmp = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] < b[i]) return -1; if (a[i] > b[i]) return 1; } return 0; };
@@ -1016,6 +1122,28 @@ const cmp = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] < b[i]) re
 // at the template's building sizes, so as many as fit sees the same layouts an exact count does. (Before, the generator
 // sat out when no count was asked, and its bars ignored the template's sizes, so which counts passed jumped with the
 // count asked and an exact-count ladder after the search worked round it, at 2-3 s a request; no longer needed.)
+// the reserve run (item 37): does option o lack a lane its type needs (the lanes drawn as the run draws them)?
+function lanesMissing(E, o, RES) {
+  const prog0 = BT.withType(o.program || E.program, E.program); let f; try { f = SITE.siteFeatures(E.plan, BT.tagElements(o.elements, prog0), prog0); } catch { return false; }
+  return RES.some(r => !f.els.some(e => e.kind === 'drive' && e.queue === (/^hotel/.test(r.btype) ? 'porte' : 'daycare')));
+}
+// the engine's program with the stalls each lane in place of a parking row takes laid out to spare (a single type's
+// ratio, a zone's parking factor)
+function reserveEngine(E, RES) {
+  const E3 = { ...E, program: { ...E.program }, opts: { ...E.opts } }, P = E3.program;
+  for (const r of RES) {
+    if (r.zone == null) { const cp = P.custom?.parking, ratio = +P.ratio > 0 ? +P.ratio : S.USES[P.use]?.ratio || 3, need = cp && +cp.rate > 0 && +cp.basis > 0 ? cp.rate * cp.basis : (+P.gfa || 0) / 1000 * ratio, f = 1 + r.stalls / Math.max(10, need);
+      P.ratio = +(ratio * f).toFixed(4); if (cp && +cp.rate > 0) P.custom = { ...P.custom, parking: { ...cp, rate: +(cp.rate * f).toFixed(4) } }; }
+    else { const z = (P.zones || [])[r.zone] || {}, need = (+z.gfa || 0) / 1000 * (S.USES[z.use]?.ratio || 3) * (+E.opts.parkF?.[z.use] || 1), f = 1 + r.stalls / Math.max(10, need); E3.opts.parkF = { ...(E3.opts.parkF || {}), [z.use]: +((+E3.opts.parkF?.[z.use] || 1) * f).toFixed(4) }; }
+  }
+  return E3;
+}
+// the reserve run's lanes, drawn before the parking is trimmed to the need (a lane in place of a row where none reaches a
+// drive over open ground); the run's own pass after the layout then finds them drawn
+function earlyLanes(E, o) {
+  const prog0 = BT.withType(o.program || E.program, E.program); let f; try { f = SITE.siteFeatures(E.plan, BT.tagElements(o.elements, prog0), prog0, { rowLane: true }); } catch { return o; }
+  return f.els === o.elements ? o : { ...o, elements: f.els, tplNotes: [...(o.tplNotes || []), ...f.notes.filter(n => !/\bno (?:room|open ground)\b/i.test(n))] }; // (what it couldn't draw is said by the run's own pass)
+}
 export function runBrief(briefIn, { now = null } = {}) {
   const check = B.validateBrief(briefIn), base = { schema: RUN_SCHEMA, versions: versions(), created: now, request: briefIn?.request || null };
   if (!check.ok) return { ...base, outcome: check.missing.length ? 'missing-information' : 'invalid-brief', problems: check.errors, warnings: check.warnings, options: [] };
@@ -1036,13 +1164,18 @@ export function runBrief(briefIn, { now = null } = {}) {
   const lay1 = Ex => { let out; try { out = layoutOptions(Ex.plan, Ex.program, asks ? { ...Ex.opts, asks } : Ex.opts) || []; } catch (e) { out = [{ error: String(e && e.message || e) }]; } return out; };
   const short = list => brief.program.uses.some(u => { if (u.use !== 'multifamily' || !['exact', 'range', 'max'].includes(u.quantity.mode)) return false; const need = u.quantity.mode === 'range' ? u.quantity.min : u.quantity.mode === 'max' ? Math.floor(u.quantity.value * 0.9) : u.quantity.value; // (at most: well under the cap is worth a second try)
     const units = o => T.templatesFor(u.form, u).length ? o.elements.filter(e => e.template && e.tplUse === u.id).reduce((t, e) => t + e.units, 0) : o.elements.filter(e => e.kind === 'building' && (e.use || o.program?.use) === 'multifamily' && (u.zone == null || e.zone == null || e.zone === u.zone)).reduce((t, e) => t + (+e.units || 0), 0);
-    return !list.some(o => !o.error && o.elements?.length && units(o) >= need); });
+    return !list.some(o => !o.error && o.elements?.length && units(o) >= need && !o.elements.some(e => +e.combined > 0)); }); /* (met only by combining homes into larger ones: the fuller retry is still looked for, lib/bldgtemplates.mjs) */
   const { value: raw, stats } = CX.deterministic({ seed: brief.solver.seed, tickMs: brief.solver.tickMs }, () => {
     const wrapNote = 'No wrap fits this site: the garage a wrap needs (about 130 ft across and 120 ft deep inside the wings, with its ramp and cores) doesn’t fit with the wings round it, so these are the nearest layouts; on a small lot a courtyard on a parking podium ("courtyard on a podium") holds more.';
     const noWrap = o => brief.program.uses.some(u => u.form === 'mf-wrap') && !o.elements?.some(e => e.wrap && e.kind === 'garage') ? { ...o, tplNotes: [...(o.tplNotes || []), wrapNote] } : o; // (a wrap asked for that the site can't hold: said, not swapped silently)
-    const fit = (Ex, out, br = brief) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br), t2 = keepIfNoWorse(Ex.plan, t1, pruneSurplus(Ex.plan, t1, br), br); const t2g = garageEntries(Ex.plan, t2), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10), br); }); // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
+    const fit = (Ex, out, br = brief, pre = null) => out.map(o => o.error ? o : noWrap(o)).map(o => { if (o.error) return o; o = podiumLevels(o); o = keepIfNoWorse(Ex.plan, o, joinCourtyard(Ex.plan, o, br), br); o = keepIfNoWorse(Ex.plan, o, oneAmenityCentre(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, courtGardens(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, nudgeAmenities(Ex.plan, o), br); o = keepIfNoWorse(Ex.plan, o, I.placeAmenities(Ex.plan, o, br.program.placements, o.program || Ex.program), br); o = exactByUnitSize(Ex.plan, o, br); const t = T.fitParking(T.trimHomes(T.applyTemplates(Ex.plan, o, br), br), els => V.quantities({ ...Ex.plan, elements: els, program: o.program || Ex.program }, br).parking); const tc = keepIfNoWorse(Ex.plan, t, cottageCommons(Ex.plan, t), br), tdw = keepIfNoWorse(Ex.plan, tc, homeDriveways(Ex.plan, tc), br), tf = keepIfNoWorse(Ex.plan, tdw, shutInFuture(Ex.plan, tdw), br), tp = keepIfNoWorse(Ex.plan, tf, playNearHomes(Ex.plan, tf), br), t0 = keepIfNoWorse(Ex.plan, tp, pondBesideWork(Ex.plan, tp), br), t1 = keepIfNoWorse(Ex.plan, t0, tidyPonds(Ex.plan, t0), br); const last = t1x => { const t2 = keepIfNoWorse(Ex.plan, t1x, pruneSurplus(Ex.plan, t1x, br), br); const t2g = garageEntries(Ex.plan, t2), t3 = keepIfNoWorse(Ex.plan, t2g, addSecondAccess(Ex.plan, t2g, br), br); const t4 = t3 === t2g ? t3 : keepIfNoWorse(Ex.plan, t3, tidyPonds(Ex.plan, t3), br); const t5 = keepIfNoWorse(Ex.plan, t4, addEmergencyAccess(Ex.plan, t4, br), br), t6 = keepIfNoWorse(Ex.plan, t5, curbReturns(Ex.plan, t5, br), br); const t7 = keepIfNoWorse(Ex.plan, t6, podiumTrim(Ex.plan, t6, br), br); const t8 = keepIfNoWorse(Ex.plan, t7, trailsClear(Ex.plan, t7), br), t8d = keepIfNoWorse(Ex.plan, t8, rowsAlongDrives(Ex.plan, t8, br), br), t9 = keepIfNoWorse(Ex.plan, t8d, aisleTurnarounds(Ex.plan, t8d, br), br), t9g = keepIfNoWorse(Ex.plan, t9, growEndIslands(Ex.plan, t9, br), br), t10 = keepIfNoWorse(Ex.plan, t9g, rowEndIslands(Ex.plan, t9g, br), br), t10f = keepIfNoWorse(Ex.plan, t10, fundEndIslands(Ex.plan, t10, br), br); return vaultWhereNoPond(Ex.plan, garageVent(t10f), br); }; return angleMixed(Ex.plan, pre ? pre(t1) : t1, br, last); }); // (angled parking asked on a mixed plan: tried here, each try finished by the passes after) // (a pond cut back for a way in: its new corners tidied too) // building schedules from the templates, then parking met, inside the run
     let got = fit(E, lay1(E));
     if (capped && short(got)) { const E2 = B.toEngine(brief); E2.opts = { ...E2.opts, deeper: false }; got = got.concat(fit(E2, lay1(E2))); } // (the retry looks for a fuller layout: no deeper-pond copies of it)
+    // a building type's lanes the layouts left no room for (a hotel's porte-cochère, a daycare's drop-off): laid out again
+    // with the stalls a lane in place of a parking row takes to spare, the lanes drawn before the parking is trimmed to the
+    // need (docs/LAYOUT-ENGINE.md item 37); kept only where it costs the program nothing (below)
+    const RES = SITE.laneReserve(E.program);
+    if (RES.length && got.filter(o => !o.error && o.elements?.length).slice(0, 1).some(o => lanesMissing(E, o, RES))) { const E3 = reserveEngine(E, RES); got = got.concat(fit(E3, lay1(E3), brief, o => earlyLanes(E, o)).map(o => o.error ? o : { ...o, reserve: true })); }
     return got;
   });
   const err = raw.find(o => o.error);
@@ -1053,8 +1186,11 @@ export function runBrief(briefIn, { now = null } = {}) {
     const asked = (brief.program.placements || []).map(p => ({ ...I.checkPlacement(lay, elements, o.program || E.program, p), how: p.how || 'checked' }));
     const { elements: _e, notes: _n, tplNotes: _t, error: _x, ...engine } = o; // the engine's own fields (score, recipe, frame…), kept for the editor
     return { ...engine, id: 'opt-' + (i + 1), engineOrder: i, name: o.name || 'Layout ' + (i + 1), geometryHash: geometryHash(elements), elements, program: o.program || E.program, params: o.params || E.plan.params, recipe: o.recipe ?? null, zones: o.zones || [], quantities: validation.quantities, validation, placements: asked,
-      notes: [...(brief.request?.assumed || []).map(a => /^(?:No (?:use|count|size)|Mixed use)/.test(a) ? 'Assumed: ' + a : a), ...asked.map(c => c.said + (c.status === 'fail' ? ' ' + (c.how === 'checked' && !steer.has(c.id) ? 'The engine has no control for this yet: it is measured and said here, not placed; move it by hand or say where else it may go.' : c.how === 'checked' ? 'The engine looked for layouts with it there; this one doesn’t have it (another option may say what having it costs).' : 'The engine was told, but this layout couldn’t fit it there; another option may.') : '')), ...BT.presetNotes(o.notes || [], prog0), ...(o.tplNotes || []), ...BT.typeNotes(prog0, elements), ...feat.notes] };
+      notes: [...(brief.request?.assumed || []).map(a => /^(?:No (?:use|count|size)|Mixed use)/.test(a) ? 'Assumed: ' + a : a), ...asked.map(c => c.said + (c.status === 'fail' ? ' ' + (c.how === 'checked' && !steer.has(c.id) ? 'The engine has no control for this yet: it is measured and said here, not placed; move it by hand or say where else it may go.' : c.how === 'checked' ? 'The engine looked for layouts with it there; this one doesn’t have it (another option may say what having it costs).' : 'The engine was told, but this layout couldn’t fit it there; another option may.') : '')), ...BT.presetNotes(o.notes || [], prog0), ...(o.tplNotes || []), ...BT.typeNotes(prog0, elements), ...feat.notes, ...simpleShort(o, validation)] };
   });
+  { // (the reserve run's options: only those that drew a lane the type needs and cost the program nothing next to the plain ones)
+    const yieldOf = o => o.quantities.totals.units || o.quantities.totals.gfa / 1000, plain = options.filter(o => !o.reserve), pass = plain.filter(o => o.validation.status === 'pass'), top = Math.max(0, ...(pass.length ? pass : plain).map(yieldOf));
+    for (let i = options.length - 1; i >= 0; i--) { const o = options[i]; if (!o.reserve) continue; if (!o.elements.some(e => e.kind === 'drive' && /^(?:porte|daycare)$/.test(e.queue || '')) || pass.length && o.validation.status !== 'pass' || yieldOf(o) < top - 1e-6) options.splice(i, 1); } }
   options.sort((a, b) => cmp(rankKey(a, brief), rankKey(b, brief)));
   options.forEach((o, i) => { o.rank = i + 1; });
   // the options handed back differ in substance: one with the same numbers as a kept one (a mirror image, the same
@@ -1076,6 +1212,12 @@ export function runBrief(briefIn, { now = null } = {}) {
     rankingHash: hashOf(keep.map(o => [o.rank, o.geometryHash])), options: keep };
 }
 
+// a simple layout (lib/sitelayout.mjs fallback: the zone layouts didn't fit) short of the parking the brief requires: said
+// plainly, against the rule that governs (the engine's own note counts its use defaults; docs/LAYOUT-ENGINE.md item 33)
+function simpleShort(o, v) {
+  const q = v.quantities.parking, c = v.checks.find(x => x.id === 'parking.count'); if (!/^Simple layout/.test(o.name || '') || c?.status !== 'fail' || q.required == null) return [];
+  return ['A simple layout: the zone layouts don’t fit this site with what it must hold. It parks ' + q.provided + ' of the ' + q.required + ' spaces required (' + S.spacesWord(q.required - q.provided) + ' short' + (q.rule ? '; ' + String(q.rule).replace(/\.$/, '') : '') + '), so it fails the parking check: less floor area, structured parking or a bigger site would park it.'];
+}
 // where things were asked to go, across the options handed back: an option missing an ask that another option meets
 // says which one and what it gives up there (fewer homes or less floor area, a check it fails); an option meeting one
 // that a fuller option misses says what meeting it costs. Notes only: the ranking is rankKey's.
@@ -1120,16 +1262,44 @@ export const ENGINE_OPT_KEYS = ['count', 'deeper', 'brief', 'parcels', 'perParce
 // lays out to that count and the independent validator's parking.count judges against it (before, a run from the app or
 // the MCP site_plan path laid apartments out at the engine's 1.6 a home and passed its own check while the city's count
 // was short). A rule the brief already sets higher stands. Changes b in place.
+// Idempotent (Nov 5, item 33): the app and the MCP hand runPlan the guardrails' effective plan and program already
+// (G.forLayout: the program's ratios carry the count reserve), so a plan marked __guard is taken as it is, never factored
+// again (it was: 2.205 a home, the 5% twice), and a brief once governed is marked (rules.guarded) and left alone.
+// Mixed use is governed use by use (rules.parkingByUse; before, the program's one top-level ratio was laid on every use
+// counted by floor area: a 120-key hotel judged at the retail ratio, 362 spaces for 212): apartments at the city's two a
+// home, a hotel by its keys at its type's rule (lib/btypes.mjs perKey; one a key), shops, offices and the rest at their
+// use's ratio (the city has no verified commercial ratio: the engine's working number), each with the city's reserve.
+// Homes with garages (townhomes, duplexes, houses) keep their own rule, as the effective plan does.
 export function governingParking(b, plan, program) {
-  if (!plan || !G.isOn({ ...plan, program })) return b;
-  let e; try { e = G.effective({ ...plan, program, __guard: undefined }); } catch { return b; } if (!e?.program) return b;
-  const R = b.rules.values, base = S.normalizeProgram(program || {}), why = 'Jurisdiction planning guardrails (' + (G.WALLER?.name || 'City of Waller') + ')';
-  const mf = b.program.uses.some(u => u.use === 'multifamily'), perUnit = +e.program.perUnit, ratio = +e.program.ratio;
-  if (mf && perUnit > 0 && perUnit > (R.parkingPerUnit?.v ?? base.perUnit ?? 0) + 1e-9) R.parkingPerUnit = { v: perUnit, cls: 'verified', source: why + ': City of Waller Ordinance No. 424, two spaces a dwelling unit, with the 5% count reserve' };
-  if (ratio > 0 && b.program.uses.some(u => u.quantity?.unit !== 'units') && ratio > (R.parkingPer1000?.v ?? base.ratio ?? 0) + 1e-9) R.parkingPer1000 = { v: ratio, cls: 'assumption', source: why + ': the use’s ratio with the 5% count reserve' };
+  if (!plan || b.rules?.guarded) return b;
+  const pre = !!plan.__guard; // (already the effective plan: its program's numbers include the reserve)
+  if (!pre && !G.isOn({ ...plan, program })) return b;
+  let e; if (pre) e = { ...plan, program: program || plan.program }; else try { e = G.effective({ ...plan, program, __guard: undefined }); } catch { return b; }
+  if (!e?.program || !e.__guard) return b;
+  const R = b.rules.values, base = S.normalizeProgram(program || {}), cf = +e.__guard.cf || 1, why = 'Jurisdiction planning guardrails (' + (G.WALLER?.name || 'City of Waller') + ')', res = cf > 1 ? ', with the ' + Math.round((cf - 1) * 100) + '% count reserve' : '';
+  b.rules.guarded = { profile: e.__guard.profile || 'waller', cf };
+  const kinds = [...new Set(b.program.uses.map(u => u.use).filter(u => u !== 'amenity' && u !== 'garage'))];
+  if (kinds.length > 1) { // mixed use: each use by its own rule
+    const r4 = x => Math.round(x * 1e4) / 1e4, P = program || {}, zones = Array.isArray(P.zones) ? P.zones : [], by = {}, src = [];
+    for (const u of b.program.uses) {
+      const z = u.zone != null ? zones[u.zone] : null, bt = (P.btZones || []).find(x => x.zone === u.zone), pre0 = bt ? BT.presetOf(bt.btype) : null, U = S.USES[u.use] || {};
+      if (u.use === 'multifamily') { const v = r4(Math.max(S.normalizeProgram({ use: 'multifamily' }).perUnit, G.WALLER.mf.perUnit.value) * cf); if (!(by.multifamily?.perUnit >= v)) by.multifamily = { perUnit: v }; }
+      else if (U.garage) continue; // (homes park in their garages and driveways: their own rule, no stall reserve)
+      else if (u.use === 'hotel') { const pk = +pre0?.params?.perKey || 1, sk = +pre0?.params?.sfPerKey || (U.ratio > 0 ? 1000 / U.ratio : 550), v = { perKey: r4(pk * cf), sfPerKey: sk, per1000: r4(1000 / sk * pk * cf) }; if (!(by.hotel?.per1000 >= v.per1000)) by.hotel = v; }
+      else if (bt?.rule?.key === 'parkingPer1000' && +bt.rule.v >= 0) { const v = r4(+bt.rule.v * cf); if (!(by[u.use]?.per1000 >= v)) by[u.use] = { per1000: v, type: bt.btype }; } // (a zone of a building type at its type's rule with the city's reserve: a bank zone like a bank, not the restaurant pad it is laid out as)
+      else { const v = r4((+z?.ratio > 0 ? +z.ratio : U.ratio ?? 3) * cf); if (!(by[u.use]?.per1000 >= v)) by[u.use] = { per1000: v }; }
+    }
+    for (const [u, r] of Object.entries(by)) src.push((S.USES[u]?.label || u) + ' ' + (r.perUnit != null ? r.perUnit + ' a home' + (u === 'multifamily' ? ' (Ord. No. 424: two a dwelling unit)' : '') : r.perKey != null ? r.perKey + ' a key' : r.per1000 + ' a 1,000 sf'));
+    if (Object.keys(by).length) R.parkingByUse = { v: by, cls: Object.keys(by).every(u => u === 'multifamily') ? 'verified' : 'assumption', source: why + ', use by use' + res + ': ' + src.join('; ') + '. The city’s commercial ratios are unverified: each use’s working number.' };
+    return b;
+  }
+  const mf = kinds[0] === 'multifamily', perUnit = +e.program.perUnit, ratio = +e.program.ratio;
+  if (mf && perUnit > 0 && perUnit > (R.parkingPerUnit?.v ?? (pre ? 0 : base.perUnit) ?? 0) + 1e-9) R.parkingPerUnit = { v: perUnit, cls: 'verified', source: why + ': City of Waller Ordinance No. 424, two spaces a dwelling unit' + res };
+  if (ratio > 0 && b.program.uses.some(u => u.quantity?.unit !== 'units') && ratio > (R.parkingPer1000?.v ?? (pre ? 0 : base.ratio) ?? 0) + 1e-9) R.parkingPer1000 = { v: ratio, cls: 'assumption', source: why + ': the use’s ratio' + res };
   return b;
 }
-export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
+// the brief runPlan runs (the app's plan, program and search settings made a brief; the bench makes guarded runs with it)
+export function briefForPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
   const b = B.briefFromProgram(program, plan, { text: ask, parser: 'app', seed });
   governingParking(b, plan, program);
   // what a size means: the words' own meaning (a bare number exactly, "at least", "up to", "as many as fit"), unless the
@@ -1142,6 +1312,10 @@ export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } =
   const eo = Object.fromEntries(ENGINE_OPT_KEYS.filter(k => opts[k] !== undefined).map(k => [k, opts[k]]));
   if (eo.keepout) b.site.exclusions = []; // the app's keep-outs go to the engine as it gave them (with their road strips); the validator reads them as keep-out pieces
   b.solver.engineOpts = JSON.parse(JSON.stringify(eo)); b.solver.options = Math.min(12, Math.max(3, +opts.count || 3));
+  return b;
+}
+export function runPlan(plan, program, opts = {}, { ask = '', seed = 'rei-1' } = {}) {
+  const b = briefForPlan(plan, program, opts, { ask, seed }), eo = b.solver.engineOpts || {};
   const rec = runBrief(b);
   if (!rec.options?.length) return { outcome: rec.outcome, problems: rec.problems || [], options: [] };
   const keep = eo.keepout ? eo.keepout.map(e => ({ ...e })) : [];

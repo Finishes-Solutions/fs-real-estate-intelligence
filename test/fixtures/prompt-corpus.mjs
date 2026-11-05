@@ -21,7 +21,9 @@ export const SITES = {
   C8: { ring: [[0, 0], [750, 0], [750, 465], [0, 465]], front: 0, streets: [1], label: '750 x 465 ft, 8 ac, side street on the east' },
   E10: { ring: [[0, 0], [500, 0], [500, 900], [0, 900]], front: 1, label: '500 x 900 ft, 10.3 ac, street on the east' },
   W20: { ring: [[0, 0], [1000, 0], [1000, 870], [0, 870]], front: 0, label: '1000 x 870 ft, 20 ac' },
-  B40: { ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]], front: 0, label: '1500 x 1160 ft, 40 ac' }
+  B40: { ring: [[0, 0], [1500, 0], [1500, 1160], [0, 1160]], front: 0, label: '1500 x 1160 ft, 40 ac' },
+  T2: { ring: [[0, 0], [330, 0], [330, 300], [0, 300]], front: 0, label: '330 x 300 ft, 2.3 ac' },
+  T3: { ring: [[0, 0], [380, 0], [380, 340], [0, 340]], front: 0, streets: [1], label: '380 x 340 ft, 3 ac, side street on the east' }
 };
 const HOUSING = [['multifamily'], ['townhomes'], ['duplex'], ['sfr']];
 export const CASES = [
@@ -152,6 +154,59 @@ export const CASES = [
 ];
 // a fast offline subset for npm test (test/prompts.mjs): a few of each kind, the quicker sites
 export const FAST = ['V03', 'V05', 'V09', 'D07', 'D20', 'M01', 'M04', 'M10', 'M21', 'S04', 'S08', 'S18', 'S22'];
+// Building types (LAYOUT-ENGINE.md item 34): requests naming a type the presets know (lib/btypes.mjs), a shape, a type a
+// zone, and one no preset knows. Written with their expected reading before the AI's program step was given the presets.
+// want.btype: the preset the program carries (a list: any of them; null: none); want.btZones: the presets of a mix's zones.
+// out: ['btype', id] a building of that preset · ['count', keys | beds | children | students | buildings | spaces, mode, n]
+//      · ['shape', L | U | T | point | plex4 | plex3] · ['queue', cars] a queue lane holding that many · ['none', piece]
+export const TYPES = [
+  { id: 'TY01', cat: 'types', site: 'R5', ask: 'a 4-story hotel with 120 rooms', want: { uses: ['hotel'], btype: 'hotel-limited', floors: { hotel: 4 } }, out: [['btype', 'hotel-limited'], ['count', 'keys', 'exact', 120]] },
+  { id: 'TY02', cat: 'types', site: 'R5', ask: 'extended stay hotel, 100 suites', want: { uses: ['hotel'], btype: 'hotel-extended' }, out: [['btype', 'hotel-extended'], ['count', 'keys', 'exact', 100]] },
+  { id: 'TY03', cat: 'types', site: 'W20', ask: 'full service conference hotel with 250 keys', want: { uses: ['hotel'], btype: 'hotel-full' }, out: [['btype', 'hotel-full'], ['count', 'keys', 'exact', 250]] },
+  { id: 'TY04', cat: 'types', site: 'R5', ask: '120-key hotel above ground-floor retail', want: { uses: ['hotel'], btype: 'hotel-over-retail' }, out: [['btype', 'hotel-over-retail'], ['count', 'keys', 'min', 110]] },
+  { id: 'TY05', cat: 'types', site: 'R5', ask: 'self storage, 3 stories, 100,000 sf climate controlled', want: { uses: ['storage'], btype: 'storage-multi' }, out: [['btype', 'storage-multi'], ['gfa', 'storage', 'min', 90000]] },
+  { id: 'TY06', cat: 'types', site: 'R10', ask: 'mini-warehouses, all drive-up, one story', want: { uses: ['storage'], btype: 'storage-single' }, out: [['btype', 'storage-single']] },
+  { id: 'TY07', cat: 'types', site: 'R5', ask: 'a 3-story medical office building, 45,000 sf', want: { uses: ['medical'], btype: 'mob', q: { medical: ['exact', 45000] }, floors: { medical: 3 } }, out: [['btype', 'mob'], ['gfa', 'medical', 'exact', 45000]] },
+  { id: 'TY08', cat: 'types', site: 'P1', ask: 'a small urgent care', want: { uses: ['medical'], btype: 'clinic' }, out: [['btype', 'clinic'], ['gfa', 'medical', 'min', 4000]] },
+  { id: 'TY09', cat: 'types', site: 'R5', ask: 'assisted living and memory care, 96 beds', want: { uses: ['multifamily'], btype: 'senior-al' }, out: [['btype', 'senior-al'], ['count', 'beds', 'exact', 96]] },
+  { id: 'TY10', cat: 'types', site: 'R10', ask: 'student housing near campus, 500 beds in 4-bedroom units', want: { uses: ['multifamily'], btype: 'student' }, out: [['btype', 'student'], ['count', 'beds', 'exact', 500]] },
+  { id: 'TY11', cat: 'types', site: 'R5', ask: 'daycare for 120 kids with a play yard', want: { uses: ['other'], btype: 'daycare' }, out: [['btype', 'daycare'], ['count', 'children', 'exact', 120], ['has', 'playground']] },
+  { id: 'TY12', cat: 'types', site: 'W20', ask: 'a middle school for 800 students', want: { uses: ['other'], btype: 'school' }, out: [['btype', 'school'], ['count', 'students', 'exact', 800], ['has', 'field']] },
+  { id: 'TY13', cat: 'types', site: 'T2', ask: 'express car wash with 20 vacuum stalls', want: { uses: ['other'], btype: 'car-wash' }, out: [['btype', 'car-wash'], ['queue', 10]] },
+  { id: 'TY14', cat: 'types', site: 'P1', ask: 'credit union with drive-up teller lanes', want: { usesAny: [['restaurant'], ['retail'], ['office']], btype: 'bank' }, out: [['btype', 'bank'], ['queue', 4]] },
+  { id: 'TY15', cat: 'types', site: 'B40', ask: 'hyperscale data center, 250,000 sf', want: { uses: ['industrial'], btype: 'data-center', q: { industrial: ['exact', 250000] } }, out: [['btype', 'data-center'], ['has', 'equipment yard'], ['none', 'truck court']] },
+  { id: 'TY16', cat: 'types', site: 'B40', ask: '200k sf cold storage facility with truck court', want: { uses: ['industrial'], btype: 'cold-storage', q: { industrial: ['exact', 200000] } }, out: [['btype', 'cold-storage'], ['gfa', 'industrial', 'exact', 200000], ['has', 'truck court']] },
+  { id: 'TY17', cat: 'types', site: 'R10', ask: 'flex industrial, 110 ft deep bays with 30% mezzanine, 80,000 sf', want: { uses: ['industrial'], btype: 'flex-mezz', q: { industrial: ['exact', 80000] } }, out: [['btype', 'flex-mezz'], ['gfa', 'industrial', 'exact', 80000]] },
+  { id: 'TY18', cat: 'types', site: 'R10', ask: 'fourplexes, 60 units', want: { uses: ['duplex'], btype: 'plex', q: { duplex: ['exact', 60] } }, out: [['btype', 'plex'], ['units', 'exact', 60], ['shape', 'plex4']] },
+  { id: 'TY19', cat: 'types', site: 'D6', ask: 'live-work units along the street, 20 of them', want: { uses: ['townhomes'], btype: 'live-work', q: { townhomes: ['exact', 20] } }, out: [['btype', 'live-work'], ['units', 'exact', 20]] },
+  { id: 'TY20', cat: 'types', site: 'R5', ask: 'a 16-story point tower, 220 units', want: { uses: ['multifamily'], btype: 'point-tower', floors: { multifamily: 16 } }, out: [['btype', 'point-tower'], ['shape', 'point'], ['units', 'exact', 220]] },
+  { id: 'TY21', cat: 'types', site: 'R10', ask: 'L-shaped apartment buildings, 4 stories, 160 units', want: { uses: ['multifamily'], btype: 'mf-l', floors: { multifamily: 4 } }, out: [['shape', 'L'], ['units', 'exact', 160]] },
+  { id: 'TY22', cat: 'types', site: 'R10', ask: 'a U-shaped apartment building wrapped around a central courtyard, 140 units', want: { uses: ['multifamily'], btype: ['mf-u', 'mf-courtyard-u'] }, out: [['shape', 'U'], ['units', 'exact', 140]] },
+  { id: 'TY23', cat: 'types', site: 'R10', ask: 'T-shaped apartments, 150 units, 4 floors', want: { uses: ['multifamily'], btype: 'mf-t' }, out: [['shape', 'T'], ['units', 'exact', 150]] },
+  { id: 'TY24', cat: 'types', site: 'R5', ask: 'a pad village of 5 restaurant pads', want: { usesAny: [['other'], ['restaurant']], btype: 'pad-village' }, out: [['btype', 'pad-village'], ['count', 'buildings', 'exact', 5]] },
+  { id: 'TY25', cat: 'types', site: 'W20', ask: 'a 150-key hotel with 25,000 sf of retail in front', want: { uses: ['hotel', 'retail'], btZones: ['hotel-limited'], place: [['retail', 'front']] }, out: [['btype', 'hotel-limited'], ['count', 'keys', 'exact', 150], ['gfa', 'retail', 'exact', 25000], ['nearer', 'retail', 'hotel', 'front']] },
+  { id: 'TY26', cat: 'types', site: 'W20', ask: 'townhomes with a daycare and a bank on pads out front', want: { usesAny: [['townhomes', 'other', 'restaurant'], ['townhomes', 'other', 'retail']], btZones: ['daycare', 'bank'] }, out: [['btype', 'daycare'], ['btype', 'bank']] },
+  { id: 'TY27', cat: 'types', site: 'R5', ask: 'an indoor go-kart track, 40,000 sf', want: { uses: ['other'], btype: ['custom', null] }, out: [['built'], ['gfa', 'other', 'min', 36000]] },
+  { id: 'TY28', cat: 'types', site: 'R10', ask: 'a 125,000 sf home improvement store', want: { uses: ['retail'], btype: 'big-box', q: { retail: ['exact', 125000] } }, out: [['btype', 'big-box'], ['gfa', 'retail', 'exact', 125000]] },
+  { id: 'TY29', cat: 'types', site: 'R5', ask: 'a 45,000 sf gym', want: { uses: ['retail'], btype: 'fitness', q: { retail: ['exact', 45000] } }, out: [['btype', 'fitness'], ['gfa', 'retail', 'exact', 45000]] },
+  { id: 'TY30', cat: 'types', site: 'T2', ask: 'parking garage for 500 cars', want: { btype: 'garage-standalone' }, out: [['btype', 'garage-standalone'], ['count', 'spaces', 'min', 450]] },
+  { id: 'TY31', cat: 'types', site: 'R10', ask: 'independent senior living community, 140 units', want: { uses: ['multifamily'], btype: 'senior-il', q: { multifamily: ['exact', 140] } }, out: [['btype', 'senior-il'], ['units', 'exact', 140]] },
+  { id: 'TY32', cat: 'types', site: 'W20', ask: 'a K-8 charter school for 650 students', want: { uses: ['other'], btype: 'school' }, out: [['btype', 'school'], ['count', 'students', 'exact', 650]] },
+  { id: 'TY33', cat: 'types', site: 'W20', ask: 'hotel at the front with 110 rooms, apartments behind, 200 units', want: { uses: ['hotel', 'multifamily'], btZones: ['hotel-limited'], place: [['hotel', 'front']] }, out: [['btype', 'hotel-limited'], ['count', 'keys', 'exact', 110], ['units', 'exact', 200], ['nearer', 'hotel', 'multifamily', 'front']] }
+];
+// Building-type requests written after the AI's program step was tuned to TYPES (item 34), scored once (--fresh3)
+export const FRESH3 = [
+  { id: 'FT01', cat: 'types', site: 'R5', ask: 'a 95-room select service hotel, 5 stories', want: { uses: ['hotel'], btype: 'hotel-limited', floors: { hotel: 5 } }, out: [['btype', 'hotel-limited'], ['count', 'keys', 'exact', 95]] },
+  { id: 'FT02', cat: 'types', site: 'R10', ask: 'memory care facility with 64 beds', want: { uses: ['multifamily'], btype: 'senior-al' }, out: [['btype', 'senior-al'], ['count', 'beds', 'exact', 64]] },
+  { id: 'FT03', cat: 'types', site: 'P1', ask: 'a drive-thru bank on the corner', want: { usesAny: [['restaurant'], ['retail'], ['office']], btype: 'bank' }, out: [['btype', 'bank'], ['queue', 4]] },
+  { id: 'FT04', cat: 'types', site: 'W20', ask: 'an elementary school, 500 kids', want: { uses: ['other'], btype: 'school' }, out: [['btype', 'school'], ['count', 'students', 'exact', 500]] },
+  { id: 'FT05', cat: 'types', site: 'B40', ask: 'colocation data center 150,000 sf', want: { uses: ['industrial'], btype: 'data-center', q: { industrial: ['exact', 150000] } }, out: [['btype', 'data-center'], ['has', 'equipment yard']] },
+  { id: 'FT06', cat: 'types', site: 'R10', ask: 'triplexes, 45 units', want: { uses: ['duplex'], btype: 'plex', q: { duplex: ['exact', 45] } }, out: [['btype', 'plex'], ['shape', 'plex3'], ['units', 'exact', 45]] },
+  { id: 'FT07', cat: 'types', site: 'T2', ask: 'a tunnel car wash', want: { uses: ['other'], btype: 'car-wash' }, out: [['btype', 'car-wash'], ['queue', 10]] },
+  { id: 'FT08', cat: 'types', site: 'R5', ask: 'a 30,000 sf health club', want: { uses: ['retail'], btype: 'fitness', q: { retail: ['exact', 30000] } }, out: [['btype', 'fitness'], ['gfa', 'retail', 'exact', 30000]] },
+  { id: 'FT09', cat: 'types', site: 'W20', ask: 'a dorm with 400 beds and 20,000 sf of shops in front', want: { uses: ['multifamily', 'retail'], btZones: ['student'] }, out: [['btype', 'student'], ['count', 'beds', 'exact', 400], ['gfa', 'retail', 'exact', 20000]] },
+  { id: 'FT10', cat: 'types', site: 'R10', ask: 'a T-shaped mid-rise apartment building, 120 units', want: { uses: ['multifamily'], btype: 'mf-t' }, out: [['shape', 'T'], ['units', 'exact', 120]] }
+];
 // written after the parser was tuned to CASES and scored once, untuned (node scripts/prompt-corpus.mjs --fresh): how
 // well the reading carries to requests it never saw
 export const FRESH = [
