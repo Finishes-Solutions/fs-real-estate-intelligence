@@ -22,6 +22,7 @@ import * as HY from './hydrology.mjs';
 import { hashOf } from './sha256.mjs';
 import { engineTarget, templatesFor, DEEP } from './bldgtemplates.mjs';
 import { REF_CORRIDOR } from './reftemplates.mjs';
+import * as I from './layoutintent.mjs';
 
 export const BRIEF_SCHEMA = 'rei.brief/1';
 export const PRECISION_FT = 0.01;
@@ -61,12 +62,12 @@ const ptFix = p => [fix(p[0]), fix(p[1])];
 export function quantityFromWords(text, unit = 'units') {
   const t = S.wordsToDigits ? S.wordsToDigits(String(text || '')) : String(text || ''), n = s => +String(s).replace(/,/g, '');
   const U = unit === 'sf' ? '(?:sf|sq\\.? ?ft|square[- ]f(?:ee|oo)t)' : unit === 'buildings' ? 'buildings?' : '(?:units?|apartments?|homes?|townhomes?|townhouses?|doors|cottages?|duplex(?:es)?)';
-  const N = '(\\d[\\d,]*)';
+  const N = '(?<![\\d.])(\\d[\\d,]*)(?!\\.\\d)';
   let m;
-  if ((m = new RegExp('\\b(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + '\\s*(?:[a-z-]+\\s+){0,2}' + U, 'i').exec(t))) return { mode: 'range', min: n(m[1]), max: n(m[2]), unit };
-  if ((m = new RegExp('\\b(?:at least|minimum of|min(?:imum)?\\.?|no fewer than|no less than)\\s+' + N + '\\s*(?:[a-z-]+\\s+){0,2}' + U, 'i').exec(t)) || (m = new RegExp(N + '\\s*\\+\\s*(?:[a-z-]+\\s+){0,2}' + U, 'i').exec(t))) return { mode: 'min', value: n(m[1]), unit };
-  if ((m = new RegExp('\\b(?:up to|at most|no more than|max(?:imum)?(?: of)?|not more than)\\s+' + N + '\\s*(?:[a-z-]+\\s+){0,2}' + U, 'i').exec(t))) return { mode: 'max', value: n(m[1]), unit };
-  if ((m = new RegExp('\\b(?:exactly\\s+)?' + N + '\\s*(?:[a-z-]+\\s+){0,3}' + U, 'i').exec(t))) return { mode: 'exact', value: n(m[1]), unit };
+  if ((m = new RegExp('\\b(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + '\\s*(?:(?!stor|floor|level|acre)[a-z-]+\\s+){0,2}' + U, 'i').exec(t))) return { mode: 'range', min: n(m[1]), max: n(m[2]), unit };
+  if ((m = new RegExp('\\b(?:at least|minimum of|min(?:imum)?\\.?|no fewer than|no less than)\\s+' + N + '\\s*(?:(?!stor|floor|level|acre)[a-z-]+\\s+){0,2}' + U, 'i').exec(t)) || (m = new RegExp(N + '\\s*\\+\\s*(?:(?!stor|floor|level|acre)[a-z-]+\\s+){0,2}' + U, 'i').exec(t))) return { mode: 'min', value: n(m[1]), unit };
+  if ((m = new RegExp('\\b(?:up to|at most|no more than|max(?:imum)?(?: of)?|not more than)\\s+' + N + '\\s*(?:(?!stor|floor|level|acre)[a-z-]+\\s+){0,2}' + U, 'i').exec(t))) return { mode: 'max', value: n(m[1]), unit };
+  if ((m = new RegExp('\\b(?:exactly\\s+)?' + N + '\\s*(?:(?!stor|floor|level|acre)[a-z-]+\\s+){0,3}' + U, 'i').exec(t))) return { mode: 'exact', value: n(m[1]), unit };
   return null;
 }
 export const wantsMax = text => /\b(as (?:many|much|big|large) as (?:will |can |it )?(?:fits?|possible|the site (?:holds|allows))|maximi[sz]e|max(?:imum)? (?:yield|density|units)|fill the site)\b/i.test(String(text || ''));
@@ -104,7 +105,7 @@ export function zoneForm(z) {
 }
 function useFromProgram(z, text, i, zi = null) {
   const unit = ['multifamily', 'townhomes', 'duplex', 'sfr'].includes(z.use) ? 'units' : 'sf';
-  const target = unit === 'units' ? z.units : z.gfa, words = text ? quantityFromWords(text, unit) : null;
+  const target = unit === 'units' ? z.units : z.gfa, words = text ? quantityFromWords(S.tidyRequest(text), unit) : null;
   let quantity;
   if (words && (target == null || words.value === target || words.max === target || words.min === target)) quantity = words;
   else if (target != null) quantity = { mode: 'exact', value: target, unit };
@@ -126,7 +127,8 @@ function useFromProgram(z, text, i, zi = null) {
 
 // A brief from an engine program (the words' guess or the AI's program step) and a plan. text: the original request.
 export const STORMWATER = ['onsite-pond', 'underground', 'offsite'];
-export function briefFromProgram(program, plan, { text = '', parser = 'structured', seed = null, options = 3 } = {}) {
+export function briefFromProgram(program, plan, { text: raw = '', parser = 'structured', seed = null, options = 3 } = {}) {
+  const text = S.tidyRequest(String(raw || '')); // (read as tidied: "apts", "senoir", "1.5 spaces/unit"; kept as typed on the brief)
   const P = program || {}, zones = Array.isArray(P.zones) && P.zones.length > 1 ? P.zones : [P];
   const many = zones.length > 1, uses = zones.map((z, zi) => [z, zi]).filter(([z]) => useOf(z) && z.use !== 'amenity' && z.use !== 'garage').map(([z, zi], i) => useFromProgram(z, many ? null : text, i, many ? zi : null));
   const form = formFromWords(text) || (P.form === 'tower' ? 'mf-tower-podium' : P.arrangement === 'courtyard' ? 'mf-courtyard' : null);
@@ -136,7 +138,7 @@ export function briefFromProgram(program, plan, { text = '', parser = 'structure
   for (const u of uses) if (u.form === 'mf-stacked-townhome' && u.use === 'townhomes') u.use = 'multifamily'; // (stacked townhomes: two homes stacked in a bay, laid out as rows of templated bays like apartments)
   const brief = {
     schema: BRIEF_SCHEMA,
-    request: { text: String(text || ''), parser },
+    request: { text: String(raw || ''), parser },
     site: siteFromPlan(plan),
     program: { uses, overlays: overlaysFromWords(text), parking: { mode: /\btuck[- ]?under\b/i.test(text) ? 'tuck-under' : /\bpodium\b/i.test(text) ? 'podium' : /\bgarage|structured\b/i.test(text) ? 'garage' : 'surface', ...(PARKING_ANGLES.includes(P.parkAngle) ? { angle: P.parkAngle } : {}) }, engine: stripProgram(P) },
     rules: { id: DEFAULT_RULES.id, version: DEFAULT_RULES.version, values: { ...DEFAULT_RULES.values, ...(plan.setbacks ? { setbacks: { v: { ...S.SETBACKS, ...plan.setbacks }, cls: plan.setbacksSource ? 'verified' : 'assumption', source: plan.setbacksSource || 'Setbacks on the plan (default or entered by hand); not verified against zoning' } } : {}) } },
@@ -154,13 +156,37 @@ export function briefFromProgram(program, plan, { text = '', parser = 'structure
     if (v) for (const u of brief.program.uses.filter(u => u.use === 'multifamily')) { if (!u.form || u.form === 'mf-garden') u.form = 'mf-midrise'; if (DEEP.forms.includes(u.form)) u.depth = { value: Math.max(DEEP.min, Math.min(DEEP.max, v)), unit: 'ft', cls: 'assumption', source: 'the request: corridor buildings ' + v + ' ft deep, deeper than any reviewed corridor building (65 ft)' }; } }
   if (P.btRule && !P.zones && DEFAULT_RULES.values[P.btRule.key]) brief.rules.values[P.btRule.key] = { v: P.btRule.v, cls: 'assumption', source: String(P.btRule.source).slice(0, 300) }; // (a building type's parking rule, lib/btypes.mjs: the engine and the check count the same requirement)
   brief.site.stormwater = sm === 'underground' ? 'underground' : sm === 'none' ? 'offsite' : sm === 'detention' || sm === 'retention' ? 'onsite-pond' : null;
+  understand(brief, P, plan, text);
   return brief;
+}
+// What the words say beyond the uses and their numbers, made part of the brief (lib/layoutintent.mjs): a pond's acres as
+// its share of the site, a density as a count, setbacks said, where things go (program.placements, and what the engine
+// can be told of them), and what was assumed where the words left things open (request.assumed, said in the plan's
+// notes). The engine's own program loses the words' extra keys so a replay hands it the same thing.
+function understand(brief, P, plan, text) {
+  const E = brief.program.engine, acres = S.ringArea(plan.ring || []) / 43560, said = [];
+  for (const k of ['pondAc', 'density', 'setbacks', 'placements']) delete E[k];
+  if (+P.pondAc > 0 && acres > 0 && E.detentionPct == null) { E.detentionPct = +Math.min(60, P.pondAc / acres * 100).toFixed(1); said.push('A ' + P.pondAc + ' acre pond, as asked: ' + E.detentionPct + '% of the ' + acres.toFixed(1) + ' acre site.'); }
+  if (+P.density > 0 && acres > 0) { const u = brief.program.uses.find(x => x.quantity.unit === 'units'); if (u && (u.quantity.mode === 'maximize' || u.quantity.value === Math.round(P.density))) { const n = Math.max(1, Math.round(P.density * acres)); u.quantity = { mode: 'exact', value: n, unit: 'units' }; if (brief.program.uses.length === 1) E.units = n; said.push(P.density + ' units an acre on ' + acres.toFixed(2) + ' acres: ' + n + ' units (gross acreage, an assumption).'); } }
+  if (P.setbacks && typeof P.setbacks === 'object') { const sb = Object.fromEntries(Object.entries(P.setbacks).filter(([k, v]) => ['front', 'side', 'rear', 'paving'].includes(k) && +v >= 0 && +v <= 500).map(([k, v]) => [k, +v])); if (Object.keys(sb).length) { brief.rules.values.setbacks = { v: { ...brief.rules.values.setbacks.v, ...sb }, cls: 'assumption', source: 'The request (' + Object.entries(sb).map(([k, v]) => k + ' ' + v + ' ft').join(', ') + '); not verified against zoning' }; said.push('Setbacks as asked: ' + Object.entries(sb).map(([k, v]) => k + ' ' + v + ' ft').join(', ') + '.'); } }
+  // what was assumed: a use with no number is as many as fit; its form and floors when the words name none
+  for (const u of brief.program.uses) if (u.quantity.mode === 'maximize' && !wantsMax(text) && !P.max) said.push('No ' + (u.quantity.unit === 'units' ? 'count' : 'size') + ' given for the ' + (S.USES[u.use]?.label || u.use).toLowerCase() + ': as many as fit, for the most the land holds (give a number to hold it).');
+  // where things go: the words', and the AI's (program.placements), each told to the engine where it can be
+  const uses = brief.program.uses.map(u => u.use), fromAI = (Array.isArray(P.placements) ? P.placements : []).map(I.cleanPlacement).filter(Boolean);
+  const words = text ? I.placementsFromWords(text, uses.concat(Array.isArray(P.zones) ? P.zones.map(z => z.use) : [])) : [];
+  const ok = p => !I.USE_SUBJECTS.includes(p.subject) || uses.includes(p.subject) || p.subject === 'restaurant' && uses.includes('retail');
+  const pl = I.mergePlacements(fromAI, words).filter(ok);
+  // a dog park or playground asked for with no place said, on apartments: by the clubhouse (an assumption, said), so it is drawn
+  if (uses.includes('multifamily')) for (const [k, re] of [['dog park', /\bdog (?:parks?|runs?)\b|\bbark park\b/i], ['playground', /\bplay ?grounds?\b|\btot lots?\b/i]]) if (re.test(text) && !pl.some(p => p.subject === k) && !/\bno (?:dog park|playground)/i.test(text)) { pl.push({ id: 'p' + (pl.length + 1), subject: k, rel: 'near', target: 'clubhouse', text: 'no place said' }); said.push('A ' + k + ' asked for with no place said: put by the clubhouse (an assumption; say where it goes to change it).'); }
+  if (pl.length) { brief.program.placements = pl; said.push(...I.applyPlacements(brief)); }
+  const prev = Array.isArray(brief.request.assumed) ? brief.request.assumed : [];
+  if (said.length || prev.length) brief.request.assumed = [...prev, ...said];
 }
 function defaultForm(use, text) {
   if (use === 'multifamily') return 'mf-garden';
   if (use === 'townhomes') return /\bstacked\b/i.test(text) ? 'mf-stacked-townhome' : 'mf-townhome';
   if (use === 'duplex') return 'mf-plex';
-  if (use === 'sfr') return /\brent|btr\b/i.test(text) ? 'mf-cottage-btr' : 'sfr-subdivision';
+  if (use === 'sfr') return /\brent|btr\b|\bcottages?\b/i.test(text) ? 'mf-cottage-btr' : 'sfr-subdivision';
   if (use === 'industrial') return /\bflex\b/i.test(text) ? 'flex-multi-tenant' : /\bcross[- ]?dock\b/i.test(text) ? 'ind-cross-dock' : /\bside[- ]?load(?:ed|ing)?\b/i.test(text) ? 'ind-side-load' : 'ind-warehouse';
   if (use === 'retail') return /\banchor/i.test(text) ? 'ret-anchored' : /\bpad\b/i.test(text) ? 'ret-inline-pads' : 'ret-inline';
   if (use === 'restaurant') return /\bdrive[- ]?th/i.test(text) ? 'ret-drive-through' : 'ret-restaurant';
@@ -172,8 +198,11 @@ function stripProgram(P) { return JSON.parse(JSON.stringify(P || {})); }
 // The words alone (the app's Low effort, the MCP tool without AI): lib/siteplan.mjs guessProgram, then the quantity
 // meanings and form the words state.
 export function briefFromRequest(text, plan, opts = {}) {
-  const prog = S.guessProgram(String(text || ''));
-  return briefFromProgram(prog, plan, { ...opts, text, parser: 'words' });
+  let prog = S.guessProgram(String(text || ''));
+  const v = I.vagueProgram(text, prog, S.ringArea(plan.ring || []) / 43560); if (v) prog = { ...v.program, ...Object.fromEntries(['perUnit', 'ratio', 'floors', 'storm', 'setbacks', 'pondAc', 'entrances'].filter(k => prog[k] != null).map(k => [k, prog[k]])) };
+  const b = briefFromProgram(prog, plan, { ...opts, text, parser: 'words' });
+  if (v) b.request.assumed = [...v.assumed, ...(b.request.assumed || []).filter(a => !/^No (?:count|size) given/.test(a))];
+  return b;
 }
 
 // ---------- checking a brief ----------
@@ -215,6 +244,7 @@ export function validateBrief(b) {
   for (const o of b.program?.overlays || []) if (!OVERLAYS.includes(o)) E('program.overlays', 'Unknown overlay ' + o);
   if (b.program?.parking?.mode && !PARKING_MODES.includes(b.program.parking.mode)) E('program.parking.mode', 'Parking mode must be one of ' + PARKING_MODES.join(', '));
   if (b.program?.parking?.angle != null && !PARKING_ANGLES.includes(b.program.parking.angle)) E('program.parking.angle', 'Parking angle must be one of ' + PARKING_ANGLES.join(', '));
+  for (const m of I.validatePlacements(b.program?.placements)) E('program.placements', m);
   if (!b.solver || b.solver.seed == null) E('solver.seed', 'A seed is needed so the run can be replayed');
   if (b.solver && !(+b.solver.tickMs > 0)) E('solver.tickMs', 'The evaluation budget tick must be positive');
   return { ok: !errors.length, errors, warnings, missing };
@@ -243,6 +273,7 @@ export function canonicalBrief(b0) {
   if (s.origin) s.origin = [+(+s.origin[0]).toFixed(8), +(+s.origin[1]).toFixed(8)];
   b.program.uses = b.program.uses.map((u, i) => ({ ...u, id: u.id || 'u' + (i + 1) }));
   b.program.overlays = [...new Set(b.program.overlays || [])].sort();
+  if (Array.isArray(b.program.placements) && !b.program.placements.length) delete b.program.placements; // (none: the brief hashes as it did before placements were read)
   b.locks = [...new Set(b.locks || [])].sort();
   b.solver = { seed: b.solver.seed, tickMs: +b.solver.tickMs || 25, options: Math.max(1, Math.min(12, +b.solver.options || 3)), ...(b.solver.engineOpts ? { engineOpts: b.solver.engineOpts } : {}) };
   return b;
