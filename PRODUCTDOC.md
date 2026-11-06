@@ -1159,6 +1159,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Edits that do what you say (Nov 5):** "move the pool to the center", "make it 4 stories", "add 20 units", "parking behind the buildings", "make it denser", "keep building 1 where it is" and more now work in Change With AI and for connected agents, and the reply says what was done and what couldn't be.
 - **Garages, T and U shapes, data centres (Nov 5):** parking garages are drawn with as many levels as the spaces need; T-shaped buildings hold their count; "U-shaped" means an open U; data centres get a service drive instead of a truck court; when a building can't fit on the lot, the plan says how much does.
 - **Parking closer and greener (Nov 5):** on wedge-shaped lots the parking sits beside the buildings; spare spaces become planted islands so more lots meet a typical landscape standard.
 - **The AI knows building types (Nov 5):** describe a hotel, car wash, school, assisted living, storage and so on, and the AI-built plan comes back as that type with its count and lanes; homes can ring a central lake on any lot shape.

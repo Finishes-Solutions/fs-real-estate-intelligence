@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-05
 
+### 6:59 PM CT: Edits to a plan understood and done right, in the app and for agents
+- **Agents' edits now reach the AI:** edits sent through the MCP server were read by simple word matching only; they now go through the AI like the app's Change With AI, and both read edits with the same code.
+- **More kinds of edits work:** moves by compass direction and distance, counts and "+20 units", stories, sizes and keys, swapping one use for another, "denser", "more open space", parking ("+30 spaces", "behind the buildings", "fix the parking"), places for the pond or a use, several asks in one sentence, typos and shorthand, and "keep building 1 where it is" (locked pieces never move).
+- **Fixes:** a parking ratio set on a plan now reaches the layout (it was always 1.6 a home); laying out again keeps the count you asked and the plan's own arrangement; a locked building is no longer laid out a second time; townhomes keep their home count when their stories change; "50,000" is no longer split in two.
+- **Honest replies:** every thing asked is measured on the new plan and reported as done or not met, with why.
+- Scored on 81 test edits: 65 fully right with or without the AI (was 17 without, 47 with). 88 test sites pass with no warnings; the full test suite passes.
+
 ### 5:58 PM CT: Parking round 7: main entry drives cleared of parking (`0c58cfc`)
 - **No parking spaces backing into the first 200 ft of the main entry drive** where it costs nothing: the spaces move to spare room, to the free side of an existing drive or to the ends of rows, and only if walks stay as short, entrances stay clear and the landscape standard still holds. On the test sites such spaces went from 460 to 378 (e.g. a mixed-use lot 18 → 0, a big box 24 → 4).
 - Fuller lots with no spare room keep their spaces, rather than take a longer walk.
