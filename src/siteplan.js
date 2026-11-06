@@ -10,6 +10,7 @@ import * as PF from './lib/proforma.mjs';
 import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
 import { BUILDING_TYPES, BUILDING_GROUPS, typeById, fromType } from './lib/buildings.mjs';
 import * as ED from './lib/siteedit.mjs';
+import * as ER from './lib/editread.mjs';
 import { freeRect as openArea, fitPadding, planSections } from './lib/planview.mjs';
 import * as RUN from './lib/planruns.mjs';
 import * as ASK from './lib/planask.mjs';
@@ -3832,15 +3833,25 @@ export function initSitePlan(ctx) {
     const ask = (ed.chg || '').trim(); if (!ask) { ctx.toast('Say what to change, e.g. “make Apt Bldg 7 four stories”.'); card.querySelector('#spChg')?.focus(); return; }
     if (ed.run) { ctx.toast('Wait for the run under way, or Cancel it.'); return; }
     const off = aiOff(), run = startRun('change', [off ? 'Reading your words' : 'Reading the plan and your request', 'Making the changes'], '#spChgGo'); if (!run) return;
-    const sel = ed.sel; let ops = [], mix = null, names = null, stn = null, full = false, note = '', question = null, byAi = false; // (stn: street names on or off, and a theme)
+    const sel = ed.sel; let ops = [], mix = null, names = null, stn = null, full = false, note = '', question = null, byAi = false, R = ER.readEdit(ask, pl, { sel }); // (stn: street names on or off, and a theme; R: the words read, lib/editread.mjs)
     try {
       if (off) throw Object.assign(new Error('AI off'), { status: 503 });
       let image = null; try { image = await planImage(pl); } catch (e) { /* words and numbers only */ }
       const d = await post({ mode: 'edit', prompt: ask, site: siteInfo(p, pl), plan: ED.describePlan(pl, sel), image }, run.ctl.signal);
-      ops = d.ops || []; mix = d.homeMix?.length ? d.homeMix : null; names = d.names?.community || d.names?.parts?.length ? d.names : null; stn = typeof d.streetNames?.on === 'boolean' ? d.streetNames : null; full = d.refit === 'full'; note = d.summary || ''; question = d.question; byAi = true;
-    } catch (e) { if (!live(run)) return; names = ED.guessNames(ask, pl, sel); const said = names ? names.rest : ask; ops = said ? ED.guessEdits(said, pl, sel) : []; mix = said ? ED.guessMix(said, pl) : null; full = /\bre-?(?:fit|lay)/i.test(ask); note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; } // (names first: "call the neighbourhood…" never renames a piece; the rest of the words are edits)
+      R = ER.mergeReads(R, ER.fromAI(d, pl)); stn = typeof d.streetNames?.on === 'boolean' ? d.streetNames : null; note = d.summary || ''; question = d.question; byAi = true; // (the AI's reading merged with the words' own: lib/editread.mjs, the same as the MCP's plan_edit)
+    } catch (e) { if (!live(run)) return; note = (e.status === 503 ? 'AI isn’t set up on this site, so ' : 'The AI didn’t answer, so ') + 'this read your words directly.'; } // (the words' own reading, lib/editread.mjs readEdit: names first, "call the neighbourhood…" never renames a piece)
+    ops = [...R.ops, ...R.adds.map(a => ER.addOp(pl, a)).filter(x => x.op).map(x => x.op)]; mix = R.mix; names = R.names; full = R.refit || /\bre-?(?:fit|lay)/i.test(ask);
+    const lockIds = new Set(R.locks.filter(l => l.lock).map(l => l.id)), relayAsk = ER.relays(R); // locks, and a change to the program or settings (laid out again below)
     if (!live(run) || PL() !== pl) return;
     const hm = mix && pl.recipe ? ED.withHomeMix(pl, mix) : null; // (a plan drawn by hand has no layout to lay the lots out again with)
+    if (!live(run) || PL() !== pl) return;
+    if (lockIds.size || R.locks.some(l => !l.lock)) change(x => { for (const e of x.elements) { if (lockIds.has(e.id)) { e.locked = true; e.pinned = true; } else if (R.locks.some(l => !l.lock && l.id === e.id)) delete e.locked; } }); // (locked: edits and re-fits leave them as they are)
+    if (relayAsk) { // the program or settings changed (a count, a size, the stories, the parking, setbacks, a place for the pond…): laid out again with them, locked pieces kept
+      const PC = ER.programChange(pl, R), S0 = ER.withSettings(PC.plan, PC.settings), did = [...S0.did, ...PC.did.filter(x => !S0.did.includes(x))], locked = pl.elements.filter(e => e.locked).map(clone);
+      if (did.length) { endRun(run); change(x => { x.program = S0.plan.program; x.setbacks = S0.plan.setbacks; x.params = S0.plan.params; x.elements = [...x.elements.filter(e => !e.locked), ...locked.map((e, i) => ({ ...T.areaPiece(x, 'keepout', SP.outline(e).map(q => [q[0], q[1]]), 'lockhold' + i), name: 'Locked: ' + ED.labelOf(e), lockHold: true }))]; });
+        const okR = await resolve({ force: true, src: '#spChgGo' }), pl2 = PL(); if (pl2) { pl2.elements = [...pl2.elements.filter(e => !e.lockHold && !locked.some(l => l.id === e.id)), ...locked]; save(P()); draw(); }
+        const V = pl2 ? ER.verifyRead(R, pl, pl2) : []; ed.chgNote = okR ? 'Laid out again with ' + did.join(', ') + '. ' + [...PC.bad, ...S0.bad, ...V.filter(v => !v.ok).map(v => v.line.replace(/^✗ /, ''))].join(' ') : 'Nothing fits with ' + did.join(', ') + '.'; ed.chg = ''; panel(); return; } }
+    if (!ops.length && !hm && !names && !stn && lockIds.size) { ed.chgDone = null; ed.chgNote = 'Locked ' + R.locks.filter(l => l.lock).map(l => l.name).join(', ') + ': edits and re-fits leave ' + (lockIds.size > 1 ? 'them' : 'it') + ' as ' + (lockIds.size > 1 ? 'they are' : 'it is') + '.'; ed.chg = ''; save(P()); endRun(run); panel(); return; }
     if (!ops.length && !hm && !names && !stn) { ed.chgDone = null; ed.chgNote = question || (mix ? 'This plan was drawn by hand, so its homes can’t be laid out again with a new mix: change the Home mix in Settings and build new layouts.' : (byAi ? 'The AI didn’t find anything on the plan to change for that.' : note) + ' Name the piece as it’s labelled (“Apt Bldg 7”), select it and say “it”, or say what to change across the site (“all the apartments 3 stories”, “no 3-story homes”).'); endRun(run); return; }
     full = (full || ed.chgFit || !!hm) && !!pl.recipe; runStep(run, 2);
     const depth = ed.undo.length, was = pl.elements.slice(), prog0 = pl.program, recipe0 = pl.recipe; // to undo it, and to show what went

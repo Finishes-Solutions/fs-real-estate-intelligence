@@ -263,3 +263,30 @@ them": no count read, and TY33's 200 apartments grown to 432 beside the hotel).
 
 Calls: 153 before, 153 + 153 after (two full runs), 10 fresh, 5 re-runs of fixed cases, 1 smoke test: about 475, about
 $0.87 at gpt-6-luna prices (tokens counted from the replies: about 5.4 M in, 0.65 M out).
+
+## Edit requests (LAYOUT-ENGINE.md item 41)
+
+The words typed after a plan exists, through the MCP's plan_edit (the same reading the app's Change With AI uses:
+lib/editread.mjs). 81 edits on 7 base plans (test/fixtures/edit-corpus.mjs), scored by scripts/edit-corpus.mjs on the
+edited plan's geometry; live by test/edit-eval-live.mjs (gpt-6-luna, the app's edit step). "Before" for the AI path is
+with the MCP's edit mode fixed (before it, plan_edit never reached the AI: its live score was the words path's 17).
+
+| Category | Edits | Words before | Words after | Live before | Live after |
+|---|---|---|---|---|---|
+| move | 10 | 4 | 6 | 6 | 6 |
+| resize / count | 12 | 1 | 12 | 8 | 12 |
+| swap / add / remove | 11 | 4 | 9 | 10 | 10 |
+| parking | 8 | 1 | 5 | 1 | 5 |
+| settings | 6 | 4 | 6 | 6 | 6 |
+| vague | 10 | 0 | 9 | 2 | 9 |
+| messy | 10 | 2 | 8 | 6 | 7 |
+| multi | 7 | 0 | 4 | 3 | 4 |
+| lock | 7 | 1 | 6 | 5 | 6 |
+| all (fully right) | 81 | 17 | 65 | 47 | 65 |
+| outcome checks met | | 40% | 88% | 69% | 88% |
+| misses said in the reply | | 57 / 64 | 15 / 16 | 22 / 34 | 13 / 16 |
+
+Fresh 15 (FRESH, written after tuning, scored once): words 12 / 15 (missed F02 a 30 ft shift held back by building
+spacing, said; F09 diagonal parking on the retail layout, said; F13 "hotel to 140 rms"), live 13 / 15 (F02, F09).
+Calls: 75 before, 81 after, 15 fresh, 2 smoke: about 175, about $0.37 (tokens from the replies: about 3.0 M in, 0.13 M out).
+Still missed after: see LAYOUT-ENGINE.md item 41.

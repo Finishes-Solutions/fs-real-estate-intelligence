@@ -520,7 +520,7 @@ async function program(b, key, res) {
 
 // The same modes in-process, for the MCP server's site_plan tool (lib/mcp/siteplan.mjs): no same-origin or per-browser
 // rate check (the MCP endpoint has its own), the answer captured instead of sent -> { status, body, model }
-const MODES = { review, bestuse: bestUse, strategy, program: (b, key, res) => program(b, key, res) };
+const MODES = { review, bestuse: bestUse, strategy, edit, program: (b, key, res) => program(b, key, res) }; // (edit: the MCP's plan_edit reads words through the same Change With AI step as the app)
 export async function siteAI(b) {
   const out = { status: 200, body: null, model: null }, hdr = {};
   const res = { statusCode: 200, setHeader(k, v) { hdr[k] = v; }, getHeader: k => hdr[k], status(c) { this.statusCode = c; return this; }, json(d) { out.status = this.statusCode; out.body = d; return this; } };
@@ -584,7 +584,7 @@ async function bestUse(b, key, res) {
 const nul = (t, extra = {}) => ({ type: [t, 'null'], ...extra });
 const EVERY = [...Object.keys(USES), 'building', 'pool', 'play', 'court', 'green', 'plaza', 'pond', 'garage', 'patio']; // what an edit on every piece of a sort can name
 export const EDIT_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['ops', 'homeMix', 'names', 'streetNames', 'refit', 'summary', 'question'],
+  type: 'object', additionalProperties: false, required: ['ops', 'whole', 'locks', 'homeMix', 'names', 'streetNames', 'refit', 'summary', 'question'],
   properties: {
     ops: { type: 'array', description: 'The edits, in order.', items: { type: 'object', additionalProperties: false, required: ['action', 'target', 'every', 'floorsOver', 'with', 'type', 'kind', 'use', 'name', 'floors', 'units', 'gfa', 'w', 'd', 'x', 'y', 'turn', 'turnBy', 'boulevard', 'signs', 'curve', 'end', 'street'], properties: {
       action: { type: 'string', enum: ['change', 'remove', 'add', 'move', 'swap', 'relay', 'culdesac', 'bend'] },
@@ -604,6 +604,16 @@ export const EDIT_SCHEMA = {
       curve: nul('number', { description: 'bend: how far the street bows sideways at its middle, ft, + to the left of its way on the drawing; null for the usual (about 6% of its length)' }),
       end: nul('string', { enum: ['start', 'end', null], description: 'culdesac: which end (plan.streets from / to); null: a dead end, else the end farther from the main entry' }),
       street: nul('string', { description: 'change on a street from plan.streets: its new street name, base and suffix ("Heritage Parkway")' }) } } },
+    whole: { type: 'object', additionalProperties: false, description: 'Changes across the whole plan, laid out again by the app (not by moving pieces): leave every field null that the request doesn’t ask for.', required: ['units', 'addUnits', 'floors', 'gfaUse', 'gfa', 'keys', 'swapFrom', 'swapTo', 'density', 'openSpace', 'useMoreLand', 'setbacks', 'parkingPerUnit', 'parkingPer1000', 'parkingAngle', 'addSpaces', 'parkingPlace', 'fixParking', 'places'], properties: {
+      units: nul('integer', { description: 'the homes / apartments in all, when they give a count ("cut it to 180 units")' }), addUnits: nul('integer', { description: 'homes more (+) or fewer (−) than now ("add 20 more units": 20)' }),
+      floors: nul('integer', { description: 'every building of the main use this many stories ("make it 4 stories")' }), gfaUse: nul('string', { enum: [...Object.keys(USES), null] }), gfa: nul('integer', { description: 'that use’s floor area, sq ft ("drop the retail to 15k": retail 15000)' }),
+      keys: nul('integer', { description: 'the hotel’s keys / rooms' }), swapFrom: nul('string', { enum: [...Object.keys(USES), null] }), swapTo: nul('string', { enum: [...Object.keys(USES), null], description: 'one use for another across the plan ("swap the townhomes for duplexes")' }),
+      density: nul('string', { enum: ['more', 'less', null], description: 'denser / less dense, less crowded, too tight, back it off' }), openSpace: nul('boolean', { description: 'more open space or green' }), useMoreLand: nul('boolean', { description: 'use more of the site / build it out' }),
+      setbacks: { type: ['object', 'null'], additionalProperties: false, required: ['front', 'side', 'rear'], properties: { front: nul('number'), side: nul('number'), rear: nul('number') } },
+      parkingPerUnit: nul('number', { description: 'spaces a home' }), parkingPer1000: nul('number', { description: 'spaces a 1,000 sf' }), parkingAngle: nul('integer', { enum: [45, 60, 90, null], description: 'angled parking: 60 unless they say 45; 90 for straight' }),
+      addSpaces: nul('integer', { description: 'more parking spaces ("add 30 spaces"; "more parking": about a tenth more)' }), parkingPlace: nul('string', { enum: ['behind', 'front', null], description: 'the parking behind / in front of the buildings' }), fixParking: nul('boolean', { description: 'the parking is short or doesn’t work: lay it out to meet the count' }),
+      places: { type: 'array', description: 'a big piece or a use’s buildings moved to a part of the site, which the app lays out again (the pond, the hotel, the retail, the apartments, the warehouse): e.g. { subject: "pond", rel: "front" }, { subject: "hotel", rel: "back" }, { subject: "pond", rel: "corner", edge: "northeast" }', items: { type: 'object', additionalProperties: false, required: ['subject', 'rel', 'edge'], properties: { subject: { type: 'string', enum: ['pond', 'retail', 'restaurant', 'office', 'medical', 'hotel', 'industrial', 'multifamily', 'townhomes', 'duplex', 'parking'] }, rel: { type: 'string', enum: ['front', 'back', 'middle', 'corner', 'edge'] }, edge: nul('string', { enum: ['front', 'back', 'side', 'left', 'right', 'north', 'south', 'east', 'west', 'northeast', 'northwest', 'southeast', 'southwest', null] }) } } } } },
+    locks: { type: 'array', description: 'ids of pieces to keep exactly where and as they are ("keep building 1 where it is", "don’t touch the retail", "lock the pool")', items: { type: 'string' } },
     homeMix: { type: 'array', description: 'The single-family homes on lots by stories, when the request changes their stories across the site (e.g. no 3-story homes: the 1- and 2-story shares only). Empty for no change.', items: { type: 'object', additionalProperties: false, required: ['stories', 'pct'], properties: { stories: { type: 'integer', enum: [1, 2, 3] }, pct: { type: 'number', description: 'share of the homes, %' } } } },
     names: { type: 'object', additionalProperties: false, required: ['community', 'parts'], description: 'names for the development and its parts (plan.parts); community null and parts empty when the request doesn’t name anything', properties: {
       community: nul('string', { description: 'the whole development’s name ("call it Beacon Hill"), or null' }),
@@ -639,6 +649,10 @@ export const EDIT_SYSTEM = `You edit a concept site plan the way a land planner 
 - Homes on lots (use sfr): houses.byStories counts them by stories and houses.mix is their mix; on a big neighbourhood they aren't listed. Their stories change through homeMix, never by ops: each home's lot is sized for its stories, so the app lays the lots out again along the same streets. "Only 1- and 2-story homes, no 3-story" is homeMix with the 1- and 2-story shares of houses.mix scaled up to 100 and no 3-story; "all single-story" is 1-story at 100. Townhomes and duplexes are buildings: use every.
 - The summary says only what the ops and homeMix do. If nothing you can do matches the request, give no ops, say so in question, and never claim a change you didn't make.
 - Pods: on a plan laid out in pods (plan.pods: each pod's id, name, use, acres, where and what streets it faces), "redo / re-lay the apartments" is action relay with target that pod's id (with use, units (homes, apartments) or gfa (shops, offices: sq ft) when they change what it holds: "make the north section townhomes" is relay with use townhomes; "make the retail pod 80,000 sf" is relay with gfa 80000; "make the apartments pod 4 stories" is relay with floors 4); "rename the north section The Lakes" is action change on that pod's id with name; "swap the apartments and the retail" is action swap with target and with the two pod ids. The app lays those pods out again; the rest of the plan stays. Never move single buildings to fake it.
+- Changes across the whole plan go in whole, never faked by changing or moving a handful of pieces: a count of homes ("add 20 more units": addUnits 20; "cut the apartments to 180": units 180), the stories of all the buildings ("make it 4 stories": floors 4), a use's floor area ("drop the retail to 15k": gfaUse retail, gfa 15000), the hotel's keys, one use for another (swapFrom / swapTo), vague asks ("make it denser": density more; "less crowded", "too dense", "back it off": density less; "more open space": openSpace; "use more of the site": useMoreLand), setbacks, the parking rule, angle, count (addSpaces), place (parkingPlace) and "fix the parking" (fixParking). The app lays the site out again with them, keeping the locked pieces. One building's stories or size ("make Apt Bldg 7 four stories") stays an op on that piece.
+- Moving the pond or a use's buildings ("move the pond to the front", "put the hotel at the back", "parking behind the buildings") is whole.places (the app lays them out there); moving a pool, clubhouse, playground, dog park, courts or one building is an op.
+- Locks: "keep X where it is", "lock X", "don't touch X", "leave X alone" put X's ids in locks; never change a locked piece (pinned / locked in the list) and never list an op on it.
+- Several asks in one sentence are several ops (and whole fields): do every one.
 - Never invent ids. If it's unclear which piece they mean, ask one short question instead.`;
 // where things are on the drawing (lib/siteedit.mjs placesOf), as the browser sent it: points and names only, kept small
 const pt = v => Array.isArray(v) && v.length >= 2 && v.slice(0, 2).every(x => Number.isFinite(+x)) ? v.slice(0, 2).map(x => Math.round(+x)) : null;
@@ -656,6 +670,19 @@ const mixIn = m => (Array.isArray(m) ? m : []).filter(t => [1, 2, 3].includes(t?
 function housesIn(h) {
   if (!h || typeof h !== 'object') return undefined;
   return { count: num(h.count), listed: !!h.listed, byStories: Object.fromEntries(Object.entries(h.byStories && typeof h.byStories === 'object' ? h.byStories : {}).filter(([k]) => ['1', '2', '3'].includes(k)).map(([k, v]) => [k, num(v)])), mix: mixIn(h.mix) };
+}
+// the changes across the plan from the AI (the fields it gave, each in range; lib/editread.mjs fromAI reads them)
+const PLACE_SUBJ = ['pond', 'retail', 'restaurant', 'office', 'medical', 'hotel', 'industrial', 'multifamily', 'townhomes', 'duplex', 'parking'], PLACE_REL = ['front', 'back', 'middle', 'corner', 'edge'], PLACE_EDGE = ['front', 'back', 'side', 'left', 'right', 'north', 'south', 'east', 'west', 'northeast', 'northwest', 'southeast', 'southwest'];
+export function wholeIn(w) {
+  if (!w || typeof w !== 'object') return {}; const o = {}, n = (k, lo, hi, int = true) => { const v = w[k]; if (v != null && Number.isFinite(+v) && +v >= lo && +v <= hi) o[k] = int ? Math.round(+v) : +v; };
+  n('units', 1, 5000); n('addUnits', -5000, 5000); if (o.addUnits === 0) delete o.addUnits; n('floors', 1, 60); n('gfa', 500, 5e6); n('keys', 1, 3000); n('parkingPerUnit', 0.2, 4, false); n('parkingPer1000', 0.5, 30, false); n('addSpaces', 1, 3000);
+  if (o.gfa && USES[w.gfaUse]) o.gfaUse = w.gfaUse; else delete o.gfa;
+  if (USES[w.swapFrom] && USES[w.swapTo] && w.swapFrom !== w.swapTo) { o.swapFrom = w.swapFrom; o.swapTo = w.swapTo; }
+  if (w.density === 'more' || w.density === 'less') o.density = w.density; for (const k of ['openSpace', 'useMoreLand', 'fixParking']) if (w[k] === true) o[k] = true;
+  if ([45, 60, 90].includes(+w.parkingAngle)) o.parkingAngle = +w.parkingAngle; if (w.parkingPlace === 'behind' || w.parkingPlace === 'front') o.parkingPlace = w.parkingPlace;
+  const sb = w.setbacks && typeof w.setbacks === 'object' ? Object.fromEntries(['front', 'side', 'rear'].filter(k => w.setbacks[k] != null && Number.isFinite(+w.setbacks[k]) && +w.setbacks[k] >= 0 && +w.setbacks[k] <= 500).map(k => [k, +w.setbacks[k]])) : {}; if (Object.keys(sb).length) o.setbacks = sb;
+  const pl = (Array.isArray(w.places) ? w.places : []).filter(p => PLACE_SUBJ.includes(p?.subject) && PLACE_REL.includes(p?.rel)).slice(0, 6).map(p => ({ subject: p.subject, rel: p.rel, ...(PLACE_EDGE.includes(p.edge) ? { edge: p.edge } : {}) })); if (pl.length) o.places = pl;
+  return o;
 }
 // names from the AI: the community's, and parts by index (at most 8, each a name that isn't empty), each at most 60 characters
 const nameOut = v => typeof v === 'string' && v.trim() ? clip(v.trim().replace(/\s+/g, ' '), 60) : null;
@@ -685,7 +712,8 @@ async function edit(b, key, res) {
     const names = namesIn(d.names), streetNames = typeof d.streetNames?.on === 'boolean' && nst.length ? { on: d.streetNames.on, theme: clip(d.streetNames.theme || '', 80) } : null;
     res.setHeader('Cache-Control', 'no-store');
     const any = ops.length || homeMix.length || names.community || names.parts.length || streetNames;
-    return res.json({ ops, homeMix, names, streetNames, refit: d.refit === 'full' ? 'full' : 'none', summary: any ? clip(d.summary, 500) : '', question: any ? null : clip(d.question || '', 300) || null });
+    const whole = wholeIn(d.whole), locks = (Array.isArray(d.locks) ? d.locks : []).filter(x => ids.has(x)).slice(0, 60), any2 = any || Object.keys(whole).length || locks.length;
+    return res.json({ ops, whole, locks, homeMix, names, streetNames, refit: d.refit === 'full' ? 'full' : 'none', summary: any2 ? clip(d.summary, 500) : '', question: any2 ? null : clip(d.question || '', 300) || null });
   } catch (e) {
     console.error('siteplan edit', e.message);
     return res.status(502).json({ error: 'The AI didn’t answer just now.' });
