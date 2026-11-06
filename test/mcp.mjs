@@ -375,6 +375,13 @@ const c2 = await connect({ Authorization: 'Bearer amp-secret-token' }); assert.o
 delete process.env.MCP_ACCESS_TOKEN;
 // GET / DELETE: 405
 for (const method of ['GET', 'DELETE']) { const x = await realFetch(URL0, { method }); assert.equal(x.status, 405); assert.equal((await x.json()).error.code, -32000); }
+// GET ?catalog=1: the tool list for Settings, every tool once with a group, the write tools marked
+{ const x = await realFetch(URL0 + '?catalog=1'); assert.equal(x.status, 200); const d = await x.json(), names = d.tools.map(t => t.name);
+  assert.equal(new Set(names).size, names.length); assert.ok(names.length >= 60 && names.includes('site_plan') && names.includes('fetch'));
+  const groups = new Set(d.groups.map(g => g.id)); assert.ok(d.tools.every(t => groups.has(t.group) && t.title && t.description.length > 20), 'every tool grouped and described');
+  assert.equal(d.tools.find(t => t.name === 'create_project').write, true); assert.equal(d.tools.find(t => t.name === 'flood').write, false);
+  assert.equal(d.tools.find(t => t.name === 'report_flood').group, 'reports'); assert.equal(d.tools.find(t => t.name === 'plan_set').group, 'drawings'); assert.equal(d.tools.find(t => t.name === 'set_assumptions').group, 'projects');
+  assert.ok(!JSON.stringify(d).includes('inputSchema')); }
 assert.ok(LIMITS.report.perMinute < LIMITS.data.perMinute, 'reports are limited tighter');
 console.log('mcp auth ok');
 

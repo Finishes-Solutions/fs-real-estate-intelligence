@@ -1,11 +1,11 @@
 // Settings: one sheet for everything you set once and forget. The app-bar gear, the phone's More › Settings and
 // Explore gear, ⌘, / Ctrl+, and ctx.openSettings(section) all open it. Desktop: a 420px sheet on the right over a scrim;
-// phones: full screen. Sections: You & your team · Map · AI model · Saved on this device · App · Help. (The app is light only.)
+// phones: full screen. Sections: You & your team · Map · AI model · Connect an AI assistant (MCP) · Saved on this device · App · Help. (The app is light only.)
 // Options shown elsewhere (the Layers panel's map display, the panel's headline metrics) stay where they are and are
 // linked from here. Nothing here deletes notes, projects or the team's sync queue.
 import { PROVIDERS, MODEL_KEY, PLANSET_MODEL_KEY, PLANSET_EFFORT_KEY, EFFORTS, pickedClaude, pickedEffort, SITEPLAN_PROVIDER_KEY, SITEPLAN_CLAUDE_KEY, AI_FEATURES, aiPickKey, readPick, aiRequest } from './lib/aimodels.mjs';
 import { summarize, priceOf, checkPrice, costOf, PRICES_AS_OF } from './lib/aiprices.mjs';
-const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help'], ['danger', 'Testing · danger zone', 'Testing']];
+const SECTIONS = [['team', 'You & your team', 'Team'], ['map', 'Map', 'Map'], ['ai', 'AI model', 'AI'], ['mcp', 'Connect an AI assistant (MCP)', 'MCP'], ['saved', 'Saved on this device', 'Saved'], ['app', 'App', 'App'], ['help', 'Help', 'Help'], ['danger', 'Testing · danger zone', 'Testing']];
 export const BASES = { dots: 'Default', streets: 'Streets', sat: 'Satellite', topo: 'Topo', esri: 'ESRI imagery', free: 'Free Map' };
 const BASE_KEY = 'fs-basemap';
 // Reset layout clears only these (never localStorage.clear()): panel open/closed and width, assistant width, which
@@ -100,6 +100,39 @@ export function initSettings(ctx) {
     const rs = el.querySelector('#setPriceReset'); if (rs) rs.onclick = () => { try { localStorage.removeItem(PRICE_KEY); } catch (e) {} paintSec('ai'); ctx.toast('Prices back to the list prices.'); };
   }
 
+  // ---------- Connect an AI assistant (Settings › MCP): the server address, how to connect each app, every tool ----------
+  // The tool list comes from the server itself (GET api/mcp?catalog=1, lib/mcp/server.mjs catalog), so it never drifts.
+  let mcp = null, mcpP = null, mcpErr = '';
+  const loadMcp = () => mcpP ||= fetch('api/mcp?catalog=1').then(async r => { if (!r.ok) throw new Error(); mcp = await r.json(); })
+    .catch(() => { mcpErr = 'Couldn’t load the tool list just now.'; mcpP = null; }).finally(() => paintSec('mcp'));
+  const copyText = async (t, what) => { try { await navigator.clipboard.writeText(t); ctx.toast(what + ' copied.'); } catch (e) { prompt('Copy this', t); } };
+  function mcpHtml() {
+    if (!mcp && !mcpP && !mcpErr) loadMcp();
+    const url = location.origin + '/api/mcp', code = t => '<code class="set-code">' + esc(t) + '</code>';
+    const cli = 'claude mcp add --transport http fs-real-estate ' + url, json = JSON.stringify({ mcpServers: { 'fs-real-estate': { url } } }, null, 2);
+    const cp = (t, what) => '<button type="button" class="btn sm" data-copy="' + esc(t) + '" data-what="' + esc(what) + '">Copy</button>';
+    const how = (title, steps) => '<details class="set-how"><summary>' + title + '</summary><ol>' + steps.map(x => '<li>' + x + '</li>').join('') + '</ol></details>';
+    const state = !mcp ? '' : mcp.signIn ? 'Sign-in is on: people connect with the address alone and type the team passcode your admin gives you.' + (mcp.writes ? '' : ' Project changes are off on this server, so assistants can only read.')
+      : 'Sign-in isn’t turned on here yet (your admin sets the connection secret and passcode on the deployment), so for now only the project app’s agents connect, with their access token.';
+    let tools = '<div class="set-note">' + (mcpErr ? esc(mcpErr) : 'Loading the tool list…') + '</div>';
+    if (mcp) {
+      const W = mcp.tools.filter(t => t.write).length;
+      tools = '<div class="set-hint">' + mcp.tools.length + ' tools. Every one only reads, except the ' + W + ' marked <span class="set-w">changes projects</span>, which show up only when project changes are allowed (and site plan, which saves to a project only when given one).</div>' +
+        mcp.groups.map(g => { const ts = mcp.tools.filter(t => t.group === g.id); return ts.length ? '<details class="set-tools"><summary>' + esc(g.label) + ' <span>' + ts.length + '</span></summary><dl>' +
+          ts.map(t => '<div><dt>' + code(t.name) + ' <b>' + esc(t.title) + '</b>' + (t.write ? ' <span class="set-w">changes projects</span>' : '') + '</dt><dd>' + esc(t.description) + '</dd></div>').join('') + '</dl></details>' : ''; }).join('');
+    }
+    return row('Server address', cp(url, 'Address'), code(url)) +
+      '<div class="set-note">Your own Claude or ChatGPT (or any app that takes a remote MCP server) can use this app’s data and the team’s projects: properties, flood, terrain, demographics, market, filings, crime, reports, site plans, plan sets, renderings and feasibility studies. ' + state + '</div>' +
+      '<span class="set-l" style="display:block;margin:14px 0 4px">How to connect</span>' +
+      how('Claude (web, desktop and phone)', ['Open claude.ai → <b>Settings → Connectors → Add custom connector</b>.', 'Name it (for example “FS Real Estate”) and paste the server address.', 'Leave the advanced OAuth fields empty: Claude registers itself.', '<b>Add</b>, then <b>Connect</b>. Claude sends you to the Finishes Solutions sign-in page.']) +
+      how('ChatGPT', ['Open <b>Settings → Connectors → Advanced</b> and turn on <b>Developer mode</b>.', 'Choose <b>Create</b>, name it and paste the server address.', 'Authentication: <b>OAuth</b>. Leave the client id and secret empty.', '<b>Create</b>. ChatGPT sends you to the same sign-in page.']) +
+      how('Claude Code', ['In a terminal: ' + code(cli) + ' ' + cp(cli, 'Command'), 'In Claude Code, type ' + code('/mcp') + ', pick <b>fs-real-estate</b> and sign in.']) +
+      how('Cursor, VS Code and other apps', ['Add a remote (HTTP) MCP server with the address. Most apps take a config like:<pre class="set-code">' + esc(json) + '</pre>' + cp(json, 'Config'), 'Connect, and sign in when the app opens the sign-in page. An app without sign-in can use an access token instead (ask your admin).']) +
+      how('The project app’s agents (AMP)', ['Your admin gives AMP the server address and the shared access token.', 'AMP sends it as ' + code('Authorization: Bearer <token>') + '. With the token the project tools are on unless your admin turned project changes off.']) +
+      how('On the sign-in page', ['Type the team passcode your admin gives you.', 'Tick <b>Also let it change projects</b> to let the assistant start projects, lay out site plans and change assumptions, budgets and scenarios. Leave it unticked and it can only read.', '<b>Connect</b>. The connection renews itself for 30 days, then asks again. Ten tries a minute.']) +
+      '<span class="set-l" style="display:block;margin:14px 0 4px">Every tool</span>' + tools;
+  }
+
   // ---------- voice log (also linked from Data & help) ----------
   ctx.saveVoiceLog = () => {
     const t = ctx.voiceLog?.() || '';
@@ -180,6 +213,11 @@ export function initSettings(ctx) {
       el.querySelectorAll('[data-aiprov]').forEach(s => s.onchange = e => { const id = s.dataset.aiprov; save(id, { provider: e.target.value, model: '' }); ctx.toast(nameOf(id) + ' will use ' + provLabel(e.target.value) + ' on this device.'); paintSec('ai'); el.querySelector('[data-aiprov="' + id + '"]')?.focus(); });
       el.querySelectorAll('[data-aimodel]').forEach(s => s.onchange = e => { const id = s.dataset.aimodel, pk = pickOf(id); save(id, { provider: pk.provider, model: e.target.value }); ctx.toast(nameOf(id) + ' will use ' + (e.target.value || 'the server’s default model') + ' on this device.'); });
       wireUsage(el);
+    },
+    mcp(el) {
+      const open = [...el.querySelectorAll('details')].map(d => d.open); el.innerHTML = mcpHtml();
+      el.querySelectorAll('details').forEach((d, i) => { if (open[i]) d.open = true; });
+      el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy, b.dataset.what));
     },
     saved(el) {
       const n = { searches: count('fs-saved-searches'), compare: count('fs-compare'), notes: ctx.field?.db?.notes?.length || 0, watch: ctx.field?.db?.watch?.length || 0, projects: ctx.sitePlan?.projects?.length || 0, files: count('fs-reports') };

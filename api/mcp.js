@@ -10,7 +10,7 @@
 // when the person allowed project changes at sign-in (scope write). Rate limits per caller (lib guard).
 import crypto from 'node:crypto';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createServer } from '../lib/mcp/server.mjs';
+import { createServer, catalog, TOOL_GROUPS, SERVER_INFO } from '../lib/mcp/server.mjs';
 import { writesOn } from '../lib/mcp/projects.mjs';
 import { configured as oauthOn, verifyAccess, resourceMetadataUrl, CORS } from '../lib/mcp/oauth.mjs';
 import { allow, clientIp } from './_lib/guard.mjs';
@@ -38,6 +38,12 @@ export default async function handler(req, res) {
   for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
   res.setHeader('Access-Control-Expose-Headers', 'WWW-Authenticate, Mcp-Session-Id');
   if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
+  // the tool list for the website's Settings (no auth: names and descriptions only, nothing from the data). A plain GET
+  // stays 405: MCP clients GET for an event stream, which this stateless server doesn't offer.
+  if (req.method === 'GET' && /[?&]catalog=1(&|$)/.test(req.url || '')) {
+    res.statusCode = 200; res.setHeader('Content-Type', 'application/json'); res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.end(JSON.stringify({ server: SERVER_INFO, groups: TOOL_GROUPS.map(([id, label]) => ({ id, label })), tools: catalog(), signIn: oauthOn(), writes: writesOn() || (oauthOn() && process.env.MCP_WRITES !== 'off') }));
+  }
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST, OPTIONS'); return rpcError(res, 405, -32000, 'Method not allowed.'); }
   const who = authenticate(req);
   if (!who.ok) {
