@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-06
 
+### 2:46 PM CT: Agents' saved plans and long requests actually kept (`1eea3ee`)
+- **Fixed on the live site:** the storage the agents' tools use refused the kind of file they were saving, so in production nothing they tried to keep was kept: the "still working" hand-offs (agents still timed out at one minute), saved site plans (no plan id came back, so plan sets and renderings couldn't follow) and plan set progress. They are now saved in a form the storage accepts.
+- The tests now refuse the same file kinds the real storage refuses, so this can't slip through again.
+
 ### 12:08 PM CT: Agents' long requests no longer time out at one minute (`abf979d`)
 - **Site plans, plan sets, renderings and reports from a connected agent finish:** many assistants give up on a request after 60 seconds, and these could take several minutes, so the agent saw a timeout. Now every request answers within about 40 seconds.
 - **Still working, then the answer:** if the work isn't done by then, the agent gets a "still working" reply with a number to check back with (the new "call result" step); the work carries on and finishes on the server, and checking back gives the full answer, sheet PDF included.
