@@ -3,6 +3,13 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-06
+
+### 10:44 PM CT: Connect an AI assistant, in Settings (acbd19c)
+- **New Settings section, MCP:** the address for connecting your own Claude, ChatGPT or another AI app to this app's data and the team's projects, with a Copy button, and whether sign-in is turned on for the site.
+- **Setup steps for each app:** Claude, ChatGPT, Claude Code, Cursor and VS Code, the project app's agents, and what to do on the sign-in page.
+- **Every tool listed:** all 61 tools the assistant gets, grouped, each with what it does; the ones that can change projects are marked. The list comes straight from the server, so it stays current.
+
 ## 2026-11-05
 
 ### 6:59 PM CT: Edits to a plan understood and done right, in the app and for agents
