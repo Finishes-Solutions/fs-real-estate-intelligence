@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 const ST = await import('../lib/mcp/store.mjs'), C = await import('../lib/mcp/calls.mjs'), { callTool, TOOLS } = await import('../lib/mcp/server.mjs');
 
 const mem = ST.memoryStore(); ST.hooks.store = mem;
+// the bucket refuses application/json (415 in production): JSON is kept as text/plain, and the memory store refuses as it does
+await assert.rejects(mem.put('x.json', '{}', 'application/json'), /invalid_mime_type/); await ST.putJSON(mem, 'x.json', { a: 1 }); assert.deepEqual(await ST.getJSON(mem, 'x.json'), { a: 1 }); mem.m.delete('x.json');
 const bg = []; C.hooks.later = q => bg.push(q); C.hooks.replyMs = 60; C.hooks.stepMs = 5;
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 const text = r => r.content.find(c => c.type === 'text').text;
