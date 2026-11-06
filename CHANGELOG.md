@@ -3,6 +3,14 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-06
+
+### 12:08 PM CT: Agents' long requests no longer time out at one minute (`abf979d`)
+- **Site plans, plan sets, renderings and reports from a connected agent finish:** many assistants give up on a request after 60 seconds, and these could take several minutes, so the agent saw a timeout. Now every request answers within about 40 seconds.
+- **Still working, then the answer:** if the work isn't done by then, the agent gets a "still working" reply with a number to check back with (the new "call result" step); the work carries on and finishes on the server, and checking back gives the full answer, sheet PDF included.
+- **Plan sets keep going between checks:** each check answers within about 40 seconds and keeps the set going for about four more minutes, instead of holding the request open for four minutes.
+- Agents are told not to send the same request again while one is still working, so nothing is laid out twice. The full test suite passes.
+
 ## 2026-11-05
 
 ### 6:59 PM CT: Edits to a plan understood and done right, in the app and for agents

@@ -77,7 +77,7 @@ console.log('mcp plan_set without Claude ok');
 PSET.hooks.ai = goodAI;
 r = await callTool('plan_set', { plan_id: 'plan0000001' }); const held = /job_id "([\w-]+)"/.exec(text(r))[1];
 { const j = await ST.getJSON(mem, 'jobs/' + held + '/job.json'); j.lease = { by: 'someone', until: T + 600000 }; await ST.putJSON(mem, 'jobs/' + held + '/job.json', j); }
-r = await callTool('plan_set_status', { job_id: held, wait_seconds: 0 }); assert.match(text(r), /Another call is working on it right now/); assert.match(text(r), /Not finished/);
+r = await callTool('plan_set_status', { job_id: held, wait_seconds: 0 }); assert.match(text(r), /Being worked on right now/); assert.match(text(r), /Not finished/);
 r = await callTool('plan_set', { plan_id: 'nope00000000' }); assert.equal(r.isError, true); assert.match(text(r), /no saved site plan with plan_id nope00000000/);
 r = await callTool('plan_set', {}); assert.equal(r.isError, true); assert.match(text(r), /Give the plan_id a site_plan answer gave/);
 r = await callTool('plan_set', { plan_id: 'plan0000001', sections: ['civil', 'gas'] }); assert.equal(r.isError, true); assert.match(text(r), /Unknown section: gas/);
@@ -89,5 +89,18 @@ ST.hooks.store = null; { const k = process.env.SUPABASE_SECRET_KEY, k2 = process
 { const t = TOOLS.find(x => x.name === 'plan_set'); assert.ok(t.inputSchema.required.includes('plan_id')); assert.ok(t.inputSchema.properties.sections.items.enum.includes('renderings')); assert.ok(!PSET.DEFAULT_SECTIONS.includes('renderings')); assert.ok(TOOLS.some(x => x.name === 'plan_set_status')); }
 ST.hooks.store = mem; r = await callTool('plan_set', { plan_id: 'plan0000001', sections: ['renderings'] }); assert.match(text(r), /Renderings: none kept for this plan yet/); ST.hooks.store = null;
 console.log('mcp plan_set errors ok');
+// ---------- a stretch longer than the reply window: the call answers with the progress, the work goes on behind it ----------
+{ const C = await import('../lib/mcp/calls.mjs'), bg = []; C.hooks.later = q => bg.push(q); C.hooks.replyMs = 30; ST.hooks.store = mem;
+  let open, gate = new Promise(res => { open = res; }); PSET.hooks.ai = async body => { await gate; return goodAI(body); }; // Claude held until the test lets go
+  const t0 = Date.now(); r = await callTool('plan_set', { plan_id: 'plan0000001', sections: ['civil', 'arch'] });
+  assert.ok(Date.now() - t0 < 2000, 'answered within the window, not after the stretch'); assert.notEqual(r.isError, true, text(r));
+  assert.match(text(r), /Working on it on the server now/); assert.match(text(r), /Not finished\. Call plan_set_status/); assert.equal(bg.length, 1, 'the stretch in the background');
+  const id = /job_id "([\w-]+)"/.exec(text(r))[1];
+  r = await callTool('plan_set_status', { job_id: id }); assert.match(text(r), /Being worked on right now/, 'a call during the stretch waits the window, then says so');
+  open(); await Promise.all(bg.splice(0));
+  for (let k = 0; k < 8 && !/Download:/.test(text(r)); k++) { T += 1000; r = await callTool('plan_set_status', { job_id: id }); await Promise.all(bg.splice(0)); }
+  assert.match(text(r), /Download:/, 'finished across calls'); assert.ok(!(await ST.getJSON(mem, 'jobs/' + id + '/job.json')).lease, 'lease given back');
+  C.hooks.later = null; C.hooks.replyMs = null; PSET.hooks.ai = goodAI; ST.hooks.store = null; }
+console.log('mcp plan_set in the background ok');
 if (process.env.CHROME_PATH) await (await import('../lib/pdf.mjs')).closeBrowser();
 console.log('mcp plan_set tests passed');
