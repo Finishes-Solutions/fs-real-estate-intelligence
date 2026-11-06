@@ -54,6 +54,10 @@ geometry yourself. Each answer starts with a short summary and names its sources
    save_plan_to_project (or create_project + site_plan with project_id), then feasibility_study and
    feasibility_report. upload_project_file adds a survey or earlier plan to the project (the AI reads its facts; a
    person confirms them on the Files tab).
+Long calls: no call holds on longer than about 40 s. A tool still working then (site_plan at medium or high,
+plan_edit, site_renderings, reports) answers "still working" with a call_id: call call_result with it until it gives
+the answer, and never send the same request again meanwhile. plan_set answers with a job_id: call plan_set_status
+every minute or two (each call keeps the set going for about four minutes) until it gives the link.
 Never hand on a NOT READY plan without saying what fails. Concept only: not for permitting or construction.
 ```
 
