@@ -3,6 +3,14 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-08
+
+### 1:26 PM CT: Nightly data refresh fixed: clear failures, last good data kept, published through a pull request (`3e8d3a5`)
+- **Why the data stopped on November 3:** since November 4 the nightly refresh could no longer save its results (the main branch now only takes changes through a pull request), and on November 8 the state's TABS site was down for maintenance. The refresh now puts each night's data into a pull request for an administrator to approve, instead of writing straight to the site.
+- **When the state's site is down,** the refresh says exactly what happened (the status it got and what it was asking for), waits as the site asks before trying again, stops instead of hammering a site that says it is down for hours, and leaves the last good data in place. An empty or half-built set of filings is never published, including when any one county comes back nearly empty or most of the new project pages fail.
+- **Nothing is lost on a failed save:** the night's built files are kept with the run for a week.
+- The guide's Construction filings section and Recently added list say how data updates now arrive.
+
 ## 2026-11-06
 
 ### 2:46 PM CT: Agents' saved plans and long requests actually kept (`1eea3ee`)
