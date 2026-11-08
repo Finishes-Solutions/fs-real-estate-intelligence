@@ -2,10 +2,15 @@
 import fs from 'node:fs';
 const LOG = process.env.MOCK_LOG;
 const count = h => { if (LOG) fs.appendFileSync(LOG, h + '\n'); };
+const b0 = opts => new URLSearchParams(opts.body);
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(String(url)); count(u.host + u.pathname.replace(/\/TABS\d+.*$/, '/TABS*').replace(/\/geocoding\/.*/, '/geocoding'));
   if (u.pathname.endsWith('/TABS/Search/SearchProjects')) {
+    // TDLR maintenance (test/pipeline.sh): a 503 telling clients to come back in two hours, or an HTML page with a 200
+    if (process.env.MOCK_TABS_DOWN) return new Response('<html><body>TABS is down for scheduled maintenance.</body></html>', { status: 503, headers: { 'Retry-After': '7200', 'Content-Type': 'text/html' } });
+    if (process.env.MOCK_TABS_HTML) return new Response('<html><body>TABS is down for scheduled maintenance.</body></html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
+    if (process.env.MOCK_TABS_EMPTY === b0(opts).get('LocationCounty')) return json({ data: [], recordsFiltered: 0 });
     const b = new URLSearchParams(opts.body), c = b.get('LocationCounty'), d = b.get('RegistrationDateBegin'); const [m, , y] = d.split('/');
     const rows = [0, 1, 2].map(i => ({ ProjectNumber: `TABS${y}${c}${m}${i}`, ProjectName: `Project ${c}-${m}-${i}`, TypeOfWork: 9001 + (i % 3), EstimatedCost: 250000 * (i + 1) + (i === 1 ? 0.28 : 0) + (process.env.BUMP && i === 0 ? 99999 : 0),
       ProjectCreatedOn: `${y}-${m}-0${i + 1}T00:00:00`, ProjectStatus: i ? 3008 : 3001, EstimatedStartDate: i === 2 ? null : `${y}-${m}-15T00:00:00`, EstimatedEndDate: i === 0 ? `${+y + 1}-${m}-15T00:00:00` : null }));

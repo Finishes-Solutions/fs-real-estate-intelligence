@@ -7,6 +7,15 @@ mkdir -p "$T/data"; cp data/regions.json "$T/data/"; node test/fixture.mjs >/dev
 node -e "const fs=require('fs');const g=JSON.parse(fs.readFileSync('test/.data/geo.json'));const {createHash}=require('crypto');g._regions=createHash('sha1').update(JSON.stringify(JSON.parse(fs.readFileSync('data/regions.json')))+'2').digest('hex').slice(0,12);fs.writeFileSync('$T/data/geo.json',JSON.stringify(g))"
 run() { MOCK_LOG="$T/calls$1.log" DATA_DIR="$T/data/" OPENAI_API_KEY=sk-test ONLY=Waller,Austin PERIOD_START=2026-06-01 PERIOD_END=2026-08-31 ${2:-} node --import ./test/mock-net.mjs build.mjs > "$T/out$1.log" 2>&1 || { cat "$T/out$1.log"; exit 1; }; }
 run 1 "env AREA=1 AREA_NEWS_TOWNS=1"; run 2 "env BUMP=1"
+# TDLR down (a 503 maintenance page, then an HTML page with a 200): the build stops with the status in the log and data/ untouched
+sum() { sha1sum "$T/data/filings.json" "$T/data/changes.json" "$T/data/cache/tabs.json" | cut -c1-40 | tr '\n' ' '; }
+before=$(sum)
+fail() { if MOCK_LOG="$T/calls$1.log" DATA_DIR="$T/data/" OPENAI_API_KEY=sk-test ONLY=Waller,Austin PERIOD_START=2026-06-01 PERIOD_END=2026-08-31 env "${@:2}" node --import ./test/mock-net.mjs build.mjs > "$T/out$1.log" 2>&1; then echo "run $1 should have failed"; cat "$T/out$1.log"; exit 1; fi; }
+fail 3 MOCK_TABS_DOWN=1; grep -q "attempt 1/6: 503, Retry-After 7200 s" "$T/out3.log"; grep -q "asked to wait 7200 s, over the 60 s cap" "$T/out3.log"; grep -q "(TABS list Waller " "$T/out3.log"
+[ "$(grep -c SearchProjects "$T/calls3.log")" = 1 ] || { echo "a long Retry-After should stop the retries at once"; exit 1; }
+fail 4 MOCK_TABS_HTML=1; grep -q "answered 200 with something other than JSON (maintenance page?)" "$T/out4.log"
+[ "$(sum)" = "$before" ] || { echo "data changed after a failed run"; exit 1; }
+echo "tdlr down: build stopped, data kept"
 n() { grep -c "$2" "$T/calls$1.log" || true; }
 echo "run1: details $(n 1 'TABS\*') census $(n 1 census.gov/geocoder) openai $(n 1 chat/completions)"
 echo "run2: details $(n 2 'TABS\*') census $(n 2 census.gov/geocoder) openai $(n 2 chat/completions)"

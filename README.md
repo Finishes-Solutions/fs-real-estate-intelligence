@@ -44,13 +44,16 @@ GitHub Action (nightly, or manual)          Vercel (every deploy)
    ├ area context: LODES jobs, Census          tenants.js  businesses registered at an address
    │   housing permits, Comptroller new
    │   businesses, Google News (area.json)
-   └ commits data/  ──────────────push──────▶ deploy
+   └ commits data/ to the data/refresh branch
+     and opens / updates one pull request ──merge──▶ deploy
 ```
 
 - `data/regions.json`: counties (TABS id + FIPS), ring counties, bounding box, months of history. Adding a county is a JSON edit.
 - `data/filings.json`, `data/geo.json`, `data/changes.json`, `data/market.json`, `data/area.json`: what the site loads.
 - `data/cache/`: TABS details, geocodes and AI results, committed so each nightly run only fetches what's new. Files are written one entry per line so git diffs stay small.
-- The build refuses to overwrite data if TABS suddenly returns less than half of last week's filings (set `ALLOW_SHRINK=1` to force).
+- The build refuses to overwrite data if TABS suddenly returns nothing, or less than half of last run's filings in total or in any one county (`build/guard.mjs`; set `ALLOW_SHRINK=1` to force), if more than half of the new detail pages fail, or if the search answers something other than JSON (TDLR's maintenance page). The run then stops with `data/` untouched and the site keeps the last good data; nothing is ever published half-built.
+- Every request to TDLR and the other sources goes through `fetchRetry` (`build/util.mjs`): a time limit per attempt, bounded exponential backoff with jitter on 429 / 5xx / network failures, `Retry-After` honoured (a wait longer than the cap ends the run at once), no retry on other 4xx, and each failed attempt logged with the status and what it was for, never with a key or a webhook URL.
+- **Publishing:** `main` only takes changes through a pull request, so the workflow does not push to it. `scripts/publish-data.sh` commits `data/` to the `data/refresh` branch (replaced each night; it only ever holds the workflow's own commits on top of `main`, and is left alone if anyone else has committed to it) and opens one pull request, updated on later nights rather than duplicated. Merging publishes (Vercel deploys from the merge). The built files are also kept as a workflow artifact for 7 days. Set the repository variable `DATA_PR_AUTO_MERGE=true` to have the run request auto-merge (needs "Allow auto-merge" in Settings → General, and branch rules that let the Actions token merge).
 - `lib/`: code shared by the build, the functions and the browser (filter spec, use taxonomy, OpenAI client).
 
 The first full run takes a few hours (Nominatim allows one request per second); later runs take minutes.
@@ -225,7 +228,8 @@ Limits to know:
    - **Plan sets (Claude):** `ANTHROPIC_API_KEY` (type Sensitive, Production + Preview) lets Claude write each plan set's cover notes (`api/planset.js`, `lib/anthropic.mjs`). Optional `ANTHROPIC_MODEL` (default `claude-opus-5-5`; Settings › AI model › Plan sets can pick another model the key has, per device), `ANTHROPIC_EFFORT` (`low`, `medium`, `high` or `xhigh`; default `medium`) and `PLANSET_MONTHLY_CAP_USD` (default `100`, per US Central calendar month, counted from the `ai_usage` table under the Plan sets feature; `0` turns the notes off). Without the key, sets are still made, with no notes. The title block is `templates/titleblock.pdf`, made from the AutoCAD border `templates/A-XREF-BORD-V01.pdf` by `node build/titleblock.mjs` (it turns the page, covers the plot stamp and, while it's off, the firm number); field positions are in `lib/titleblock.mjs`.
 2. **GitHub → Settings → Secrets and variables → Actions**: secret `OPENAI_API_KEY`. Optional: secret `ZAPIER_DIGEST_WEBHOOK` (a Zapier catch hook gets a weekly summary of new filings), secret `MAPTILER_KEY`, secret `CENSUS_KEY`, variable `OPENAI_MODEL`.
 3. **OpenAI dashboard**: set a monthly budget cap on the project that owns the key. The site is public, so the cap is the hard spending limit.
-4. Run **Actions → Refresh data → Run workflow** once (or push a change under `build/`). The nightly schedule only runs on the default branch. The old Zapier monthly deploy hook is no longer needed.
+4. **GitHub → Settings → Actions → General**: under "Workflow permissions" tick **Allow GitHub Actions to create and approve pull requests** (the Refresh data workflow opens the nightly data pull request with the Actions token; the token itself cannot bypass the pull-request rule on `main`, and must not be given a person's credentials).
+5. Run **Actions → Refresh data → Run workflow** once (or push a change under `build/`). The nightly schedule only runs on the default branch. Merge the **Refresh data** pull request it opens to publish. The old Zapier monthly deploy hook is no longer needed.
 
 ## Environment variables (build)
 
