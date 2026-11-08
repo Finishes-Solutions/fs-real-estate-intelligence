@@ -3,6 +3,14 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-08
+
+### 1:24 PM CT: Agents lay out at high effort and revise their site plans until they're right (`f6d5a32`)
+- **High effort by default:** a site plan asked for by a connected agent is now laid out at high effort (the AI plans, reviews and may revise) unless the agent asks for less.
+- **The agent sees the plan:** every site plan and every change an agent makes comes back with a picture of the plan, not only the PDF.
+- **Review and revise:** each answer ends with a short checklist (passes the quality check, everything asked for done, the drawing reads well). If the plan falls short, the agent sends it back with the fixes in plain words, locks what's right, looks again and repeats, usually one to four rounds and at most about six, then tells you what it changed. Every round is kept, so it can go back to an earlier version.
+- The MCP tests pass, including the full agent walk-through.
+
 ## 2026-11-06
 
 ### 2:46 PM CT: Agents' saved plans and long requests actually kept (`1eea3ee`)
