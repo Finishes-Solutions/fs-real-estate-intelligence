@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-08
 
+### 2:25 PM CT: "Fix the parking" keeps the pool (`ce00714`)
+- **The pool and its plaza stay put:** when an agent asked to fix the parking on a plan, the parking was laid out again round the buildings but the pool and plaza could vanish. Now the pool, plaza, play areas and courts stay exactly where they were with the buildings; only the parking and drives move.
+- **No phantom buildings:** the same fix could leave buildings squeezed to nothing (an empty patch on the drawing, counted as extra buildings). Those are removed.
+- Checked on the real plan where it happened: parking 154 → 179 of 168 needed, pool kept, "pool in the middle" met.
+
 ### 1:24 PM CT: Agents lay out at high effort and revise their site plans until they're right (`f6d5a32`)
 - **High effort by default:** a site plan asked for by a connected agent is now laid out at high effort (the AI plans, reviews and may revise) unless the agent asks for less.
 - **The agent sees the plan:** every site plan and every change an agent makes comes back with a picture of the plan, not only the PDF.
