@@ -320,17 +320,22 @@ console.log('mcp upstream timeout ok');
   r = await call('site_plan', { ...K, request: '30,000 sf retail strip', effort: 'low', include_geojson: true }); clean(r, 'site_plan');
   { const id = /^Plan id: ([\w-]+) \(give it to plan_set/m.exec(r.text)?.[1]; assert.ok(id, 'a plan_id'); const saved = await ST.getJSON(mem, 'plans/' + id + '.json');
     assert.ok(saved.plan.elements.some(e => e.kind === 'building'), 'the picked layout saved'); assert.ok(saved.plan.ring.length >= 3); assert.match(saved.address, /24600 KATY FWY/); assert.ok(saved.facts.length, 'with the site facts'); assert.equal(saved.verdict, /Quality check: (\w[\w ]*?) \(/.exec(r.text)[1].toLowerCase()); }
+  { const img = r.content.find(x => x.type === 'image'); assert.ok(img && /^image\//.test(img.mimeType) && img.data.length > 100, 'a picture of the plan for the agent to look at');
+    assert.match(r.text, /## Review it before handing it on \(you are the reviewer\)/); assert.match(r.text, /call plan_edit with plan_id "[\w-]+"/); assert.match(r.text, /stop after about 6/); }
   ST.hooks.store = null;
   await spOf(r, 'low'); assert.match(r.text, /front [\d,]+ ft on KATY FWY/, 'the front faces I-10'); assert.match(r.text, /side street/, 'and the street on the west side');
   assert.match(r.text, /Read as: Retail · 30,000 sf/); assert.deepEqual(aiCalls.map(b => b.mode || 'program'), ['program'], 'Low: the program only');
   { const gj = JSON.parse(r.content.find(x => x.resource?.mimeType === 'application/geo+json').resource.text); assert.equal(gj.type, 'FeatureCollection'); assert.ok(gj.features.some(f => f.properties.kind === 'building' && f.properties.floorAreaSf > 0), 'buildings in the GeoJSON');
     assert.ok(gj.features.every(f => f.geometry.coordinates[0].every(([x, y]) => Math.abs(x - KATY[0]) < 0.01 && Math.abs(y - KATY[1]) < 0.01)), 'in lon/lat on the parcel'); }
   // no request: the AI's best-use ideas, the best one laid out, planned and reviewed (Medium), the drawings sent as pictures
-  aiCalls.length = 0; r = await call('site_plan', { ...K });
+  aiCalls.length = 0; r = await call('site_plan', { ...K, effort: 'medium' });
   await spOf(r, 'best use'); assert.match(r.text, /## Best-use ideas/); assert.match(r.text, /laid out #1 \(Retail strip with pads\)/); assert.match(r.text, /The AI’s pick: Faces the freeway/);
   assert.deepEqual(aiCalls.map(b => b.mode || 'program'), ['bestuse', 'strategy', 'program', 'review'], 'Medium: plan, program, review');
   { const bu = aiCalls[0]; assert.ok(bu.site.acres > 10 && bu.site.frontageFt > 500, 'the AI gets the site'); assert.ok(bu.nearby?.restaurant || Object.keys(bu.nearby || {}).length, 'and what is nearby (the app\'s places, not OpenStreetMap)');
     assert.ok(bu.facts.some(f => /FEMA flood zone/.test(f)), 'and the site facts'); const rv = aiCalls.at(-1); assert.ok(rv.options.length >= 1 && rv.options.every(o => o.metrics.floorAreaSf >= 0)); assert.match(rv.options[0].image || '', /^data:image\/jpeg;base64,/, 'drawings go with the review'); }
+  // no effort given: high (the AI plans, reads, reviews and may revise)
+  aiCalls.length = 0; r = await call('site_plan', { ...K, request: '30,000 sf retail strip' }); await spOf(r, 'default effort'); assert.match(r.text, /Effort high/, 'high by default');
+  assert.ok(aiCalls.some(b => b.mode === 'review'), 'reviewed by the AI');
   aiCalls.length = 0; r = await call('site_plan', { ...K, idea: 2, effort: 'low' }); assert.match(r.text, /laid out #2 \(Medical office\)/); assert.match(r.text, /Read as: /);
   // two parcels with a street between them (Waller, inside the City of Waller): merged as one site with the street a no-build
   // strip, laid out under the Waller guardrails, the guardrails page on the sheet
