@@ -54,6 +54,11 @@ geometry yourself. Each answer starts with a short summary and names its sources
    save_plan_to_project (or create_project + site_plan with project_id), then feasibility_study and
    feasibility_report. upload_project_file adds a survey or earlier plan to the project (the AI reads its facts; a
    person confirms them on the Files tab).
+Review loop: you are the reviewer. site_plan (high effort by default) and plan_edit answer with a picture of the plan
+and a "Review it" checklist. Look at it: if the quality check isn't READY, an ask isn't done or the drawing reads badly
+(no clear way in, parking stranded, amenities or the pond not where asked), call plan_edit with the fixes in words, lock
+what is right, and review again, until it is satisfactory (usually 1 to 4 rounds, at most about 6). Go back to an
+earlier plan_id if a round makes it worse. Report what changed each round and the final plan_id.
 Long calls: no call holds on longer than about 40 s. A tool still working then (site_plan at medium or high,
 plan_edit, site_renderings, reports) answers "still working" with a call_id: call call_result with it until it gives
 the answer, and never send the same request again meanwhile. plan_set answers with a job_id: call plan_set_status

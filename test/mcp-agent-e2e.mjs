@@ -127,7 +127,10 @@ const ent = p => { const es = SPL.entrancesOf(p.plan.elements); return es.find(e
 const d1 = dist(rec1); // (the engine already puts the clubhouse near the main entry, in front of the pool in the middle)
 { const f = (await import('../lib/siteedit.mjs')).sheetFrame(rec1.plan), pool = f.to(cen(rec1.plan.elements.find(e => e.kind === 'pool'))); assert.ok(Math.abs(pool[0] - f.width / 2) < f.width * 0.25 && Math.abs(pool[1] - f.depth / 2) < f.depth * 0.25, 'the pool in the center (' + pool.map(Math.round) + ')'); }
 r = await call('plan_edit', { plan_id: p1, words: 'move the clubhouse to the entry' });
-const p2 = idOf(r.text); assert.ok(p2 && p2 !== p1, 'a new plan id'); assert.match(r.text, /Read by: AI/); assert.match(r.text, /Moved Clubhouse/i);
+const p2 = idOf(r.text); assert.ok(p2 && p2 !== p1, 'a new plan id');
+// the agent reviews each round: a picture of the new plan and the checklist pointing plan_edit at the new id
+assert.ok(r.res.some(x => x.uri === '(image)' && /^image\//.test(x.mimeType)), 'plan_edit sends a picture of the new plan'); assert.match(r.text, /## Review it before handing it on \(you are the reviewer, round \d+\)/); assert.match(r.text, new RegExp('plan_edit with plan_id "' + p2 + '"'));
+{ const g = await call('plan_get', { plan_id: p2, include_picture: true }); assert.ok(g.res.some(x => x.uri === '(image)'), 'plan_get with include_picture'); const g2 = await call('plan_get', { plan_id: p2 }); assert.ok(!g2.res.some(x => x.uri === '(image)'), 'and only when asked'); } assert.match(r.text, /Read by: AI/); assert.match(r.text, /Moved Clubhouse/i);
 const rec2 = await ST.getJSON(mem, 'plans/' + p2 + '.json'); assert.equal(rec2.parent, p1); assert.ok(await ST.getJSON(mem, 'plans/' + p1 + '.json'), 'the plan before is kept');
 assert.notDeepEqual(cen(club(rec2)), cen(club(rec1)), 'the clubhouse moved'); assert.ok(dist(rec2) <= Math.max(d1, 260), 'beside the entry (' + Math.round(d1) + ' → ' + Math.round(dist(rec2)) + ' ft)');
 // from the back of the site, the same words with the AI off (read directly) bring it to the entry
