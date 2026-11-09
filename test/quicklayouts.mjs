@@ -1,5 +1,5 @@
 // Quick layouts (lib/quicklayouts.mjs): every request of every type, on sites from 1 to 60 acres, is read by the words
-// parser (no AI) as the use it is meant to be; the type buttons are offered only where something fits; the set is
+// parser (no AI) as the use it is meant to be, and asks for as much as fits (no fixed size that leaves land over); the type buttons are offered only where something fits; the set is
 // fixed for a site (the same requests every time); and a type's set laid out on a sample site gives real, different layouts.
 import assert from 'node:assert/strict';
 import * as Q from '../lib/quicklayouts.mjs';
@@ -23,7 +23,10 @@ for (const acres of [1, 2.5, 5.5, 11, 20, 40, 60]) for (const fr of [150, 400, 9
       const p = S.normalizeProgram(S.guessProgram(q.ask)), u = usesOf(p);
       if (t.id === 'mixed') assert.ok(u.length >= 2, q.ask + ' reads as mixed use: ' + u);
       else assert.ok(u.every(x => USE[t.id].includes(x)), q.ask + ' reads as ' + u + ' (' + t.id + ')');
-      if (/(\d[\d,]*) (?:sf|units|townhomes|apartments|keys)/.test(q.ask) && !/anchor|retail along|retail in front/.test(q.ask) && t.id !== 'mixed') assert.ok(p.gfa || p.units, q.ask + ': its number is read');
+      // the site is filled: every request asks for as much as fits, but for those whose program fills by itself (homes on
+      // lots, self storage, flex, a gas station on a small corner)
+      if (!/single[- ]family|self storage|flex buildings 120|gas station with 8 pumps/i.test(q.ask)) assert.match(q.ask, /as (?:many as fit|big as fits)/, q.ask + ': fills the site');
+      assert.ok(!p.units && !(p.gfa && !/gas station/i.test(q.ask)), q.ask + ': no fixed size (' + (p.units || p.gfa) + ')');
     }
   }
 }
