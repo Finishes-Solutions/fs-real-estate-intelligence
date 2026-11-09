@@ -3822,7 +3822,7 @@ button.sp-mx-r:hover{background:var(--chip)}
 #card .sp-parcels .chip>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Add: the pieces as tiles in their groups (groups flow side by side when they fit), then the building library */
 #card .sp-addg{display:flex;flex-wrap:wrap;gap:14px 18px}
-#card .sp-add-g{display:grid;gap:6px;flex:none;min-width:0}
+#card .sp-add-g{display:grid;gap:6px;flex:0 1 auto;min-width:0;max-width:100%} /* a group wider than the card (Paving: 6 tiles) wraps its tiles instead of pushing the card sideways */
 #card.sp-mode .sp-add-g .sp-sub{margin:0;padding:0;border:0}
 #card .sp-add-r{display:flex;flex-wrap:wrap;gap:6px}
 #card .sp-add{width:76px;min-height:64px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:7px 4px 6px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--panel);color:var(--text);font:600 11px/1.2 var(--font-display);text-align:center;cursor:var(--cur-pointer,pointer);transition:border-color var(--dur-fast,150ms),background var(--dur-fast,150ms)}
@@ -3835,7 +3835,7 @@ button.sp-mx-r:hover{background:var(--chip)}
 #card .sp-libw{position:relative;display:block}
 #card .sp-libw svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
 #card.sp-mode .sp-libw select{padding-left:34px}
-#card .sp-bt{display:grid;gap:6px;margin-top:10px}
+#card .sp-bt{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;gap:6px;margin-top:10px} /* full width (it's also a .sp-f, whose flex-end pushed it to the right) */
 #card .sp-bt .sp-fl{font-size:11.5px;color:var(--text-2)}
 #card .sp-bt input,#card.sp-mode .sp-bt .sp-libw input[type=search]{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:6px 8px 6px 34px;border:1px solid var(--line-2);border-radius:4px;background:var(--panel);color:var(--text)}
 #card .sp-btl{max-height:220px;overflow-y:auto;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--panel)}

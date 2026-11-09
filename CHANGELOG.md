@@ -23,6 +23,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Clear names:** each layout is labelled with what it is (**Layout 2 · Mid-rise, 4 stories · …**); the best one that passes every check goes on the map. If two come out the same, the copy is replaced by another choice for that kind.
 - **Build with AI** is still there underneath for anything specific.
 
+### 12:12 PM CT: Permits quick button; site plan Add panel fixed (`32fb18b`)
+- **Permits on the map's quick buttons:** a new **Permits** button, next to Filings, turns building permits on and off in one tap (the same switch as Building Permits in Map layers; zoom in to see them).
+- **The site plan's Add panel no longer scrolls sideways:** the Paving row (six tiles) was wider than the panel and pushed it sideways, cutting off its left edge. The tiles now wrap onto a second line.
+- **"Add a building by type" lines up:** the search box and list now use the panel's full width instead of sitting indented to the right.
+
 ## 2026-11-08
 
 ### 2:25 PM CT: "Fix the parking" keeps the pool (`ce00714`)

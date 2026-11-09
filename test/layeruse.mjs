@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { DEFAULT_CHIPS, DEFAULT_GROUPS, CHIP_GROUP, PANEL_KEY, parseUse, bumpUse, orderByUse, orderGroups } from '../lib/layeruse.mjs';
 
 // the shipped chip order, in any starting order, with no use yet
-const shuffled = ['radar', 'filings', 'sat', 'planes', 'parcels', 'tilt', 'traffic', 'demo', 'flood'];
-assert.deepEqual(orderByUse(shuffled, {}), ['parcels', 'flood', 'demo', 'traffic', 'sat', 'tilt', 'filings', 'planes', 'radar']);
+const shuffled = ['radar', 'permits', 'filings', 'sat', 'planes', 'parcels', 'tilt', 'traffic', 'demo', 'flood'];
+assert.deepEqual(orderByUse(shuffled, {}), ['parcels', 'flood', 'demo', 'traffic', 'sat', 'tilt', 'filings', 'permits', 'planes', 'radar']);
 assert.deepEqual(orderByUse(shuffled, {}), DEFAULT_CHIPS);
 assert.equal(DEFAULT_CHIPS.indexOf('filings') > DEFAULT_CHIPS.indexOf('tilt'), true, 'filings come after the property and area layers');
 
@@ -14,7 +14,7 @@ let use = {};
 for (let i = 0; i < 3; i++) use = bumpUse(use, 'radar');
 use = bumpUse(use, 'sat'); use = bumpUse(use, 'flood');
 assert.deepEqual(use, { radar: 3, sat: 1, flood: 1 });
-assert.deepEqual(orderByUse(DEFAULT_CHIPS, use), ['radar', 'flood', 'sat', 'parcels', 'demo', 'traffic', 'tilt', 'filings', 'planes']);
+assert.deepEqual(orderByUse(DEFAULT_CHIPS, use), ['radar', 'flood', 'sat', 'parcels', 'demo', 'traffic', 'tilt', 'filings', 'permits', 'planes']);
 // bump doesn't change its input, and ignores junk keys
 const before = { parcels: 2 }; const after = bumpUse(before, 'parcels');
 assert.deepEqual(before, { parcels: 2 }); assert.equal(after.parcels, 3);
@@ -31,8 +31,8 @@ assert.deepEqual(parseUse(JSON.stringify({ parcels: 4, flood: -1, demo: 'x', sat
 assert.deepEqual(parseUse(JSON.stringify(bumpUse(parseUse('{"demo":1}'), 'demo'))), { demo: 2 });
 
 // panel groups: a new user sees Property & site first and Construction filings near the end
-const groups = ['filings', 'property', 'env', 'util', 'demo', 'live', 'base'];
-assert.deepEqual(orderGroups(groups, {}), ['property', 'demo', 'base', 'env', 'util', 'filings', 'live']);
+const groups = ['filings', 'property', 'env', 'dev', 'util', 'demo', 'live', 'base'];
+assert.deepEqual(orderGroups(groups, {}), ['property', 'demo', 'base', 'env', 'util', 'filings', 'live', 'dev']);
 assert.deepEqual(orderGroups(groups, {}), DEFAULT_GROUPS);
 // a group's uses are the sum of its layers' uses; panel-only layers name their group through groupOf
 const groupOf = k => CHIP_GROUP[k] || { lyWetlands: 'env', lySoils: 'env' }[k];
