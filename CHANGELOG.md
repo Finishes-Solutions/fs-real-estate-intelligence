@@ -5,6 +5,24 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-09
 
+### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
+- **Hotel + retail is its own quick layout type:** one hotel building on its own parcel at one end of the frontage, sized to the land it and its parking need, and the rest of the site retail. Five versions: the hotel at either end, a 5-story hotel, retail with a pad site, or restaurant pads. It needs about 4 acres and 300 ft of frontage. **Office & hotel** is now **Office & medical**.
+- **Set the size if you want:** two optional boxes, **Buildings** and **Square feet**, under the type buttons. Blank fills the site as before; filled in, the layouts use that floor area and number of buildings (e.g. retail, 40,000 sf in 2 buildings) and the rest of the land is marked for a later phase. Square feet apply to shops, offices, warehouses and the hotel; homes are always as many as fit.
+- On an odd-shaped lot the hotel's parcel can come out short of the keys planned (e.g. 65,500 of 82,500 sf on the sample site, where it also holds its own detention pond); the layout's notes say how much fit.
+
+### 1:30 PM CT: Quick layouts fill the whole site (`ab3369c`)
+- **Every quick layout now uses the whole site:** retail, office, medical, hotel and mixed-use presets ask for as much as fits instead of a fixed size, so a 16-acre retail layout no longer leaves three quarters of the land marked "Future development".
+- **Courtyard apartments taken out of the quick set:** a courtyard building can't fill a site on its own. You can still ask for one under Build with AI.
+- **More distinct townhome layouts:** townhomes for rent with garages, for sale with driveways, stacked townhomes, duplexes and cottages, with fourplexes and a tiny home community standing in when two come out the same.
+- A request for restaurant pads "as many as fit" now reads "Pad sites as fit" instead of "NaN pad sites".
+
+### 12:26 PM CT: Quick layouts: pick a type, get five layouts in seconds (`a86e3b7`)
+- **No prompt needed:** at the top of a site plan's **Build** section there's now a button for each kind of development: Multifamily, Townhomes & BTR, Single-family, Retail, Office & hotel, Industrial and Mixed use. One click gives up to five layouts of that kind (e.g. garden, walk-up, mid-rise, courtyard and garden-round-a-pool apartments), without typing anything and without the AI.
+- **Sized to the site:** square footage, unit counts and hotel keys follow the acreage; options that need more land or street frontage are left out, and a kind with nothing that fits is greyed out with a note on how much land it needs.
+- **Fast:** the layouts are drawn several at once on your computer: a few seconds on a 5-acre site, 10–30 seconds on 15–20 acres.
+- **Clear names:** each layout is labelled with what it is (**Layout 2 · Mid-rise, 4 stories · …**); the best one that passes every check goes on the map. If two come out the same, the copy is replaced by another choice for that kind.
+- **Build with AI** is still there underneath for anything specific.
+
 ### 12:12 PM CT: Permits quick button; site plan Add panel fixed (`32fb18b`)
 - **Permits on the map's quick buttons:** a new **Permits** button, next to Filings, turns building permits on and off in one tap (the same switch as Building Permits in Map layers; zoom in to see them).
 - **The site plan's Add panel no longer scrolls sideways:** the Paving row (six tiles) was wider than the panel and pushed it sideways, cutting off its left edge. The tiles now wrap onto a second line.
