@@ -5,6 +5,11 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-09
 
+### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
+- **Hotel + retail is its own quick layout type:** one hotel building on its own parcel at one end of the frontage, sized to the land it and its parking need, and the rest of the site retail. Five versions: the hotel at either end, a 5-story hotel, retail with a pad site, or restaurant pads. It needs about 4 acres and 300 ft of frontage. **Office & hotel** is now **Office & medical**.
+- **Set the size if you want:** two optional boxes, **Buildings** and **Square feet**, under the type buttons. Blank fills the site as before; filled in, the layouts use that floor area and number of buildings (e.g. retail, 40,000 sf in 2 buildings) and the rest of the land is marked for a later phase. Square feet apply to shops, offices, warehouses and the hotel; homes are always as many as fit.
+- On an odd-shaped lot the hotel's parcel can come out short of the keys planned (e.g. 65,500 of 82,500 sf on the sample site, where it also holds its own detention pond); the layout's notes say how much fit.
+
 ### 1:30 PM CT: Quick layouts fill the whole site (`ab3369c`)
 - **Every quick layout now uses the whole site:** retail, office, medical, hotel and mixed-use presets ask for as much as fits instead of a fixed size, so a 16-acre retail layout no longer leaves three quarters of the land marked "Future development".
 - **Courtyard apartments taken out of the quick set:** a courtyard building can't fill a site on its own. You can still ask for one under Build with AI.
