@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-09
 
-### 12:12 PM CT: Permits quick button; site plan Add panel fixed (`HASH`)
+### 12:12 PM CT: Permits quick button; site plan Add panel fixed (`32fb18b`)
 - **Permits on the map's quick buttons:** a new **Permits** button, next to Filings, turns building permits on and off in one tap (the same switch as Building Permits in Map layers; zoom in to see them).
 - **The site plan's Add panel no longer scrolls sideways:** the Paving row (six tiles) was wider than the panel and pushed it sideways, cutting off its left edge. The tiles now wrap onto a second line.
 - **"Add a building by type" lines up:** the search box and list now use the panel's full width instead of sitting indented to the right.
