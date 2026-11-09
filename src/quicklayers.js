@@ -2,7 +2,7 @@
 // scrolls sideways. They work the same controls as the Map layers panel (every layer and the finer options: demographic
 // measure, crime type, filing dot size, heatmap, base maps, live weather…), so the two always agree.
 // The buttons and the panel's groups are ordered by what this person turns on most (counted per browser, lib/layeruse.mjs);
-// a new user gets parcels, flood zones, demographics, traffic, satellite and 3D first, then filings and the live feeds.
+// a new user gets parcels, flood zones, demographics, traffic, satellite and 3D first, then filings, permits and the live feeds.
 // This file also keeps the panel's counts: the [Layers · N] button, the panel header, its "On now" list and each group's
 // count, all from activeLayers() (every layer drawing data on the map; display settings like roads or 3D buildings don't count).
 import { parseUse, bumpUse, orderByUse, orderGroups, CHIP_GROUP, PANEL_KEY } from './lib/layeruse.mjs';
@@ -19,6 +19,7 @@ const ICON = {
   demo: I('<circle cx="5.5" cy="5.5" r="2"/><circle cx="11" cy="6.5" r="1.6"/><path d="M1.8 13c.4-2.4 1.8-3.6 3.7-3.6S8.8 10.6 9.2 13M9.6 10.2c.5-.5 1-.7 1.6-.7 1.5 0 2.6 1.1 2.9 3.5"/>'),
   traffic: I('<path d="M5 2 3 14M11 2l2 12M8 3v2M8 7.5v2M8 12v2"/>'),
   filings: I('<path d="M3 14V6l5-4 5 4v8"/><path d="M6.5 14v-4h3v4"/>'),
+  permits: I('<path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3M6.2 8h4M6.2 10.6h4"/>'),
   planes: I('<path d="M8 1.8v12.4M8 6.3 2 9v1.4l6-1.6 6 1.6V9zM5.8 13.6 8 12.8l2.2.8"/>'),
   radar: I('<path d="M4.5 11.5a4.5 4.5 0 1 1 7 0"/><path d="M8 8 11 4.5M8 8h.01"/><path d="M3 14h10"/>')
 };
@@ -38,6 +39,7 @@ export function initQuickLayers(ctx) {
     { k: 'traffic', label: 'Traffic Counts', title: 'TxDOT average daily traffic on counted roads', ...check('lyAadt') },
     { k: 'filings', label: 'Filings', title: 'Construction filings (TDLR): dots, or the heatmap set in Map Layers', on: () => ctx.filingsShown ? ctx.filingsShown() : !!el('lyFilings')?.checked,
       toggle: () => ctx.setFilingsShown ? ctx.setFilingsShown(!ctx.filingsShown()) : check('lyFilings').toggle() },
+    { k: 'permits', label: 'Permits', title: 'Building and trade permits (zoom in to see them; Map Layers sets how far back)', ...check('lyDevPermit') },
     { k: 'planes', label: 'Planes', title: 'Live aircraft', ...live('planes') },
     { k: 'radar', label: 'Radar', title: 'Live rain radar', ...live('radar') },
     { k: 'sat', label: 'Satellite', title: 'Satellite imagery (Map Layers has more basemaps)', on: () => SAT.has(ctx.basemap()),
