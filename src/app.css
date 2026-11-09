@@ -1934,7 +1934,7 @@ button:disabled{cursor:var(--cur-default,default)}
 .sp-plans{display:flex;flex-wrap:wrap;gap:6px;margin:0 16px 12px}
 .sp-start .sp-radio{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;flex-wrap:wrap}
 .sp-start .sp-in{flex:1;min-width:160px}
-.sp-in,.sp-grid input,.sp-grid select,.sp-ai textarea{border:1px solid var(--line-2);border-radius:4px;background:var(--panel);color:var(--text);font:inherit;font-size:13px;padding:6px 8px}
+.sp-in,.sp-grid input,.sp-grid select,.sp-ai textarea,#card .sp-qsize input{border:1px solid var(--line-2);border-radius:4px;background:var(--panel);color:var(--text);font:inherit;font-size:13px;padding:6px 8px}
 .sp-ai textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:52px;margin-top:4px}
 .sp-ai textarea:focus,.sp-grid input:focus,.sp-in:focus{outline:2px solid var(--green-300);outline-offset:0;border-color:var(--brand)}
 .sp-sugs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
@@ -1946,6 +1946,8 @@ button:disabled{cursor:var(--cur-default,default)}
 #card .sp-qt:disabled{opacity:.45;cursor:not-allowed}
 #card .sp-qt.busy{border-style:dashed}
 #card .sp-qhint{margin-top:6px}
+#card .sp-qsize{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+#card .sp-qsize input{width:100%;box-sizing:border-box}
 .card .bacts.sp-go{padding:8px 0 0;align-items:flex-start}
 .btn.busy{position:relative;color:transparent!important;pointer-events:none;opacity:1} /* working: a spinner where the label was (the label stays, hidden, so the button keeps its size) */
 .btn.busy::after{content:"";position:absolute;inset:0;margin:auto;width:16px;height:16px;box-sizing:border-box;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:sp-spin .7s linear infinite}

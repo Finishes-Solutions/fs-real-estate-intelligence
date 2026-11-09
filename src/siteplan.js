@@ -14,6 +14,7 @@ import * as ER from './lib/editread.mjs';
 import { freeRect as openArea, fitPadding, planSections } from './lib/planview.mjs';
 import * as RUN from './lib/planruns.mjs';
 import * as QL from './lib/quicklayouts.mjs';
+import polyclip from './lib/vendor/polyclip.mjs';
 import * as ASK from './lib/planask.mjs';
 import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
@@ -2258,9 +2259,13 @@ export function initSitePlan(ctx) {
     const acres = SP.ringArea(pl.ring) / 43560, fr = SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), types = QL.quickTypes(acres, fr), cur = ed.runMeta?.quick || null;
     return '<div class="sp-quick" id="spQuick"><div class="sp-ai-h"><div class="lt" id="spQuickL">Quick layouts</div></div>' +
       '<div class="sp-qtypes" role="group" aria-labelledby="spQuickL">' + types.map(t => '<button type="button" class="chip sp-qt" data-quick="' + t.id + '" aria-pressed="' + (cur === t.id) + '"' +
-        (t.count ? ' title="' + esc(t.tip + ': ' + plural(t.count, 'layout') + ' sized to this ' + acres.toFixed(1) + '-acre site, in seconds, without the AI') + '"' : ' disabled title="' + esc(t.why) + '"') + '>' + esc(t.label) + '</button>').join('') + '</div>' +
-      '<div class="rnote sp-qhint">Pick a type for ready-made layouts in seconds, no prompt needed. Or describe exactly what you want below.</div></div>';
+        (t.count ? ' title="' + esc(t.tip + ': ' + plural(t.count, 'layout') + ' on this ' + acres.toFixed(1) + '-acre site, in seconds, without the AI') + '"' : ' disabled title="' + esc(t.why) + '"') + '>' + esc(t.label) + '</button>').join('') + '</div>' +
+      '<div class="sp-qsize" role="group" aria-label="Optional sizes for the quick layouts"><label class="sp-f"><span class="sp-fl">Buildings</span><input id="spQBld" type="number" min="1" max="40" step="1" inputmode="numeric" placeholder="Any" value="' + (ed.quickBld || '') + '" title="How many buildings for the main use (a hotel is one unless you say). Blank: as the layout works out."></label>' +
+        '<label class="sp-f"><span class="sp-fl">Square feet</span><input id="spQSf" type="number" min="1000" step="1000" inputmode="numeric" placeholder="Fill the site" value="' + (ed.quickSf || '') + '" title="The floor area of the main use: shops, offices, warehouses or the hotel (homes are counted by how many fit). Blank: as much as fits."></label></div>' +
+      '<div class="rnote sp-qhint">Pick a type for ready-made layouts that fill the site, in seconds, no prompt needed. Give a number of buildings or square feet to size them instead. Or describe exactly what you want below.</div></div>';
   }
+  // the optional sizes under Quick layouts (blank: fill the site)
+  const quickSizes = () => ({ sf: +ed?.quickSf > 0 ? +ed.quickSf : 0, buildings: +ed?.quickBld > 0 ? Math.round(+ed.quickBld) : 0 });
   function buildHtml(pl) {
     const off = aiOff(), lvl = effortNow(), building = ed.run?.kind === 'build', asked = building ? ed.run.ask : ed.runMeta?.ask || '';
     const why = off ? '<div class="rnote sp-aioff" id="spAiOff">AI isn’t set up on this site</div>' : ''; // the one line that says so (no note repeating it)
@@ -2323,6 +2328,7 @@ export function initSitePlan(ctx) {
     const ta = $('#spAsk'); if (ta) { ta.oninput = () => { ed.ask = ta.value; $('#spGo')?.classList.remove('sp-pulse'); }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!ed.run) build(); } }; } // Enter (or ⌘/Ctrl+Enter) builds; Shift+Enter is a new line
     each('#spGo', () => build()); each('#spBest', () => bestUse());
     each('[data-quick]', b => quick(b.dataset.quick));
+    const qb = $('#spQBld'), qs = $('#spQSf'); if (qb) qb.oninput = () => { ed.quickBld = qb.value; }; if (qs) qs.oninput = () => { ed.quickSf = qs.value; };
     each('[data-sug]', b => fillAsk(b.dataset.sug, true));
     each('[data-bedit],[data-raedit]', () => fillAsk(ed.runMeta?.ask || ed.readAs?.ask || ed.ask || ''));
     each('[data-bnew]', () => fillAsk(''));
@@ -3520,25 +3526,35 @@ export function initSitePlan(ctx) {
   // engine's best passing layout is kept; one that comes out the same as another is dropped for the type's next request.
   // The set lands in Layouts as one run (Layout 1 · Mid-rise, 4 stories · …), the best on the map; each layout keeps its
   // own program, so picking another puts its use and numbers on the plan.
+  // a hotel quick layout's two parcels (lib/quicklayouts.mjs splitSite): the hotel's block at an end of the frontage and
+  // the rest for retail, as parts the parcel-by-parcel layout takes (lib/siteparcels.mjs partsOf); null when they don't fit
+  function hotelParts(pl, h) {
+    const front = pl.front ?? SP.longestEdge(pl.ring), sp = QL.splitSite(pl.ring, front, h.acres, { clip: polyclip.intersection, diff: polyclip.difference, area: SP.ringArea, width: h.width, end: h.end }); if (!sp) return null;
+    const F = SP.frame(pl.origin), geo = r => ({ type: 'Polygon', coordinates: [r.concat([r[0]]).map(F.toLL)] });
+    const parts = PARC.partsOf(pl, [{ key: 'hotel', label: 'Hotel parcel', geometry: geo(sp.first) }, { key: 'retail', label: 'Retail parcel', geometry: geo(sp.rest) }]);
+    return parts.length === 2 && !parts.some(x => x.landlocked) ? parts : null;
+  }
   async function quick(id, o = {}) {
     const pl = PL(); if (!pl || pl.ring.length < 3) return;
     if (ed.run) { ctx.toast('A build is already running: wait for it, or Cancel it.'); return; }
     const acres = SP.ringArea(pl.ring) / 43560, fr = SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), T = QL.quickTypes(acres, fr).find(t => t.id === id);
-    const all = QL.quickSet(id, acres, fr, { all: true }); if (!T || !all.length) { ctx.toast(T?.why || 'Nothing of that type fits this site.'); return; }
+    const all = QL.quickSet(id, acres, fr, { all: true, ...quickSizes() }); if (!T || !all.length) { ctx.toast(T?.why || 'Nothing of that type fits this site.'); return; }
     if (!o.confirmed && dirty(pl) && pl.elements.length) { askReplace(() => quick(id, { confirmed: true })); return; }
     const want = Math.min(QL.QUICK_MAX, all.length), big = acres > 40 ? ' (big site: up to a minute)' : '';
     const run = startRun('quick', ['Laying out ' + T.label + ' layouts' + big], '[data-quick="' + id + '"]', { ask: T.label }); if (!run) return;
     if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; }
     let done = 0; const tick = () => runStep(run, 1, 'Laying out ' + T.label + ' layouts' + big + ' · ' + done + ' of ' + want + ' done');
     const one = async q => {
-      const prog = SP.keepNames(SP.guessProgram(q.ask), pl.program), np = SP.normalizeProgram(prog), wb = BR.wordsBrief(q.ask);
-      let params = RUN.fillParams(pl.params, { ask: q.ask }); if (np.form) params = { ...(params || {}), form: np.form };
+      const hp = q.hotel ? hotelParts(pl, q.hotel) : null; if (q.hotel && !hp) { done = Math.min(want, done + 1); tick(); return null; } // (no room for a hotel beside the retail on this lot)
+      const rp = SP.guessProgram(q.ask), prog = hp ? { use: 'retail', parcels: [{ parcel: 'hotel', program: SP.guessProgram(q.hotel.words) }, { parcel: 'retail', program: rp }] } : SP.keepNames(rp, pl.program);
+      const np = SP.normalizeProgram(rp), wb = hp ? null : BR.wordsBrief(q.ask), ask = hp ? q.hotel.words + '; ' + q.ask : q.ask;
+      let params = RUN.fillParams(pl.params, { ask: q.ask }); if (np.form && !hp) params = { ...(params || {}), form: np.form };
       const plan = { ...pl, params }; let out = [];
-      try { out = await laidRun(plan, prog, { count: 3, ...koOpts(pl), ...(wb ? { brief: wb } : {}) }, q.ask); } catch (e) { console.warn('quick layout', q.key, e); }
+      try { out = await laidRun(plan, prog, { count: 3, ...koOpts(pl), ...(wb ? { brief: wb } : {}), ...(hp ? { parcels: hp, perParcel: true } : {}) }, ask); } catch (e) { console.warn('quick layout', q.key, e); }
       if (!live(run)) return null;
       const vs = named(out || [], { ...plan, program: prog }, { params }), r = K.recommended(vs, null), i = r ? r.index : vs.findIndex(v => v.elements?.length);
       done = Math.min(want, done + 1); tick();
-      return i < 0 ? null : { ...vs[i], program: vs[i].program || prog, params: vs[i].params || params, arr: QL.quickArr(q.label, vs[i].arr), quick: { key: q.key, label: q.label, ask: q.ask } };
+      return i < 0 ? null : { ...vs[i], program: vs[i].program || prog, params: vs[i].params || params, arr: QL.quickArr(q.label, vs[i].arr), quick: { key: q.key, label: q.label, ask, ...(hp ? { parts: hp } : {}) } };
     };
     tick();
     // the first `want` requests at once; a duplicate or an empty one makes way for the next request of the type
@@ -3560,6 +3576,7 @@ export function initSitePlan(ctx) {
     endRun(run);
     if (!variants.length) ctx.toast('No ' + T.label.toLowerCase() + ' layout fits this site. Try another type, or describe it under Build with AI.');
     else if (variants.length < want) ctx.toast(plural(variants.length, T.label + ' layout') + ': the other requests came out the same or didn’t fit.');
+    else if (quickSizes().sf && QL.sizeNote(id)) ctx.toast(QL.sizeNote(id) + ', so these fill the site.');
   }
   async function build(o = {}) {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
@@ -4268,7 +4285,7 @@ export function initSitePlan(ctx) {
     const v = ed.variants[i], pl = PL(); if (!v || !pl) return null;
     ctx.toast(stale ? 'Fitting ' + numOf(v) + ' to the new site…' : 'Laying out ' + numOf(v) + ' again…');
     const base = { ...pl, setbacks: v.setbacks || pl.setbacks, params: v.params || pl.params };
-    let out = []; try { out = await laid('options', base, v.program || pl.program, { count: v.aiBrief ? 2 : 12, ...koOpts(pl), ...(v.aiBrief?.brief ? { brief: v.aiBrief.brief } : {}) }); } catch (e) { console.warn('layout', e); }
+    let out = []; try { out = await laid('options', base, v.program || pl.program, { count: v.aiBrief ? 2 : 12, ...koOpts(pl), ...(v.aiBrief?.brief ? { brief: v.aiBrief.brief } : {}), ...(v.quick?.parts ? { parcels: v.quick.parts, perParcel: true } : {}) }); } catch (e) { console.warn('layout', e); } // (a hotel quick layout: its two parcels again)
     if (PL() !== pl || ed.variants?.[i] !== v) return null;
     const a2 = v.aiBrief ? aiLayout(out, base, v.program || pl.program, { ...v.aiBrief }).v || null : null; // the AI's plan: its brief laid out again, still the AI's (none when it no longer fits: then it says so below)
     if (v.aiBrief && !a2) { ctx.toast(numOf(v) + ', the AI’s plan, doesn’t fit with these settings any more.'); return null; }

@@ -43,13 +43,14 @@ const want = (process.env.TYPES || 'multifamily,retail,industrial').split(',');
 for (const id of want) {
   const t = types.find(x => x.id === id); if (!t || t.off) { console.log('skip', id); continue; }
   const t0 = Date.now();
+  if (process.env.SF || process.env.BLDG) { await page.fill('#spQSf', process.env.SF || ''); await page.fill('#spQBld', process.env.BLDG || ''); }
   await page.click('[data-quick="' + id + '"]');
   await page.waitForSelector('[data-quick="' + id + '"][aria-pressed="true"]', { timeout: 180000 });
   await page.waitForFunction(() => !document.querySelector('#spRunPill:not([hidden])') && document.querySelectorAll('#spVariants [data-var], #spVariants [data-usevar]').length > 0, null, { timeout: 180000 });
   const names = await page.$$eval('#spVariants .sp-vname, #spVariants [data-var] b, #spVariants h4', els => els.map(e => e.textContent.trim()).filter(Boolean));
   const cnt = await page.textContent('.sp-lcount');
   console.log(id + ': ' + ((Date.now() - t0) / 1000).toFixed(1) + 's, layouts' + cnt + ' — ' + names.slice(0, 6).join(' | '));
-  if (SHOTS) await page.screenshot({ path: SHOTS + '/quick-' + id + '.png' });
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/quick-' + id + (process.env.SF ? '-sized' : '') + '.png' });
 }
 assert.equal(aiCalls, 0, 'no AI endpoint called');
 assert.deepEqual(errs, [], 'no page errors');
