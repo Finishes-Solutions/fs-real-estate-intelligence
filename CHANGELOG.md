@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-09
 
+### 1:30 PM CT: Quick layouts fill the whole site (`ab3369c`)
+- **Every quick layout now uses the whole site:** retail, office, medical, hotel and mixed-use presets ask for as much as fits instead of a fixed size, so a 16-acre retail layout no longer leaves three quarters of the land marked "Future development".
+- **Courtyard apartments taken out of the quick set:** a courtyard building can't fill a site on its own. You can still ask for one under Build with AI.
+- **More distinct townhome layouts:** townhomes for rent with garages, for sale with driveways, stacked townhomes, duplexes and cottages, with fourplexes and a tiny home community standing in when two come out the same.
+- A request for restaurant pads "as many as fit" now reads "Pad sites as fit" instead of "NaN pad sites".
+
 ### 12:26 PM CT: Quick layouts: pick a type, get five layouts in seconds (`a86e3b7`)
 - **No prompt needed:** at the top of a site plan's **Build** section there's now a button for each kind of development: Multifamily, Townhomes & BTR, Single-family, Retail, Office & hotel, Industrial and Mixed use. One click gives up to five layouts of that kind (e.g. garden, walk-up, mid-rise, courtyard and garden-round-a-pool apartments), without typing anything and without the AI.
 - **Sized to the site:** square footage, unit counts and hotel keys follow the acreage; options that need more land or street frontage are left out, and a kind with nothing that fits is greyed out with a note on how much land it needs.
