@@ -13,6 +13,7 @@ import * as ED from './lib/siteedit.mjs';
 import * as ER from './lib/editread.mjs';
 import { freeRect as openArea, fitPadding, planSections } from './lib/planview.mjs';
 import * as RUN from './lib/planruns.mjs';
+import * as QL from './lib/quicklayouts.mjs';
 import * as ASK from './lib/planask.mjs';
 import * as K from './lib/planpick.mjs';
 import * as MAP from './lib/planmap.mjs';
@@ -408,7 +409,7 @@ export function initSitePlan(ctx) {
     let vs = clone(r.variants); if (vs.some(v => !v.key)) { const k = RUN.layoutKeys(vs); vs = vs.map((v, i) => ({ ...v, key: v.key || k[i] })); }
     const on = pl.variant && !pl.variant.edited && vs.find(v => v.key === pl.variant.key && !v.elements); if (on) on.elements = clone(pl.elements); // the team copy keeps numbers only: the one on the map is the option's own pieces
     for (const v of vs) derive(v, pl);
-    ed.variants = vs; ed.aiNote = r.note || ''; ed.aiSummary = r.summary || ''; ed.sortBy = r.sort || 'rec'; ed.ask = r.ask || ''; ed.runMeta = { ask: r.ask || '', at: r.at, effort: ASK.runEffort(r) }; if (r.ideas?.list?.length) ed.ideas = r.ideas; if (r.read) ed.readAs = r.read; ed.aiPick = r.pick || null;
+    ed.variants = vs; ed.aiNote = r.note || ''; ed.aiSummary = r.summary || ''; ed.sortBy = r.sort || 'rec'; ed.ask = r.ask || ''; ed.runMeta = { ask: r.ask || '', at: r.at, effort: ASK.runEffort(r), ...(r.quick ? { quick: r.quick } : {}) }; if (r.ideas?.list?.length) ed.ideas = r.ideas; if (r.read) ed.readAs = r.read; ed.aiPick = r.pick || null;
     refreshFin(true);
   }
   // the plan closes (Done, ×, another card, leaving the map): say where it was saved and leave a way back to it
@@ -849,8 +850,22 @@ export function initSitePlan(ctx) {
   const netStep = (px = ftPerPx()) => Math.max(80, 56 * px); // (the spacing of a network street's handles, and how far a drag of one bends it either way)
   const isNetStreet = (pl, e) => !!(e && pl?.recipe?.net && e.kind === 'drive' && e.net && e.path && !e.bulb && !e.closed); // a street of a neighbourhood's network (lib/streetedit.mjs)
   const ftPerPx = () => 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** map.getZoom()) * 3.28084;
-  // layouts run in a worker (sp-worker.js) so the page stays responsive; straight in the page if workers aren't there
-  let worker = null, wseq = 0; const wait = new Map();
+  // layouts run in a worker (sp-worker.js) so the page stays responsive; straight in the page if workers aren't there.
+  // A small pool: one job at a time uses the first worker (as before); jobs sent together (Quick layouts' five runs) each
+  // get a worker of their own, up to one fewer than the device's cores (at most 4)
+  const WMAX = Math.max(1, Math.min(4, ((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 2) - 1));
+  let wseq = 0, noWorker = false; const workers = [];
+  function workerFor() {
+    if (noWorker) return null;
+    const idle = workers.find(x => !x.wait.size); if (idle) return idle;
+    if (workers.length < WMAX) try {
+      const x = { w: new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }), wait: new Map() };
+      x.w.onmessage = ({ data }) => { const j = x.wait.get(data.id); if (!j) return; x.wait.delete(data.id); data.ok ? j.ok(data.result) : j.no(new Error(data.error)); };
+      x.w.onerror = e => { for (const j of x.wait.values()) j.no(new Error(e.message || 'layout worker failed')); x.wait.clear(); const i = workers.indexOf(x); if (i >= 0) workers.splice(i, 1); try { x.w.terminate(); } catch (e2) {} };
+      workers.push(x); return x;
+    } catch (e) { if (!workers.length) { noWorker = true; return null; } }
+    return workers.reduce((a, b) => b.wait.size < a.wait.size ? b : a);
+  }
   // a Waller plan's layouts: the engine gets the scenario's inputs (lib/guardrails.mjs forLayout) and what comes back is
   // kept with the plan's own working numbers (unapply); every other plan goes to the engine as it is
   function laid(fn, ...args) {
@@ -862,10 +877,9 @@ export function initSitePlan(ctx) {
     return laid0(fn, ...(fn === 'refit' ? [g.plan, args[1] || {}] : [g.plan, g.program, g.opts, ...args.slice(3)])).then(r => fn === 'refit' ? G.unapply(r, base) : fn === 'run' ? { ...r, options: (r?.options || []).map(o => G.unapply(o, base)) } : (r || []).map(o => G.unapply(o, base)));
   }
   function laid0(fn, ...args) {
-    try { if (!worker) { worker = new Worker(new URL('./sp-worker.js', import.meta.url), { type: 'module' }); worker.onmessage = ({ data }) => { const w = wait.get(data.id); if (!w) return; wait.delete(data.id); data.ok ? w.ok(data.result) : w.no(new Error(data.error)); }; worker.onerror = e => { for (const w of wait.values()) w.no(new Error(e.message || 'layout worker failed')); wait.clear(); worker = null; }; } }
-    catch (e) { worker = null; }
-    if (!worker) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'run' ? runPlan(...args) : fn === 'refit' ? refit(...args) : fn === 'pods' ? relayPods(...args) : fn === 'net' ? netEdit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
-    const id = ++wseq; return new Promise((ok, no) => { wait.set(id, { ok, no }); worker.postMessage({ id, fn, args: JSON.parse(JSON.stringify(args)) }); });
+    const x = workerFor();
+    if (!x) return new Promise((ok, no) => setTimeout(() => { try { ok(fn === 'run' ? runPlan(...args) : fn === 'refit' ? refit(...args) : fn === 'pods' ? relayPods(...args) : fn === 'net' ? netEdit(...args) : layoutOptions(...args)); } catch (e) { no(e); } }, 30));
+    const id = ++wseq; return new Promise((ok, no) => { x.wait.set(id, { ok, no }); x.w.postMessage({ id, fn, args: JSON.parse(JSON.stringify(args)) }); });
   }
   // Build's layouts as runs (lib/layoutrun.mjs runPlan): the same engine inside a saved, replayable run (seeded, so the
   // same request on the same site gives the same layouts), apartment buildings from the reviewed templates, each option
@@ -2237,6 +2251,16 @@ export function initSitePlan(ctx) {
     const p = P(), n = SF.confirmed(p), k = (p?.files || []).length, go = t => ' <button type="button" class="lnk" data-reffiles="1">' + t + '</button>';
     return '<div class="rnote sp-refs">' + (n ? 'The AI also uses ' + plural(n, 'confirmed fact') + ' from this project’s reference files.' + go('Reference files') : k ? 'This project’s reference files have facts still to check: only confirmed ones go to the AI.' + go('Check them') : 'A survey or floor plans to go by?' + go('Add reference files') + ' for the AI to use.') + '</div>';
   }
+  // Quick layouts (lib/quicklayouts.mjs): one button a development type; a click lays out about five fixed requests of that
+  // type, sized to this site, with the engine alone (no AI, nothing to type), several at once in the layout workers. A
+  // type with nothing for a site this size is shown greyed, its tooltip saying why.
+  function quickHtml(pl) {
+    const acres = SP.ringArea(pl.ring) / 43560, fr = SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), types = QL.quickTypes(acres, fr), cur = ed.runMeta?.quick || null;
+    return '<div class="sp-quick" id="spQuick"><div class="sp-ai-h"><div class="lt" id="spQuickL">Quick layouts</div></div>' +
+      '<div class="sp-qtypes" role="group" aria-labelledby="spQuickL">' + types.map(t => '<button type="button" class="chip sp-qt" data-quick="' + t.id + '" aria-pressed="' + (cur === t.id) + '"' +
+        (t.count ? ' title="' + esc(t.tip + ': ' + plural(t.count, 'layout') + ' sized to this ' + acres.toFixed(1) + '-acre site, in seconds, without the AI') + '"' : ' disabled title="' + esc(t.why) + '"') + '>' + esc(t.label) + '</button>').join('') + '</div>' +
+      '<div class="rnote sp-qhint">Pick a type for ready-made layouts in seconds, no prompt needed. Or describe exactly what you want below.</div></div>';
+  }
   function buildHtml(pl) {
     const off = aiOff(), lvl = effortNow(), building = ed.run?.kind === 'build', asked = building ? ed.run.ask : ed.runMeta?.ask || '';
     const why = off ? '<div class="rnote sp-aioff" id="spAiOff">AI isn’t set up on this site</div>' : ''; // the one line that says so (no note repeating it)
@@ -2244,10 +2268,10 @@ export function initSitePlan(ctx) {
     const ideas = '<div id="spIdeas">' + ideasHtml() + '</div>';
     const fold = o => '<button type="button" class="sp-tgl sp-tgl-i" data-bfold="' + (o ? 1 : 0) + '" aria-expanded="' + o + '" aria-label="' + (o ? 'Fold the request box away' : 'Open the request box') + '" title="' + (o ? 'Fold the request box away (the last request stays)' : 'Open the request box') + '">' + CHEV + '</button>';
     if (!ed.buildOpen && asked && (ed.variants || building))
-      return '<div class="bsec sp-ai sp-built" id="spAiSec"><div class="sp-ai-h"><div class="lt">Build with AI</div>' + fold(false) + '</div><div class="sp-built-l">' + (building ? 'Building from ' : 'Built from ') + '<q>' + esc(asked) + '</q>' + effOn(building ? ed.run.effort : ed.runMeta?.effort) + '</div>' +
+      return '<div class="bsec sp-ai sp-built" id="spAiSec">' + quickHtml(pl) + '<div class="sp-ai-h"><div class="lt">Build with AI</div>' + fold(false) + '</div><div class="sp-built-l">' + (building ? 'Building from ' : 'Built from ') + '<q>' + esc(asked) + '</q>' + effOn(building ? ed.run.effort : ed.runMeta?.effort) + '</div>' +
         '<div class="sp-row"><button type="button" class="btn sm" data-bedit="1">Edit request</button><button type="button" class="btn sm" data-bnew="1">New request</button></div>' + readHtml(asked) + ideas + note + why + refNote() + '</div>';
     const acres = SP.ringArea(pl.ring) / 43560, sugs = RUN.presets(acres, SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), { aiOff: off }), lo = RUN.leftoverOf(RUN.fillParams(pl.params, { ask: ed.ask || '' }));
-    return '<div class="bsec sp-ai" id="spAiSec"><div class="sp-ai-h"><label class="lt" for="spAsk">Build with AI</label>' + (asked && ed.variants ? fold(true) : '') + '</div>' +
+    return '<div class="bsec sp-ai" id="spAiSec">' + quickHtml(pl) + '<div class="sp-ai-h"><label class="lt" for="spAsk">Build with AI</label>' + (asked && ed.variants ? fold(true) : '') + '</div>' +
       '<textarea id="spAsk" rows="2" placeholder="What should go here? e.g. ' + esc(sugs[0]?.text || '25,000 sf retail strip') + '">' + esc(ed.ask || '') + '</textarea>' +
       ((pl.parcels || []).length > 1 ? '<label class="sp-chk sp-perparcel" title="Each parcel laid out on its own: its own street side, program and layouts, nothing across a parcel line. Say which use goes on which parcel (“retail on the 5.88 acre parcel, flex on the corner parcel”), or one program is shared by acreage."><input type="checkbox" id="spPerParcel"' + (ed.perParcel ? ' checked' : '') + '> Lay out parcel by parcel</label>' : '') +
       (ed.questions?.length ? '<div class="sp-qs" id="spQs"><div class="lt">Before it lays this out, the AI asks</div><ol>' + ed.questions.map(q => '<li>' + esc(q) + '</li>').join('') + '</ol><textarea id="spAnswers" rows="2" placeholder="Your answers"></textarea><div class="sp-row"><button type="button" class="btn sm primary" id="spAnswer">Answer and Build</button><button type="button" class="btn sm ghost" id="spSkipQs" title="Lay it out on the AI’s best reading of the request">Build Anyway</button></div></div>' : '') +
@@ -2298,6 +2322,7 @@ export function initSitePlan(ctx) {
     const sk = $('#spSkipQs'); if (sk) sk.onclick = () => { ed.questions = null; build({ answered: true }); };
     const ta = $('#spAsk'); if (ta) { ta.oninput = () => { ed.ask = ta.value; $('#spGo')?.classList.remove('sp-pulse'); }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!ed.run) build(); } }; } // Enter (or ⌘/Ctrl+Enter) builds; Shift+Enter is a new line
     each('#spGo', () => build()); each('#spBest', () => bestUse());
+    each('[data-quick]', b => quick(b.dataset.quick));
     each('[data-sug]', b => fillAsk(b.dataset.sug, true));
     each('[data-bedit],[data-raedit]', () => fillAsk(ed.runMeta?.ask || ed.readAs?.ask || ed.ask || ''));
     each('[data-bnew]', () => fillAsk(''));
@@ -3490,6 +3515,52 @@ export function initSitePlan(ctx) {
   // off, or on Low, the layouts go on the map and into the list as soon as they're drawn.
   // The effort level sets the work: Low reads the request and stops; Medium reviews once; High may revise once; Ultra
   // starts from a wider search (five layouts), reviews up to six and may revise twice.
+  // Quick layouts: the requests for one type (lib/quicklayouts.mjs quickSet), each laid out as Build lays out a request
+  // read without the AI (the same seeded, checked runs), all at once across the layout workers. From each run the
+  // engine's best passing layout is kept; one that comes out the same as another is dropped for the type's next request.
+  // The set lands in Layouts as one run (Layout 1 · Mid-rise, 4 stories · …), the best on the map; each layout keeps its
+  // own program, so picking another puts its use and numbers on the plan.
+  async function quick(id, o = {}) {
+    const pl = PL(); if (!pl || pl.ring.length < 3) return;
+    if (ed.run) { ctx.toast('A build is already running: wait for it, or Cancel it.'); return; }
+    const acres = SP.ringArea(pl.ring) / 43560, fr = SP.edgeLen(pl.ring, pl.front ?? SP.longestEdge(pl.ring)), T = QL.quickTypes(acres, fr).find(t => t.id === id);
+    const all = QL.quickSet(id, acres, fr, { all: true }); if (!T || !all.length) { ctx.toast(T?.why || 'Nothing of that type fits this site.'); return; }
+    if (!o.confirmed && dirty(pl) && pl.elements.length) { askReplace(() => quick(id, { confirmed: true })); return; }
+    const want = Math.min(QL.QUICK_MAX, all.length), big = acres > 40 ? ' (big site: up to a minute)' : '';
+    const run = startRun('quick', ['Laying out ' + T.label + ' layouts' + big], '[data-quick="' + id + '"]', { ask: T.label }); if (!run) return;
+    if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; }
+    let done = 0; const tick = () => runStep(run, 1, 'Laying out ' + T.label + ' layouts' + big + ' · ' + done + ' of ' + want + ' done');
+    const one = async q => {
+      const prog = SP.keepNames(SP.guessProgram(q.ask), pl.program), np = SP.normalizeProgram(prog), wb = BR.wordsBrief(q.ask);
+      let params = RUN.fillParams(pl.params, { ask: q.ask }); if (np.form) params = { ...(params || {}), form: np.form };
+      const plan = { ...pl, params }; let out = [];
+      try { out = await laidRun(plan, prog, { count: 3, ...koOpts(pl), ...(wb ? { brief: wb } : {}) }, q.ask); } catch (e) { console.warn('quick layout', q.key, e); }
+      if (!live(run)) return null;
+      const vs = named(out || [], { ...plan, program: prog }, { params }), r = K.recommended(vs, null), i = r ? r.index : vs.findIndex(v => v.elements?.length);
+      done = Math.min(want, done + 1); tick();
+      return i < 0 ? null : { ...vs[i], program: vs[i].program || prog, params: vs[i].params || params, arr: QL.quickArr(q.label, vs[i].arr), quick: { key: q.key, label: q.label, ask: q.ask } };
+    };
+    tick();
+    // the first `want` requests at once; a duplicate or an empty one makes way for the next request of the type
+    const got = [], seen = new Set(); let next = 0;
+    const sig = v => [v.m?.units || 0, Math.round((v.m?.gfa || 0) / 100), v.m?.spaces || 0, v.m?.buildings || 0, v.elements?.length || 0].join('|');
+    while (got.length < want && next < all.length && live(run)) {
+      const batch = all.slice(next, next + want - got.length); next += batch.length;
+      const res = await Promise.all(batch.map(one)); if (!live(run) || PL() !== pl) return;
+      for (const v of res) { if (!v || got.length >= want) continue; const k = sig(v); if (seen.has(k)) continue; seen.add(k); got.push(v); }
+    }
+    if (!live(run) || PL() !== pl) return;
+    const keys = RUN.layoutKeys(got), variants = renumber(got.map((v, i) => ({ ...v, key: keys[i], rank: -i })));
+    run.applied = true;
+    ed.variants = variants; ed.readAs = null; ed.aiNote = ''; ed.aiSummary = ''; ed.reviewCleared = false; ed.pickedByUser = false; ed.reviewing = false; ed.aiPick = null; ed.sortBy = 'rec';
+    ed.runMeta = { ask: '', quick: id, at: new Date().toISOString(), effort: 'low' };
+    const rec0 = K.recommended(variants, null), best = rec0 ? rec0.index : variants.findIndex(v => v.elements.length);
+    if (best >= 0) await useVariant(best, { quiet: true, fresh: true }); else saveRun(pl);
+    if (!live(run)) return;
+    endRun(run);
+    if (!variants.length) ctx.toast('No ' + T.label.toLowerCase() + ' layout fits this site. Try another type, or describe it under Build with AI.');
+    else if (variants.length < want) ctx.toast(plural(variants.length, T.label + ' layout') + ': the other requests came out the same or didn’t fit.');
+  }
   async function build(o = {}) {
     const p = P(), pl = PL(); if (!pl || pl.ring.length < 3) return;
     if (ed.run) { ctx.toast('A build is already running: wait for it, or Cancel it.'); return; }
@@ -3654,8 +3725,8 @@ export function initSitePlan(ctx) {
   // panel (Trees, a setting) never loses it. Every await checks live(run) before using what came back; Cancel aborts the
   // AI call and drops whatever arrives after (a layout already running in the worker finishes, unused).
   let runTok = 0, runTick = 0;
-  const LAYS = ['build', 'more', 'resolve']; // runs that put layouts on the map: a hand edit before they land cancels them
-  const LOCK = ['#spGo', '#spBest', '[data-idea]', '[data-sug]', '#spMore', '#spResolve', '#spNewLay', '#spRefitMine', '#spStaleRefit', '#spStaleNew', '#spReReview', '#spChgGo', '#spChgNew', '[data-eff]', '#spOvUpd'];
+  const LAYS = ['build', 'more', 'resolve', 'quick']; // runs that put layouts on the map: a hand edit before they land cancels them
+  const LOCK = ['#spGo', '#spBest', '[data-quick]', '[data-idea]', '[data-sug]', '#spMore', '#spResolve', '#spNewLay', '#spRefitMine', '#spStaleRefit', '#spStaleNew', '#spReReview', '#spChgGo', '#spChgNew', '[data-eff]', '#spOvUpd'];
   const live = r => !!(r && ed && ed.run === r && !r.cancelled);
   const mmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const pillEl = document.createElement('div'); pillEl.className = 'sp-runpill'; pillEl.hidden = true; document.body.appendChild(pillEl);
@@ -3740,7 +3811,7 @@ export function initSitePlan(ctx) {
   function endRun(r, o = {}) {
     if (!ed || ed.run !== r) return false;
     ed.run = null; clearInterval(runTick); runTick = 0; pillEl.hidden = true;
-    if (!o.quiet) { panel(); if (['build', 'more', 'review'].includes(r.kind) && ed.variants) showLayouts(r); }
+    if (!o.quiet) { panel(); if (['build', 'more', 'review', 'quick'].includes(r.kind) && ed.variants) showLayouts(r); }
     if (ed.solveLater && !r.cancelled) { ed.solveLater = false; resolveSoon(); } // a setting changed while it ran
     return true;
   }
@@ -3751,7 +3822,7 @@ export function initSitePlan(ctx) {
     const held = r.hold ? heldIn(r, { why: 'cancelled' }) : null;
     const mid = !held && ed.reviewing && ed.variants?.length; ed.reviewing = false;
     if (mid) { ed.aiNote = RUN.unreviewedNote('cancelled'); saveRun(); }
-    endRun(r); if (why || !mid) ctx.toast(why || (held ? 'AI review cancelled: the layouts are shown as the engine ranked them, not reviewed by the AI.' : r.kind === 'best' ? 'Ideas cancelled.' : r.kind === 'change' ? 'Change cancelled.' : r.kind === 'build' ? 'Build cancelled' : r.kind === 'review' ? 'Review cancelled.' : 'Cancelled: the layouts stay as they were.'));
+    endRun(r); if (why || !mid) ctx.toast(why || (held ? 'AI review cancelled: the layouts are shown as the engine ranked them, not reviewed by the AI.' : r.kind === 'best' ? 'Ideas cancelled.' : r.kind === 'change' ? 'Change cancelled.' : r.kind === 'build' ? 'Build cancelled' : r.kind === 'quick' ? 'Quick layouts cancelled.' : r.kind === 'review' ? 'Review cancelled.' : 'Cancelled: the layouts stay as they were.'));
     if (held) heldOut(held);
   }
   // the plan closes or another option opens: a build's held layouts are kept with the option (its saved run, said not to
@@ -4013,7 +4084,7 @@ export function initSitePlan(ctx) {
   function saveRun(pl = PL()) {
     if (!pl || !ed?.variants) return;
     const meta = ed.runMeta || pl.lastRun || {};
-    pl.lastRun = RUN.slimRun({ ask: meta.ask || '', note: ed.aiNote || '', ...(ed.aiSummary ? { summary: ed.aiSummary } : {}), ...(ed.sortBy && ed.sortBy !== 'rec' ? { sort: ed.sortBy } : {}), ...(ed.ideas?.list?.length ? { ideas: ed.ideas } : {}), ...(ed.readAs ? { read: ed.readAs } : {}), ...(ed.aiPick ? { pick: ed.aiPick } : {}), at: meta.at || new Date().toISOString(), ...(meta.effort ? { effort: meta.effort } : {}), aiReviewed: ed.variants.some(v => v.ai), variants: ed.variants }, pl.variant?.key);
+    pl.lastRun = RUN.slimRun({ ask: meta.ask || '', ...(meta.quick ? { quick: meta.quick } : {}), note: ed.aiNote || '', ...(ed.aiSummary ? { summary: ed.aiSummary } : {}), ...(ed.sortBy && ed.sortBy !== 'rec' ? { sort: ed.sortBy } : {}), ...(ed.ideas?.list?.length ? { ideas: ed.ideas } : {}), ...(ed.readAs ? { read: ed.readAs } : {}), ...(ed.aiPick ? { pick: ed.aiPick } : {}), at: meta.at || new Date().toISOString(), ...(meta.effort ? { effort: meta.effort } : {}), aiReviewed: ed.variants.some(v => v.ai), variants: ed.variants }, pl.variant?.key);
     save(projOf(pl));
   }
   // money again for every layout (the Pro forma's assumptions changed); shortly after the last change
@@ -4201,7 +4272,9 @@ export function initSitePlan(ctx) {
     if (PL() !== pl || ed.variants?.[i] !== v) return null;
     const a2 = v.aiBrief ? aiLayout(out, base, v.program || pl.program, { ...v.aiBrief }).v || null : null; // the AI's plan: its brief laid out again, still the AI's (none when it no longer fits: then it says so below)
     if (v.aiBrief && !a2) { ctx.toast(numOf(v) + ', the AI’s plan, doesn’t fit with these settings any more.'); return null; }
-    const list = a2 ? [a2] : named(out, { ...base, program: v.program || pl.program }, v.revisedBy ? { revisedBy: v.revisedBy } : {}), r = a2 ? { index: 0, exact: true } : RUN.matchLayout(list, v.key, v.name);
+    let list = a2 ? [a2] : named(out, { ...base, program: v.program || pl.program }, v.revisedBy ? { revisedBy: v.revisedBy } : {});
+    if (v.quick && !a2) { list = list.map(x => ({ ...x, arr: QL.quickArr(v.quick.label, x.arr), quick: v.quick })); const ks = RUN.layoutKeys(list); list = list.map((x, k) => ({ ...x, key: ks[k] })); } // (a quick layout's name and key carry its request's label)
+    const r = a2 ? { index: 0, exact: true } : RUN.matchLayout(list, v.key, v.name);
     if (r.index < 0) { ctx.toast(numOf(v) + ' doesn’t fit with these settings any more.'); return null; }
     const got = list[r.index], nv = r.exact ? { ...got, key: v.key, name: v.name, rank: v.rank, ai: v.ai } : { ...got, rank: v.rank, name: numOf(v) + ' · ' + got.arr };
     if (!r.exact) ctx.toast(numOf(v) + ' came out differently this time, so the nearest one (' + got.arr + ') is shown in its place.');

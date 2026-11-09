@@ -189,3 +189,8 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 - **Unit counts on buildings without a template** (courtyard, tower) are floor-area estimates, so an exact count may be met by sizing homes between 750 and 1,400 gross sf; templated buildings never change their schedule.
 - **A pool may shrink to 75%** to fit its court rather than overlap a wing; the note says so.
 - **Fire-code spacing between ways in is a warning, not a hard check**: fire officials commonly accept an emergency-only access; the count of ways in (two past 200 apartments or 30 homes) is hard.
+
+## Quick layouts (2026-11-09)
+
+- **Typed presets, not open prompts**: Quick layouts are fixed word requests per type (lib/quicklayouts.mjs) run through the no-AI words parser and the seeded engine, because open-ended AI requests were giving odd layouts; each preset is checked in test/quicklayouts.mjs to read as the use it names.
+- **Run in parallel, dedupe by numbers**: up to five runs at once in a small worker pool (one fewer than the cores, at most 4); a layout with the same units, floor area, spaces, buildings and piece count as an earlier one is dropped for the type's next preset, since some word variants (e.g. "rear-load") draw the same plan on a given site.
