@@ -3,6 +3,15 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-09
+
+### 12:26 PM CT: Quick layouts: pick a type, get five layouts in seconds (`a86e3b7`)
+- **No prompt needed:** at the top of a site plan's **Build** section there's now a button for each kind of development: Multifamily, Townhomes & BTR, Single-family, Retail, Office & hotel, Industrial and Mixed use. One click gives up to five layouts of that kind (e.g. garden, walk-up, mid-rise, courtyard and garden-round-a-pool apartments), without typing anything and without the AI.
+- **Sized to the site:** square footage, unit counts and hotel keys follow the acreage; options that need more land or street frontage are left out, and a kind with nothing that fits is greyed out with a note on how much land it needs.
+- **Fast:** the layouts are drawn several at once on your computer: a few seconds on a 5-acre site, 10–30 seconds on 15–20 acres.
+- **Clear names:** each layout is labelled with what it is (**Layout 2 · Mid-rise, 4 stories · …**); the best one that passes every check goes on the map. If two come out the same, the copy is replaced by another choice for that kind.
+- **Build with AI** is still there underneath for anything specific.
+
 ## 2026-11-08
 
 ### 2:25 PM CT: "Fix the parking" keeps the pool (`ce00714`)
