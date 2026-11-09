@@ -77,6 +77,16 @@ Branch: `experimental` (never main or staging). Read `CLAUDE.md` first (hard rul
 - **Layout review harness** (`scripts/layout-review.mjs [outdir] [regex]`): 13 requests on 8 test lots drawn as review sheets (the prompt, how it was read, three options with numbers and checks), screenshotted with the local Chromium.
 - **Open from the harness:** mixed-use zones with a count still fill the rest of the site (80 townhomes asked, 559 laid out on the 40 ac test lot) under the "fill the site" default (review item 7, owner's call); in "hold" mode the same request comes back short of its retail (16,700 of 20,000 sf) and 8–9 spaces short. Second entry (item 4), restaurant drive ring (item 5) and mixed-use allocation (items 9–10) are next.
 
+## After the phases: the Finishes budget library (2026-11-09)
+
+- **What:** the purchasing team's workbook (Finishes_Budget_Library_v1.xlsx, built from the Hart Homes purchasing archive) is a cost source. Data: `lib/feasibility/data/fs-budget-library-v1.mjs`. Calculator (inputs → drivers → condition flags → lines with low / likely / high → benchmark band): `lib/feasibility/budgetlib.mjs`. Wired in `costlib.mjs` (`FSLIB_USES`, `fsLibInputs`, `fsLibPrice`, `fsLibApartmentCheck`) and `budget.mjs` (`fs:` lines, `B.fsLib`, `budgetLibNotes`). Shown in the workspace's Budget step, the report, the Budget sheet / CSV (Low, High, Cost code) and the MCP study.
+- **Covers:** houses, cottages, townhomes. Apartments get a cross-check note. Everything else is priced as before.
+- **Checked:** the calculator reproduces the workbook's own BUDGET_ENGINE drivers and its HIGH total for the default house to the cent (LOW and LIKELY differ only by the re-based insulation line). `test/fz-budgetlib.mjs` (in `npm test`).
+- **Effect to know about:** house and townhome budgets come out about 30% under the team's 2024–25 medians on the test plans, because the library's rates are Hart's. The existing "beside the team's budgets" check flags it.
+- **Not done (needs sign-in first, see Infra):** the evidence layer (552 rates with vendor, date and status; bid leveling; vendor list; actual costs; data flags), a drill-down from a line to its rates, and budget approval routing.
+- **Not done (needs people):** a Finishes-priced baseline (the workbook's F-36 audit), bids for the four unpriced apartment lines and for every townhome scope, legal review of the one vendor's non-disclosure clause before its rates are stored anywhere shared, approval of the workbook's PROPOSED cost codes.
+- Decisions: DECISIONS.md, "Finishes budget library as a cost source".
+
 ## Verification (Phase 5)
 
 | Check | Command | Result |
@@ -151,6 +161,8 @@ infra grep: 126 patterns from docs/AUDIT.md, 0 matches (excluding docs/AUDIT.md,
    - **Schedules on, every 3 hours (AUTO mode):** each source gets a full load until one finishes (a job GitHub stops at 6 hours is picked up by the next run, writing only what's missing), then refreshes once a day (permits: last 45 days; registries: weekly). Geocoding of address-only permits continues on every pass. `county_loads` rows `full:<slug>` mark the finished full loads.
    - **Not free in bulk (not loaded):** California (bizfile bulk orders are paid), Delaware, Washington, Ohio, Michigan and the other states' business registries; OpenCorporates sells a national feed. Waller County and City of Waller permits (records requests drafted in `docs/permit-records-requests.md`). New Jersey's statewide permit file, Roseville and Howard County have no street addresses, so they're off.
 
+7. **For the budget library's evidence layer** (vendor rates, bids, contacts, payables): sign-in with roles (purchasing / management only) and a private table set in the platform's own database, e.g. `fz_rate_library`, `fz_vendors`, `fz_bid_leveling`, with row-level security. Nothing was created. Until then the workbook stays outside Git and outside the app.
+
 ## Owner actions found during the audit (outside this repo)
 
 - **Rotate the monday.com API token** committed in fs-cre-report-runner `zap-jsons/exported-zap-2026-08-13T16_25_41.263Z.json` (BD GATE MOVING). It was not read or copied.
@@ -195,7 +207,7 @@ Every screen and report carries the scope statement, and the Fact & Assumption R
 ## Recommended next steps
 
 1. Try "Save the whole set" on a real project (the report-sets bucket now exists); add the CI job above.
-2. Replace the cost library's single-project rates with a real estimate source: a GC budget template, or a licensed database such as RSMeans with city cost indexes, which also gives real location factors. `lib/feasibility/costlib.mjs` is the one place to plug it in.
+2. Cost library: houses and townhomes now come from the Finishes budget library (2026-11-09). Still to replace: the apartment workbook's single-project rates (bid the library's four unpriced apartment lines, or a licensed database such as RSMeans, which also gives real location factors), and Hart's rates with Finishes' own once the purchasing audit is documented. `lib/feasibility/costlib.mjs` is the one place to plug it in.
 3. Add rent and sale comps from a licensed provider to replace the house rent and cap-rate assumptions, keeping ZORI as the check.
 4. Move plan-set generation to a server job (queue plus Storage) so the report set can include the full drawing set.
 5. Fix the street-network block-length breach after edits (`lib/streetnet.mjs`) and make the UI's network search use `netEvals` too.

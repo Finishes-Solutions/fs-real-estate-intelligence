@@ -194,3 +194,24 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 
 - **Typed presets, not open prompts**: Quick layouts are fixed word requests per type (lib/quicklayouts.mjs) run through the no-AI words parser and the seeded engine, because open-ended AI requests were giving odd layouts; each preset is checked in test/quicklayouts.mjs to read as the use it names.
 - **Run in parallel, dedupe by numbers**: up to five runs at once in a small worker pool (one fewer than the cores, at most 4); a layout with the same units, floor area, spaces, buildings and piece count as an earlier one is dropped for the type's next preset, since some word variants (e.g. "rear-load") draw the same plan on a given site.
+
+
+## Finishes budget library as a cost source (2026-11-09)
+
+- The owner asked for the purchasing workbook (Finishes_Budget_Library_v1.xlsx) to be built into `experimental`, keeping current rates for everything it doesn't cover. Pushed to `experimental` on that instruction (the session's own branch was a different one).
+- Only the workbook's **computable layer** is in the repo (`lib/feasibility/data/fs-budget-library-v1.mjs`: inputs, takeoff constants, the 92 template lines with low / likely / high, the top-down benchmarks). The **evidence layer** (rate library with vendors, bid leveling, vendor list with contacts and payables, actual costs, data flags) stays out: the data modules load in the browser and the app has only a shared passcode. The .xlsx itself is not committed.
+- Line descriptions were rewritten without vendor or product names; basis notes and source file names were dropped.
+- **T-043 insulation**: the workbook's low and likely rates came from a vendor whose agreement forbids disclosing its terms (workbook flag F-21). Its rates here are the other three bids for the same house ($1.65 / $1.66 / $1.88 a living sf). The workbook's own totals differ from the calculator's by that one line.
+- **Which uses:** houses and cottages (`sfr`) and townhomes take the library; they were on the team's 2024–25 medians (n=3) and the Waller workbook. Apartments stay on the workbook: the library's apartment rates are placeholders and four lines have no rate, so they are a cross-check note only. Storage stays parametric (the library has one benchmark line). Duplexes are not a product in the library: unchanged.
+- **Tiny and manufactured home communities** keep their delivered-home pricing, as before.
+- **Site work is not counted twice:** the template's SWPPP, lot clearing, pad / fill and culvert lines (T-010, T-012, T-013, T-014) are left out because the platform's lot and site-prep lines cover them. On-lot work (driveway, sod, landscape, fence, final grade) stays in. With meters entered, the fee calculator replaces T-007 / T-008.
+- **Soft costs:** the template's engineering, geotech, survey, inspections, permit, impact fee, tap, warranty and builder's risk lines are the homes' soft costs (not escalated). The platform's soft % then applies only to site work and other uses, so permits and engineering aren't counted twice. Legal and taxes during construction are not in the library; they are not added.
+- **GC fee:** the library is direct cost with no fee, so its hard lines take the budget's GC fee % (12% by default, about $15–20k a home, in line with the workbook's fee-build precedent).
+- **Escalation** runs from Dec 2025 (most rates are 2025 quotes and the Dec 2025 – Jan 2026 bid round).
+- **CSI codes** were assigned line by line here; the workbook has only Hart's XX.XX cost codes, which ride along as `costCode` and in each line's source ref.
+- **What the plan doesn't say** takes the workbook's defaults (25% masonry, windstorm strapping, all-electric, slab on grade). Baths: 2 for one storey, 2.5 above. A house plan's storeys are the ones most homes have. Townhome storeys come from the plan (`byFloors`, new in `metricsOf`), 3 where it doesn't say; a townhome's total sf is the plan's gross, not the workbook's ratio.
+- **Townhome driveway, sod and fence** are 0.6 of a detached home's: the workbook gives only detached defaults (and 0 for apartments), and 0.6 is the share the platform already prices a townhome's lot at. An estimate, editable per line.
+- **Confidence labels:** a house line is at most `medium` (the rates are Hart's, not Finishes'; the workbook's flag F-36 says Finishes may pay much more on finish trades); a townhome line at most `medium-low`, `low` on the multifamily-rate lines.
+- **Jurisdiction** comes from the intake's city: Houston and Dayton have adders in the library; any other city gets none (`OTHER`).
+- The range shown is the direct cost of the library's lines (low / likely / high). The pro forma runs on the likely figure only; low and high are not carried into returns (the cost sensitivity grid already does that job).
+
