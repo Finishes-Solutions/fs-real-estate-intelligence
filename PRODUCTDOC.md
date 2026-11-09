@@ -377,7 +377,7 @@ The quick buttons and the panel always match. A layer turned on in either place,
 
 ## Construction filings
 
-Texas requires most commercial and public construction projects to register with the state (TDLR, through its TABS system). The app loads two years of these filings for the 7 counties every night. AI reads each filing for its use, tenant, developer, architect, contractor and housing units.
+Texas requires most commercial and public construction projects to register with the state (TDLR, through its TABS system). The app loads two years of these filings for the 7 counties every night, and the new data goes live once the day's data update is approved (an administrator merges it; the Data & help page shows when the data was last built). If the state's site is down, the night's update is skipped and the app keeps showing the last good data, never a half-built set. AI reads each filing for its use, tenant, developer, architect, contractor and housing units.
 
 - **Filing dots** are off by default. Turn them on with **Filings** (above the map) or the **On map** switch on the panel's Construction Filings header. Green is new construction, grey is renovation, and a ring is an addition.
 - **Filters → Construction filings:** time period, county, type, value, use, status, size, housing units, company name, exact addresses only, start or registration dates, and recent changes. On phones, Filters opens as a full sheet with **Clear All** at the top and a button at the bottom that closes it.
@@ -1164,6 +1164,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 ## Recently added
 
 - **Agents review and revise their site plans (Nov 8):** connected agents now lay out at high effort by default, see a picture of each plan, and send it back for changes until it passes its checks and does what was asked.
+- **Nightly data updates arrive for approval:** the night's construction filings, market and area data are prepared as an update that an administrator approves before it goes live; the app no longer updates itself overnight. When the state's TABS site is down for maintenance (as on November 8, 2026), the night's update is skipped and the last good data stays, instead of a half-built or empty set.
 - **Agents' long requests finish (Nov 6):** site plans, plan sets, renderings and reports asked for by a connected agent no longer fail at the one-minute mark; the agent gets a "still working" answer and checks back for the result.
 - **Edits that do what you say (Nov 5):** "move the pool to the center", "make it 4 stories", "add 20 units", "parking behind the buildings", "make it denser", "keep building 1 where it is" and more now work in Change With AI and for connected agents, and the reply says what was done and what couldn't be.
 - **Garages, T and U shapes, data centres (Nov 5):** parking garages are drawn with as many levels as the spaces need; T-shaped buildings hold their count; "U-shaped" means an open U; data centres get a service drive instead of a truck court; when a building can't fit on the lot, the plan says how much does.

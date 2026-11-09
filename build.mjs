@@ -10,6 +10,7 @@ import { geocodeRows, cleanStreet, parseCity } from './build/geocode.mjs';
 import { buildGeo, buildUsCounties } from './build/geometry.mjs';
 import { addTractRisk } from './build/tractrisk.mjs';
 import { toFiling, countyCheck } from './build/compact.mjs';
+import { checkShrink } from './build/guard.mjs';
 import { enrich, aiFields, aiKey } from './build/enrich.mjs';
 import { diff, appendRun } from './build/changes.mjs';
 import { buildMarket } from './build/market.mjs';
@@ -80,7 +81,8 @@ async function refresh() {
   const seen = new Set(); rows = rows.filter(r => !seen.has(r.ProjectNumber) && seen.add(r.ProjectNumber));
   const prevFile = await readJSON(D + 'filings.json', { filings: [] });
   const prevHere = prevFile.filings.filter(f => counties.some(c => c.name === f.county));
-  if (prevHere.length > 200 && rows.length < prevHere.length * 0.5 && !process.env.ALLOW_SHRINK) throw new Error(`TABS returned ${rows.length} filings vs ${prevHere.length} last run; refusing to overwrite (set ALLOW_SHRINK=1 to force)`);
+  // a collapsed list (in total or in any one county) is a failed source, not news: stop here and keep the last good data
+  for (const p of checkShrink(prevFile.filings, rows, counties)) log('shrink forced past:', p);
 
   // 2. detail pages (cached)
   const tabsCache = await readJSON(C + 'tabs.json', {});

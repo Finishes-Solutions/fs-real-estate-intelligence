@@ -10,6 +10,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **No phantom buildings:** the same fix could leave buildings squeezed to nothing (an empty patch on the drawing, counted as extra buildings). Those are removed.
 - Checked on the real plan where it happened: parking 154 → 179 of 168 needed, pool kept, "pool in the middle" met.
 
+### 1:26 PM CT: Nightly data refresh fixed: clear failures, last good data kept, published through a pull request (`3e8d3a5`)
+- **Why the data stopped on November 3:** since November 4 the nightly refresh could no longer save its results (the main branch now only takes changes through a pull request), and on November 8 the state's TABS site was down for maintenance. The refresh now puts each night's data into a pull request for an administrator to approve, instead of writing straight to the site.
+- **When the state's site is down,** the refresh says exactly what happened (the status it got and what it was asking for), waits as the site asks before trying again, stops instead of hammering a site that says it is down for hours, and leaves the last good data in place. An empty or half-built set of filings is never published, including when any one county comes back nearly empty or most of the new project pages fail.
+- **Nothing is lost on a failed save:** the night's built files are kept with the run for a week.
+- The guide's Construction filings section and Recently added list say how data updates now arrive.
+
 ### 1:24 PM CT: Agents lay out at high effort and revise their site plans until they're right (`f6d5a32`)
 - **High effort by default:** a site plan asked for by a connected agent is now laid out at high effort (the AI plans, reviews and may revise) unless the agent asks for less.
 - **The agent sees the plan:** every site plan and every change an agent makes comes back with a picture of the plan, not only the PDF.

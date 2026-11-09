@@ -19,7 +19,8 @@ on:
         required: false
 
 permissions:
-  contents: write
+  contents: write # push the data branch (main itself requires a pull request; see "Publish data")
+  pull-requests: write # open / update the data pull request (also needs Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests")
   id-token: write # GitHub OIDC: lets the site's /api/pipeline-ai do AI tagging with the key stored in Vercel
 
 concurrency:
@@ -57,18 +58,27 @@ jobs:
           PERIOD_START: ${{ inputs.period_start }}
           PERIOD_END: ${{ inputs.period_end }}
         run: node build.mjs ${{ inputs.markets_only == 'yes' && '--markets' || '' }}
-      - name: Commit data
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
-          if git diff --cached --quiet; then echo "No data changes"; exit 0; fi
-          git commit -m "Refresh data $(date -u +%Y-%m-%d)"
-          # This commit only touches data/. If someone pushed data/ meanwhile, this run's freshly built files win
-          # (-X theirs = the commit being replayed), so hours of geocoding are never thrown away over a conflict.
-          for i in 1 2 3 4 5; do
-            if git pull --rebase -X theirs --autostash origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
-            git rebase --abort 2>/dev/null || true
-            sleep $((i * 5))
-          done
-          exit 1
+      # the build's outputs, kept a week even if publishing fails (no secrets in data/; the caches are what cost hours)
+      - name: Keep the built files
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-${{ github.run_id }}
+          path: |
+            data/*.json
+            data/cache/*.json
+          retention-days: 7
+          if-no-files-found: error
+      # main only takes changes through a pull request (GH006), so the run commits to the data branch and keeps one
+      # pull request open for it (scripts/publish-data.sh): created the first night, updated every night after, never two.
+      # The GITHUB_TOKEN cannot bypass the rule, and events it causes (the branch push, the pull request) start no other
+      # workflows, which is fine: nothing here runs on push or pull_request. Vercel deploys from its own GitHub app when
+      # the pull request is merged. Set the repository variable DATA_PR_AUTO_MERGE=true to have the run request auto-merge.
+      - name: Publish data (data branch + pull request)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          AUTO_MERGE: ${{ vars.DATA_PR_AUTO_MERGE }}
+        run: bash scripts/publish-data.sh
