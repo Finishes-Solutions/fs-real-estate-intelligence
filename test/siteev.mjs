@@ -1,0 +1,183 @@
+// EV chargers reserve existing stalls; they never create a new parking or land-use type.
+import assert from 'node:assert/strict';
+import * as S from '../lib/siteplan.mjs';
+import * as EV from '../lib/siteev.mjs';
+import * as L from '../lib/sitelayout.mjs';
+import * as M from '../lib/planmap.mjs';
+import * as SH from '../lib/sitesheet.mjs';
+import * as PS from '../lib/planset.mjs';
+import * as RUN from '../lib/layoutrun.mjs';
+import * as LE from '../lib/layoutedit.mjs';
+import { ctxFor, fm362, tract } from './helpers/setctx.mjs';
+
+const plan = {
+  origin: [-95.78, 29.78], ring: [[0, 0], [1000, 0], [1000, 1000], [0, 1000]], front: 0,
+  setbacks: { ...S.SETBACKS }, program: { use: 'retail' }, elements: []
+};
+const parking = { id: 'pk-1', kind: 'parking', x: 500, y: 500, w: 360, d: 60, rot: 0 };
+const drive = { id: 'drive-1', kind: 'drive', x: 500, y: 360, w: 500, d: 26, rot: 0 };
+
+// Off/default stays byte-for-byte unchanged, and generated layouts only gain equipment when requested.
+const untouched = { elements: [parking, drive] };
+assert.strictEqual(EV.withEV(plan, untouched), untouched);
+assert.equal(S.normalizeProgram({ use: 'retail' }).ev, null);
+const generated = L.layoutOptions({ ...plan, ring: [[0, 0], [600, 0], [600, 400], [0, 400]] }, {
+  use: 'retail', ratio: 3, ev: { enabled: true, mode: 'count', value: 2, type: 'level2' }
+});
+assert.ok(generated.some(o => o.elements.filter(e => e.kind === 'evcharger').length === 2));
+assert.ok(generated.every(o => o.elements.every(e => !['evcharger', 'evpower', 'evcanopy'].includes(e.kind)) || o.program.ev?.enabled));
+const generatedOff = L.layoutOptions({ ...plan, ring: [[0, 0], [600, 0], [600, 400], [0, 400]] }, { use: 'retail', ratio: 3 });
+assert.ok(generatedOff.every(o => !o.elements.some(e => e.kind.startsWith('ev'))));
+
+// Share uses eligible surface stalls; charger markers avoid accessible stalls/routes and drives.
+const option = {
+  program: { use: 'retail', ev: { enabled: true, mode: 'share', value: 5, type: 'level2', power: { w: 20, d: 20 }, canopy: { w: 40, d: 18 } } },
+  elements: [parking, drive], notes: []
+};
+const placed = EV.withEV(plan, option), p = { ...plan, program: placed.program, elements: placed.elements };
+const chargers = p.elements.filter(e => e.kind === 'evcharger'), access = S.accessible(p);
+const disabledAgain = EV.withEV(plan, { program: { use: 'retail' }, elements: p.elements, notes: placed.notes });
+assert.ok(disabledAgain.elements.every(e => !['evcharger', 'evpower', 'evcanopy'].includes(e.kind)));
+assert.ok(disabledAgain.notes.every(n => !n.startsWith('EV charging:')));
+assert.equal(chargers.length, 4);
+assert.ok(chargers.every(e => e.parkingId === parking.id));
+assert.ok(chargers.every(e => ![...access.stalls, ...access.aisles].some(a => S.rectsOverlap(e, { poly: a.poly }))));
+assert.ok(chargers.every(e => !S.rectsOverlap(e, drive)));
+assert.equal(S.metrics(p).spaces, S.metrics({ ...p, elements: [parking, drive] }).spaces);
+assert.deepEqual(S.metrics(p).ev, {
+  requested: 4, placed: 4, short: 0, type: 'level2', powerSf: 400, canopySf: 720,
+  powerRequested: true, canopyRequested: true, powerIncomplete: false, canopyIncomplete: false
+});
+assert.deepEqual(S.check(p).filter(i => i.level === 'bad'), []);
+assert.ok(!S.check(p).some(i => i.level === 'warn' && /EV/.test(i.text)));
+
+// A 0% share reserves nothing and reports no shortfall.
+const zeroShare = EV.withEV(plan, { program: { use: 'retail', ev: { enabled: true, mode: 'share', value: 0 } }, elements: [parking, drive], notes: [] });
+assert.equal(zeroShare.elements.filter(e => e.kind === 'evcharger').length, 0);
+assert.equal(S.metrics({ ...plan, program: zeroShare.program, elements: zeroShare.elements }).ev.requested, 0);
+assert.ok(!S.check({ ...plan, program: zeroShare.program, elements: zeroShare.elements }).some(i => /EV charging is/.test(i.text)));
+
+// Unfit requests are reported both in option notes and plan checks, without changing parking counts.
+const tooMuch = EV.withEV(plan, {
+  program: { use: 'retail', ev: { enabled: true, mode: 'count', value: 5000, type: 'dcfc', canopy: { w: 40, d: 25 } } },
+  elements: [parking, drive], notes: []
+});
+const shortPlan = { ...plan, program: tooMuch.program, elements: tooMuch.elements };
+assert.ok(S.metrics(shortPlan).ev.short > 0);
+assert.ok(tooMuch.notes.some(n => /EV charging:/.test(n) && /requested/.test(n)));
+assert.ok(tooMuch.notes.some(n => /canopy.*does not fit/.test(n)));
+assert.ok(S.check(shortPlan).some(i => i.level === 'warn' && /EV charging is/.test(i.text)));
+assert.ok(S.check(shortPlan).some(i => i.level === 'warn' && /EV canopy/.test(i.text)));
+const partial = EV.withEV(plan, { program: { use: 'retail', ev: { enabled: true, mode: 'count', value: 1, power: { w: 20 }, canopy: { d: 18 } } }, elements: [parking, drive] });
+assert.ok(partial.notes.some(n => /power equipment: enter both width and depth/.test(n)));
+assert.ok(partial.notes.some(n => /canopy: enter both width and depth/.test(n)));
+assert.ok(S.check({ ...plan, program: partial.program, elements: partial.elements }).some(i => /canopy needs both a width and a depth/.test(i.text)));
+
+// The same equipment is visible in the map key, site sheet, electrical sheet and CAD export.
+const fc = S.planFeatures(p), marker = fc.features.find(f => f.properties.k === 'evcharger');
+assert.equal(marker.geometry.type, 'Point');
+assert.equal(marker.properties.charger, 'level2');
+assert.ok(M.keyItems(p).kinds.includes('evcharger') && /EV charger stalls/.test(M.keyHtml(p)));
+const svg = SH.planSVG(p, { px: 900 }).svg;
+assert.ok(svg.includes('#0b7a5f'), 'site-plan SVG has the EV charger symbol');
+assert.ok(/EV charger stalls|EV charging canopy/.test(SH.sheetHTML({ plan: p, size: 'tabloid' })));
+assert.ok(SH.sheetData(p).parking.some(([name]) => name.includes('EV charger stalls')));
+const dxf = S.toDXF(p, 'EV TEST');
+assert.match(dxf, /EV_CHARGERS/); assert.match(dxf, /EV_POWER/); assert.match(dxf, /EV_CANOPY/);
+
+const ctx = ctxFor('retail'), sitePlan = { ...ctx.plan, program: { ...ctx.plan.program, ev: { enabled: true, mode: 'count', value: 2, type: 'dcfc' } } };
+const withEquipment = EV.withEV(sitePlan, { program: sitePlan.program, elements: sitePlan.elements });
+const evCtx = PS.setContext({ ...ctx, plan: { ...sitePlan, elements: withEquipment.elements } }, ctx.sheets);
+const electrical = PS.sheetPage(evCtx, evCtx.sheets.find(s => s.kind === 'e-site'));
+const civil = PS.sheetPage(evCtx, evCtx.sheets.find(s => s.kind === 'c-dims'));
+assert.match(electrical, /EV charging equipment/);
+assert.match(electrical, /DC fast charger/);
+assert.match(civil, /DCFC/);
+
+// Realistic generated layouts (the 7.7 acre FM 362 lot): every charger sits in a stall the engine draws, the canopy
+// fits over a row whose aisle drive runs flush along it, and the power pad stays off the walks round the buildings.
+const EVK = ['evcharger', 'evpower', 'evcanopy'];
+const onReal = (prog, ev) => L.layoutOptions({ ...fm362, elements: [] }, { ...prog, ev }, { count: 3 }).map(o => ({ o, p: { ...fm362, program: o.program, elements: o.elements } }));
+// the engine's own stalls: an angled row's parallelograms, else square stalls round S.stallCentres
+const stallShapes = park => {
+  if (S.stallAng(park)) return S.angledStallPolys(park).map(q => ({ poly: q.poly }));
+  const st = S.stalls(park), sw = park.sw || S.STALL.w, sd = park.sd || S.STALL.d, rot = (park.rot || 0) + (st.swap ? -90 : 0);
+  return S.stallCentres(park).map(([x, y]) => ({ x, y, w: sw, d: sd, rot }));
+};
+const inShape = (r, q) => r.poly ? S.inRing(q, r.poly) : S.hitRect(r, q);
+// every charger fully inside a stall the engine draws, on the piece it names, one to a stall, none on an accessible
+// stall, a drive or a building's walk; parking the same as without the equipment
+function onStalls(p, label) {
+  const cs = p.elements.filter(e => e.kind === 'evcharger'), A = S.accessible(p), routes = [...A.stalls, ...A.aisles].map(a => ({ poly: a.poly })), walks = S.details(p).walks, used = new Set();
+  for (const c of cs) {
+    const park = p.elements.find(e => e.kind === 'parking' && e.id === c.parkingId), shapes = park ? stallShapes(park) : [], at = shapes.findIndex(r => inShape(r, [c.x, c.y])), stall = shapes[at];
+    assert.ok(stall && S.corners(c).every(q => inShape(stall, q)), label + ': ' + c.id + ' inside a drawn stall of ' + c.parkingId);
+    const key = c.parkingId + ':' + at; assert.ok(!used.has(key), label + ': one charger to a stall'); used.add(key);
+    assert.ok(!routes.some(a => S.rectsOverlap(stall, a)), label + ': not an accessible stall or aisle');
+    assert.ok(!p.elements.some(e => e.kind === 'drive' && S.rectsOverlap(c, e)), label + ': clear of drives');
+    assert.ok(!walks.some(w => S.rectsOverlap(c, w, 0.1)), label + ': off the building walks');
+  }
+  assert.equal(S.metrics(p).spaces, S.metrics({ ...p, elements: p.elements.filter(e => !EVK.includes(e.kind)) }).spaces, label + ': parking unchanged');
+  assert.deepEqual(S.check(p).filter(i => i.level === 'bad' && EVK.includes(p.elements.find(e => e.id === i.id)?.kind)).map(i => i.text), [], label + ': no plan-check problems on the equipment');
+  return cs;
+}
+for (const { o, p } of onReal({ use: 'retail', gfa: 40000 }, { enabled: true, mode: 'count', value: 4, type: 'level2', power: { w: 10, d: 6 }, canopy: { w: 40, d: 18 } })) {
+  const cs = onStalls(p, 'retail'), canopy = p.elements.find(e => e.kind === 'evcanopy');
+  assert.equal(cs.length, 4);
+  assert.ok(canopy, 'a 40 x 18 ft canopy fits over four reserved stalls: ' + o.notes.join(' | '));
+  assert.ok(cs.every(c => S.hitRect(canopy, [c.x, c.y])));
+  assert.ok(!p.elements.some(e => e.kind === 'drive' && S.rectsOverlap(canopy, e)));
+}
+for (const { p } of onReal({ use: 'office', gfa: 60000, floors: 3 }, { enabled: true, mode: 'count', value: 6, type: 'level2', power: { w: 12, d: 8 } })) {
+  const pad = p.elements.find(e => e.kind === 'evpower');
+  if (pad) assert.ok(!S.details(p).walks.some(w => S.rectsOverlap(pad, w, 0.1)), 'power equipment stays off the building walks');
+}
+
+// Angled rows (a restaurant's 45° one-way rows): the charger at the head of an angled stall, inside its parallelogram.
+{ let angled = 0;
+  for (const { p } of onReal({ use: 'restaurant' }, { enabled: true, mode: 'share', value: 10, type: 'dcfc', power: { w: 20, d: 20 } })) {
+    const cs = onStalls(p, 'restaurant'); angled += cs.filter(c => S.stallAng(p.elements.find(e => e.id === c.parkingId))).length;
+  }
+  assert.ok(angled > 0, 'chargers were placed on angled stalls'); }
+// A row parked head-in against the buildings has its heads on the building's walk: no charger there.
+for (const { p } of onReal({ use: 'multifamily', units: 200 }, { enabled: true, mode: 'share', value: 10, type: 'dcfc', power: { w: 20, d: 20 } })) onStalls(p, 'multifamily');
+
+// Build (lib/layoutrun.mjs): chargers go on last, after the run's passes have moved and trimmed parking; asking for them
+// leaves the layout itself as it is without them (the same pond, the same pick of layout).
+{
+  const ev = { enabled: true, mode: 'count', value: 6, type: 'level2', power: { w: 10, d: 6 }, canopy: { w: 60, d: 18 } };
+  const off = RUN.runPlan({ ...fm362, elements: [] }, { use: 'retail', gfa: 40000 }, { count: 3 }).options, on = RUN.runPlan({ ...fm362, elements: [] }, { use: 'retail', gfa: 40000, ev }, { count: 3 }).options;
+  const bare = els => JSON.stringify(els.filter(e => !EVK.includes(e.kind)));
+  assert.deepEqual(on.map(o => bare(o.elements)), off.map(o => bare(o.elements)), 'the run picks and draws the same layouts with EV asked for');
+  for (const o of on) {
+    assert.deepEqual(o.program.ev, S.normalizeProgram({ use: 'retail', ev }).ev);
+    const p = { ...fm362, program: o.program, elements: o.elements }, cs = onStalls(p, 'run');
+    assert.equal(cs.length, 6); assert.equal(o.check.status, off[on.indexOf(o)].check.status);
+    assert.ok(o.elements.some(e => e.kind === 'evcanopy'), 'a 60 ft canopy over a 72 ft row: ' + o.notes.filter(n => /^EV/.test(n)).join(' | '));
+    assert.ok(!('rankHash' in o));
+  }
+  for (const o of RUN.runPlan({ ...tract, elements: [] }, { use: 'restaurant', ev }, { count: 3 }).options) onStalls({ ...tract, program: o.program, elements: o.elements }, 'tract run');
+  // edits (lib/layoutedit.mjs) lay the rest out again: the chargers follow onto the stalls as they are after the edit
+  const rec = RUN.runBrief(RUN.briefForPlan({ ...fm362, elements: [] }, { use: 'retail', gfa: 40000, ev }, { count: 3 }));
+  let r = LE.applyEdit(rec, { op: 'lock', target: { kind: 'building' } }); assert.ok(r.ok); r = LE.applyEdit(r.record, { op: 'regenerate' }); assert.ok(r.ok, (r.conflicts || []).join(' | '));
+  assert.equal(onStalls({ ...fm362, program: r.record.options[0].program, elements: r.record.options[0].elements }, 'locked regenerate').length, 6, 'chargers over the parking field paving');
+  assert.ok(!('rankHash' in r.record.options[0]));
+  const mf = RUN.runBrief(RUN.briefForPlan({ ...fm362, elements: [] }, { use: 'multifamily', units: 200, ev }, { count: 3 }));
+  const mv = LE.applyEdit(mf, { op: 'move', target: { kind: 'pool' }, to: 'center' }); assert.ok(mv.ok, (mv.conflicts || []).join(' | '));
+  assert.equal(onStalls({ ...fm362, program: mv.record.options[0].program, elements: mv.record.options[0].elements }, 'moved pool').length, 6);
+}
+
+// A canopy shorter than the chargers' run covers as many as it can and says so; equipment dragged onto a building's
+// walk is a plan-check problem.
+{
+  const o = EV.withEV(plan, { program: { use: 'retail', ev: { enabled: true, mode: 'count', value: 6, canopy: { w: 20, d: 18 } } }, elements: [parking, drive], notes: [] });
+  const canopy = o.elements.find(e => e.kind === 'evcanopy'), cs = o.elements.filter(e => e.kind === 'evcharger');
+  assert.ok(canopy && cs.filter(c => S.hitRect(canopy, [c.x, c.y])).length === 3); // (chargers 9 ft apart: a 20 ft canopy over three)
+  assert.ok(o.notes.some(n => /canopy: covers 3 of the 6 chargers/.test(n)), o.notes.join(' | '));
+  const bldg = { id: 'b-1', kind: 'building', use: 'retail', x: 500, y: 600, w: 200, d: 80, rot: 0, floors: 1 };
+  const onWalk = { id: 'ev-charger-x', kind: 'evcharger', x: 500, y: 555, w: 2, d: 2, rot: 0, chargerType: 'level2', parkingId: null };
+  const iss = S.check({ ...plan, program: { use: 'retail', ev: { enabled: true, mode: 'count', value: 1 } }, elements: [bldg, onWalk] }).filter(i => i.id === onWalk.id);
+  assert.ok(iss.some(i => i.level === 'bad' && /walk round a building/.test(i.text)), JSON.stringify(iss));
+}
+
+console.log('EV site-layout tests passed');

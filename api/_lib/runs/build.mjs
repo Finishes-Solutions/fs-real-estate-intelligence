@@ -159,7 +159,7 @@ export async function step(job, d, ctx) {
     const rv = d.rv, pool = d.pool.map(byKey).filter(Boolean); let add = [], progR = d.progR || d.prog;
     if (rv.revise && rv.program) {
       at(4 + o0, (d.revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
-      const params2 = RUN.fillParams({ ...d.params1, ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, { ask }), prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) };
+      const params2 = RUN.fillParams({ ...d.params1, ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, { ask }), prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}), ...(d.prog?.ev ? { ev: d.prog.ev } : {}) /* (the plan's EV charging settings, as keepNames keeps them) */ };
       let out2 = []; try { out2 = laid({ ...pl, setbacks: d.setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...d.koOpts, ...(d.wb ? { brief: d.wb } : {}) }); } catch (e) { out2 = []; }
       const v2 = named(out2, { ...d.plan, params: params2, program: prog2 }, { params: params2, revisedBy: rv.why || 'the AI review' }).filter(v => v.elements?.length);
       if (v2.length) { add = v2.slice(0, 3); progR = prog2; d.params1 = params2; d.revised.push(rv.why || 'a better program'); }
