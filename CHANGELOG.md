@@ -3,6 +3,13 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-10
+
+### 5:29 PM CT: Planned EV charging in site layouts (`bb5bd30`, on the `test/ev-stations` preview branch)
+- **EV chargers on existing parking:** turn on **Plan EV charging** under Program and choose a number of chargers or a share of the parking, Level 2 or DC fast charging, and optionally the size of the power equipment and a canopy. Chargers reserve stalls the plan already has (straight or angled), so parking counts and the layout around them stay the same.
+- **Kept clear and said when it doesn't fit:** accessible stalls and aisles, drives and the walks round buildings stay clear. When the chargers, power equipment or canopy don't fit, the plan's notes and check say so instead of squeezing them in; a canopy shorter than the row of chargers covers as many as it can and says how many.
+- **Everywhere the plan goes:** Build, Quick layouts, Change With AI edits and hand-drawn plans place the chargers; Numbers, the map, the site and electrical sheets and the CAD (DXF) export show them.
+
 ## 2026-11-09
 
 ### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
