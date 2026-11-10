@@ -5,6 +5,15 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-09
 
+### 6:18 PM CT: Feasibility budgets: houses and townhomes priced from the Finishes budget library (`experimental` branch, `6a5394d`)
+- **Houses, cottages and townhomes are budgeted line by line** from the purchasing team's budget library: about 65 lines a home (slab, framing, roof, plumbing, electrical, cabinets, flooring, driveway and so on), each quantity worked out from the home's size and storeys and each rate taken from real bids, quotes and the cost of homes already built.
+- **A low, likely and high cost:** the budget carries the likely figure; a new **Finishes budget library** box under the budget summary shows the range in total and per home, and the Budget spreadsheet has Low and High columns for these lines.
+- **A check against real jobs:** the box says where the homes land per living square foot against the library's own jobs, and flags a budget outside that range or a house size the library was never bid on.
+- **Townhome rates are marked as placeholders** (none has been built from them yet). Apartments stay on the team's budget workbook, with the library's apartment figure shown beside it as a cross-check and its four unpriced lines named.
+- **Everything else is priced exactly as before:** duplexes, shops, restaurants, offices, hotels, industrial, storage, convenience stores, tiny and manufactured home communities, and all site work.
+- **Expect lower house and townhome budgets than before:** the library's rates are what Hart Homes paid, which run well under the team's 2024–25 budgets (about a third lower on the test plans). The app says so beside the budget; change any rate you know better.
+- Vendor names, contacts, individual bids and payables from the library are **not** in the app. They wait for proper sign-in.
+
 ### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
 - **Hotel + retail is its own quick layout type:** one hotel building on its own parcel at one end of the frontage, sized to the land it and its parking need, and the rest of the site retail. Five versions: the hotel at either end, a 5-story hotel, retail with a pad site, or restaurant pads. It needs about 4 acres and 300 ft of frontage. **Office & hotel** is now **Office & medical**.
 - **Set the size if you want:** two optional boxes, **Buildings** and **Square feet**, under the type buttons. Blank fills the site as before; filled in, the layouts use that floor area and number of buildings (e.g. retail, 40,000 sf in 2 buildings) and the rest of the land is marked for a later phase. Square feet apply to shops, offices, warehouses and the hotel; homes are always as many as fit.
