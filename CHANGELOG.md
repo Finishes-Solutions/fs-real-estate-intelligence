@@ -3,6 +3,11 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-11
+
+### 2:03 PM CT: EV chargers counted on each parking lot (`92151c4`, on the `test/ev-stations` preview branch)
+- **Each lot says how many of its stalls have chargers:** a parking lot with EV chargers is now labelled like "7 spaces · 6 EV" on the map, the site plan sheet and the editor's Items list, and "7 SPACES, 6 EV" in the CAD (DXF) export. Lots without chargers are labelled as before.
+
 ## 2026-11-10
 
 ### 5:29 PM CT: Planned EV charging in site layouts (`bb5bd30`, on the `test/ev-stations` preview branch)
