@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-11
 
+### 5:25 PM CT: EV charging stalls tinted on the map and chargers shown in 3D (`f5a5ce5`, on the `test/ev-stations` preview branch)
+- **See which stalls are for EV cars:** stalls with a charger are shaded green (blue for DC fast charging) on the map and the site plan sheet.
+- **In 3D on the tilted map:** chargers stand as posts about 5.5 ft tall, and a canopy shows as a roof 12 ft up on columns along the chargers' side.
+
 ### 2:03 PM CT: EV chargers counted on each parking lot (`92151c4`, on the `test/ev-stations` preview branch)
 - **Each lot says how many of its stalls have chargers:** a parking lot with EV chargers is now labelled like "7 spaces · 6 EV" on the map, the site plan sheet and the editor's Items list, and "7 SPACES, 6 EV" in the CAD (DXF) export. Lots without chargers are labelled as before.
 
