@@ -8,6 +8,7 @@ import * as SH from '../lib/sitesheet.mjs';
 import * as PS from '../lib/planset.mjs';
 import * as RUN from '../lib/layoutrun.mjs';
 import * as LE from '../lib/layoutedit.mjs';
+import * as T from '../lib/sitetools.mjs';
 import { ctxFor, fm362, tract } from './helpers/setctx.mjs';
 
 const plan = {
@@ -85,6 +86,21 @@ assert.ok(SH.sheetData(p).parking.some(([name]) => name.includes('EV charger sta
 const dxf = S.toDXF(p, 'EV TEST');
 assert.match(dxf, /EV_CHARGERS/); assert.match(dxf, /EV_POWER/); assert.match(dxf, /EV_CANOPY/);
 
+// Each parking lot's label says how many of its stalls have chargers: the map, the site sheet, the DXF and the Items list.
+{
+  const n = S.stalls(parking).count, lot = p.elements.find(e => e.id === parking.id);
+  assert.deepEqual([...S.evByLot(p.elements)], [[parking.id, 4]]);
+  assert.equal(S.labelOf(lot, p.program, 4).size, n + ' spaces · 4 EV');
+  assert.equal(S.labelOf(lot, p.program).size, n + ' spaces', 'without a count the label is as before');
+  assert.ok(S.planFeatures(p).features.some(f => f.properties.k === 'label' && f.properties.t === n + ' spaces · 4 EV'), 'map label');
+  assert.ok(SH.planSVG(p, { px: 1400 }).svg.includes(n + ' SPACES · 4 EV'), 'site sheet label');
+  assert.ok(S.toDXF(p, 'EV TEST').includes(n + ' SPACES, 4 EV'), 'DXF label');
+  assert.equal(T.itemSub(lot, p), S.spacesWord(n) + ' · 4 EV', 'Items list');
+  const off = { ...plan, elements: [parking, drive] };
+  assert.ok(!S.planFeatures(off).features.some(f => f.properties.k === 'label' && /EV/.test(f.properties.t)), 'no EV in labels without chargers');
+  assert.ok(!/ EV\b/.test(S.toDXF(off, 'X').replace(/EV_(CHARGERS|POWER|CANOPY)/g, '')));
+}
+
 const ctx = ctxFor('retail'), sitePlan = { ...ctx.plan, program: { ...ctx.plan.program, ev: { enabled: true, mode: 'count', value: 2, type: 'dcfc' } } };
 const withEquipment = EV.withEV(sitePlan, { program: sitePlan.program, elements: sitePlan.elements });
 const evCtx = PS.setContext({ ...ctx, plan: { ...sitePlan, elements: withEquipment.elements } }, ctx.sheets);
@@ -133,6 +149,13 @@ for (const { p } of onReal({ use: 'office', gfa: 60000, floors: 3 }, { enabled: 
   if (pad) assert.ok(!S.details(p).walks.some(w => S.rectsOverlap(pad, w, 0.1)), 'power equipment stays off the building walks');
 }
 
+// On a real layout every lot keeps its sheet label with the longer EV text (a small lot of 7 spaces, all of them EV, too)
+{
+  const ev = { enabled: true, mode: 'count', value: 40, type: 'level2' }, o = onReal({ use: 'retail', gfa: 40000 }, ev)[0], q = o.p;
+  const lots = svg => (svg.match(/>[0-9]+ SPACES[^<]*</g) || []).length, evBy = S.evByLot(q.elements), svg = SH.planSVG(q, { px: 1400 }).svg;
+  assert.equal(lots(svg), lots(SH.planSVG({ ...q, elements: q.elements.filter(e => !EVK.includes(e.kind)) }, { px: 1400 }).svg), 'no lot label lost');
+  for (const [id, k] of evBy) assert.ok(svg.includes(S.stalls(q.elements.find(e => e.id === id)).count + ' SPACES · ' + k + ' EV'), 'lot ' + id + ' says its ' + k + ' EV');
+}
 // Angled rows (a restaurant's 45° one-way rows): the charger at the head of an angled stall, inside its parallelogram.
 { let angled = 0;
   for (const { p } of onReal({ use: 'restaurant' }, { enabled: true, mode: 'share', value: 10, type: 'dcfc', power: { w: 20, d: 20 } })) {

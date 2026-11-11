@@ -3147,7 +3147,10 @@ export function streetApron(plan, els, programIn) {
 
 // ---------- map features ----------
 // what a piece is called and how big it is, for labels on the map, the PDF and the DXF
-export function labelOf(e, prog) {
+// how many EV chargers each parking piece holds: Map(parking id -> count) (lib/siteev.mjs puts each on a stall of the piece it names)
+export function evByLot(els) { const m = new Map(); for (const e of els || []) if (e.kind === 'evcharger' && e.parkingId != null) m.set(e.parkingId, (m.get(e.parkingId) || 0) + 1); return m; }
+// evN: the EV chargers on a parking piece's stalls (evByLot), said after its spaces ("24 spaces · 4 EV")
+export function labelOf(e, prog, evN = 0) {
   const P = normalizeProgram(prog), use = USES[e.use] ? e.use : P.use, gfa = Math.round(gfaOfEl(e));
   if (e.kind === 'building' && use === 'sfr') return { name: e.name || '', what: e.note || '', size: '' }; // a home: its lot number and type are enough
   if (e.kind === 'building' && use === 'storage') { const q = storageOf([{ ...e, use }], P); return { name: e.name || '', what: e.note || USES.storage.label, size: (q.units ? '~' + q.units.toLocaleString('en-US') + ' units · ' : '') + gfa.toLocaleString('en-US') + ' sf' + ((e.floors || 1) > 1 ? ' · ' + e.floors + ' fl' : '') }; }
@@ -3160,7 +3163,7 @@ export function labelOf(e, prog) {
   }
   if (isRing(e)) return { name: e.name || 'Roundabout', what: '', size: Math.round(2 * ringOf(e).R) + ' ft across' };
   if (isLoop(e)) return { name: e.name || 'Drop-off loop', what: 'One way', size: '' };
-  if (e.kind === 'parking') { const n = stalls(e).count; return { name: '', what: '', size: n + (e.rv ? ' ' + (e.site ? e.site.replace(/^[A-Z](?=[a-z])/, c => c.toLowerCase()) + 's' : 'RV / boat') : e.vac ? ' air / vacuum' : n === 1 ? ' space' : ' spaces') }; } // ("1 space", not "1 spaces")
+  if (e.kind === 'parking') { const n = stalls(e).count; return { name: '', what: '', size: n + (e.rv ? ' ' + (e.site ? e.site.replace(/^[A-Z](?=[a-z])/, c => c.toLowerCase()) + 's' : 'RV / boat') : e.vac ? ' air / vacuum' : n === 1 ? ' space' : ' spaces') + (evN > 0 ? ' · ' + evN + ' EV' : '') }; } // ("1 space", not "1 spaces")
   if (e.kind === 'canopy') return { name: e.name || 'Fuel canopy', what: (e.pumps || 0) + ' pumps · ' + 2 * (e.pumps || 0) + ' fueling positions', size: Math.round(elArea(e)).toLocaleString('en-US') + ' sf' };
   if (e.kind === 'tanks') return { name: e.name || 'Fuel tanks', what: 'Underground · keep clear', size: '' };
   if (e.kind === 'evcharger') return { name: '', what: '', size: '' };
@@ -3683,7 +3686,7 @@ export function streetLabels(plan) {
   return out;
 }
 export function planFeatures(plan, selected, keep = null) {
-  const F = frame(plan.origin), ll = r => r.map(F.toLL), poly = r => ({ type: 'Polygon', coordinates: [ll(r.concat([r[0]]))] }), feats = [], prog = normalizeProgram(plan.program);
+  const F = frame(plan.origin), ll = r => r.map(F.toLL), poly = r => ({ type: 'Polygon', coordinates: [ll(r.concat([r[0]]))] }), feats = [], prog = normalizeProgram(plan.program), evBy = evByLot(plan.elements); // (evBy: the EV chargers on each parking piece, in its label)
   const ring = plan.ring || []; if (ring.length < 3) return { type: 'FeatureCollection', features: feats }; const quiet = namedOnce(plan.elements || [], !!plan.params?.streetNames?.on);
   feats.push({ type: 'Feature', properties: { k: 'lot', site: 1 }, geometry: poly(ring) }); // the site itself (house lots are k 'lot' too, without `site`)
   for (const x of streetLabels(plan)) feats.push({ type: 'Feature', properties: { k: 'sname', t: x.t }, geometry: { type: 'LineString', coordinates: ll(x.path) } }); // the street names, along their streets
@@ -3727,7 +3730,7 @@ export function planFeatures(plan, selected, keep = null) {
       for (const l of q.nets) feats.push({ type: 'Feature', properties: { k: 'mark', c: '#1b1e1f', w: 2 }, geometry: { type: 'LineString', coordinates: ll(l) } }); }
     if (e.kind === 'foodtruck' && e.w >= 20 && e.d >= 10) { const q = truckParts(e); // the truck (3D), its serving window toward the seating, the pedestal
       feats.push({ type: 'Feature', properties: { k: 'ftbody', h: 3.2 }, geometry: poly(q.body) }, { type: 'Feature', properties: { k: 'mark', c: '#e07b24', w: 3 }, geometry: { type: 'LineString', coordinates: ll(q.window) } }, { type: 'Feature', properties: { k: 'pedestal', h: 1.2 }, geometry: poly(q.pedestal) }); }
-    const L = labelOf(e, plan.program), t = [L.name.toUpperCase(), L.what, L.size].filter(Boolean).join('\n');
+    const L = labelOf(e, plan.program, evBy.get(e.id)), t = [L.name.toUpperCase(), L.what, L.size].filter(Boolean).join('\n');
     const lp = e.kind === 'sign' ? signLabelAt(e) : [e.x, e.y];
     if (t && !quiet.has(e.id)) feats.push({ type: 'Feature', properties: { k: 'label', t, kind: e.kind, big: e.kind === 'building' ? 1 : 0 }, geometry: { type: 'Point', coordinates: F.toLL(lp) } });
   }
@@ -3752,7 +3755,7 @@ export function planFeatures(plan, selected, keep = null) {
 // Feet, origin at the plan origin (its lon/lat is written as a note on the drawing), north up.
 const LAYERS = [['LOT', 7], ['SETBACK', 8], ['ZONES', 8], ['BUILDING', 1], ['PARKING', 3], ['STALLS', 9], ['DRIVE', 8], ['TRUCK', 6], ['POND', 5], ['LANDSCAPE', 82], ['AMENITY', 4], ['PLAZA', 41], ['WALK', 9], ['TREES', 3], ['TEXT', 2], ['CURB', 7], ['ADA', 5], ['MARKINGS', 2], ['TRASH', 30], ['EASEMENT', 1], ['CANOPY', 4], ['TANKS', 30], ['EV_CHARGERS', 4], ['EV_POWER', 4], ['EV_CANOPY', 4]];
 export function toDXF(plan, title = '') {
-  const o = [], g = (c, v) => o.push(String(c), String(v));
+  const o = [], g = (c, v) => o.push(String(c), String(v)), evBy = evByLot(plan.elements);
   const num = v => (+v).toFixed(4);
   const pl = (layer, pts, closed = true) => { g(0, 'POLYLINE'); g(8, layer); g(66, 1); g(10, 0); g(20, 0); g(30, 0); g(70, closed ? 1 : 0); for (const [x, y] of pts) { g(0, 'VERTEX'); g(8, layer); g(10, num(x)); g(20, num(y)); g(30, 0); } g(0, 'SEQEND'); g(8, layer); };
   const line = (layer, [a, b]) => { g(0, 'LINE'); g(8, layer); g(10, num(a[0])); g(20, num(a[1])); g(30, 0); g(11, num(b[0])); g(21, num(b[1])); g(31, 0); };
@@ -3778,7 +3781,7 @@ export function toDXF(plan, title = '') {
   const m = metrics(plan), th = Math.max(4, Math.min(20, Math.sqrt(m.siteSf || 1e4) / 40));
   for (const e of plan.elements || []) {
     if (isRing(e)) { const r = ringOf(e); pl('DRIVE', ringDisc(r.c, r.R, 64)); pl('DRIVE', ringDisc(r.c, r.Ri, 64)); } else pl(layerOf[e.kind] || 'LANDSCAPE', outline(e)); // (a roundabout: its two circles, not its outline's seam across the lane)
-    if (e.kind === 'parking') { stallLines(e).forEach(l => line('STALLS', l)); text('TEXT', [e.x, e.y], th * 0.8, stalls(e).count + ' SPACES'); }
+    if (e.kind === 'parking') { stallLines(e).forEach(l => line('STALLS', l)); text('TEXT', [e.x, e.y], th * 0.8, stalls(e).count + ' SPACES' + (evBy.get(e.id) ? ', ' + evBy.get(e.id) + ' EV' : '')); }
     if (e.kind === 'building') { const L = labelOf(e, plan.program); if (L.name) text('TEXT', [e.x, e.y + th * 0.7], th, L.name.toUpperCase()); text('TEXT', [e.x, e.y - (L.name ? th * 0.7 : 0)], th * 0.8, L.size.toUpperCase()); }
     else if (e.kind === 'keepout') text('EASEMENT', [e.x, e.y], th * 0.8, ((e.name || 'Easement') + ' (drawn, not surveyed)').toUpperCase());
     else if (e.kind === 'evcharger') text('EV_CHARGERS', [e.x, e.y], th * 0.55, e.chargerType === 'dcfc' ? 'DCFC' : 'L2');
