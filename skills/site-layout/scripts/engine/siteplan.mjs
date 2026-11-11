@@ -3651,6 +3651,38 @@ export function pumpsOf(e) {
 // a fuel canopy in 3D (ft; plan rings): on each pump island a 6 in curb, the dispenser (7 ft) in its middle and a column
 // (2 ft square) at one end up to the canopy's clearance (FUEL.canopyH, 18 ft); the roof deck over it and a 3½ ft fascia
 // band round its edge. [{ part, c (colour), b, h, ring }]
+// the stall under each EV charger, as the engine draws it (an angled row's parallelogram, else the square stall round
+// stallCentres): [{ id (the charger's), parkingId, dcfc, poly }]. A charger that isn't on a stall of its piece has none.
+export function evStalls(plan) {
+  const els = plan.elements || [], lots = new Map(els.filter(e => e.kind === 'parking' && e.id != null).map(e => [e.id, e])), shapes = new Map(), out = [];
+  for (const c of els) {
+    if (c.kind !== 'evcharger' || c.parkingId == null) continue;
+    const park = lots.get(c.parkingId); if (!park || isFree(park)) continue;
+    if (!shapes.has(park.id)) {
+      if (stallAng(park)) shapes.set(park.id, angledStallPolys(park).map(q => q.poly));
+      else { const st = stalls(park), w = park.sw || STALL.w, d = park.sd || STALL.d, r = (park.rot || 0) + (st.swap ? -90 : 0); shapes.set(park.id, stallCentres(park).map(([x, y]) => corners({ x, y, w, d, rot: r }))); }
+    }
+    const poly = shapes.get(park.id).find(q => inRing([c.x, c.y], q)); if (poly) out.push({ id: c.id, parkingId: park.id, dcfc: c.chargerType === 'dcfc', poly });
+  }
+  return out;
+}
+// an EV charger and canopy in 3D (feet): a 5½ ft charging post at the head of its stall (blue DC fast, green Level 2); the
+// canopy's roof deck at a 12 ft clearance on 1½ ft columns about every 30 ft along the side its chargers are on (the stall
+// heads, clear of the aisle; both long sides when it covers none). chargers: the ones under it. [{ part, c, b, h, ring }]
+export const EV_CANOPY_H = 12;
+export function ev3d(e, chargers = []) {
+  if (e.kind === 'evcharger') return [{ part: 'post', c: e.chargerType === 'dcfc' ? '#1769aa' : '#0b7a5f', b: 0, h: 5.5, ring: corners({ x: e.x, y: e.y, w: 1.6, d: 1.2, rot: e.rot || 0 }) }];
+  if (e.kind !== 'evcanopy') return [];
+  const long = e.w >= e.d, L = long ? e.w : e.d, D = long ? e.d : e.w, u = rot([1, 0], e.rot || 0), v = [-u[1], u[0]], ax = long ? u : v, ac = long ? v : u;
+  const across = chargers.map(c => (c.x - e.x) * ac[0] + (c.y - e.y) * ac[1]), mean = across.length ? across.reduce((t, x) => t + x, 0) / across.length : 0;
+  const sides = across.length && Math.abs(mean) > 0.5 ? [Math.sign(mean)] : [-1, 1], n = Math.max(2, Math.round(L / 30) + 1), out = [];
+  for (const side of sides) for (let i = 0; i < n; i++) {
+    const t = -L / 2 + 1.5 + (L - 3) * i / (n - 1), off = side * (D / 2 - 1.5);
+    out.push({ part: 'column', c: '#9aa1a5', b: 0, h: EV_CANOPY_H, ring: corners({ x: e.x + ax[0] * t + ac[0] * off, y: e.y + ax[1] * t + ac[1] * off, w: 1.5, d: 1.5, rot: e.rot || 0 }) });
+  }
+  out.push({ part: 'roof', c: '#79c9bb', b: EV_CANOPY_H, h: EV_CANOPY_H + 1.5, ring: outline(e) });
+  return out;
+}
 export function canopy3d(e) {
   const H = FUEL.canopyH, out = [], o = outline(e), box = (x, y, w, d, r) => corners({ x, y, w, d, rot: r });
   for (const q of pumpsOf(e)) {
@@ -3740,6 +3772,11 @@ export function planFeatures(plan, selected, keep = null) {
   for (const i of d.islands) feats.push({ type: 'Feature', properties: { k: 'island' }, geometry: poly(outline(i)) });
   for (const q of d.pumps || []) feats.push({ type: 'Feature', properties: { k: 'pump' }, geometry: poly(corners(q)) }); // pump islands under the canopy
   for (const e of plan.elements || []) if (e.kind === 'canopy') for (const c of canopy3d(e)) feats.push({ type: 'Feature', properties: { k: 'c3', part: c.part, c: c.c, b: +(c.b / FT).toFixed(2), h: +(c.h / FT).toFixed(2), ...(c.part === 'roof' ? { sel: e.id === selected ? 1 : 0 } : {}) }, geometry: c.hole ? { type: 'Polygon', coordinates: [ll(c.ring.concat([c.ring[0]])), ll(c.hole.slice().reverse().concat([c.hole[c.hole.length - 1]]))] } : poly(c.ring) }); // the canopy in 3D
+  // EV charging: each reserved stall tinted (green, blue for DC fast) under its stripes; in 3D the charging posts and the
+  // canopy's columns and roof deck, drawn by the fuel canopy's 3D layers (k 'c3': colour, base and height their own)
+  for (const st of evStalls(plan)) feats.push({ type: 'Feature', properties: { k: 'evstall', dcfc: st.dcfc ? 1 : 0 }, geometry: poly(st.poly) });
+  { const evc = (plan.elements || []).filter(e => e.kind === 'evcharger');
+    for (const e of plan.elements || []) if (e.kind === 'evcharger' || e.kind === 'evcanopy') for (const c of ev3d(e, e.kind === 'evcanopy' ? evc.filter(x => hitRect(e, [x.x, x.y])) : [])) feats.push({ type: 'Feature', properties: { k: 'c3', part: c.part, c: c.c, b: +(c.b / FT).toFixed(2), h: +(c.h / FT).toFixed(2), ...(c.part === 'roof' ? { sel: e.id === selected ? 1 : 0 } : {}) }, geometry: poly(c.ring) }); }
   // the paving as one surface (its curb drawn once round the outside), and its markings
   for (const pv of pavement(plan)) feats.push({ type: 'Feature', properties: { k: 'paved' }, geometry: { type: 'Polygon', coordinates: [pv.outer, ...pv.holes].map(r => ll(r.concat([r[0]]))) } });
   const A = accessible(plan);

@@ -31,7 +31,7 @@ export function turned(plan, deg) {
 // Returns { svg, scale (px per ft), box, height, turn }
 export function planSVG(plan0, opts = {}) {
   const turn = opts.turn ?? streetDown(plan0), plan = turned(plan0, turn);
-  const ring = plan.ring || [], els = plan.elements || [], prog = S.normalizeProgram(plan.program), P = PALETTE, evBy = S.evByLot(els); // (evBy: the EV chargers on each parking piece, in its label)
+  const ring = plan.ring || [], els = plan.elements || [], prog = S.normalizeProgram(plan.program), P = PALETTE, evBy = S.evByLot(els), evSt = S.evStalls(plan).reduce((m, q) => m.set(q.parkingId, [...(m.get(q.parkingId) || []), q]), new Map()); // (evBy: the EV chargers on each parking piece, in its label; evSt: their stalls, tinted)
   if (ring.length < 3) return { svg: '<svg xmlns="http://www.w3.org/2000/svg"/>', scale: 1, box: [0, 0, 1, 1] };
   const pad = opts.pad ?? 40, xs = ring.map(p => p[0]), ys = ring.map(p => p[1]), box = [Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad];
   const W = box[2] - box[0], H = box[3] - box[1], k = opts.k || (opts.px || 1000) / W, px = +(W * k).toFixed(1), X = x => ((x - box[0]) * k).toFixed(1), Y = y => ((box[3] - y) * k).toFixed(1);
@@ -53,6 +53,7 @@ export function planSVG(plan0, opts = {}) {
     if (kind === 'green' && !e.name) continue; // plain lawn is the background already
     if (kind === 'green') { o.push(poly(S.outline(e), 'fill="' + (e.future ? P.lawn : fill) + '" stroke="' + (e.future ? '#8fae7f' : '#a9c79a') + '" stroke-width="' + lw(0.8) + '"' + (e.future ? ' stroke-dasharray="8 5"' : ''))); continue; }
     o.push(poly(S.outline(e), 'fill="' + fill + '" stroke="' + (kind === 'green' ? '#a9c79a' : kind === 'court' ? '#ffffff' : 'none') + '" stroke-width="' + lw(0.6) + '"'));
+    if (kind === 'parking') for (const q of evSt.get(e.id) || []) o.push(poly(q.poly, 'fill="' + (q.dcfc ? '#1769aa' : P.evcharger) + '" fill-opacity=".3" stroke="none"')); // (the stalls its EV chargers reserve, under the stripes)
     if (kind === 'parking' && opts.lines !== false) for (const l of S.stallLines(e)) o.push('<line x1="' + X(l[0][0]) + '" y1="' + Y(l[0][1]) + '" x2="' + X(l[1][0]) + '" y2="' + Y(l[1][1]) + '" stroke="' + P.stripe + '" stroke-width="' + lw(0.5) + '"/>');
     if (kind === 'drive' && e.path && (e.width || 0) >= 24) { const c = S.fillet(e.path, e.r ?? 30, e.closed); o.push('<polyline points="' + pts(e.closed ? c.concat([c[0]]) : c) + '" fill="none" stroke="#f4f4f0" stroke-width="' + lw(0.6) + '" stroke-dasharray="8 6"/>'); }
     if (kind === 'drive' && !S.isFree(e) && e.d >= 24 && e.w >= 24 && e.name) { const a = (e.rot || 0) * Math.PI / 180, L = Math.max(e.w, e.d) / 2 - 8, along = e.w >= e.d ? [Math.cos(a), Math.sin(a)] : [-Math.sin(a), Math.cos(a)];

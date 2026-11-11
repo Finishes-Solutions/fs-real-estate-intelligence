@@ -149,6 +149,33 @@ for (const { p } of onReal({ use: 'office', gfa: 60000, floors: 3 }, { enabled: 
   if (pad) assert.ok(!S.details(p).walks.some(w => S.rectsOverlap(pad, w, 0.1)), 'power equipment stays off the building walks');
 }
 
+// The reserved stalls are tinted on the map and the site sheet (the engine's own stall: square here, angled below), and in 3D
+// each charger stands as a post with the canopy's roof deck on columns along the chargers' side, clear of the drives.
+{
+  const FT = 3.280839895, ev = { enabled: true, mode: 'count', value: 4, type: 'level2', canopy: { w: 40, d: 18 } };
+  for (const { p: q } of onReal({ use: 'retail', gfa: 40000 }, ev)) {
+    const cs = q.elements.filter(e => e.kind === 'evcharger'), st = S.evStalls(q), fc = S.planFeatures(q).features;
+    assert.equal(st.length, cs.length, 'a tinted stall for every charger');
+    for (const c of cs) { const mine = st.filter(x => S.inRing([c.x, c.y], x.poly)); assert.equal(mine.length, 1); assert.equal(mine[0].id, c.id); assert.ok(S.corners(c).every(pt => S.inRing(pt, mine[0].poly))); }
+    assert.equal(fc.filter(f => f.properties.k === 'evstall').length, cs.length, 'map tint');
+    assert.equal((SH.planSVG(q, { px: 1400 }).svg.match(/fill-opacity=".3" stroke="none"/g) || []).length, cs.length, 'sheet tint');
+    const c3 = fc.filter(f => f.properties.k === 'c3'), posts = c3.filter(f => f.properties.part === 'post');
+    assert.equal(posts.length, cs.length); assert.ok(posts.every(f => Math.abs(f.properties.h * FT - 5.5) < 0.05 && f.properties.b === 0), '5½ ft posts on the ground');
+    const can = q.elements.find(e => e.kind === 'evcanopy'); assert.ok(can);
+    const roof = c3.filter(f => f.properties.part === 'roof'); assert.equal(roof.length, 1); assert.ok(Math.abs(roof[0].properties.b * FT - S.EV_CANOPY_H) < 0.05);
+    const cols = S.ev3d(can, cs.filter(c => S.hitRect(can, [c.x, c.y]))).filter(x => x.part === 'column');
+    assert.ok(cols.length >= 2 && cols.every(x => x.ring.every(pt => S.hitRect({ ...can, w: can.w + 0.01, d: can.d + 0.01 }, pt))), 'columns under the roof');
+    assert.ok(cols.every(x => !q.elements.some(d => d.kind === 'drive' && S.rectsOverlap({ poly: x.ring }, d, 0.1))), 'columns clear of the drives');
+    const head = cs.filter(c => S.hitRect(can, [c.x, c.y])), side = x => { const u = S.rotPt([0, 1], can.rot || 0); return Math.sign((x[0] - can.x) * u[0] + (x[1] - can.y) * u[1]); };
+    assert.ok(cols.every(x => side(S.centroid(x.ring)) === side([head[0].x, head[0].y])), 'columns on the chargers\' side of the canopy');
+    const off = { ...q, program: { ...q.program, ev: null }, elements: q.elements.filter(e => !EVK.includes(e.kind)) }, fo = S.planFeatures(off).features;
+    assert.ok(!fo.some(f => f.properties.k === 'evstall' || f.properties.k === 'c3'), 'nothing EV without chargers');
+  }
+  for (const { p: q } of onReal({ use: 'restaurant' }, { enabled: true, mode: 'count', value: 5, type: 'dcfc' })) {
+    for (const x of S.evStalls(q)) { const pk = q.elements.find(e => e.id === x.parkingId); if (S.stallAng(pk)) assert.ok(S.angledStallPolys(pk).some(r => JSON.stringify(r.poly) === JSON.stringify(x.poly)), 'angled stall tinted as drawn'); assert.ok(x.dcfc); }
+    assert.ok(S.planFeatures(q).features.filter(f => f.properties.k === 'evstall').every(f => f.properties.dcfc === 1), 'DC fast stalls tinted blue');
+  }
+}
 // On a real layout every lot keeps its sheet label with the longer EV text (a small lot of 7 spaces, all of them EV, too)
 {
   const ev = { enabled: true, mode: 'count', value: 40, type: 'level2' }, o = onReal({ use: 'retail', gfa: 40000 }, ev)[0], q = o.p;

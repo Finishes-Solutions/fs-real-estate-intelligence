@@ -721,6 +721,7 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'field', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
       paint: { 'fill-color': ['case', ['==', ['get', 'em'], 1], '#cfdcae', ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'field', C.drive, 'pond', C.pond, 'plaza', C.plaza, 'court', ['coalesce', ['get', 'c'], C.court], 'pool', C.pool, 'play', C.play, C.green]],
         'fill-opacity': ['case', sel1, .5, ['==', ['get', 'em'], 1], .9, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } }); // (an emergency access lane: grass pavers, not asphalt)
+    add({ id: 'fs-sp-evstall', type: 'fill', source: SRC, filter: kind('evstall'), paint: { 'fill-color': ['case', ['==', ['get', 'dcfc'], 1], '#1769aa', C.evcharger], 'fill-opacity': .38 } }); // the stalls the EV chargers reserve, tinted under their stripes (lib/siteplan.mjs evStalls)
     add({ id: 'fs-sp-evshape', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['evpower', 'evcanopy']]],
       paint: { 'fill-color': ['match', ['get', 'k'], 'evpower', C.evpower, C.evcanopy], 'fill-opacity': ['case', sel1, .85, .68] } });
     add({ id: 'fs-sp-evpoint', type: 'circle', source: SRC, filter: kind('evcharger'), paint: {
