@@ -266,7 +266,7 @@ export function initBuildings(ctx) {
     card.innerHTML = '<div class="top"><div><div class="kicker" id="bKick">' + kindOf(b) + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
       ctx.cardActs('<button class="btn sm askai" type="button" id="bAsk" disabled aria-busy="true" title="Ready once the parcel record loads">' + ctx.SPARK + 'Ask AI</button>' +
-        '<button class="btn sm" type="button" id="bPlan" title="Start a project and lay out a site plan on this parcel, by hand or with AI">Site plan</button>',
+        '<button class="btn sm" type="button" id="bPlan" disabled aria-busy="true" title="Ready once the parcel record loads">Site plan</button>',
         [{ href: gsv, label: 'Street View ↗', sub: 'Google Street View at this spot' }, { label: 'Add site note', attrs: ' id="bNote" data-push' },
           ...(ctx.reduceMotion ? [] : [{ label: 'Orbit view', attrs: ' id="bOrbit"' }]),
           { label: 'Select more', attrs: ' id="bMulti" title="Then ' + (coarse ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 20"', sub: (coarse ? 'Tap' : 'Click or Shift-click') + ' more buildings or parcels' },
@@ -288,6 +288,8 @@ export function initBuildings(ctx) {
     card.querySelector('#bCsv').onclick = () => { const s = stats(b), p = b.parcel || b.rg; ctx.exportCsv([{ Address: p?.situs || '', Owner: p?.owner || '', 'Property ID': p?.propId || '', County: p?.county || countyAt(b.center), 'Land use': p?.landUse || '', 'Market value': appraised(p) || '', 'Land value': p?.landValue || '', 'Improvement value': p?.improvementValue || '', 'Tax year': p?.taxYear || '', 'Land area': p?.area || '', 'Year built': p?.yearBuilt || '',
       'Footprint sq ft': s.fp || '', 'Est. floor area sq ft': s.gfa || '', 'Height ft': s.h ? Math.round(s.h * 3.281) : '', 'Height source': s.hSrc, Floors: s.fl || '', 'Floors source': s.fSrc, Latitude: b.center[1].toFixed(6), Longitude: b.center[0].toFixed(6) }], 'property-' + String(p?.situs || 'parcel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)); };
     const ready = () => { const a = card.querySelector('#bAsk'); if (a && alive()) { a.disabled = false; a.removeAttribute('aria-busy'); a.title = 'Ask the assistant about this property'; } };
+    // Site plan only once the parcel record (its address and outline) is in, so a project is never named "Loading parcel…"
+    const planReady = () => { const a = card.querySelector('#bPlan'); if (a && alive()) { a.disabled = false; a.removeAttribute('aria-busy'); if (a.textContent === 'Site plan') a.title = 'Start a project and lay out a site plan on this parcel, by hand or with AI'; } };
     ctx.tabs?.track({ id: bid(b), kind: 'building', label: b.parcel?.situs || (b.footprint ? 'Building' : 'Parcel'), ref: b, reopen: () => open(b), leave: stopOrbit });
     card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center, label: b.parcel?.situs || b.rg?.situs || '' });
     card.querySelector('#bPlan').onclick = () => ctx.sitePlan?.start(ctx.currentBuilding());
@@ -300,17 +302,22 @@ export function initBuildings(ctx) {
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
     const onParcel = pd => {
       if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); clearOfCard(b); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
-      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready(); planBtn(b);
+      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready(); planReady(); planBtn(b);
       ctx.cardStatus?.(pd.parcel ? 'Owner and value loaded for ' + (pd.parcel.situs || 'this parcel') + '.' : 'No appraisal record here; Regrid can look it up.');
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, pd.parcel);
     };
     try { d = await details(b, onParcel); }
-    catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Property details unavailable'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
+    catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Couldn’t load this parcel';
+      // the failure, plainly, with Retry; Site plan becomes "Draw the site instead" (it asks for a project name: there's no address to name it after)
+      const fail = document.createElement('div'); fail.className = 'b-fail'; fail.setAttribute('role', 'alert');
+      fail.innerHTML = '<b>The parcel record didn’t load.</b> ' + esc(/too many|429/i.test(err.message) ? 'The lookup service is busy right now.' : err.message) + ' Nothing has been saved. <span class="btnrow"><button type="button" class="btn sm primary" id="bRetry">Retry</button></span>';
+      card.querySelector('#bParcel')?.prepend(fail); card.querySelector('#bRetry').onclick = () => open(b);
+      const pb = card.querySelector('#bPlan'); if (pb) { pb.disabled = false; pb.removeAttribute('aria-busy'); pb.textContent = 'Draw the site instead'; pb.title = 'Start a project by drawing the site by hand; you name the project first'; } card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
       // (the Regrid section still comes: its button is how a parcel without a free record gets one)
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, null); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, null); ready(); return; }
     if (!alive()) return;
     if (dropIfDuplicate(b)) return;
-    ready();
+    ready(); planReady();
     highlight(); ctx.tabs?.label(bid(b), d.parcel?.situs || d.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
     // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it

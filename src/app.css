@@ -4415,3 +4415,7 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 .kp-warn{margin:8px 6px 0;padding:7px 9px;border-radius:5px;background:var(--warn-bg,#fff4e5);color:var(--warn-ink,#7a4100);font-size:12.5px;line-height:1.35}
 =======
 .rg-off{color:var(--muted);font-size:12px}
+
+#card .b-fail{margin:0 0 10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--danger) 35%,transparent);border-left-width:3px;border-radius:6px;background:color-mix(in srgb,var(--danger) 6%,var(--panel));font-size:12.5px;line-height:1.45}
+#card .b-fail .btnrow{display:flex;margin-top:6px}
+#spName[aria-invalid="true"]{border-color:var(--danger)}

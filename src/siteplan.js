@@ -307,7 +307,9 @@ export function initSitePlan(ctx) {
     if (list.length <= 1 && !list[0]?.geometry && rg && inGeom(center, rg)) list = [{ ...(list[0] || {}), geometry: rg, regrid: true }]; // Harris and Waller: Regrid's outline
     const recs = list.map(pc => parcelOf(pc, pc.center || center)); recs.forEach((r, i) => keyIn(r, recs.slice(0, i)));
     const b = siteOf(recs), many = recs.length > 1;
-    const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || info.title || 'Site';
+    const named = t => t && !/^(Loading parcel|Property details unavailable|Couldn’t load this parcel)/i.test(t); // the card's placeholders aren't names
+    const unnamed = !many && !recs[0]?.label && !named(info.title);
+    const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || (named(info.title) ? info.title : '');
     const acres = b ? SP.ringArea(b.ring) / 43560 : null, noGeom = recs.filter(r => !r.geometry).length;
     // the projects these parcels are already in (newest first), and a project waiting for a parcel (Find a Parcel)
     const have = RUN.projectsWith(db.projects, recs.map(r => r.key)).slice(0, 3), want = pendingProject(), first = !db.projects.length;
@@ -316,14 +318,14 @@ export function initSitePlan(ctx) {
     for (const x of [pre, ...have.map(h => h.p)]) if (x && !recent.includes(x)) recent.unshift(x);
     if (ed) close();
     ctx.clearSelection?.();
-    const back = info.title && !/^Loading/.test(info.title) ? info.title : recs[0]?.label || 'Property';
+    const back = named(info.title) ? info.title : recs[0]?.label || 'Property';
     // started from a property card: that card waits behind the plan ("← address" in the header, and × goes back to it)
     const radio = (id, html, on) => '<label class="sp-radio"><input type="radio" name="spP" value="' + esc(id) + '"' + (on ? ' checked' : '') + '> ' + html + '</label>';
     const paint = () => { card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan</div><h2>' + (want ? 'Add a parcel to ' + esc(want.name) : have.length ? 'Site plan' : 'Start a site plan') + '</h2><div class="bsub">' + esc(label) + (acres ? ' · ' + acres.toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() + '</div>' +
       (have.length ? '<div class="bsec sp-haves">' + have.map(({ p, plan }) => '<div class="sp-have"><div class="sp-have-t"><b>Already in ' + esc(p.name) + '</b><span>' + (plan ? esc(plan.name) + ' · ' + holds(p, plan) : 'no options yet') + (p.plans.length > 1 ? ' · ' + plural(p.plans.length, 'option') : '') + '</span></div>' +
         '<span class="btnrow">' + (plan ? '<button type="button" class="btn sm primary" data-openplan="' + esc(p.id) + '|' + esc(plan.id) + '">Open Plan</button>' : '') + '<button type="button" class="btn sm" data-newin="' + esc(p.id) + '" title="Start a new option in ' + esc(p.name) + '">New Option</button></span></div>').join('') + '</div>' : '') +
       '<div class="bsec sp-start"><div class="lt sp-lt-proj">' + (have.length ? 'Or start another plan' : 'Project') + '</div>' +
-      radio('', 'New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name">', !pre) +
+      radio('', 'New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name"' + (unnamed ? ' placeholder="Name this project" aria-describedby="spNameErr"' : '') + '>', !pre) + (unnamed ? '<div class="rnote" id="spNameErr">No address came with this parcel, so name the project before you start.</div>' : '') +
       recent.map(p => radio(p.id, 'Add to <b>' + esc(p.name) + '</b> <span class="rnote">' + p.plans.length + ' plan' + (p.plans.length === 1 ? '' : 's') + (have.some(h => h.p === p) ? ' · has this parcel' : p === want ? ' · waiting for a parcel' : '') + '</span>', p === pre)).join('') +
       '<div class="lt sp-lt-site" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up, and parcels apart are joined over the gap between them).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + ', dashed on the map.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (in Harris and Waller County, use “Get owner, value &amp; zoning from Regrid” on the property card first). You’ll draw the site on the map.') + '</div>' +
       gapNote(b) + (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels are more than ' + SP.BRIDGE_FT + ' ft from the rest, so they’re left out of the site.</div>' : '') +
@@ -347,12 +349,13 @@ export function initSitePlan(ctx) {
       p.plans.push(plan); save(p); open(p.id, plan.id, { draw: !b });
     };
     card.querySelector('#spStart').onclick = () => {
-      const pick = card.querySelector('input[name=spP]:checked').value;
-      begin(db.projects.find(x => x.id === pick) || newProject(card.querySelector('#spName').value.trim() || label));
+      const pick = card.querySelector('input[name=spP]:checked').value, nm = card.querySelector('#spName'), name = nm.value.trim() || label;
+      if (!pick && !name) { nm.setAttribute('aria-invalid', 'true'); const e = card.querySelector('#spNameErr'); if (e) { e.textContent = 'Enter a project name to start.'; e.classList.add('err'); } nm.focus(); return; }
+      begin(db.projects.find(x => x.id === pick) || newProject(name));
     };
     card.querySelectorAll('[data-openplan]').forEach(x => x.onclick = () => { const [pid, plid] = x.dataset.openplan.split('|'), o = planOf({ pid, plid }); if (o) open(pid, plid, { draw: o.pl.ring.length < 3 }); });
     card.querySelectorAll('[data-newin]').forEach(x => x.onclick = () => { const p = db.projects.find(y => y.id === x.dataset.newin); if (p) begin(p); });
-    if (first) card.querySelector('#spStart').click(); // no projects yet: nothing to choose, so the project (named after the address) is made and the plan opens
+    if (first && !unnamed) card.querySelector('#spStart').click(); // no projects yet: nothing to choose, so the project (named after the address) is made and the plan opens
     return true;
   }
   const inGeom = (pt, g) => (g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : []).some(p => SP.inRing(pt, p[0]));
