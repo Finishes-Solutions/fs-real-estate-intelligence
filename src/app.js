@@ -842,7 +842,7 @@ map.on('movestart',hideMenu);
 let mode='pan', draft=[], boxA=null, boxB=null;
 const hintEl=document.getElementById('hint'), radiusEl=document.getElementById('radius');
 const isTouch=window.matchMedia('(pointer: coarse)').matches;
-const HINTS={area:'Drag a box over the area you want.'+(isTouch?'':' Esc to cancel.'),poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes. Esc to cancel.',county:'Click counties to add or remove them from the selection.'+(isTouch?'':' Esc to cancel.')};
+const HINTS={area:'Drag a box over the area you want.'+(isTouch?'':' Esc to cancel.'),poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes. Esc to cancel.',county:(isTouch?'Tap':'Click')+' counties to add or remove them from the selection.'+(isTouch?'':' Esc to cancel.')};
 function setMode(m){
   mode=m; draft=[]; boxA=null; drawDraft();
   document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));

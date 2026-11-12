@@ -65,6 +65,8 @@ export function initMobile(ctx) {
     if (t === 'more') { openSheet(); return; }
     closeSheet();
     if (t !== 'map' && card.classList.contains('open')) ctx.closeCard();
+    // leaving the Map ends a picking or drawing tool (the selection stays), so a tap on the map later can't change the area
+    if (t !== 'map' && ctx.mode?.() && ctx.mode() !== 'pan') ctx.setMode('pan');
     // Explore is the Map's side list: the area, its reports, then the filings (folded unless opened before)
     if (t === 'map' || t === 'list') { app.dataset.mtab = t; if (ctx.view !== 'map') ctx.setView('map'); }
     else { const leaf = leafFor(t); app.dataset.mtab = leaf; ctx.setView(leaf); } // Projects / Reports (a group opens the page used last)
