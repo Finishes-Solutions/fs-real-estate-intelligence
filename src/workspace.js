@@ -171,7 +171,8 @@ export function workspace(env) {
       '<div class="ws-gal">' + shown.map(card).join('') + '</div>' + (g.list.length > shown.length ? '<button type="button" class="btn" data-act="moreGallery">Show ' + Math.min(12, g.list.length - shown.length) + ' more</button>' : '');
   }
   function runGallery(p) {
-    const s = st(p), f = fz(p), parcels = p.parcels || [], base = P.siteFromParcels(parcels); if (!base) throw new Error('The parcels have no outline to lay out.');
+    const s = st(p); fz(p); // fz() fills in the project's feasibility record if it has none yet
+    const parcels = p.parcels || [], base = P.siteFromParcels(parcels); if (!base) throw new Error('The parcels have no outline to lay out.');
     const ask = s.ask, prog = ask ? P.programFromWords(ask) : { use: s.use || 'multifamily' }, np = S.normalizeProgram(prog), parts = parcels.length > 1 && s.per !== false ? partsOf(base, parcels) : [], per = parts.length > 1 && (np.parcels || s.per !== false);
     const t0 = Date.now(); let list;
     if (per) list = layoutOptions(base, prog, { count: 4, netEvals: 6, parcels: parts, perParcel: true });
