@@ -80,6 +80,21 @@ export function initMobile(ctx) {
     nav.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === p || (b.dataset.tab === 'more' && !inNav.has(p)))));
   }
   nav.querySelectorAll('button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+  // First visit on a phone: the Getting started tip sits at the top of Explore, a tab away from the map users land on. Until
+  // it's dismissed ("Got it", the same fs-tip-intro key as everywhere) it floats over the map on the Map tab, above the
+  // legend and the tab bar, and goes back to the top of Explore there.
+  const intro = document.getElementById('introTip'), introHome = intro?.nextElementSibling, viewportEl = document.getElementById('viewport');
+  // over the map it says the short version, in touch words (the full text stays for Explore)
+  if (intro && !intro.querySelector('.ptip-m')) { const m = document.createElement('p'); m.className = 'ptip-t ptip-m'; m.innerHTML = 'Tap any parcel or building, or search an address, for its owner, value and zoning. Use <b>Select</b> to pick an area for its reports.'; intro.appendChild(m); }
+  function placeIntro() {
+    if (!intro || !introHome) return;
+    const float = isPhone() && app.dataset.mtab === 'map' && ctx.view === 'map';
+    intro.classList.toggle('ptip-float', float);
+    if (float && intro.parentNode !== viewportEl) viewportEl.appendChild(intro);
+    else if (!float && intro.parentNode !== panel) panel.insertBefore(intro, introHome);
+  }
+  new MutationObserver(placeIntro).observe(app, { attributes: true, attributeFilter: ['data-mtab'] });
+  ctx.onViewChange(() => setTimeout(placeIntro, 0)); phoneMQ.addEventListener('change', placeIntro); placeIntro();
   ctx.onViewChange(v => { // views opened from elsewhere (citations, "who" clicks, change items)
     if (!isPhone()) return;
     if (v === 'map') { if (app.dataset.mtab !== 'list') app.dataset.mtab = 'map'; }

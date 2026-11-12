@@ -2736,6 +2736,13 @@ table.who tr.nomatch td{border:0}
 .ptip b{font:700 13.5px/1.3 var(--font-display);color:var(--text)}
 .ptip-t{margin:0;font-size:12.5px;line-height:1.5;color:var(--text-2)}
 .ptip .btn{flex:none;min-height:28px;padding:3px 10px}
+/* phones: the same tip floating over the map on the Map tab (src/mobile.js), above the legend and the tab bar; it steps
+   aside while a card is open */
+.ptip-m,.ptip.ptip-float .ptip-t:not(.ptip-m){display:none}
+.ptip.ptip-float .ptip-m{display:block}
+.ptip.ptip-float{position:absolute;left:10px;right:10px;bottom:68px;z-index:6;margin:0;box-shadow:var(--sh-2)}
+.app:has(#card.open) .ptip.ptip-float,.app.sel-open .ptip.ptip-float{display:none}
+@media (pointer:coarse){ .ptip .btn{min-height:var(--tap);padding:3px 14px} }
 
 /* scope header: pinned to the top of the panel while it scrolls (the grey strip above the card hides what scrolls past) */
 .scope{position:sticky;top:0;z-index:4;padding:var(--sp-3) var(--pg) 0;background:var(--panel-2)}
