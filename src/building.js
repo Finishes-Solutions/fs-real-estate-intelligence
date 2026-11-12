@@ -385,6 +385,14 @@ export function initBuildings(ctx) {
   const landArea = p => { if (p.area) return fld('Land area', esc(p.area), p.areaSource === 'outline' || p.legalArea ? { sub: [p.areaSource === 'outline' ? 'From the parcel outline' : '', p.legalArea ? 'Legal acreage on the roll: ' + esc(p.legalArea) : ''].filter(Boolean).join(' · ') } : undefined); const ac = outlineAcres(p.geometry);
     return ac ? fld('Land area', '≈ ' + (ac < 10 ? ac.toFixed(2) : ac.toFixed(1)) + ' acres', { sub: 'From the parcel outline' }) : fld('Land area', '—'); };
   const appraised = p => p?.marketValue || ((p?.landValue || 0) + (p?.improvementValue || 0)) || null;
+  // no value on the roll: say why from the record itself rather than a bare dash
+  const GOV = /^(city|town|village) of\b|\bcounty\b|\b(c?isd|independent school district|school district)\b|\bstate of texas\b|\bunited states\b|\bmunicipal utility\b|\bm\.?u\.?d\.?\b|\b(water|drainage|hospital|navigation|port|flood control) (district|authority)\b|\bhousing authority\b/i;
+  function noValueReason(p) {
+    if (GOV.test(p.owner || '')) return { v: 'Exempt (government owner)', sub: 'Public property carries no taxable value on the roll' };
+    const yr = +p.taxYear || 0, now = new Date().getFullYear();
+    if (yr >= now) return { v: 'Not yet certified for ' + yr, sub: 'The appraisal district hasn’t published ' + yr + ' values for this account' };
+    return { v: 'Not in the appraisal record', sub: 'The ' + (p.taxYear ? p.taxYear + ' ' : '') + 'roll has no value for this account' };
+  }
   // a building that spans several parcels (a shopping center, a warehouse built over lot lines): list them all, with totals.
   // Each row opens that parcel in a card tab of its own (the grid above shows parcel 1; the Overview adds them all up).
   function parcelsHtml(list) {
@@ -454,7 +462,8 @@ export function initBuildings(ctx) {
       : '<button class="lnk" type="button" data-rg title="Zoning and last sale from Regrid. Uses 1 of your monthly records; a parcel looked up before is free.">Get from Regrid' + rgFor() + '<span data-rg-left>' + rgLeft() + '</span></button>';
     el.innerHTML = head + (many ? '<div class="fl pgrid-h">Parcel 1 of ' + many.length + (p.owner ? ' · ' + esc(p.owner) : '') + '</div>' : '') + '<div class="fgrid">' +
       fld('Owner', esc(p.owner || '—'), { w: true }) +
-      fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' }) +
+      (val ? fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' })
+        : (r => fld('Appraised value', esc(r.v), { dim: true, sub: esc(r.sub) }))(noValueReason(p))) +
       fld('Tax year', esc(p.taxYear || '—')) +
       fld('Land', '<span class="mono">' + money(p.landValue) + '</span>') + fld('Improvements', '<span class="mono">' + money(p.improvementValue) + '</span>') +
       landArea(p) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
