@@ -4847,7 +4847,7 @@ export function initSitePlan(ctx) {
   const PIN = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.8 4.5 7.8z"/><circle cx="8" cy="6.6" r="1.6"/></svg>';
   const ICON_CARDS = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>';
   const ICON_LIST = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5"/><circle cx="2.6" cy="4" r=".6"/><circle cx="2.6" cy="8" r=".6"/><circle cx="2.6" cy="12" r=".6"/></svg>';
-  let pq = '', psort = 'updated', mode = get(VIEW_KEY) === 'list' ? 'list' : 'cards', cur = null, adding = false, renaming = false, waiting = false;
+  let pq = '', psort = 'updated', mode = get(VIEW_KEY) === 'list' ? 'list' : 'cards', cur = null, adding = false, renaming = false, editingNext = false, waiting = false;
   const thumbs = new Map(), infos = new Map();
   const plural = (n, w) => f0(n) + ' ' + w + (n === 1 ? '' : 's');
   const money = v => '$' + f0(v);
@@ -4974,7 +4974,25 @@ export function initSitePlan(ctx) {
         : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
       '<div class="pj-hmeta"><span class="pj-st" data-st="' + st.id + '"><label class="sr" for="pjStatus">Status</label><select id="pjStatus" title="The project’s status (shared with the team)">' + PJ.STATUSES.map(x => '<option value="' + x.id + '"' + (x.id === st.id ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></span>' +
         (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac" title="The parcels’ recorded acreage (appraisal district), added up. The merged site outline, with overlaps between parcels closed up, can be slightly smaller: see Site on the Feasibility tab."><b>' + ac.toFixed(2) + '</b> acres in parcels</span>' : '') +
-        updHtml(p) + '</div></header>';
+        updHtml(p) + '</div>' + nextHtml(p) + '</header>';
+  }
+  // who acts next, on what, by when and what blocks it (p.next, synced with the team like the status); what the steps say
+  // is still to do is shown beside it and pre-fills the action. Nothing notifies anyone: an overdue date just turns red.
+  function nextHtml(p) {
+    const n = PJ.nextStepOf(p, WS.steps(p)), due = n.due ? new Date(n.due + 'T12:00') : null, late = PJ.overdue(n.due);
+    const left = '<span class="pj-nleft"><span class="pj-nk">Still to do</span> ' + (n.pending.length ? n.pending.map(esc).join(' · ') : 'Nothing: every step is done') + '</span>';
+    if (editingNext) {
+      const names = [...new Set([get(NAME_KEY), p.by, ...db.projects.map(x => x.by)].filter(Boolean))], risks = (WS.studyOf(p, { sensitivity: false })?.study?.risks || []).filter(r => r.level !== 'low').slice(0, 6);
+      const fld = (id, label, v, extra = '') => '<label class="pj-nf"><span>' + label + '</span><input id="' + id + '" value="' + esc(v) + '" autocomplete="off"' + extra + '></label>';
+      return '<form class="pj-next pj-nform" id="pjNextForm" aria-label="Next step">' + fld('pjNxOwner', 'Owner', n.owner, ' list="pjNxPeople" maxlength="80" placeholder="Who acts next"') + fld('pjNxAction', 'Next action', n.action || n.suggest, ' maxlength="160"') +
+        fld('pjNxDue', 'Due', n.due, ' type="date"') + fld('pjNxBlock', 'Blocked by (optional)', n.blocker, ' list="pjNxRisks" maxlength="160" placeholder="e.g. waiting on the GC’s cost check"') +
+        '<datalist id="pjNxPeople">' + names.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist><datalist id="pjNxRisks">' + risks.map(r => '<option value="' + esc(r.title) + '">').join('') + '</datalist>' +
+        '<span class="btnrow"><button class="btn primary sm">Save</button><button type="button" class="btn sm" id="pjNxX">Cancel</button>' + (n.set ? '<button type="button" class="lnk" id="pjNxClear">Clear</button>' : '') + '</span></form>';
+    }
+    return '<div class="pj-next" role="group" aria-label="Next step"><div class="pj-nmain"><span class="pj-nk">Next step</span> ' +
+      (n.set ? (n.owner ? '<b>' + esc(n.owner) + '</b>' : '<b>No owner</b>') + (n.action ? ' · ' + esc(n.action) : '') + (due ? ' · <span class="pj-due' + (late ? ' late' : '') + '">' + (late ? 'Overdue, was due ' : 'Due ') + due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</span>' : '')
+        : '<em>No next step set</em>') +
+      ' <button type="button" class="lnk" id="pjNxEdit">' + (n.set ? 'Edit' : 'Set next step') + '</button></div><div class="pj-nsub">' + (n.blocker ? '<span class="pj-blk"><span class="pj-nk">Blocked by</span> ' + esc(n.blocker) + '</span>' : '') + left + '</div></div>';
   }
   // "Updated … by …" and where the last save went (the editor's save mark, in words), repainted by paintUpd() after each
   // save and sync even while someone is typing (render() waits for them to leave the field)
@@ -5500,7 +5518,7 @@ export function initSitePlan(ctx) {
   // the project page is in the address (#pj=<id>): opening one adds a history entry, so Back returns to the list (src/app.js)
   const pjMoved = was => { if (was !== cur) ctx.scheduleHash?.(ctx.view === 'projects' ? { push: true } : undefined); };
   function paintUpd() { const p = cur && db.projects.find(x => x.id === cur), u = p && root?.querySelector('.pj-head .pj-upd'); if (u) u.outerHTML = updHtml(p); }
-  function show(id, tab) { const was = cur; cur = id; renaming = false; adding = false; if (id && tab) ptab.set(id, PJ.tabOf(tab)); render(true); root.scrollTop = 0; pjMoved(was); }
+  function show(id, tab) { const was = cur; cur = id; renaming = false; editingNext = false; adding = false; if (id && tab) ptab.set(id, PJ.tabOf(tab)); render(true); root.scrollTop = 0; pjMoved(was); }
   ctx.currentProject = () => ctx.view === 'projects' ? cur : null;
   ctx.openProject = (id, tab) => { if (ctx.view !== 'projects') ctx.setView('projects'); if (!id || db.projects.some(x => x.id === id)) show(id || null, tab); };
   function setTab(p, id, focus) { ptab.set(p.id, PJ.tabOf(id)); render(true); if (focus) root.querySelector('#pjTab-' + PJ.tabOf(id))?.focus(); }
@@ -5551,6 +5569,16 @@ export function initSitePlan(ctx) {
       $('#pjRenX').onclick = () => { renaming = false; render(true); };
     }
     const st = $('#pjStatus'); if (st) st.onchange = () => { p.status = st.value; st.parentElement.dataset.st = st.value; save(p); };
+    on('#pjNxEdit', () => { editingNext = true; render(true); $('#pjNxOwner')?.focus(); });
+    const nf = $('#pjNextForm');
+    if (nf) {
+      const done = () => { editingNext = false; render(true); $('#pjNxEdit')?.focus(); };
+      nf.onsubmit = e => { e.preventDefault(); const v = id => ($(id)?.value || '').replace(/\s+/g, ' ').trim();
+        const nx = { owner: v('#pjNxOwner'), action: v('#pjNxAction'), due: v('#pjNxDue'), blocker: v('#pjNxBlock') };
+        if (Object.values(nx).some(Boolean)) p.next = nx; else delete p.next; save(p); done(); };
+      $('#pjNxX').onclick = done; nf.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); done(); } };
+      on('#pjNxClear', () => { delete p.next; save(p); done(); });
+    }
     wireTabs(p);
     // the fields save when you leave them (Enter in a one-line field leaves it), like the notes always have
     const keep = (id, k, n) => { const el = $(id); if (!el) return; el.onchange = () => { const v = el.value.slice(0, n); if (v !== (p[k] || '')) { p[k] = v; save(p); } }; if (el.tagName === 'INPUT') el.onkeydown = e => { if (e.key === 'Enter') el.blur(); }; };

@@ -125,7 +125,8 @@ export function workspace(env) {
     return '<aside class="ws-rail" aria-labelledby="wsRailH"><div class="ws-card"><div class="kicker" id="wsRailH">Project summary</div>' +
       '<div class="ws-kpis">' + (s ? '<div class="ws-kpi" title="The merged site outline (parcels joined, overlaps closed up), which the study uses. The header’s figure is the parcels’ recorded acreage added up."><b>' + num(s.acres, 2) + '</b><span>Site acres (merged outline)</span></div>' : kpi(num((p.parcels || []).reduce((a, x) => a + (x.acres || 0), 0), 2), 'Acres in parcels')) + kpi(s ? (s.units ? num(s.units) : num(s.gfa)) : '—', s?.units ? 'Units' : 'Gross sf') +
         kpi(h ? pct(h.levIrr) : '—', 'Levered IRR') + kpi(h ? num(h.multiple, 2) + '×' : '—', 'Equity multiple') + (h?.forSale ? kpi(pct(h.margin, 1), 'Margin') : kpi(h?.cocAvg != null ? pct(h.cocAvg) : '—', 'Cash-on-cash, ' + (h?.cocByYear?.length || 10) + '-yr avg')) + kpi(h ? usdM(h.totalCost) : '—', 'Total cost') + '</div>' +
-      scen + (study?.risks?.length ? '<div class="ws-risks"><div class="kicker">Top risks</div><ul>' + study.risks.filter(r => r.level !== 'low').slice(0, 4).map(r => '<li data-level="' + r.level + '"><span class="ws-lv">' + r.level + '</span>' + esc(r.title) + '</li>').join('') + '</ul></div>' : '') +
+      scen + (study?.risks?.length ? '<div class="ws-risks"><div class="kicker">Top risks</div><ul>' + study.risks.filter(r => r.level !== 'low').slice(0, 4).map(r => { const blocks = typeof p.next?.blocker === 'string' && !!r.title && p.next.blocker.toLowerCase().startsWith(r.title.toLowerCase()); // picked as the next step's blocker (src/siteplan.js nextHtml)
+        return '<li data-level="' + r.level + '"' + (blocks ? ' class="blocks"' : '') + '><span class="ws-lv">' + r.level + '</span>' + esc(r.title) + (blocks ? ' <small class="ws-blocks">Blocking the next step</small>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
       (study?.option ? '<p class="ws-meta">Option: <b>' + esc(study.option.name) + '</b>' + (study.scenario ? ' · ' + esc(study.scenario.name) : '') + '<br>Inputs <span class="mono">' + esc(study.inputsHash || '') + '</span></p>' : '') + '</div></aside>';
   }
 
@@ -415,5 +416,5 @@ export function workspace(env) {
       e.preventDefault(); el.querySelector('.ws-step[data-step="' + ids[to] + '"]')?.focus();
     });
   }
-  return { html, wire, studyOf, paint };
+  return { html, wire, studyOf, paint, steps: p => P.stepStatus(p, null) };
 }

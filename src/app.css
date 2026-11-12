@@ -2230,11 +2230,25 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-head{margin-bottom:12px}
 .pj-hmeta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;margin-top:6px;font-size:12.5px;color:var(--text-2)}
 .pj-hmeta .pj-addr{font-size:12.5px}
+.pj-nsub{display:flex;flex-wrap:wrap;gap:2px 22px}
+/* the Next step row under the status (owner · action · due · blocker, and what the steps say is left) */
+.pj-next{display:grid;gap:3px;justify-content:start;margin-top:8px;padding:7px 12px;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:6px;background:var(--panel);font-size:12.5px;color:var(--text-2);max-width:1180px}
+.pj-next .pj-nk{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-right:4px}
+.pj-next b{color:var(--text)}
+.pj-next em{font-style:normal;color:var(--muted)}
+.pj-due.late{color:var(--danger);font-weight:600}
+.pj-blk{color:var(--danger);font-weight:600}
+.pj-blk .pj-nk{color:var(--danger)}
+.pj-nform{display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px}
+.pj-nf{display:grid;gap:2px;font-size:11.5px;color:var(--muted)}
+.pj-nf input{font:inherit;font-size:13px;color:var(--text);padding:5px 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);min-width:150px}
+.pj-nf:nth-of-type(2) input{min-width:300px}
 .pj-hac b{font-family:var(--font-mono);font-weight:600;color:var(--text)}
 .pj-st{--sc:var(--text-2);--sb:var(--chip);display:inline-flex}
 .pj-st select{appearance:none;-webkit-appearance:none;border:1px solid color-mix(in srgb,var(--sc) 35%,transparent);background:var(--sb) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 9px center;color:var(--sc);border-radius:999px;padding:4px 26px 4px 11px;font:600 12px/1.3 var(--font-display);cursor:var(--cur-pointer,pointer)}
 .pj-st select:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pj-st[data-st="review"]{--sc:#8a5a00;--sb:color-mix(in srgb,var(--amber) 14%,var(--panel))}
+.pj-st[data-st="approved"]{--sc:var(--green-800);--sb:color-mix(in srgb,var(--green-600) 10%,var(--panel))}
 .pj-st[data-st="contract"]{--sc:var(--green-800);--sb:var(--green-100)}
 .pj-st[data-st="owned"]{--sc:#fff;--sb:var(--green-600)}
 .pj-st[data-st="owned"] select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-width='1.4'/%3E%3C/svg%3E")}

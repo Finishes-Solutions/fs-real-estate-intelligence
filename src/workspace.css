@@ -197,3 +197,6 @@
 /* step state in words beside each Feasibility step (To do, Needs details, Waiting on …) */
 .ws-ss{margin-left:auto;flex:none;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;line-height:1.5;color:var(--ws-warn);background:var(--ws-warn-bg)}
 .ws-ss[data-state="blocked"]{color:var(--muted);background:var(--panel-2)}
+
+/* the risk picked as the project's Next step blocker (src/siteplan.js nextHtml) */
+.ws-risks .ws-blocks{display:inline-block;margin-left:4px;padding:0 6px;border-radius:999px;font-size:10.5px;font-weight:700;color:var(--danger);background:color-mix(in srgb,var(--danger) 9%,var(--panel))}
