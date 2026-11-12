@@ -43,7 +43,7 @@ export function initKpis(ctx) {
     if (focusKey) pop.querySelector('input[data-k="' + focusKey + '"]')?.focus(); // re-rendering keeps your place
   }
   const kp = ctx.popover(pop, { trigger: btn, first: 'input:not([disabled])' }); // focus in, Tab stays in, Esc / Done back to Metrics
-  function toggle(on) { const was = pop.classList.contains('on'); pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) { warn = ''; renderPop(); requestAnimationFrame(() => pop.scrollIntoView({ block: 'nearest' })); if (!was) kp.opened(); } else if (was) kp.closed(); } // it opens near the bottom of the panel: bring it into view
+  function toggle(on) { const was = pop.classList.contains('on'); pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) { warn = ''; renderPop(); requestAnimationFrame(() => pop.scrollIntoView({ block: 'nearest' })); if (!was) { kp.opened(); pop.querySelector('input:not([disabled])')?.focus({ preventScroll: true }); } } else if (was) kp.closed(); } // it opens near the bottom of the panel: bring it into view
   btn.onclick = e => { e.stopPropagation(); toggle(!pop.classList.contains('on')); };
   document.addEventListener('pointerdown', e => { if (pop.classList.contains('on') && !pop.contains(e.target) && !btn.contains(e.target)) toggle(false); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && pop.classList.contains('on')) { e.preventDefault(); toggle(false); } });
