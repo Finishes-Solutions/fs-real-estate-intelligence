@@ -119,7 +119,8 @@ export function workspace(env) {
   function rail(p, study) {
     const h = study && !study.missing ? study.pf.headline : null, s = study?.site, f = fz(p);
     const kpi = (v, l) => '<div class="ws-kpi"><b>' + v + '</b><span>' + esc(l) + '</span></div>';
-    const scen = f.scenarios.length ? '<label class="ws-f"><span>Scenario shown</span><select data-f="activeScenario"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === f.activeScenario ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' : '';
+    const ed = st(p).editing && st(p).editing !== (f.activeScenario || '') ? f.scenarios.find(x => x.id === st(p).editing) : null;
+    const scen = f.scenarios.length ? '<label class="ws-f"><span>Scenario shown</span><select data-f="activeScenario"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === f.activeScenario ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' + (ed ? '<p class="ws-railnote">You’re editing <b>' + esc(ed.name) + '</b>; its numbers are on the Pro Forma step. <button type="button" class="lnk" data-act="showEditing">Show it here</button></p>' : '') : '';
     return '<aside class="ws-rail" aria-labelledby="wsRailH"><div class="ws-card"><div class="kicker" id="wsRailH">Project summary</div>' +
       '<div class="ws-kpis">' + kpi(s ? num(s.acres, 2) : num((p.parcels || []).reduce((a, x) => a + (x.acres || 0), 0), 2), 'Acres') + kpi(s ? (s.units ? num(s.units) : num(s.gfa)) : '—', s?.units ? 'Units' : 'Gross sf') +
         kpi(h ? pct(h.levIrr) : '—', 'Levered IRR') + kpi(h ? num(h.multiple, 2) + '×' : '—', 'Equity multiple') + (h?.forSale ? kpi(pct(h.margin, 1), 'Margin') : kpi(h?.cocAvg != null ? pct(h.cocAvg) : '—', 'Cash-on-cash, ' + (h?.cocByYear?.length || 10) + '-yr avg')) + kpi(h ? usdM(h.totalCost) : '—', 'Total cost') + '</div>' +
@@ -234,14 +235,18 @@ export function workspace(env) {
   // ---------- 5 Pro Forma ----------
   function proformaStep(p, study, c) {
     if (!study || study.missing) return empty('Nothing to model yet', 'The pro forma runs on a laid-out site option and its budget.', 'Go to Site', 'step:site');
-    const f = fz(p), s = st(p), h = study.pf.headline, editing = f.scenarios.find(x => x.id === s.editing) || null;
+    const f = fz(p), s = st(p), editing = f.scenarios.find(x => x.id === s.editing) || null;
+    // while a scenario is being edited the results are its numbers (the rail keeps the scenario picked there)
+    let es = null; if (editing && editing.id !== (study.scenario?.id || null)) { try { es = P.runStudy(p, { market, scenarioId: editing.id, sensitivity: false }); if (es.missing) es = null; } catch (e) { es = null; } }
+    const base = study.pf.headline, h = es ? es.pf.headline : base;
     const over = editing ? editing.overrides : f.overrides;
     // the three returns the team decides on first (levered IRR, equity multiple, cash-on-cash over the hold), then the rest
     const yrs = h.cocByYear?.length || 0, lead = [[pct(h.levIrr), 'Levered IRR'], [num(h.multiple, 2) + '×', 'Equity multiple'], h.forSale ? [pct(h.margin, 1), 'Margin on sales'] : [h.cocAvg != null ? pct(h.cocAvg) : '—', 'Cash-on-cash, ' + (yrs || h.hold || 10) + '-year average']];
     const rest = [[usdM(h.totalCost), 'Total development cost'], h.forSale ? [usdM(h.profit), 'Profit'] : [usdM(h.noi), 'Stabilized NOI'], h.forSale ? null : [pct(h.yoc), 'Yield on cost'], h.forSale ? null : [h.coc != null ? pct(h.coc) : '—', 'Cash-on-cash, year 1'], [pct(h.unlevIrr), 'Unlevered IRR'], [usdM(h.npvLev), 'Levered NPV'], [h.dscr != null ? num(h.dscr, 2) + '×' : '—', 'DSCR']].filter(Boolean);
     const kpiH = ([v, l]) => '<div class="ws-kpi"><b>' + v + '</b><span>' + esc(l) + '</span></div>';
+    const vsBase = editing ? '<p class="ws-vs" role="status"><b>Showing ' + esc(editing.name) + '</b> · vs ' + (study.scenario ? esc(study.scenario.name) : 'base case') + ': levered IRR ' + pct(h.levIrr) + ' (' + delta(h.levIrr, base.levIrr) + '), total cost ' + usdM(h.totalCost) + ' (' + (h.totalCost - base.totalCost >= 0 ? '+' : '−') + usdM(Math.abs(h.totalCost - base.totalCost)) + ')</p>' : '';
     const cocRow = yrs ? '<div class="ws-scroll" tabindex="0" role="region" aria-label="Cash-on-cash by year"><table class="ws-t ws-coc"><caption>Cash-on-cash by year of the hold (cash flow after debt service ÷ equity)</caption><thead><tr>' + h.cocByYear.map((_, i) => '<th scope="col" class="r">Yr ' + (i + 1) + '</th>').join('') + '</tr></thead><tbody><tr>' + h.cocByYear.map(v => '<td class="r m">' + pct(v) + '</td>').join('') + '</tr></tbody></table></div>' : '';
-    const kpis = '<div class="ws-kpis big ws-lead">' + lead.map(kpiH).join('') + '</div>' + cocRow + '<div class="ws-kpis">' + rest.map(kpiH).join('') + '</div>';
+    const kpis = vsBase + '<div class="ws-kpis big ws-lead">' + lead.map(kpiH).join('') + '</div>' + cocRow + '<div class="ws-kpis">' + rest.map(kpiH).join('') + '</div>';
     // the assumptions, grouped, each with its source
     const groups = GROUPS.map(([g, label]) => { const rows = study.register.filter(a => a.group === g); if (!rows.length) return '';
       return '<details class="ws-box" data-group="' + g + '"' + (s.open[g] ? ' open' : '') + '><summary><span>' + label + '</span><span class="ws-c">' + rows.length + '</span></summary><div class="ws-as">' + rows.map(a => {
@@ -250,8 +255,9 @@ export function workspace(env) {
           chip(a.source) + (o ? '<button type="button" class="lnk" data-reset="' + esc(a.key) + '" aria-label="Reset ' + esc(a.label) + ' to ' + esc(fmtVal({ ...a, value: a.default ?? a.value })) + '">Reset</button>' : '') +
           (a.range ? '<small id="' + id + 'r" class="' + (out ? 'out' : '') + '">' + (out ? 'Outside the usual ' : 'Usual ') + esc(a.range[0] + '–' + a.range[1]) + '</small>' : '') + (a.marketCheck ? '<small class="ws-mc">' + esc(a.marketCheck) + '</small>' : '') + '</div>'; }).join('') + '</div></details>'; }).join('');
     const edBar = '<div class="ws-edbar"><label class="ws-f"><span>Editing</span><select data-f="editing"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === s.editing ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' +
+      (editing ? '<label class="ws-f"><span>Scenario name</span><input id="wsScName" data-scname="1" maxlength="60" value="' + esc(editing.name) + '" autocomplete="off"></label>' : '') +
       '<button type="button" class="btn" data-act="newScenario">New scenario</button>' + (editing ? '<button type="button" class="btn" data-act="delScenario">Delete “' + esc(editing.name) + '”</button>' : '') + '</div>' +
-      (editing ? '<p class="ws-note">Changes now go into <b>' + esc(editing.name) + '</b>; the base case keeps its numbers. The rail shows ' + (f.activeScenario === editing.id ? 'this scenario.' : 'the base case — pick the scenario there to see it.') + '</p>' : '') +
+      (editing ? '<p class="ws-note">Changes now go into <b>' + esc(editing.name) + '</b>; the base case keeps its numbers. The results above show this scenario' + (f.activeScenario === editing.id ? ', and so does the rail.' : '. <button type="button" class="lnk" data-act="showEditing">Show it in the rail and reports too</button>') + '</p>' : '') +
       (editing && (study.site.mix || []).length ? mixEditor(editing, study) : '');
     // results: returns, break-even, sensitivity, hold, scenarios
     const be = study.pf.breakEven;
@@ -357,6 +363,7 @@ export function workspace(env) {
         p.parcels = [...(p.parcels || []), M0.parcelFrom({ key: 'sv-' + M0.hashOf(calls), label: 'Surveyed tract (' + num(r.acres, 2) + ' ac)', acres: +r.acres.toFixed(3), geometry: r.geometry }, M0.src('user', 'Metes and bounds entered at intake, closure ' + r.precisionText, { confidence: 'medium' }))];
         env.toast('Added the surveyed tract: ' + num(r.acres, 2) + ' acres, closure ' + r.precisionText + '.'); s.err = ''; return changed(p, true);
       }
+      if (act === 'showEditing') { record(p, t); f.activeScenario = s.editing || null; return changed(p, true); }
       if (act === 'newScenario') { const id = 'sc' + Date.now().toString(36), n = f.scenarios.length + 1; f.scenarios.push({ id, name: 'Scenario ' + n, overrides: {} }); s.editing = id; return changed(p, true); }
       if (act === 'delScenario') { f.scenarios = f.scenarios.filter(x => x.id !== s.editing); if (f.activeScenario === s.editing) f.activeScenario = null; s.editing = ''; return changed(p, true); }
       if (act === 'preview') { const c = studyOf(p, { sensitivity: true }); if (!c?.study) return; const opt = M0.optionOf(p), w = window.open('', '_blank'); if (!w) { s.reportErr = 'Your browser blocked the new window.'; return paint(); }
@@ -370,7 +377,8 @@ export function workspace(env) {
     });
     el.addEventListener('input', e => {
       const t = e.target, f = fz(p), s = st(p);
-      if (t.dataset.as || t.dataset.line || t.dataset.mix || (t.dataset.in && !/^sv/.test(t.dataset.in))) record(p, t);
+      if (t.dataset.as || t.dataset.line || t.dataset.mix || t.dataset.scname || (t.dataset.in && !/^sv/.test(t.dataset.in))) record(p, t);
+      if (t.dataset.scname) { const sc = f.scenarios.find(x => x.id === s.editing); if (!sc) return; sc.name = t.value.replace(/\s+/g, ' ').trimStart().slice(0, 60) || sc.name; return changed(p); }
       if (t.dataset.as) { const o = s.editing ? f.scenarios.find(x => x.id === s.editing)?.overrides : f.overrides; if (!o) return; if (t.value === '' || !Number.isFinite(+t.value)) return; o[t.dataset.as] = +t.value; return changed(p); }
       if (t.dataset.line) { if (!Number.isFinite(+t.value) || t.value === '') return; (f.budgetEdits[t.dataset.line] ||= {}).rate = +t.value; return changed(p); }
       if (t.dataset.mix) { const sc = f.scenarios.find(x => x.id === s.editing); if (!sc) return; if (!sc.mix) { const c = studyOf(p, { sensitivity: false }); if (!c?.study?.site) return; sc.mix = mixOf(c.study); } const [i, k] = t.dataset.mix.split(':'); if (Number.isFinite(+t.value)) sc.mix[+i][k] = +t.value; return changed(p); }
