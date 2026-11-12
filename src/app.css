@@ -4377,3 +4377,4 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
   .netchip{position:fixed;left:10px;right:10px;bottom:calc(var(--navh,58px) + var(--sb,0px) + 8px);z-index:var(--z-nav);justify-content:center;height:34px;box-shadow:var(--sh-2)}
 }
 
+#view-market .mk-tbl thead th{top:calc(var(--mk-nav, 0px) - var(--view-pt, 20px))} /* Market: the header stops under the sticky section bar */
