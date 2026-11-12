@@ -4295,9 +4295,9 @@ a{color:var(--text)}
   #card .bnav button,.rnote.eb .eb-retry,.bot.err .lnk,.lnk.retry,.card .raw summary,.vhead .lnk,#card .sp-link{position:relative}
   #card .bnav button::before,.rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before,.card .raw summary::before,.vhead .lnk::before,#card .sp-link::before{content:"";position:absolute;left:0;right:0;top:50%;height:var(--tap);transform:translateY(-50%)}
   .rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before,.vhead .lnk::before{left:-8px;right:-8px}
-  /* the plan's (i) buttons keep their look with a 44px hit area */
-  #card .sp-i{position:relative}
-  #card .sp-i::before{content:"";position:absolute;left:50%;top:50%;width:var(--tap);height:var(--tap);transform:translate(-50%,-50%)}
+  /* the × on a filter chip (map chip row) and the plan's (i) buttons keep their look with a 44px hit area */
+  .fchip button,#card .sp-i{position:relative}
+  .fchip button::before,#card .sp-i::before{content:"";position:absolute;left:50%;top:50%;width:var(--tap);height:var(--tap);transform:translate(-50%,-50%)}
 }
 @media (pointer:coarse) and (max-width:700px){
   /* the plan header takes two rows so the full-size buttons leave room for the option's name */
