@@ -154,7 +154,8 @@ export function initMobile(ctx) {
   // only from the top). Stepping down puts the content back at its top. A sideways drag (the section chips) is left alone.
   let y0 = null, x0 = 0, dy = 0, zone = null, axis = null;
   card.addEventListener('touchstart', e => {
-    if (!isPhone()) return; const r = card.getBoundingClientRect(), t = e.touches[0];
+    if (!isPhone() || e.target.closest?.('button,a,input,select,textarea')) return; // a tap on a control is that control's, not a sheet step
+    const r = card.getBoundingClientRect(), t = e.touches[0];
     const grab = t.clientY - r.top < 48, head = !!e.target.closest?.('#card > .top');
     if (grab || head || card.scrollTop <= 0) { y0 = t.clientY; x0 = t.clientX; dy = 0; axis = null; zone = grab ? 'grab' : head ? 'head' : 'body'; }
   }, { passive: true });
