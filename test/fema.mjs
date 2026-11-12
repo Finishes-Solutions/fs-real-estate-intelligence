@@ -47,6 +47,14 @@ assert.equal(d.risk_index.risk_score, 38, 'building-value weighted'); assert.equ
 // one failing source doesn't sink the report
 const real = globalThis.fetch; globalThis.fetch = async (url, o) => String(url).includes('NfipClaims') ? new Response('down', { status: 503 }) : real(url, o);
 const e = await femaReport(AREA); assert.match(e.nfip_claims.error, /OpenFEMA 503/, 'retried once, then reported'); assert.equal(e.risk_index.tracts, 2); globalThis.fetch = real;
+// parts: the map card asks for each part on its own; only the asked parts come back, and only their sources are called
+{ seen.length = 0; const z = await femaReport(AREA, { parts: ['flood_zones'] });
+  assert.ok(z.flood_zones.shares); assert.deepEqual(['nfip_claims', 'disasters', 'risk_index', 'counties'].filter(k => k in z), []);
+  assert.ok(!seen.some(u => /National_Risk_Index|NfipClaims|DisasterDeclarations/.test(u)), 'no tract lookup for flood zones alone');
+  seen.length = 0; const c = await femaReport(AREA, { parts: ['nfip_claims', 'disasters'] });
+  assert.equal(c.nfip_claims.claims, 3); assert.equal(c.disasters.count, 2); assert.deepEqual(c.counties, ['Harris']); assert.ok(!('flood_zones' in c) && !('risk_index' in c));
+  assert.ok(!seen.some(u => u.includes('/NFHL/MapServer/28/query')), 'no flood zone queries for claims and declarations');
+  const all = await femaReport(AREA, { parts: ['nope'] }); assert.ok(all.flood_zones && all.nfip_claims && all.disasters && all.risk_index, 'unknown parts mean the whole report'); }
 // only an abuse guard: bigger than any Texas county
 await assert.rejects(femaReport({ type: 'Polygon', coordinates: [[[-100, 28], [-96, 28], [-96, 32], [-100, 32], [-100, 28]]] }), /larger than 10,000 square miles/);
 // a county-sized area: flood zone shares from the zones under the sample points (multipoint queries of up to 150 points)
@@ -71,6 +79,8 @@ r = res(); await handler({ headers: {}, query: { lat: '29.75', lon: '-95.39', mi
 { const real2 = globalThis.fetch; globalThis.fetch = async (url, o) => String(url).includes('NfipClaims') ? new Response('down', { status: 503 }) : real2(url, o);
   r = res(); await handler({ headers: {}, query: { lat: '29.75', lon: '-95.39', mi: '0.25' } }, r); assert.equal(r.headers['Cache-Control'], 'no-store', 'a report with a failed part is not cached'); globalThis.fetch = real2; }
 r = res(); await handler({ headers: {}, method: 'POST', query: {}, body: { geometry: { type: 'Point', coordinates: [0, 0] } } }, r); assert.equal(r.code, 400);
+r = res(); await handler({ headers: {}, method: 'POST', query: {}, body: { geometry: AREA, label: 'T', parts: ['risk_index'] } }, r); assert.equal(r.code, 200);
+assert.equal(r.body.risk_index.tracts, 2); assert.ok(!('flood_zones' in r.body) && !('nfip_claims' in r.body)); assert.equal(r.headers['Cache-Control'], 'no-store');
 // pieces
 assert.equal(zoneClass('VE'), 'high'); assert.equal(zoneClass('X', 'AREA OF MINIMAL FLOOD HAZARD', 'F'), 'minimal'); assert.equal(zoneClass('D'), 'undetermined'); assert.equal(zoneClass(''), 'unmapped');
 assert.equal(zoneShares(AREA, []).shares.unmapped, 100); assert.ok(samplePoints(AREA).length > 700);

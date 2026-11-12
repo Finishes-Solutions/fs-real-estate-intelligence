@@ -4,7 +4,7 @@
 //   share of the area in high / moderate / minimal flood risk, NFIP flood insurance claims paid nearby (by year and storm),
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
-import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable, fitArea, fmtSqmi } from './reportkit.js';
+import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable, fitArea, fmtSqmi, sqmiOf } from './reportkit.js';
 import { reveal } from './motion.js';
 import { femaReport, femaCsvRows } from './lib/reports/fema.mjs';
 const SRC = 'fema-nfhl';
@@ -46,18 +46,50 @@ export function initFema(ctx) {
   ctx.femaClassNow = () => cls;
 
   // ---------- report ----------
-  const reportFor = (geometry, label) => getJSON('api/fema', { what: 'Flood and hazard data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label }) });
-  ctx.femaReportData = reportFor;
+  // the four parts come back separately (api/fema `parts`): each shows as soon as it lands, a slow one (claims over a whole
+  // county take minutes) doesn't hold up the rest, and one that failed can be asked for again on its own
+  const reportFor = (geometry, label, parts, signal) => getJSON('api/fema', { what: 'Flood and hazard data', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ geometry, label, ...(parts ? { parts } : {}) }), signal });
+  ctx.femaReportData = (geometry, label) => reportFor(geometry, label);
+  const STEPS = [['flood_zones', 'Flood zones'], ['nfip_claims', 'Flood insurance claims'], ['disasters', 'Disaster declarations'], ['risk_index', 'FEMA risk index']];
+  const ASKS = [['flood_zones'], ['risk_index'], ['nfip_claims', 'disasters']]; // claims and declarations share one tract lookup
   const { body, reportHtml } = femaReport({ esc, fmtN, fmtM, unavailable, areaMap, reportDoc });
+  let seq = 0, ctl = null, tick = 0;
+  const stop = () => { ctl?.abort(); ctl = null; clearInterval(tick); };
+  ctx.onCardClose?.(stop); // closing the card stops a report still loading
+  const head = (label, sub) => '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div><button class="x" aria-label="Close">×</button></div>';
   async function report({ geometry, label }) {
-    const card = ctx.card || document.getElementById('card');
-    ctx.closeCard?.(); card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2></div><button class="x" aria-label="Close">×</button></div><div class="bsec"><div class="rnote loading">Checking flood zones, insurance claims, disasters and risk…</div></div>';
-    card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard(); fitArea(ctx, geometry);
-    let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Flood and hazard data')); return; }
-    last = { d, label, geometry };
-    card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2><div class="bsub">' + fmtSqmi(d.area_sqmi) + '</div></div><button class="x" aria-label="Close">×</button></div>' + body(d) +
+    const my = ++seq, card = ctx.card || document.getElementById('card');
+    ctx.closeCard?.(); stop(); ctl = new AbortController();
+    const signal = ctl.signal, sq = sqmiOf(geometry), t0 = Date.now(), state = {}, d = { label, area_sqmi: sq, counties: [] };
+    STEPS.forEach(([k]) => { d[k] = { pending: true }; state[k] = 'run'; });
+    // still this run's card (not a newer report, and not another card drawn over it)
+    const mine = () => my === seq && !!card.querySelector('.fm-prog[data-run="' + my + '"]');
+    const elapsed = () => { const s = Math.round((Date.now() - t0) / 1000); return 'Working for ' + (s < 60 ? s + ' s.' : Math.floor(s / 60) + ' min ' + (s % 60) + ' s.'); };
+    // while parts are still out: the step list (each part's state, the time so far, Cancel) above whatever has landed
+    const progress = () => '<div class="bsec fm-prog" data-run="' + my + '"><ul class="fm-steps" aria-label="Report parts">' + STEPS.map(([k, l]) => '<li class="' + state[k] + '"><i aria-hidden="true"></i>' + esc(l) + '<span>' + (state[k] === 'ok' ? 'Done' : state[k] === 'err' ? 'Didn’t load' : 'Working…') + '</span></li>').join('') + '</ul>' +
+      '<div class="rnote" role="status"><span id="fmEl">' + elapsed() + '</span>' + (sq > 200 ? ' Large areas can take 1–3 minutes; each part appears below as soon as it’s in.' : '') + ' <button class="lnk" type="button" id="fmCancel">Cancel</button></div></div>';
+    const paint = (first) => { if (!first && !mine()) return; const y = card.scrollTop;
+      card.innerHTML = head(label, fmtSqmi(sq)) + progress() + body(d); card.classList.add('open'); card.scrollTop = y;
+      card.querySelector('.x').onclick = () => ctx.closeCard(); card.querySelector('#fmCancel').onclick = cancel; };
+    const cancel = () => { if (!mine()) return; stop();
+      card.querySelector('.fm-prog').replaceChildren(errorBox('Stopped. The parts that had loaded are shown below.', () => report({ geometry, label }))); card.querySelector('.fm-prog .eb-retry').textContent = 'Run it again';
+      card.querySelectorAll('.bsec:has(> .rnote.loading)').forEach(b => b.remove()); }; // the parts that hadn't loaded go
+    fitArea(ctx, geometry); paint(true);
+    tick = setInterval(() => { const e = mine() && card.querySelector('#fmEl'); if (e) e.textContent = elapsed(); else clearInterval(tick); }, 1000);
+    const ask = parts => reportFor(geometry, label, parts, signal).then(r => { parts.forEach(k => { d[k] = r[k]; state[k] = r[k]?.error ? 'err' : 'ok'; }); if (r.counties?.length) d.counties = r.counties; d.area_sqmi = r.area_sqmi ?? d.area_sqmi; d.sources = r.sources; d.risk_labels = r.risk_labels; },
+      e => { if (e?.name === 'AbortError') throw e; parts.forEach(k => { d[k] = { error: e.message, failed: true }; state[k] = 'err'; }); return e; }).then(x => { paint(); return x; });
+    let errs; try { errs = await Promise.all(ASKS.map(ask)); } catch (e) { return; } // cancelled
+    if (!mine()) return; stop();
+    // nothing came back at all (offline, the service down): one sentence with Retry, as before
+    const fails = errs.filter(x => x instanceof Error); if (fails.length === ASKS.length) { card.querySelector('.fm-prog').replaceChildren(errorBox(fails[0], () => report({ geometry, label }), 'Flood and hazard data')); card.querySelectorAll('.bsec:not(.fm-prog)').forEach(b => b.remove()); return; }
+    last = { d, label, geometry }; draw(card);
+  }
+  // the finished card (again after a part is retried)
+  function draw(card) {
+    const { d, label, geometry } = last;
+    card.innerHTML = head(label, fmtSqmi(d.area_sqmi)) + body(d) +
       '<div class="bacts"><button class="btn" id="fmLayer" type="button">Show Flood Zones on Map</button><button class="btn primary" id="fmPdf" type="button">Export PDF</button><button class="btn" id="fmCsv" type="button">Export CSV</button></div>' +
-      '<div class="rnote bsec">Flood maps show regulatory risk, not every flood; Houston floods outside them too. For a single parcel, confirm with an elevation certificate or a FEMA flood zone determination.<span class="src"> ' + esc(d.sources) + '</span></div>';
+      '<div class="rnote bsec">Flood maps show regulatory risk, not every flood; Houston floods outside them too. For a single parcel, confirm with an elevation certificate or a FEMA flood zone determination.<span class="src"> ' + esc(d.sources || '') + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
     reveal(card, 'card:fema|' + label); // its charts draw in once per report (src/motion.js)
     card.querySelector('#fmLayer').onclick = () => { setOn(true); ctx.fitGeom?.(geometry); };
