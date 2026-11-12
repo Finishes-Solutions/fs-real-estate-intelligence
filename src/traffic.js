@@ -56,6 +56,8 @@ export function initTraffic(ctx) {
   // a live part (speeds, incidents) that answered with an error: say so in words, not with the server's text
   const sub = (x, what, plain) => /not configured/i.test(x?.error || '') ? plain + ' aren’t set up on this site.' : unavailable(what);
   ctx.trafficReportData = reportFor;
+  // why a live tile has no number, in words (not a bare dash that reads as zero)
+  const liveWhy = x => /not configured/i.test(x?.error || '') ? 'live traffic not set up' : x?.error ? 'live data unavailable' : 'no live readings';
   const congestion = x => x.closed ? 'Closed' : x.congestion_pct == null ? '—' : x.congestion_pct + '% slower';
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
@@ -67,8 +69,8 @@ export function initTraffic(ctx) {
     const top = roads[0], slow = live.filter(x => x.congestion_pct >= 25);
     fillCard(ctx, card, cardTop('Traffic report', label, (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi · ' : '') + 'TxDOT counts' + (c.as_of ? ' (file of ' + esc(String(c.as_of).slice(0, 10)) + ')' : '') + ' · live now') +
       '<div class="bsec">' + (c.error ? '<div class="rnote err">' + esc(unavailable('Traffic count data')) + '</div>' :
-        kgrid([[top ? fmt(top.aadt) : '—', top ? 'Busiest: ' + top.road : 'No counted roads'], [fmt(roads.length), 'Counted roads'], [live.length ? slow.length + ' of ' + live.length : '—', 'Busy roads slowed now'], [Array.isArray(d.incidents) ? fmt(inc.length) : '—', 'Incidents now']])) + '</div>' +
-      (roads.length ? '<div class="bsec"><div class="lt">Busiest roads (vehicles a day)</div>' + bars(roads.slice(0, 10).map(r => ({ label: r.road.length > 12 ? r.road.slice(0, 11) + '…' : r.road, v: r.aadt, color: colorOf(r.aadt) })), { height: 110 }) +
+        kgrid([[top ? fmt(top.aadt) : '—', top ? 'Busiest: ' + top.road : 'No counted roads'], [fmt(roads.length), 'Counted roads'], [live.length ? slow.length + ' of ' + live.length : 'n/a', live.length ? 'Busy roads slowed now' : 'Busy roads slowed now · ' + liveWhy(d.live)], [Array.isArray(d.incidents) ? fmt(inc.length) : 'n/a', Array.isArray(d.incidents) ? 'Incidents now' : 'Incidents now · ' + liveWhy(d.incidents)]])) + '</div>' +
+      (roads.length ? '<div class="bsec"><div class="lt">Busiest roads (vehicles a day)</div>' + bars(roads.slice(0, 10).map(r => ({ label: r.road, v: r.aadt, color: colorOf(r.aadt) })), { height: 110, labels: false }) +
         '<dl>' + roads.slice(0, 12).map(r => '<dt>' + esc(r.road) + '</dt><dd class="mono">' + fmt(r.aadt) + ' <span class="sc">' + esc(r.type) + (r.segments > 1 ? ', avg ' + fmt(r.avg) + ' over ' + r.segments + ' segments' : '') + '</span></dd>').join('') + '</dl></div>' : '') +
       (c.types?.length ? '<div class="bsec"><div class="lt">By road type (average a day)</div><dl>' + c.types.map(t => '<dt>' + esc(t.label) + '</dt><dd class="mono">' + fmt(t.avg) + ' <span class="sc">' + fmt(t.segments) + ' segments, busiest ' + fmt(t.max) + '</span></dd>').join('') + '</dl>' +
         (c.segments_capped ? '<div class="rnote">' + fmt(c.types.reduce((n, t) => n + t.segments, 0)) + ' counted segments in all (averages above use every one). The map and PDF show the 1,000 busiest; <b>Export CSV</b> lists all of them.</div>' : '') + '</div>' : '') +

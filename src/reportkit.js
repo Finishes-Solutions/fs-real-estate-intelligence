@@ -125,13 +125,18 @@ export function table(headers, rows) {
   return '<table><thead><tr>' + h.map(x => '<th' + (x.r ? ' class="r"' : '') + '>' + esc(x.t) + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map(r => '<tr>' + r.map((c, i) => '<td' + (h[i]?.r ? ' class="m r"' : h[i]?.m ? ' class="m"' : '') + '>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
 }
-// vertical bars: [{ label, v, color? }]; labels under every nth bar
-export function bars(list, { color = '#0b7a5f', height = 120, every = 1, unit = '' } = {}) {
+// vertical bars: [{ label, v, color? }]; labels under every nth bar.
+//   px: the width the chart is drawn at (the side card is about 340 px): labels are sized to read at 11 px there and thinned
+//   so they never overlap. labels: false leaves them off (a list beside the chart names the bars).
+export function bars(list, { color = '#0b7a5f', height = 120, every = 1, unit = '', px = 0, labels = true } = {}) {
   const W = 620, H = height, n = list.length || 1, bw = W / n, mx = Math.max(1, ...list.map(x => +x.v || 0));
-  return '<svg viewBox="0 0 ' + W + ' ' + (H + 16) + '" xmlns="http://www.w3.org/2000/svg" role="img">' + list.map((x, i) => {
+  const fs = px ? 11 * W / px : 9, longest = Math.max(1, ...list.map(x => String(x.label).length));
+  if (px) every = Math.max(every, Math.ceil((longest * fs * 0.6 + fs) / bw));
+  const foot = labels ? Math.round(fs * 1.5) + 2 : 4;
+  return '<svg viewBox="0 0 ' + W + ' ' + (H + foot) + '" xmlns="http://www.w3.org/2000/svg" role="img">' + list.map((x, i) => {
     const h = Math.max(x.v > 0 ? 1.5 : 0, (+x.v || 0) / mx * (H - 14)), X = i * bw;
     return '<g><title>' + esc(x.label + ': ' + fmt(x.v) + unit) + '</title><rect class="m-bar" x="' + (X + bw * .12).toFixed(1) + '" y="' + (H - h).toFixed(1) + '" width="' + (bw * .76).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.5" fill="' + (x.color || color) + '"/>' +
-      (i % every === 0 ? '<text x="' + (X + bw / 2).toFixed(1) + '" y="' + (H + 12) + '" font-size="9" text-anchor="middle" fill="currentColor" opacity=".6">' + esc(x.label) + '</text>' : '') + '</g>';
+      (labels && i % every === 0 ? '<text x="' + (X + bw / 2).toFixed(1) + '" y="' + (H + fs * 1.25).toFixed(1) + '" font-size="' + fs.toFixed(1) + '" text-anchor="middle" fill="currentColor" opacity=".7">' + esc(x.label) + '</text>' : '') + '</g>';
   }).join('') + '</svg>';
 }
 // ---------- report maps: a street map under the area ----------
