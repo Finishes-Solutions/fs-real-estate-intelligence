@@ -255,14 +255,16 @@ async function hcad() {
     for await (const r of records(jz, 'jur_exempt.txt', P.splitTsv)) { const a = r.acct?.trim(); if (!a) continue; const v = r.tax_district?.trim() + ':' + r.exempt_cat?.trim() + ':' + (+r.exempt_val || 0); ex.set(a, ex.has(a) ? ex.get(a) + ';' + v : v); }
     const exOf = s => { const by = {}, cats = new Set(); for (const p of (s || '').split(';').filter(Boolean)) { const [d, c, v] = p.split(':'); cats.add(c); (by[d] ||= {})[c] = +v; } return { cats, by }; };
     // buildings: detail rows written now, a summary kept for the account
-    const sum = new Map(), IW = writer('cad_improvements', 'county,account_id,tax_year,imp_id');
+    // HCAD writes a row per building section; the property's unit count and net rentable area repeat on each row
+    const sum = new Map(), seq = new Map(), IW = writer('cad_improvements', 'county,account_id,tax_year,imp_id');
     for (const [entry, kind] of [['building_res.txt', 'residential'], ['building_other.txt', 'commercial']]) {
       for await (const r of records(bz, entry, P.splitTsv)) {
         const b = P.hcadBuilding(r, { taxYear: y, kind }); if (!b.account_id) continue;
-        b.imp_id = (kind === 'commercial' ? 'C' : 'R') + b.imp_id; await IW.push({ ...b, source_run_id: run.id });
-        const s = sum.get(b.account_id) || [null, 0, 0, 0, null], first = t1(r.bld_num) === '1'; // [year built, main?, sq ft, units, class]
-        if (b.year_built && (first ? !s[1] : !s[0] || b.year_built < s[0])) { s[0] = b.year_built; s[1] = s[1] || (first ? 1 : 0); } // (building 1's year when it has one, else the oldest)
-        s[2] += b.sqft || 0; s[3] += b.units || 0; s[4] ||= b.bldg_class; sum.set(b.account_id, s);
+        const k = b.account_id + '|' + kind, n = (seq.get(k) || 0) + 1; seq.set(k, n);
+        b.imp_id = (kind === 'commercial' ? 'C' : 'R') + b.imp_id + '-' + n; await IW.push({ ...b, source_run_id: run.id }); // (building number + section: unique within the account)
+        const s = sum.get(b.account_id) || [null, 0, 0, 0, null, 0], first = t1(r.bld_num) === '1'; // [year built, from building 1?, sq ft, units, class, net rentable sf]
+        if (b.year_built) { if (first) { if (!s[1]) { s[0] = b.year_built; s[1] = 1; } } else if (!s[1] && (!s[0] || b.year_built < s[0])) s[0] = b.year_built; } // (building 1's year, else the oldest)
+        s[2] += b.sqft || 0; s[3] = Math.max(s[3], b.units || 0); s[4] ||= b.bldg_class; s[5] = Math.max(s[5], +r.nra || 0); sum.set(b.account_id, s);
       }
     }
     await IW.flush();
@@ -276,8 +278,8 @@ async function hcad() {
     for await (const r of records(az, 'real_acct.txt', P.splitTsv)) {
       const a = P.hcadAccount(r, { roll }); if (!a.account_id || a.tax_year !== y) continue; read++; vsum += a.market_value || 0; if (ids.length < 5000) ids.push(a.account_id);
       const s = sum.get(a.account_id), e = ex.has(a.account_id) ? exOf(ex.get(a.account_id)) : null, v = jvOf(jv.get(a.account_id));
-      if (s) { a.year_built = s[0] || a.year_built; a.bldg_sqft = s[2] || a.bldg_sqft; a.units = s[3] || null; a.bldg_class = s[4] || a.bldg_class; }
-      if (e) a.exemptions = [...e.cats].filter(Boolean);
+      if (s) { a.year_built = s[0] || a.year_built; a.bldg_sqft = s[5] || s[2] || a.bldg_sqft; a.units = s[3] || null; a.bldg_class = s[4] || a.bldg_class; } // (net rentable area where HCAD gives it: building sections include garages)
+      if (e) a.exemptions = [...e.cats].filter(c => c && c !== 'NONE');
       const row = { ...P.stripPrivate(a), source_run_id: run.id }; row.h = P.rowHash(row); await AW.push(row);
       const codes = v ? Object.keys(v) : a._jurs; if (codes.length) await UW.push({ county: 'Harris', account_id: a.account_id, tax_year: y, unit_codes: codes, taxable: v || {}, exemptions: e?.by || {}, partial: false, source_run_id: run.id });
     }
@@ -309,17 +311,21 @@ async function fbcadOne(url, y, roll) {
   const run = await startRun({ source: 'fbcad', county: 'Fort Bend', tax_year: y, roll, url, file_name: f.name, sha256: f.sha256, bytes: f.bytes, ...(await keepRaw(f, 'fbcad', y)) });
   try {
     const list = zipList(f.file), entry = k => list.find(n => new RegExp(k + 'Export\\.txt$', 'i').test(n));
-    const owners = new Map(), ents = new Map(), exs = new Map();
-    for await (const r of records(f.file, entry('Owner'), P.splitCsv)) { const o = P.orionOwner(r); if (o.account_id && !owners.has(o.account_id)) owners.set(o.account_id, o); }
-    for await (const r of records(f.file, entry('Entity'), P.splitCsv)) { const e = P.orionEntity(r); if (!e.owner_ref) continue; const o = ents.get(e.owner_ref) || ents.set(e.owner_ref, { codes: [], taxable: {}, market: 0, assessed: 0 }).get(e.owner_ref); o.codes.push(e.code); o.taxable[e.code] = e.taxable; o.market = Math.max(o.market, e.market || 0); o.assessed = Math.max(o.assessed, e.assessed || 0); }
-    for await (const r of records(f.file, entry('Exemption'), P.splitCsv)) { const e = P.orionExemption(r); if (e.owner_ref) (exs.get(e.owner_ref) || exs.set(e.owner_ref, new Set()).get(e.owner_ref)).add(e.code); }
+    // a property with several owners has an owner record each, and its entity and exemption records are per owner: rolled up to the property
+    const owners = new Map(), ents = new Map(), exs = new Map(), propOf = new Map();
+    for await (const r of records(f.file, entry('Owner'), P.splitCsv)) { const o = P.orionOwner(r); if (!o.account_id) continue; if (o.owner_ref && o.owner_ref !== o.account_id) propOf.set(o.owner_ref, o.account_id); if (!owners.has(o.account_id)) owners.set(o.account_id, o); }
+    const byUnit = new Map(); // property|code → [market, assessed, taxable] summed over owners
+    for await (const r of records(f.file, entry('Entity'), P.splitCsv)) { const e = P.orionEntity(r); if (!e.owner_ref) continue; const k = (propOf.get(e.owner_ref) || e.owner_ref) + '|' + e.code, v = byUnit.get(k) || [0, 0, 0]; v[0] += e.market || 0; v[1] += e.assessed || 0; v[2] += e.taxable || 0; byUnit.set(k, v); }
+    for (const [k, v] of byUnit) { const [id, code] = k.split('|'), o = ents.get(id) || ents.set(id, { codes: [], taxable: {}, market: 0, assessed: 0 }).get(id); if (!o.codes.includes(code)) o.codes.push(code); o.taxable[code] = v[2]; o.market = Math.max(o.market, v[0]); o.assessed = Math.max(o.assessed, v[1]); }
+    byUnit.clear();
+    for await (const r of records(f.file, entry('Exemption'), P.splitCsv)) { const e = P.orionExemption(r); if (!e.owner_ref) continue; const id = propOf.get(e.owner_ref) || e.owner_ref; (exs.get(id) || exs.set(id, new Set()).get(id)).add(e.code); }
     const AW = writer('cad_accounts', 'county,account_id,tax_year'), UW = writer('account_taxing_units', 'county,account_id,tax_year');
     let read = 0, vsum = 0; const codes = new Set();
     for await (const r of records(f.file, entry('Property'), P.splitCsv)) {
       const a = P.orionProperty(r); if (!a.account_id || !(/^R/.test(a._type) || a._type === 'M') || (a.tax_year && a.tax_year !== y)) continue; // (RR residential, RL land, RD ag, RC commercial, RX exempt, M mobile home; P personal and N minerals left out)
-      const o = owners.get(a.account_id), e = ents.get(o?.owner_ref || a.account_id); read++;
+      const o = owners.get(a.account_id), e = ents.get(a.account_id); read++;
       Object.assign(a, { tax_year: y, roll, owner: o?.owner || null, mailing: o?.mailing || null, land_value: o?.land_value ?? null, improvement_value: o?.improvement_value ?? null, ag_value: o?.ag_use || null,
-        market_value: e?.market || ((o?.land_value || 0) + (o?.improvement_value || 0) + (o?.ag_market || 0)) || null, appraised_value: e?.assessed || null, exemptions: [...(exs.get(o?.owner_ref || a.account_id) || [])],
+        market_value: e?.market || ((o?.land_value || 0) + (o?.improvement_value || 0) + (o?.ag_market || 0)) || null, appraised_value: e?.assessed || null, exemptions: [...(exs.get(a.account_id) || [])],
         year_built: null, bldg_sqft: null, units: null, stories: null, bldg_class: null, neighborhood: null, lon: null, lat: null });
       vsum += a.market_value || 0;
       const row = { ...P.stripPrivate(a), source_run_id: run.id }; row.h = P.rowHash(row); await AW.push(row);
@@ -394,9 +400,10 @@ async function grimes() {
     const run = await startRun({ source: 'grimes-roll', county: 'Grimes', tax_year: y, roll: 'certified', url: f.url, file_name: f.name, sha256: f.sha256, bytes: f.bytes, ...(await keepRaw(f, 'grimes', y)) });
     try {
       const AW = writer('cad_accounts', 'county,account_id,tax_year'), UW = writer('account_taxing_units', 'county,account_id,tax_year'), names = new Map();
-      let read = 0, vsum = 0; const ids = [];
+      let read = 0, vsum = 0; const ids = [], seen = new Set();
       for (const b of P.grimesBlocks(fs.readFileSync(f.file, 'latin1').split('\n').slice(0, MAX_ROWS))) { // (about 100 MB of text: read whole)
-        const r = P.grimesAccount(b, { taxYear: y }); if (!r || r.account._prefix !== 'R') continue; // (real property: minerals N, personal P left out)
+        const r = P.grimesAccount(b, { taxYear: y }); if (!r || r.account._prefix !== 'R' || seen.has(r.account.account_id)) continue; // (real property: minerals N, personal P left out; a property with several owners is printed once each: the first is kept)
+        seen.add(r.account.account_id);
         read++; vsum += r.account.market_value || 0; if (ids.length < 5000) ids.push(r.account.account_id);
         for (const u of r.unitNames) names.set(u.code, u.name);
         const row = { ...P.stripPrivate(r.account), source_run_id: run.id }; row.h = P.rowHash(row); await AW.push(row);
@@ -425,12 +432,13 @@ async function layers() {
       if (ROLL_SOURCE[county] && db) { const had = await db.select('source_runs', 'source=eq.' + ROLL_SOURCE[county] + '&tax_year=gte.' + y + '&status=in.(ok,warning)&limit=1'); if (had.length) { log('layer', county, y, 'covered by the roll file'); continue; } }
       const run = await startRun({ source: 'bis-layer', county, tax_year: y, roll: 'current', url, file_name: 'FeatureServer/0', sha256: null });
       const AW = writer('cad_accounts', 'county,account_id,tax_year'), UW = writer('account_taxing_units', 'county,account_id,tax_year'), h = crypto.createHash('sha256');
-      let read = 0, vsum = 0, off = 0;
+      let read = 0, vsum = 0, off = 0; const seen = new Set();
       for (;;) {
         const page = E.CAD_DIR ? JSON.parse(fs.readFileSync(path.join(E.CAD_DIR, 'layer-' + county + '-' + off + '.json'), 'utf8')) : await (await get(url + '/query?' + new URLSearchParams({ f: 'json', where: 'owner_tax_yr=' + y, outFields: '*', returnGeometry: 'true', outSR: '4326', geometryPrecision: '6', orderByFields: 'ObjectID_1', resultOffset: String(off), resultRecordCount: '2000' }))).json();
         if (page.error) throw new Error(county + ' layer: ' + (page.error.message || 'error'));
         for (const f of page.features || []) {
-          const r = P.bisAccount(f.attributes, { county, centroid: P.ringCentroid(f.geometry) }); if (!r.account.account_id || r.account.tax_year !== y) continue;
+          const r = P.bisAccount(f.attributes, { county, centroid: P.ringCentroid(f.geometry) }); if (!r.account.account_id || r.account.tax_year !== y || seen.has(r.account.account_id)) continue; // (an account drawn as several polygons: once)
+          seen.add(r.account.account_id);
           read++; vsum += r.account.market_value || 0; h.update(JSON.stringify(f.attributes));
           const row = { ...r.account, source_run_id: run.id }; row.h = P.rowHash(row); await AW.push(row);
           if (r.units.unit_codes.length) await UW.push({ ...r.units, source_run_id: run.id });

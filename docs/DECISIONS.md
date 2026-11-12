@@ -194,3 +194,39 @@ One line per decision: what was chosen and why. Newest at the bottom of each pha
 
 - **Typed presets, not open prompts**: Quick layouts are fixed word requests per type (lib/quicklayouts.mjs) run through the no-AI words parser and the seeded engine, because open-ended AI requests were giving odd layouts; each preset is checked in test/quicklayouts.mjs to read as the use it names.
 - **Run in parallel, dedupe by numbers**: up to five runs at once in a small worker pool (one fewer than the cores, at most 4); a layout with the same units, floor area, spaces, buildings and piece count as an earlier one is dropped for the type's next preset, since some word variants (e.g. "rear-load") draw the same plan on a given site.
+
+
+## Appraisal rolls and tax rates (2026-11-12, branch matthew/more-data-sources)
+
+- **Free official files only, no scraping.** Every source is a file or layer the district or the Comptroller publishes
+  for download (docs/data-sources/cad-and-tax-rates.md). Waller CAD's property search forbids automated access in its
+  robots.txt and is not used. Waller, Austin and Montgomery need public information requests for a full roll; the draft
+  letter is in that doc.
+- **One row per account and tax year** (`cad_accounts`), with the roll it came from. A load writes only its file's tax
+  year, so earlier years are never overwritten; within a year a later roll replaces the earlier one. History therefore
+  starts with the first load for counties that post only the current year (Harris, Washington, Waller, Austin); Fort Bend
+  posts certified exports back to 2023 and Grimes back to 2006 (2018 on is loaded by default via YEARS).
+- **Units per account as one row** (`account_taxing_units`: an array of codes and a JSON of taxable values) instead of a
+  row per unit: Harris alone would be about 11 million unit rows a year on a 1 GB database.
+- **Improvement summary on the account** (year built, building sf, units, stories, class) so comparables are one query;
+  `cad_improvements` keeps the detail.
+- **Rates by unit key**: the Comptroller's unit ID where known, else `<county>:<code>`. A district's code is linked to
+  the Comptroller's unit by ID (Fort Bend's rate workbook gives it) or by a careful name match (numbers must agree;
+  names without a number must match exactly). Unlinked units keep their own rates from the district's table. Linked:
+  Waller 51 of 57, Fort Bend 267 of 269, Harris about 520 of 850 (most of the rest are TIRZs, which levy nothing).
+- **Rate per unit** = the district's own table for the year, else the Comptroller's for that year, else the newest
+  earlier year (said in the answer). District tables first because the Comptroller's file lags a year and disagrees with
+  Waller CAD on some special districts (e.g. Katy West MUD 0.40 vs 0.80).
+- **Waller's farm-to-market / flood fund (RFM)** is added county-wide only with Waller CAD's own rate for the year; the
+  Comptroller's county rate already includes it, and two codes that map to one Comptroller unit are counted once.
+- **TIRZs** are typed `tirz` and left out of estimates (no rate of their own).
+- **Idempotency by file checksum** (`source_runs.sha256`): the same file is skipped. Raw files go to the private
+  `cad-raw` bucket when they are under 45 MB (Supabase's default upload limit is 50 MB); HCAD's 100–230 MB zips keep
+  their checksums and URL only.
+- **Swing checks**: rows read more than 20% off the last run of the same source and roll kind is a warning; under half
+  fails the job unless ALLOW_SHRINK=1. A sample of 25 accounts is looked up in the district's parcel layer.
+- **MCP tool-list cap 95,000 → 110,000 characters**: the three tools bring the read-only list to 93,568; the cap leaves
+  room for the next few without trimming other descriptions.
+- **Not in v1**: Fort Bend improvement segments (its monthly property data export has them; a next step), coordinates
+  for Harris and Fort Bend accounts (needed for radius comps there), homestead tax ceilings.
+
