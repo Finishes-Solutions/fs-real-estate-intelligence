@@ -398,13 +398,19 @@ function applyFilters(){
 const cRow=document.getElementById('countyRow'), tRow=document.getElementById('typeRow'), pRow=document.getElementById('periodRow');
 PERIODS.forEach(([k,label])=>{ const b=document.createElement('button'); b.className='chip'; b.dataset.p=k; b.textContent=label; b.setAttribute('aria-pressed','false');
   b.onclick=()=>{ state.d=periodSpec(k); datePicked=false; applyFilters(); }; pRow.appendChild(b); });
+// County chips work like the Type chips: a click turns that county on or off (at least one stays on); "All" turns them all back on.
+// Each count is the filings that county would add under every other current filter (period, type, value, area…), so the
+// numbers add up to the result instead of showing all-time totals.
+{ const all=document.createElement('button'); all.className='chip c-all'; all.type='button'; all.textContent='All'; all.setAttribute('aria-pressed','true'); all.title='Every county';
+  all.onclick=()=>{ state.counties=new Set(COUNTIES); applyFilters(); }; cRow.appendChild(all); }
 COUNTIES.forEach(c=>{
-  const b=document.createElement('button'); b.className='chip'; b.setAttribute('aria-pressed','true');
-  b.innerHTML=c+' <span class="n">'+F.filter(f=>f.county===c).length+'</span>';
-  b.onclick=()=>{ const solo=state.counties.size===1&&state.counties.has(c); state.counties=solo?new Set(COUNTIES):new Set([c]);
-    [...cRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.counties.has(COUNTIES[i]))); applyFilters(); if(!solo) fitGeom(countyGeo.find(x=>x.name===c).geom); };
+  const b=document.createElement('button'); b.className='chip'; b.type='button'; b.dataset.c=c; b.setAttribute('aria-pressed','true');
+  b.innerHTML=c+' <span class="n">'+fmtN(F.filter(f=>f.county===c).length)+'</span>';
+  b.onclick=()=>{ state.counties.has(c)&&state.counties.size>1?state.counties.delete(c):state.counties.add(c); applyFilters(); };
   cRow.appendChild(b);
 });
+function countyCounts(){ const spec=curSpec(false); delete spec.c; const m=makeMatcher(spec,{changed:CHANGED}), n={}; COUNTIES.forEach(c=>n[c]=0);
+  for(const f of F) if(f.county in n&&m(f)&&inSel(f)&&monthOK(f)) n[f.county]++; return n; }
 TYPES.forEach(t=>{
   const b=document.createElement('button'); b.className='chip'; b.setAttribute('aria-pressed','true');
   const sw=t==='Addition'?'border:2px solid var(--c-add);background:transparent':'background:var(--c-'+(t==='New'?'new':'reno')+')';
@@ -459,7 +465,8 @@ const chgRow=document.getElementById('chgRow');
   b.onclick=()=>{ state.chg=state.chg===k?null:k; applyFilters(); }; chgRow.appendChild(b); });
 if(!LAST_RUN) chgRow.style.display='none';
 function syncFilterUI(){
-  [...cRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.counties.has(COUNTIES[i])));
+  const cn=countyCounts(); cRow.querySelectorAll('.chip[data-c]').forEach(x=>{ x.setAttribute('aria-pressed',state.counties.has(x.dataset.c)); const s=x.querySelector('.n'); if(s) s.textContent=fmtN(cn[x.dataset.c]); });
+  cRow.querySelector('.c-all')?.setAttribute('aria-pressed',state.counties.size===COUNTIES.length);
   [...tRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.types.has(TYPES[i])));
   [...chgRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',state.chg===x.dataset.chg));
   const pk=periodOf(state.d); [...pRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===pk));
