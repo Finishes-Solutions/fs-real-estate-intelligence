@@ -24,12 +24,16 @@ export function initGlance(ctx) {
   // the tracts of an area (the selection or the view): those centred inside it, or (an area smaller than a tract, e.g. zoomed
   // in on a block) the tract under its middle
   const selTracts = (tracts, g) => { const l = tractsFor(tracts, { geom: g }); if (l.length) return l; const c = centroid(g); return c ? tracts.filter(t => t.geom && inGeom(c, t.geom)) : []; };
+  // a county pick: every tract of those counties (by GEOID), the same set the Market page sums, so population and growth
+  // read the same on both (a county outline's centred tracts differ by a few at the edges)
+  const countyTracts = (tracts, g) => { const l = selTracts(tracts, g), n = new Map(); l.forEach(t => { const k = String(t.g).slice(0, 5); n.set(k, (n.get(k) || 0) + 1); });
+    const fips = [...n].filter(([, c]) => c >= l.length * 0.05).map(([k]) => k); return fips.length ? tracts.filter(t => fips.includes(String(t.g).slice(0, 5))) : l; };
   // the same numbers for any outline (Compare shows them per area): the tracts centred inside it, summed the way the tiles are
   const stats = new WeakMap();
-  ctx.areaStats = async geom => {
+  ctx.areaStats = async (geom, { county = false } = {}) => {
     if (!geom) return null; if (stats.has(geom)) return stats.get(geom);
     let m; try { m = await ctx.loadMarket(); } catch (e) { return null; }
-    const x = summarizeTracts(selTracts(m.tracts, geom.geometry || geom)), out = x ? { ...x, year: m.year, baseYear: m.baseYear } : null;
+    const x = summarizeTracts((county ? countyTracts : selTracts)(m.tracts, geom.geometry || geom)), out = x ? { ...x, year: m.year, baseYear: m.baseYear } : null;
     stats.set(geom, out); return out;
   };
   if (!el) return;
@@ -39,7 +43,7 @@ export function initGlance(ctx) {
     let m; try { m = await ctx.loadMarket(); } catch (e) { el.innerHTML = ''; return; }
     if (my !== seq) return;
     let list, place, where;
-    if (sg) { list = selTracts(m.tracts, sg); place = sel.label || 'Selected area'; where = 'in the selection'; }
+    if (sg) { list = (sel.kind === 'county' ? countyTracts : selTracts)(m.tracts, sg); place = sel.label || 'Selected area'; where = 'in the selection'; }
     else { const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
       list = selTracts(m.tracts, { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }); place = ctx.viewPlace?.() || ''; where = 'in view'; }
     const x = summarizeTracts(list);
@@ -49,7 +53,7 @@ export function initGlance(ctx) {
       tile('Population', num(x.population), gr == null ? '' : '<span class="' + (gr >= 0 ? 'up' : 'dn') + '">' + (gr >= 0 ? '+' : '') + gr + '%</span> since ' + m.baseYear) +
       tile('Median Income', money(x.median_household_income_approx)) +
       tile('Home Value', money(x.median_home_value_approx)) +
-      tile('Median Rent', x.median_gross_rent_approx == null ? '—' : '$' + fmtN(x.median_gross_rent_approx) + '/mo') +
+      tile('Median Rent', x.median_gross_rent_approx == null ? '—' : '$' + fmtN(x.median_gross_rent_approx) + '/mo', x.median_gross_rent_approx == null ? '' : 'census (ACS)') +
       tile('Households', num(x.households), x.vacancy_rate_pct == null ? '' : x.vacancy_rate_pct + '% of homes vacant') +
       tile('Jobs', x.jobs == null ? '—' : num(x.jobs), x.jobs == null ? '' : 'located here') +
       '</div><div class="g-s src">US Census ACS 5-year ' + m.year + ', ' + fmtN(x.tracts) + ' tract' + (x.tracts > 1 ? 's' : '') + ' ' + where + '; medians are household-weighted.</div>', place);

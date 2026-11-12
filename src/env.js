@@ -5,7 +5,7 @@
 //   nearest first, wells and pipelines, wetlands and soils; opens in the card and exports as PDF or CSV.
 import { KINDS, SETS } from './lib/env.mjs';
 import { envReport, envCsvRows } from './lib/reports/env.mjs';
-import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, fitArea } from './reportkit.js';
+import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, fitArea, fmtSqmi } from './reportkit.js';
 
 const SRC = 'env-sites', AREA = 'env-areas';
 const RASTERS = { rrc: { box: 'lyRrc', note: 'lyRrcNote', minz: 11, opacity: .9, attr: 'Wells & pipelines: Railroad Commission of Texas', msg: 'Oil and gas wells (symbols by type: oil, gas, plugged, dry, injection) and pipelines from the Railroad Commission. Zoom in past neighborhood level.' },
@@ -110,7 +110,7 @@ export function initEnv(ctx) {
   // (re)draw the card from last.d; Retry asks again for just that source and redraws
   function draw(card) {
     const { d, label, geometry } = last;
-    fillCard(ctx, card, cardTop('Environmental report', label, (d.area_sqmi < 1 ? Math.round(d.area_sqmi * 640) + ' acres' : d.area_sqmi.toFixed(2) + ' sq mi') + ' searched, plus the distances below') + body(d) +
+    fillCard(ctx, card, cardTop('Environmental report', label, fmtSqmi(d.area_sqmi) + ' searched, plus the distances below') + body(d) +
       '<div class="bacts"><button class="btn" id="envLayers" type="button">Show on Map</button><button class="btn primary" id="envPdf" type="button">Export PDF</button><button class="btn" id="envCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">A screen of public databases, not a Phase I environmental site assessment: records can be mislocated or missing, and nothing here says whether a site is contaminated.<span class="src"> ' + esc(d.sources) + '</span></div>');
     card.querySelector('#envLayers').onclick = () => { setSitesOn(true); setRaster('rrc', true); ctx.fitGeom?.(geometry); };

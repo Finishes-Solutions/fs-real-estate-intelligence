@@ -72,6 +72,8 @@ export const middleOf = g => { let w = 180, s = 90, e = -180, n = -90; const wal
 export const sqmiOf = g => { g = g?.geometry || g; const polys = g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : []; const c = middleOf(g); if (!c) return 0;
   const kx = 69.17 * Math.cos(c[1] * Math.PI / 180), ky = 69.17, ring = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += r[j][0] * kx * r[i][1] * ky - r[i][0] * kx * r[j][1] * ky; return Math.abs(s) / 2; };
   return polys.reduce((a, p) => a + ring(p[0]) - p.slice(1).reduce((t, r) => t + ring(r), 0), 0); };
+// one way to write an area's size on every screen: acres under a square mile, one decimal under 10, whole miles above
+export const fmtSqmi = v => !Number.isFinite(+v) ? '' : v < 1 ? Math.round(v * 640).toLocaleString('en-US') + ' acres' : (v < 10 ? (+v).toFixed(1) : Math.round(v).toLocaleString('en-US')) + ' sq mi';
 // a point as '29.891, -95.394'
 export const latLon = c => c ? c[1].toFixed(3) + ', ' + c[0].toFixed(3) : '';
 // 'Map view near Katy', or plain 'Map view' where no place is known (never a guessed town)

@@ -3,7 +3,7 @@
 //   Traffic report for any area: the busiest roads and every counted segment (TxDOT), average traffic by road type,
 //   live speed vs free flow on the busiest roads and current crashes / closures / road works (TomTom, live, not stored).
 //   Opens in the card; exports a PDF report and CSV.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, inTexas, fitArea } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, inTexas, fitArea, fmtSqmi } from './reportkit.js';
 
 const STOPS = [[5000, '#22c55e'], [20000, '#eab308'], [60000, '#f97316'], [150000, '#dc2626'], [300000, '#7f1d1d']];
 const colorOf = v => (STOPS.find(s => v < s[0]) || STOPS[STOPS.length - 1])[1];
@@ -67,7 +67,7 @@ export function initTraffic(ctx) {
     last = { d, label, geometry };
     const c = d.counts || {}, roads = c.roads || [], live = Array.isArray(d.live) ? d.live : [], inc = Array.isArray(d.incidents) ? d.incidents : [];
     const top = roads[0], slow = live.filter(x => x.congestion_pct >= 25);
-    fillCard(ctx, card, cardTop('Traffic report', label, (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi · ' : '') + 'TxDOT counts' + (c.as_of ? ' (file of ' + esc(String(c.as_of).slice(0, 10)) + ')' : '') + ' · live now') +
+    fillCard(ctx, card, cardTop('Traffic report', label, (d.area_sqmi ? fmtSqmi(d.area_sqmi) + ' · ' : '') + 'TxDOT counts' + (c.as_of ? ' (file of ' + esc(String(c.as_of).slice(0, 10)) + ')' : '') + ' · live now') +
       '<div class="bsec">' + (c.error ? '<div class="rnote err">' + esc(unavailable('Traffic count data')) + '</div>' :
         kgrid([[top ? fmt(top.aadt) : '—', top ? 'Busiest: ' + top.road : 'No counted roads'], [fmt(roads.length), 'Counted roads'], [live.length ? slow.length + ' of ' + live.length : 'n/a', live.length ? 'Busy roads slowed now' : 'Busy roads slowed now · ' + liveWhy(d.live)], [Array.isArray(d.incidents) ? fmt(inc.length) : 'n/a', Array.isArray(d.incidents) ? 'Incidents now' : 'Incidents now · ' + liveWhy(d.incidents)]])) + '</div>' +
       (roads.length ? '<div class="bsec"><div class="lt">Busiest roads (vehicles a day)</div>' + bars(roads.slice(0, 10).map(r => ({ label: r.road, v: r.aadt, color: colorOf(r.aadt) })), { height: 110, labels: false }) +
@@ -116,7 +116,7 @@ export function initTraffic(ctx) {
       '<div class="two"><div><h2>By road type</h2>' + table(['Type', { t: 'Avg a day', r: 1 }, { t: 'Busiest', r: 1 }, { t: 'Segments', r: 1 }], (c.types || []).map(t => [esc(t.label), fmt(t.avg), fmt(t.max), fmt(t.segments)])) + '</div>' +
       '<div><h2>Live speeds (' + new Date(d.as_of_live).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) + ')</h2>' + (live.length ? table(['Road', { t: 'Now', r: 1 }, { t: 'Free flow', r: 1 }, 'Condition'], live.map(x => [esc(x.road), fmt(x.current_mph) + ' mph', fmt(x.free_flow_mph) + ' mph', esc(congestion(x))])) : '<p class="meta">' + esc(d.live?.error ? sub(d.live, 'Live speed data', 'Live speeds') : 'No live readings.') + '</p>') + '</div></div>' +
       '<h2>Incidents at the time of the report</h2>' + (inc.length ? table(['Type', 'Road', 'Where', 'What', { t: 'Delay', r: 1 }], inc.map(x => [esc(x.kind), esc(x.road), esc(x.from && x.to ? x.from + ' to ' + x.to : x.from), esc(x.what), x.delay_min ? x.delay_min + ' min' : ''])) : '<p class="meta">' + esc(d.incidents?.error ? sub(d.incidents, 'Live incident data', 'Live incidents') : 'None reported.') + '</p>');
-    await savePdf(ctx, 'traffic', label, reportDoc({ kicker: 'Traffic report', title: label, meta: (d.area_sqmi ? fmt(d.area_sqmi) + ' sq mi' : '') + (c.as_of ? ' · TxDOT file of ' + esc(String(c.as_of).slice(0, 10)) : ''), body,
+    await savePdf(ctx, 'traffic', label, reportDoc({ kicker: 'Traffic report', title: label, meta: (d.area_sqmi ? fmtSqmi(d.area_sqmi) : '') + (c.as_of ? ' · TxDOT file of ' + esc(String(c.as_of).slice(0, 10)) : ''), body,
       sources: esc(d.sources) + ' Counts are annual averages for both directions and all vehicles; live speeds and incidents are a snapshot.' }), { meta: { geom: geometry } });
   }
   // the area on a street map, with the counted segments coloured by traffic

@@ -6,6 +6,7 @@ import { BY_KEY } from './metrics.js';
 import { contains as inArea } from './lib/geomatch.mjs';
 import { reveal } from './motion.js';
 import { centroid } from './lib/demographics.mjs';
+import { sqmiOf, fmtSqmi } from './reportkit.js';
 
 const MAX = 4;
 const COLORS = ['#0b7a5f', '#b7791f', '#2b6cb0', '#9b2c6f'];
@@ -35,7 +36,7 @@ export function initCompare(ctx) {
   const color = i => COLORS[i % COLORS.length];
   const keyOf = a => a.key || a.label;
   const has = key => areas.some(x => keyOf(x) === key);
-  const sqmi = g => d3.geoArea(g) * 3958.8 ** 2;
+  const sqmi = g => sqmiOf(g); // the same size the area reports print
   // counties named by a county selection ('county:Harris|Waller'): these count by the county on each filing, exactly as the
   // area bar does, so the numbers agree; drawn shapes, circles and places count what lies inside the outline
   const countyNames = a => a.kind === 'county' && String(keyOf(a)).startsWith('county:') ? new Set(keyOf(a).slice(7).split('|').filter(Boolean)) : null;
@@ -139,7 +140,7 @@ export function initCompare(ctx) {
   function loadStats() {
     const todo = areas.filter(a => !stats.has(keyOf(a)));
     if (!todo.length) return Promise.resolve();
-    const p = Promise.all(todo.map(a => Promise.resolve(ctx.areaStats?.(a.geom)).catch(() => null).then(x => { stats.set(keyOf(a), x || null); })));
+    const p = Promise.all(todo.map(a => Promise.resolve(ctx.areaStats?.(a.geom, { county: a.kind === 'county' })).catch(() => null).then(x => { stats.set(keyOf(a), x || null); })));
     statsP = p; p.then(() => { if (statsP === p && ctx.view === 'compare') render(); });
     return p;
   }
@@ -162,7 +163,7 @@ export function initCompare(ctx) {
       return S.map((x, i) => loading[i] ? cell(null, '…') : vals[i] != null ? cell(vals[i], f(vals[i]), i === b) : cell(null, '—')); };
     const yr = S.find(Boolean)?.baseYear;
     const census = { title: 'Area (US Census)', rows: [
-      { label: 'Size', unit: 'sq mi', cells: sz.map((v, i) => cell(+v.toFixed(1), (v < 10 ? v.toFixed(1) : fmtN(Math.round(v))) + ' sq mi', i === lead(sz))) },
+      { label: 'Size', unit: 'sq mi', cells: sz.map((v, i) => cell(+v.toFixed(1), fmtSqmi(v), i === lead(sz))) },
       { label: 'Population', cells: CS('population', 'n') },
       { label: 'Population growth' + (yr ? ' since ' + yr : ''), unit: '%', cells: CS('population_growth_pct', v => (v >= 0 ? '+' : '') + v + '%') },
       { label: 'Median household income', unit: '$', cells: CS('median_household_income_approx', '$') },

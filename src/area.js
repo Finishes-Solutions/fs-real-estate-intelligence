@@ -174,7 +174,7 @@ export function initArea(ctx) {
       s.pop ? ({ label: 'Population', v: fmtN(s.pop.n), d: C.delta(s.pop.gr), sub: 'since ' + s.pop.baseYear }) : null,
       s.jobs ? ({ label: 'Jobs located here', v: fmtN(s.jobs.n), d: C.delta(s.jobs.gr), sub: s.jobs.gr != null ? 'since ' + s.jobs.baseYear : 'LODES ' + s.jobs.year }) : null,
       hs?.median_household_income_approx ? ({ label: 'Median household income', v: money(hs.median_household_income_approx), sub: 'census estimate' }) : null,
-      rn ? ({ label: 'Typical rent', v: '$' + fmtN(Math.round(rn.typical)) + '<small>/mo</small>', d: C.delta(rn.yoy), sub: 'ZIP median · a year earlier' }) : null,
+      rn ? ({ label: 'Typical rent (Zillow)', v: '$' + fmtN(Math.round(rn.typical)) + '<small>/mo</small>', d: C.delta(rn.yoy), sub: 'ZIP median · a year earlier' }) : null,
       lastP ? ({ label: 'Homes permitted ' + lastP.y, v: fmtN(lastP.sf + lastP.mf), d: prevP ? C.delta(chg(lastP.sf + lastP.mf, prevP.sf + prevP.mf)) : '', sub: prevP ? 'vs ' + prevP.y : '', sp: C.spark(s.permits.map(r => r.sf + r.mf), { ck: 'mk:overview:permits', tips: s.permits.map(r => r.y + ': ' + fmtN(r.sf + r.mf) + ' homes') }) }) : null,
       // no change badge: the permit list only keeps locations still open, so older months read low and a year-on-year gain is inflated
       bz.a.length ? ({ label: 'New businesses, 12 mo', v: fmtN(bzA), sub: 'still open · older months read low', sp: C.spark(bzDone.map(r => r.n), { ck: 'mk:overview:biz', tips: bzDone.map(r => monthLabel(r.m) + ': ' + fmtN(r.n)) }) }) : null,
