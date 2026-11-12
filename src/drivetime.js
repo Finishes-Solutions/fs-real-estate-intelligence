@@ -4,7 +4,7 @@
 // the map selection, so every area report (crime, FEMA, traffic…) works on a "20-minute drive" trade area.
 // Data: api/isochrone (TomTom reachable range with traffic; Valhalla / OpenStreetMap without).
 import { inGeom, tractsFor, summarizeTracts } from './lib/demographics.mjs';
-import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, sqmiOf, latLon } from './reportkit.js';
+import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, sqmiOf, latLon, errorBox } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
 
 export const BAND_COL = ['#16a34a', '#eab308', '#f97316', '#dc2626'];
@@ -75,7 +75,7 @@ export function initDriveTime(ctx) {
     const card = openCard(ctx, { kicker: 'Drive-time map', title: titleOf(head), sub: esc(startOf(head)), loading: 'Working out how far you can drive…' });
     pin(center);
     let d, bands; try { d = await fetchBands(center, minutes, depart); bands = await enrich(d); }
-    catch (e) { if (my === seq) card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return { error: e.message }; }
+    catch (e) { if (my === seq) card.querySelector('.bsec').replaceChildren(errorBox(e?.message || e, () => show(args), 'Drive-time data')); return { error: e.message }; }
     if (my !== seq) return {};
     last = { d, bands, center, label, minutes, depart, from, near };
     draw(d); ctx.fitGeom?.(d.features[d.features.length - 1].geometry);
