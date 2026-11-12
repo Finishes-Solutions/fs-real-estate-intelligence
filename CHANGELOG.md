@@ -5,6 +5,13 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-12
 
+### 2:22 AM CT: Property taxes for the agents: appraisal rolls and tax rates for the seven counties (`matthew/more-data-sources`)
+- **Agents can estimate a parcel's property tax:** every taxing unit (county, city, school district, water and emergency-services districts, college, hospital, drainage) with its rate and the year it is from, and the tax a year at the appraisal district's value and at a value they give, such as a purchase price.
+- **Assessment history:** a parcel's land, improvement and total values by year with the change each year.
+- **Tax-comparable tables:** what similar properties are valued at per unit, per square foot and per acre, filtered by area, land use, year built, units and size.
+- **Where it comes from:** the appraisal districts' own published rolls (Harris, Fort Bend, Washington and Grimes in full; Waller and Austin current year only) and the published tax rates (the districts' tables and the Texas Comptroller's). Montgomery has rates only until its appraisal district answers a records request.
+- Nothing changes in the app's screens yet, and the data loads once the new database tables are set up and the job is run.
+
 ### 1:15 AM CT: Research: where to get appraisal rolls and tax rates for the seven counties (`matthew/more-data-sources`, docs only)
 - No change to the app. A new note lists the official sources for each county's appraisal roll and every taxing unit's tax rates, what each one contains, and which counties need a public records request (Waller, Austin, Montgomery). It's the plan for adding property tax estimates.
 

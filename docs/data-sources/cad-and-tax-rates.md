@@ -4,6 +4,32 @@ Phase 1 (discovery) of the CAD roll and tax-rate pipeline. Checked 2026-11-12 fr
 page or file below (HTTP 200 unless a note says otherwise). Nothing has been loaded yet. "Verified" means the page or
 file was opened and read; "not verified" means it came from search results only.
 
+## Build status (2026-11-12)
+
+Phases 2–4 are built on `matthew/more-data-sources`: the schema (`supabase/migrations/20261112000000_cad_rolls.sql`,
+not yet applied), the loader (`build/cad-rolls.mjs`, workflow "CAD rolls and tax rates") and the MCP tools
+`tax_estimate`, `assessment_history`, `assessment_comps` (`docs/MCP_TOOLS.md`). Nothing has been written to Supabase yet:
+every source below was run end to end against the real files in dry-run mode (parse, check, write JSON lines).
+
+| Source | Dry run on the real files |
+|---|---|
+| Comptroller rates 2024–2025 (four kinds a year) | 4,800 units a year; county M&O = general fund + road & bridge + FMFC |
+| Waller CAD 2025 rate table (PDF) | 57 units, 51 linked to Comptroller IDs (2024's PDF is a scan: skipped with a warning) |
+| Fort Bend CAD rate workbook (2023 XLSX) | 269 codes, 267 with the Comptroller ID from the workbook itself |
+| Montgomery tax office 2026 rates (PDF) | 68 units, 52 linked |
+| Harris (HCAD bulk files, 2026 certified) | 1,628,388 accounts, 1,481,169 building sections, 1,082 jurisdictions with HCAD's own 2026 rates; 11 min, 5.3 GB peak memory |
+| Fort Bend (2026 certified export + supplements 1–4) | 392,257 accounts certified, then 10,315 / 4,161 / 3,693 / 3,789 in the supplements; about $182B market value |
+| Washington (2026 certified PACS export) | 25,278 accounts, 59,574 improvements; 100% of a sample found in the parcel layer |
+| Grimes (2025 and 2026 printed rolls) | 29,113 and 28,966 accounts; 92% and 96% of samples found in the parcel layer |
+| Waller and Austin parcel layers (2027 current) | 54,153 and 22,423 accounts with coordinates |
+
+Waller account 265550 through `tax_estimate` on those rows: tax year 2027 (current roll), market $19,622,330; Waller
+County 0.532596% + Waller County RFM (farm-to-market / flood fund) 0.023591% + City of Waller 0.4464% + Waller ISD
+1.0626% = **2.065187%** (Waller CAD's 2025 table; the same as the Comptroller's 2025 county + city + ISD). The parcel layer
+doesn't say whether the parcel is in Waller-Harris ESD 200 (0.1% in 2025); with it the total would be 2.165187%. The
+2.065962% figure given at the start still matches neither year exactly; the 2024 combination with ESD 200 (2.065919%)
+is the closest.
+
 ## The short version
 
 - **Tax rates: one statewide source covers every unit.** The Comptroller publishes a yearly XLSX of every taxing unit
