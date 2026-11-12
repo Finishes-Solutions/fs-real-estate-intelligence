@@ -4269,8 +4269,7 @@ a{color:var(--text)}
 /* watchlist: what changed on a watched filing, and when */
 .witem .chitem em{display:block}
 .witem .wchg{color:var(--text-2);margin-top:5px}
-/* ================= touch: the compact controls that were still under a fingertip (44px) =================
-   Last in the file so it wins over the compact desktop and phone sizes above. Small buttons, chips, segmented toggles,
+/* ================= touch: the compact controls that were still under a fingertip (44px) ==========   Last in the file so it wins over the compact desktop and phone sizes above. Small buttons, chips, segmented toggles,
    the site plan's tool strip, its header icons and stage chips get the full size. Rows that can't grow without
    crowding (the card's section chips) and text links (Retry) keep their look and get an invisible 44px hit area,
    as the card's × does. */
@@ -4383,3 +4382,9 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
    below it; the rest of the scale is unchanged. */
 .kpi span,.sc-k,.sc-k .sk-l,.fs-t em,#filingsPeriod,.fsw.tg2{font-size:var(--fs-xs)}
 .tl-chart .yax text,.tl-chart .xax text,.g-ticks span{font-size:11px}
+=======
+/* drive times: where the bands start (an area's drive times start from its middle) */
+.dt-start{display:flex;align-items:center;gap:5px;pointer-events:none}
+.dt-start i{width:14px;height:14px;border-radius:50%;background:#16191a;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.dt-start b{font:700 12px/1 var(--font-display,Inter,sans-serif);color:#16191a;background:#fff;border-radius:4px;padding:3px 6px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+#card .dt-from{margin:0 0 10px;padding:8px 10px;border-radius:6px;background:var(--chip,#f3f4f4);color:var(--text-2,#3b4245)}

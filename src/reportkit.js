@@ -68,6 +68,12 @@ export const inHouston = c => !!c && c[0] > -95.95 && c[0] < -95.0 && c[1] > 29.
 export const nearHouston = (c, nm = 100) => { if (!c) return false; const R = Math.PI / 180, h = Math.sin((c[1] - HOU[1]) * R / 2) ** 2 + Math.cos(c[1] * R) * Math.cos(HOU[1] * R) * Math.sin((c[0] - HOU[0]) * R / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)) <= nm * 1.15078; };
 // the middle of a Polygon / MultiPolygon's bounding box
 export const middleOf = g => { let w = 180, s = 90, e = -180, n = -90; const walk = a => typeof a[0] === 'number' ? (w = Math.min(w, a[0]), e = Math.max(e, a[0]), s = Math.min(s, a[1]), n = Math.max(n, a[1])) : a.forEach(walk); if (!g?.coordinates) return null; walk(g.coordinates); return e < w ? null : [(w + e) / 2, (s + n) / 2]; };
+// an outline's size in square miles (the same flat-earth sum the report APIs use, lib/fema.mjs areaSqMi)
+export const sqmiOf = g => { g = g?.geometry || g; const polys = g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : []; const c = middleOf(g); if (!c) return 0;
+  const kx = 69.17 * Math.cos(c[1] * Math.PI / 180), ky = 69.17, ring = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += r[j][0] * kx * r[i][1] * ky - r[i][0] * kx * r[j][1] * ky; return Math.abs(s) / 2; };
+  return polys.reduce((a, p) => a + ring(p[0]) - p.slice(1).reduce((t, r) => t + ring(r), 0), 0); };
+// a point as '29.891, -95.394'
+export const latLon = c => c ? c[1].toFixed(3) + ', ' + c[0].toFixed(3) : '';
 // 'Map view near Katy', or plain 'Map view' where no place is known (never a guessed town)
 export const viewLabel = ctx => { const p = ctx.viewPlace?.(); return p ? 'Map view near ' + p : 'Map view'; };
 
@@ -259,6 +265,10 @@ export const centerOf = g => { const r = (g.type === 'Polygon' ? g.coordinates[0
 //   modes: which ways to pick the area the Reports tab offers (default all three: 'selection', 'view', 'pick')
 //   noPanel / noSite: the Map panel / the Site section already have their own button for it
 const SHORT = { drivetime: '10–30 minute drives', traffic: 'Busiest roads, speeds', airtraffic: 'Planes overhead', fema: 'Flood zones, claims', environmental: 'Cleanup sites, permits' };
+// reports that start from one point of the area (drive times) or a circle around it (planes now): above this size the row
+// says so, so a county pick isn't read as county-wide figures
+const POINTY = { drivetime: [50, 'From the area’s middle'], airtraffic: [700, 'Planes near its middle'] };
+const hintFor = (key, sel) => { const p = POINTY[key]; return p && sel?.feature && sqmiOf(sel.feature) > p[0] ? p[1] : SHORT[key]; };
 export function initAreaReports(ctx) {
   const list = ctx.areaReports = [];
   const grid = document.getElementById('arepGrid');
@@ -268,7 +278,7 @@ export function initAreaReports(ctx) {
   const covered = (r, c) => !r.cover || r.cover.test(c);
   const syncSel = () => list.forEach(r => { if (!r.sb) return; let ok = true; try { ok = covered(r, ctx.areaCenter()); } catch (e) {}
     r.sb.disabled = !ok; r.sb.setAttribute('aria-disabled', String(!ok));
-    r.sb.querySelector('.ar-d').textContent = !ok ? r.cover.short : ctx.sel?.feature ? SHORT[r.key] || r.label : 'Run on map view'; r.sb.title = ok ? r.desc || r.label : r.cover.why; });
+    r.sb.querySelector('.ar-d').textContent = !ok ? r.cover.short : ctx.sel?.feature ? hintFor(r.key, ctx.sel) || r.label : 'Run on map view'; r.sb.title = ok ? r.desc || r.label : r.cover.why; });
   ctx.addAreaReport = r => {
     if (list.some(x => x.key === r.key)) return; list.push(r);
     if (grid && !r.noPanel) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ar-row'; b.dataset.ic = r.key; b.title = r.desc || r.label;

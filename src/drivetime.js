@@ -4,7 +4,7 @@
 // the map selection, so every area report (crime, FEMA, traffic…) works on a "20-minute drive" trade area.
 // Data: api/isochrone (TomTom reachable range with traffic; Valhalla / OpenStreetMap without).
 import { inGeom, tractsFor, summarizeTracts } from './lib/demographics.mjs';
-import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf } from './reportkit.js';
+import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, sqmiOf, latLon } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
 
 export const BAND_COL = ['#16a34a', '#eab308', '#f97316', '#dc2626'];
@@ -45,12 +45,22 @@ export function initDriveTime(ctx) {
         '<button class="lnk" type="button" data-dt-clear>Clear from map</button>' : '');
     } catch (e) { /* map style still loading */ }
   }
-  const clear = () => { last = null; draw(null); };
+  // the start point, on the map while the bands are (a county's drive times start from one point: show which)
+  let startPin = null;
+  function pin(c) {
+    if (!c) { startPin?.remove(); startPin = null; return; }
+    if (!startPin) { const el = document.createElement('div'); el.className = 'dt-start'; el.innerHTML = '<i></i><b>Start</b>'; el.title = 'Drive times start here'; startPin = new maplibregl.Marker({ element: el, anchor: 'left', offset: [-10, 0] }); }
+    try { startPin.setLngLat(c).addTo(map); } catch (e) { /* no map in tests */ }
+  }
+  const clear = () => { last = null; draw(null); pin(null); };
   ctx.clearDriveTime = clear;
   ctx.onOverlays?.(() => { if (last && !map.getSource(SRC)) draw(last.d); });
 
+  // what the card and the PDF are titled: an area's drive times start from its middle, so say so
+  const titleOf = x => x.from ? 'From the middle of ' + x.from : x.label;
+  const startOf = x => 'Start ' + latLon(x.center) + (x.near && x.near !== x.from ? ' · near ' + x.near : '');
   function select(b) {
-    const label = b.minutes + '-minute drive from ' + last.label;
+    const label = b.minutes + '-minute drive from ' + (last.from ? 'the middle of ' + last.from : last.label);
     // the selection is a plain polygon wound the way d3 expects (as the drawn shapes are)
     let g = b.geometry; try { if (window.d3?.geoArea(g) > 2 * Math.PI) g = { type: 'Polygon', coordinates: [g.coordinates[0].slice().reverse()] }; } catch (e) {}
     ctx.setSelection?.('shape', label, g);
@@ -58,23 +68,26 @@ export function initDriveTime(ctx) {
   }
 
   // open the drive-time card and draw the bands
-  async function show({ center, label, minutes = [10, 20, 30], depart = 'now' }) {
+  async function show(args) {
+    const { center, label, minutes = [10, 20, 30], depart = 'now', from = null } = args, near = ctx.nearestPlace?.(center) || null;
     const my = ++seq; if (ctx.view !== 'map') ctx.setView?.('map');
-    const card = openCard(ctx, { kicker: 'Drive-time map', title: label, loading: 'Working out how far you can drive…' });
+    const head = { center, label, from, near };
+    const card = openCard(ctx, { kicker: 'Drive-time map', title: titleOf(head), sub: esc(startOf(head)), loading: 'Working out how far you can drive…' });
+    pin(center);
     let d, bands; try { d = await fetchBands(center, minutes, depart); bands = await enrich(d); }
     catch (e) { if (my === seq) card.querySelector('.bsec').innerHTML = '<div class="rnote err">' + esc(e.message) + '</div>'; return { error: e.message }; }
     if (my !== seq) return {};
-    last = { d, bands, center, label, minutes, depart };
+    last = { d, bands, center, label, minutes, depart, from, near };
     draw(d); ctx.fitGeom?.(d.features[d.features.length - 1].geometry);
     render(card);
     return last;
   }
   function render(card) {
-    const { d, bands, label, minutes, depart } = last, hasCensus = bands.some(b => b.people != null);
+    const { d, bands, minutes, depart } = last, hasCensus = bands.some(b => b.people != null);
     const when = depart === 'now' ? (d.traffic ? 'Leaving now, with live traffic' : 'Without traffic') : (DEPARTS.find(x => x[0] === depart)?.[1] || '') + (d.traffic ? ', typical traffic' : '');
     const big = bands[bands.length - 1];
-    fillCard(ctx, card, cardTop('Drive-time map', label, esc(when) + '<span class="src"> · ' + esc(d.source) + '</span>') +
-      '<div class="bsec"><div class="dt-ctl"><div class="mi-chips" role="radiogroup" aria-label="Leaving">' + DEPARTS.map(([k, l]) => '<button type="button" class="chip" role="radio" data-dep="' + k + '" aria-checked="' + (k === depart) + '">' + l + '</button>').join('') + '</div>' +
+    fillCard(ctx, card, cardTop('Drive-time map', titleOf(last), esc(startOf(last)) + '<br>' + esc(when) + '<span class="src"> · ' + esc(d.source) + '</span>') +
+      '<div class="bsec">' + (last.from ? '<div class="rnote dt-from">Drive times start from one point, the middle of ' + esc(last.from) + ' (the <b>Start</b> dot on the map), not from the whole area. <button class="lnk" type="button" id="dtPick">Pick a start point</button></div>' : '') + '<div class="dt-ctl"><div class="mi-chips" role="radiogroup" aria-label="Leaving">' + DEPARTS.map(([k, l]) => '<button type="button" class="chip" role="radio" data-dep="' + k + '" aria-checked="' + (k === depart) + '">' + l + '</button>').join('') + '</div>' +
       '<div class="mi-chips" role="radiogroup" aria-label="Minutes">' + SETS.map(s => '<button type="button" class="chip" role="radio" data-set="' + s.join(',') + '" aria-checked="' + (s.join() === minutes.join()) + '">' + s.join(' / ') + ' min</button>').join('') + '</div></div>' +
       (d.note ? '<div class="rnote">' + esc(d.note) + '</div>' : '') +
       kgrid([[fmt(big.sqmi), 'Sq mi within ' + big.minutes + ' min'], [big.people == null ? '—' : fmt(big.people), 'People'], [big.jobs == null ? '—' : fmt(big.jobs), 'Jobs'], [fmt(big.filings), 'Filings on the map']]) + '</div>' +
@@ -89,14 +102,19 @@ export function initDriveTime(ctx) {
     card.querySelectorAll('[data-sel]').forEach(b => b.onclick = () => select(bands.find(x => x.minutes === +b.dataset.sel)));
     card.querySelector('#dtPdf').onclick = exportReport; card.querySelector('#dtCsv').onclick = exportCsv;
     card.querySelector('#dtClear').onclick = () => { clear(); ctx.closeCard?.(); };
+    const pick = card.querySelector('#dtPick'); if (pick) pick.onclick = () => { picking = { minutes: last.minutes, depart: last.depart }; map.getCanvas().style.cursor = 'crosshair'; ctx.toast?.('Click the map where the drive should start.'); };
   }
+  // "Pick a start point": the next map click starts the drive times there
+  let picking = null;
+  ctx.mapClickHandlers?.unshift(e => { if (!picking) return false; const p = picking; picking = null; map.getCanvas().style.cursor = '';
+    const c = [e.lngLat.lng, e.lngLat.lat], nm = ctx.nearestPlace?.(c); show({ center: c, label: nm ? 'Near ' + nm : latLon(c), ...p }); return true; });
   function exportCsv() {
     if (!last) return;
     saveCsv(ctx, 'drivetime', last.label, last.bands.map(b => ({ 'Drive time (min)': b.minutes, 'Leaving': DEPARTS.find(x => x[0] === last.depart)?.[1] || last.depart, 'Area (sq mi)': b.sqmi, People: b.people ?? '', Households: b.households ?? '', Jobs: b.jobs ?? '',
       'Median household income (approx)': b.income ?? '', 'Census tracts': b.tracts, 'Filings on the map': b.filings, Routing: last.d.source })), { geom: { type: 'Point', coordinates: last.center } });
   }
   async function exportReport() {
-    if (!last) return; const { d, bands, label, depart, center } = last;
+    if (!last) return; const { d, bands, label, depart, center } = last, title = titleOf(last);
     const big = bands[bands.length - 1], when = depart === 'now' ? (d.traffic ? 'Leaving now, live traffic' : 'No traffic') : DEPARTS.find(x => x[0] === depart)?.[1] + (d.traffic ? ', typical traffic' : '');
     const body = kgridDoc(big) +
       '<div class="map">' + areaSvg(bands.slice().reverse().map(b => ({ geometry: b.geometry, stroke: BAND_COL[bands.indexOf(b)] || BAND_COL[3], fill: 'rgba(0,0,0,0)', width: 2.2 })), { points: [{ c: center, r: 6, color: '#23282a', label: 'Start' }] }) + '</div>' +
@@ -104,7 +122,7 @@ export function initDriveTime(ctx) {
       '<h2>By drive time</h2>' + table(['Drive time', { t: 'Sq mi', r: 1 }, { t: 'People', r: 1 }, { t: 'Households', r: 1 }, { t: 'Median income', r: 1 }, { t: 'Jobs', r: 1 }, { t: 'Filings', r: 1 }],
         bands.map(b => [b.minutes + ' min', fmt(b.sqmi), fmt(b.people), fmt(b.households), b.income ? '$' + fmt(b.income) : '—', fmt(b.jobs), fmt(b.filings)])) +
       '<p class="meta">Each band includes the ones inside it. People, households, income and jobs sum the census tracts whose center is inside the band. Filings are those on the map when the report was made' + (ctx.filterText?.() ? ' (filters: ' + esc(ctx.filterText()) + ')' : '') + '.</p>';
-    await savePdf(ctx, 'drivetime', label, reportDoc({ kicker: 'Drive-time report', title: label, meta: esc(when), body,
+    await savePdf(ctx, 'drivetime', label, reportDoc({ kicker: 'Drive-time report', title, meta: esc(startOf(last)) + ' · ' + esc(when), body,
       sources: esc(d.source) + ' routing; US Census ACS 5-year and LEHD LODES (people, households, jobs); TDLR TABS (filings). Drive times are estimates for a car and vary with traffic, signals and construction.' }), { meta: { geom: { type: 'Point', coordinates: center } } });
   }
   const kgridDoc = big => '<div class="kp">' + [[fmt(big.sqmi), 'Sq mi within ' + big.minutes + ' min'], [fmt(big.people), 'People'], [fmt(big.jobs), 'Jobs'], [fmt(big.filings), 'Filings']].map(([v, l]) => '<div><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>';
@@ -121,5 +139,7 @@ export function initDriveTime(ctx) {
 
   // area reports: a drive-time map from the middle of the chosen area
   ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes from a point, now or at rush hour, with the people, jobs and filings inside each band. PDF or CSV.',
-    note: 'From the middle of the selected area or the map view', run: ({ geometry, label, center }) => show({ center: center || centerOf(geometry), label: label.replace(/^[\d.]+ mi around /, '') }) });
+    note: 'From the middle of the selected area or the map view', run: ({ geometry, label, center }) => { const l = label.replace(/^[\d.]+ mi around /, '');
+      // a radius is already a point (its centre); anything bigger than a neighborhood starts from its middle, and says so
+      return show({ center: center || centerOf(geometry), label: l, from: l === label && sqmiOf(geometry) > 50 ? label : null }); } });
 }
