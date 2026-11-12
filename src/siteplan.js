@@ -4970,7 +4970,7 @@ export function initSitePlan(ctx) {
       (renaming ? '<form class="pj-ren" id="pjRenForm" novalidate><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120" required aria-describedby="pjRenErr">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span><small class="field-err" id="pjRenErr" role="alert" hidden>Give the project a name</small></form>'
         : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
       '<div class="pj-hmeta"><span class="pj-st" data-st="' + st.id + '"><label class="sr" for="pjStatus">Status</label><select id="pjStatus" title="The project’s status (shared with the team)">' + PJ.STATUSES.map(x => '<option value="' + x.id + '"' + (x.id === st.id ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></span>' +
-        (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') +
+        (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac" title="The parcels’ recorded acreage (appraisal district), added up. The merged site outline, with overlaps between parcels closed up, can be slightly smaller: see Site on the Feasibility tab."><b>' + ac.toFixed(2) + '</b> acres in parcels</span>' : '') +
         updHtml(p) + '</div></header>';
   }
   // "Updated … by …" and where the last save went (the editor's save mark, in words), repainted by paintUpd() after each
@@ -5003,7 +5003,7 @@ export function initSitePlan(ctx) {
     const fact = (k, v, sub) => '<div><dt>' + k + '</dt><dd>' + v + (sub ? '<small>' + sub + '</small>' : '') + '</dd></div>';
     const field = (id, label, input) => '<div class="pj-f"><label for="' + id + '">' + label + '</label>' + input + '</div>';
     return '<div class="pj-ov"><section class="pj-box pj-info" aria-labelledby="pjInfoH"><h3 class="pj-h3" id="pjInfoH">Project information</h3>' +
-        '<div class="pj-ib"><div class="pj-thumb">' + (c || '<i>No site yet</i>') + '</div><dl class="pj-dl">' + fact('Site area', ac ? ac.toFixed(2) + ' acres' : 'Not set', ac ? f0(ac * 43560) + ' sq ft' : '') + fact('Parcels', f0(p.parcels.length)) +
+        '<div class="pj-ib"><div class="pj-thumb">' + (c || '<i>No site yet</i>') + '</div><dl class="pj-dl">' + fact('Parcel area', ac ? ac.toFixed(2) + ' acres' : 'Not set', ac ? f0(ac * 43560) + ' sq ft, recorded acreage added up' : '') + fact('Parcels', f0(p.parcels.length)) +
           (owners.length ? fact(owners.length > 1 ? 'Owners' : 'Owner', esc(owners[0]), owners.length > 1 ? 'and ' + plural(owners.length - 1, 'other') : '') : '') +
           (value ? fact('Appraised value', money(value), land ? 'land ' + money(land) : '') : '') + fact('Site plan options', f0(p.plans.length)) +
           (big ? fact('Largest option', f0(big.m.gfa) + ' sq ft', esc(big.pl.name) + ' · ' + esc(SP.USES[SP.normalizeProgram(big.pl.program).use].label) + (big.m.units ? ' · ' + plural(big.m.units, 'unit') : '')) : '') + '</dl></div>' +
