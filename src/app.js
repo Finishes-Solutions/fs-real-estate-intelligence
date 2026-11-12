@@ -851,7 +851,9 @@ document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.onclick=()=>{
 const MODE_TXT={area:'Drawing a box',poly:'Drawing a shape',radius:'Radius search',county:'Picking counties'};
 const selPill=document.getElementById('selPill'), modeChip=document.getElementById('modeChip');
 function setSelSheet(on){ document.querySelector('.app').classList.toggle('sel-open',!!on); selPill?.setAttribute('aria-expanded',String(!!on)); }
-function syncModeUI(m){ if(modeChip){ modeChip.hidden=m==='pan'||!MODE_TXT[m]; document.getElementById('modeChipT').textContent=MODE_TXT[m]||''; }
+function syncModeUI(m){ if(modeChip){ modeChip.hidden=m==='pan'||!MODE_TXT[m]; document.getElementById('modeChipT').textContent=MODE_TXT[m]||'';
+    // once a radius or counties are applied, leaving the tool keeps them: the button says Done, not Cancel (the area chip's × removes it)
+    const kept=(m==='radius'||m==='county')&&!!sel.feature, mc=document.getElementById('modeCancel'); if(mc){ mc.textContent=kept?'Done':'Cancel'; mc.title=kept?'Close the tool and keep the area':'Stop without picking an area'; } }
   if(!selPill) return; const ic=(m==='pan'?selIc0:document.querySelector('.tools button[data-mode="'+m+'"] svg'))?.cloneNode(true);
   if(ic){ ic.setAttribute('class','sp-ic'); selPill.querySelector('.sp-ic').replaceWith(ic); } selPill.classList.toggle('on',m!=='pan'); }
 const selIc0=selPill?.querySelector('.sp-ic')?.cloneNode(true);
@@ -866,9 +868,9 @@ function ringFeature(ring){
 }
 function setSelection(kind,label,feature,counties){
   sel.kind=kind; sel.label=label; sel.feature=feature; sel.counties=counties||new Set(); if(kind!=='radius'){ sel.center=null; setPin(null); }
-  syncSel(); applyFilters();
+  syncSel(); applyFilters(); try{ syncModeUI(mode); }catch(e){} // (not yet defined while the URL state restores at boot)
 }
-function clearSelection(){ sel.kind=null; sel.label=''; sel.feature=null; sel.center=null; sel.counties=new Set(); setPin(null); syncSel(); applyFilters(); }
+function clearSelection(){ sel.kind=null; sel.label=''; sel.feature=null; sel.center=null; sel.counties=new Set(); setPin(null); syncSel(); applyFilters(); try{ syncModeUI(mode); }catch(e){} }
 function syncSel(){ const s=map.getSource&&map.getSource('sel'); if(s) s.setData(fc(sel.feature?[{type:'Feature',properties:{},geometry:sel.feature}]:[])); }
 function drawDraft(cursor){
   const s=map.getSource&&map.getSource('draft'), p=map.getSource&&map.getSource('draftpts'); if(!s||!p) return;
@@ -908,7 +910,7 @@ map.on('click',e=>{
     const set=new Set(sel.kind==='county'?sel.counties:[]); set.has(c.name)?set.delete(c.name):set.add(c.name);
     if(!set.size){ clearSelection(); return; }
     setCountySel(set);
-  } else if(mode==='radius'){ setRadiusCenter(ll,pinLabel(ll),false); }
+  } else if(mode==='radius'){ setRadiusCenter(ll,pinLabel(ll),false); radiusEl.classList.remove('on'); }
 });
 map.on('dblclick',e=>{ if(mode==='poly'&&draft.length>=3){ e.preventDefault(); finishPoly(); } });
 function setCountySel(set){ const names=COUNTIES.filter(n=>set.has(n));
@@ -978,7 +980,7 @@ rq.addEventListener('keydown',e=>{
   if(e.key==='ArrowDown'&&sugs.length){e.preventDefault(); sugI=(sugI+1)%sugs.length; renderSugs();}
   else if(e.key==='ArrowUp'&&sugs.length){e.preventDefault(); sugI=(sugI-1+sugs.length)%sugs.length; renderSugs();}
   else if(e.key==='Enter'&&sugs.length){e.preventDefault(); pickSug(sugs[Math.max(0,sugI)]);} });
-function pickSug(o){ picked=true; rq.value=o.t; sugs=[]; renderSugs(); setRadiusCenter(o.c,o.t,true); }
+function pickSug(o){ picked=true; rq.value=o.t; sugs=[]; renderSugs(); setRadiusCenter(o.c,o.t,true); if(mode==='radius') radiusEl.classList.remove('on'); } // the panel folds to the chip: the circle is what you look at now (the Radius button reopens it)
 function setMiles(v,fromRange,silent){ v=Math.max(0.1,Math.min(MAX_MI,+v||0)); radiusMiles=v; if(!fromRange) rrange.value=v; rmi.value=v;
   document.querySelectorAll('.rpre button').forEach(b=>b.classList.toggle('on',+b.dataset.mi===v)); if(sel.kind==='radius'&&!silent) updateRadius(false); }
 rrange.addEventListener('input',()=>setMiles(rrange.value,true)); rmi.addEventListener('change',()=>setMiles(rmi.value));
