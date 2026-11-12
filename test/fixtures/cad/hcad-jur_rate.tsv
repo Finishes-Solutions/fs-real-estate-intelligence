@@ -1,0 +1,3 @@
+RP_TYPE	tax_dist	name	exempt_cd	prop	curr	exempt_val	exempt_rate
+Real	001	HOUSTON ISD	APD	0.878300	0.842100	65000	0.000000
+Real	001	HOUSTON ISD	APO	0.878300	0.842100	65000	0.000000

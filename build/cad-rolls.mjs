@@ -250,30 +250,33 @@ async function hcad() {
     const hr = P.hcadRates(rateRows, { taxYear: y });
     await writeUnits(hr.map(x => x.unit), 'Harris', run.id); await writeRates(hr.map(x => x.rate), run.id);
     // exemptions by account
-    const ex = new Map();
-    for await (const r of records(jz, 'jur_exempt.txt', P.splitTsv)) { const a = r.acct?.trim(); if (!a) continue; const o = ex.get(a) || ex.set(a, { cats: new Set(), by: {} }).get(a); o.cats.add(r.exempt_cat?.trim()); (o.by[r.tax_district?.trim()] ||= {})[r.exempt_cat?.trim()] = +r.exempt_val || 0; }
+    // (1.6 million accounts: kept as short strings, not objects, to stay inside a runner's memory)
+    const ex = new Map(); // acct → "district:cat:value;…"
+    for await (const r of records(jz, 'jur_exempt.txt', P.splitTsv)) { const a = r.acct?.trim(); if (!a) continue; const v = r.tax_district?.trim() + ':' + r.exempt_cat?.trim() + ':' + (+r.exempt_val || 0); ex.set(a, ex.has(a) ? ex.get(a) + ';' + v : v); }
+    const exOf = s => { const by = {}, cats = new Set(); for (const p of (s || '').split(';').filter(Boolean)) { const [d, c, v] = p.split(':'); cats.add(c); (by[d] ||= {})[c] = +v; } return { cats, by }; };
     // buildings: detail rows written now, a summary kept for the account
     const sum = new Map(), IW = writer('cad_improvements', 'county,account_id,tax_year,imp_id');
     for (const [entry, kind] of [['building_res.txt', 'residential'], ['building_other.txt', 'commercial']]) {
       for await (const r of records(bz, entry, P.splitTsv)) {
         const b = P.hcadBuilding(r, { taxYear: y, kind }); if (!b.account_id) continue;
         b.imp_id = (kind === 'commercial' ? 'C' : 'R') + b.imp_id; await IW.push({ ...b, source_run_id: run.id });
-        const s = sum.get(b.account_id) || sum.set(b.account_id, { yb: null, main: false, sq: 0, units: 0, cls: null }).get(b.account_id), first = t1(r.bld_num) === '1';
-        if (b.year_built && (first ? !s.main : !s.yb || b.year_built < s.yb)) { s.yb = b.year_built; s.main ||= first; } // (building 1's year when it has one, else the oldest)
-        s.sq += b.sqft || 0; s.units += b.units || 0; s.cls ||= b.bldg_class;
+        const s = sum.get(b.account_id) || [null, 0, 0, 0, null], first = t1(r.bld_num) === '1'; // [year built, main?, sq ft, units, class]
+        if (b.year_built && (first ? !s[1] : !s[0] || b.year_built < s[0])) { s[0] = b.year_built; s[1] = s[1] || (first ? 1 : 0); } // (building 1's year when it has one, else the oldest)
+        s[2] += b.sqft || 0; s[3] += b.units || 0; s[4] ||= b.bldg_class; sum.set(b.account_id, s);
       }
     }
     await IW.flush();
     // each account's units and taxable values
-    const jv = new Map();
-    for await (const r of records(jz, 'jur_value.txt', P.splitTsv)) { const a = r.acct?.trim(); if (!a) continue; const o = jv.get(a) || jv.set(a, {}).get(a); o[r.tax_district?.trim()] = +r.taxable_val || 0; }
+    const jv = new Map(); // acct → "district:taxable,…"
+    for await (const r of records(jz, 'jur_value.txt', P.splitTsv)) { const a = r.acct?.trim(); if (!a) continue; const v = r.tax_district?.trim() + ':' + (+r.taxable_val || 0); jv.set(a, jv.has(a) ? jv.get(a) + ',' + v : v); }
+    const jvOf = s => s ? Object.fromEntries(s.split(',').map(p => { const [d, v] = p.split(':'); return [d, +v]; })) : null;
     // accounts
     const AW = writer('cad_accounts', 'county,account_id,tax_year'), UW = writer('account_taxing_units', 'county,account_id,tax_year');
     let read = 0, vsum = 0; const ids = [];
     for await (const r of records(az, 'real_acct.txt', P.splitTsv)) {
       const a = P.hcadAccount(r, { roll }); if (!a.account_id || a.tax_year !== y) continue; read++; vsum += a.market_value || 0; if (ids.length < 5000) ids.push(a.account_id);
-      const s = sum.get(a.account_id), e = ex.get(a.account_id), v = jv.get(a.account_id);
-      if (s) { a.year_built = s.yb || a.year_built; a.bldg_sqft = s.sq || a.bldg_sqft; a.units = s.units || null; a.bldg_class = s.cls || a.bldg_class; }
+      const s = sum.get(a.account_id), e = ex.has(a.account_id) ? exOf(ex.get(a.account_id)) : null, v = jvOf(jv.get(a.account_id));
+      if (s) { a.year_built = s[0] || a.year_built; a.bldg_sqft = s[2] || a.bldg_sqft; a.units = s[3] || null; a.bldg_class = s[4] || a.bldg_class; }
       if (e) a.exemptions = [...e.cats].filter(Boolean);
       const row = { ...P.stripPrivate(a), source_run_id: run.id }; row.h = P.rowHash(row); await AW.push(row);
       const codes = v ? Object.keys(v) : a._jurs; if (codes.length) await UW.push({ county: 'Harris', account_id: a.account_id, tax_year: y, unit_codes: codes, taxable: v || {}, exemptions: e?.by || {}, partial: false, source_run_id: run.id });
@@ -313,7 +316,7 @@ async function fbcadOne(url, y, roll) {
     const AW = writer('cad_accounts', 'county,account_id,tax_year'), UW = writer('account_taxing_units', 'county,account_id,tax_year');
     let read = 0, vsum = 0; const codes = new Set();
     for await (const r of records(f.file, entry('Property'), P.splitCsv)) {
-      const a = P.orionProperty(r); if (!a.account_id || !['R', 'M'].includes(a._type) || (a.tax_year && a.tax_year !== y)) continue;
+      const a = P.orionProperty(r); if (!a.account_id || !(/^R/.test(a._type) || a._type === 'M') || (a.tax_year && a.tax_year !== y)) continue; // (RR residential, RL land, RD ag, RC commercial, RX exempt, M mobile home; P personal and N minerals left out)
       const o = owners.get(a.account_id), e = ents.get(o?.owner_ref || a.account_id); read++;
       Object.assign(a, { tax_year: y, roll, owner: o?.owner || null, mailing: o?.mailing || null, land_value: o?.land_value ?? null, improvement_value: o?.improvement_value ?? null, ag_value: o?.ag_use || null,
         market_value: e?.market || ((o?.land_value || 0) + (o?.improvement_value || 0) + (o?.ag_market || 0)) || null, appraised_value: e?.assessed || null, exemptions: [...(exs.get(o?.owner_ref || a.account_id) || [])],
