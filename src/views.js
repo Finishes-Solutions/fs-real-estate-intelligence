@@ -45,7 +45,9 @@ export function initWho(ctx) {
     root.querySelector('#whoBody').innerHTML = rows.slice(0, 150).map(g => '<tr data-k="' + esc(g.k) + '" class="' + (cur && cur.k === role && cur.v === g.k ? 'on' : '') + '"><td><button class="lnk">' + esc(g.label) + '</button>' + (Object.keys(g.names).length > 1 ? '<span class="aka">also filed as ' + esc(top(g.names).slice(1, 3).map(x => x[0]).join(', ')) + '</span>' : '') + '</td><td class="m r">' + fmtN(g.n) + '</td><td class="m r">' + fmtM(g.v) + '</td><td>' + esc(top(g.uses)[0][0] === 'Reno' ? 'Renovation' : top(g.uses)[0][0]) + '</td><td>' + esc(top(g.cos).slice(0, 2).map(x => x[0]).join(', ')) + '</td><td>' + spark(g.q) + '</td><td class="m">' + esc(g.last) + '</td></tr>').join('')
       || '<tr class="nomatch"><td colspan="7">' + (ctx.vempty ? ctx.vempty({ icon: 'search', title: q ? 'No names match “' + q + '”' : 'No companies with these filters', text: q ? 'Check the spelling, or try part of the name.' : 'Loosen the filters above to see more filings.' }) : 'No names match.') + '</td></tr>';
     const byK = new Map(rows.map(g => [g.k, g]));
-    root.querySelectorAll('#whoBody tr[data-k]').forEach(tr => tr.onclick = () => { const g = byK.get(tr.dataset.k); ctx.state.who = { k: role, v: g.k, label: g.label }; ctx.showFilings?.(); ctx.applyFilters(); ctx.setView('map'); ctx.toast('Showing ' + fmtN(g.n) + ' filings for ' + g.label + '. Reset filters to see everything.'); });
+    root.querySelectorAll('#whoBody tr[data-k]').forEach(tr => tr.onclick = () => { const g = byK.get(tr.dataset.k); ctx.state.who = { k: role, v: g.k, label: g.label }; ctx.showFilings?.(); ctx.applyFilters(); ctx.setView('map');
+      requestAnimationFrame(() => ctx.fitToVisible?.()); // frame the company's filings (one filing: zoom in on it)
+      ctx.toast('Showing ' + fmtN(g.n) + ' filings for ' + g.label + '. Reset filters to see everything.'); });
   }
   ctx.onChange(render); ctx.onView('who', render);
 }
