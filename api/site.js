@@ -55,9 +55,15 @@ export function floodInfo(rows) {
 }
 // ---------- traffic ----------
 const PRFX = { IH: 'I-', US: 'US ', SH: 'SH ', FM: 'FM ', RM: 'RM ', SL: 'Loop ', SS: 'Spur ', BI: 'Bus. I-', BU: 'Bus. US ', BF: 'Bus. FM ', PR: 'Park Rd ', RE: 'Rec Rd ' };
+// TxDOT files toll roads by internal route codes (TL0008-RG / -KG / -LG: one per roadbed); the public names we know
+const TOLL = { '0008': 'Sam Houston Tollway (Beltway 8)' };
 export function roadName(a) {
   const p = String(a.RTE_PRFX || '').trim(), n = String(a.RTE_NBR || '').replace(/^0+/, '').trim();
   if (p === 'CS') return 'City street'; if (p === 'CR') return 'County road';
+  const code = String(a.RTE_NM || '').trim(), m = /^TL(\d{4})/.exec(code) || (p === 'TL' ? ['', String(a.RTE_NBR || '').padStart(4, '0')] : null);
+  if (m) return TOLL[m[1]] || 'Toll road (TxDOT ' + (code.replace(/-[A-Z]{2}$/, '') || 'TL' + m[1]) + ')';
+  // any other bare segment code: say what it is, keep the code for anyone checking TxDOT's file
+  if (!PRFX[p] && /^[A-Z]{2}\d{4}-[A-Z]{2}$/.test(code)) return 'Unnamed TxDOT segment (' + code + ')';
   return PRFX[p] ? PRFX[p] + n : (a.RTE_NM || 'Road');
 }
 export function trafficInfo(rows) {

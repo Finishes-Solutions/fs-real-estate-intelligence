@@ -82,6 +82,11 @@ console.log('drivetime ok');
   const c = await countsIn(sq, f);
   assert.deepEqual(c.roads.map(r => [r.road, r.aadt, r.segments, r.avg]), [['I-10', 250000, 2, 225000], ['Westheimer Rd', 30000, 1, 30000]], 'busiest per road, with averages');
   assert.equal(c.segments.length, 3); assert.equal(c.types[0].label, 'Interstates');
+  // toll roadbeds with one count (TL0008-RG / -KG / -LG) merge into one named row under Toll roads; no raw codes left
+  { const tl = nm => ({ attributes: { RTE_PRFX: 'TL', RTE_NBR: '0008', RTE_NM: nm, AADT_CUR: 197362, SYSTEM: 'On', BEGIN_DFO: 12.3 }, geometry: { paths: [[[-95.47, 29.76], [-95.46, 29.76]]] } });
+    const g = async (url, o = {}) => { const p = new URLSearchParams(o.body); if (p.get('outStatistics')) return json({ features: [{ attributes: { RTE_PRFX: 'TL', avg: 110698, n: 37, mx: 197362 } }] }); return json({ features: ['TL0008-RG', 'TL0008-KG', 'TL0008-LG'].map(tl) }); };
+    const t = await countsIn(sq, g); assert.deepEqual(t.roads.map(r => [r.road, r.type, r.segments]), [['Sam Houston Tollway (Beltway 8)', 'Toll roads', 1]]);
+    assert.equal(t.types[0].label, 'Toll roads'); assert.ok(!t.roads.some(r => /^[A-Z]{2}\d{4}-[A-Z]{2}$/.test(r.road))); }
   const d = await trafficReport(sq, { key: 'k', fetchImpl: f, label: 'x' });
   assert.equal(d.live[0].congestion_pct, 50); assert.equal(d.live[0].road, 'I-10');
   assert.equal(d.incidents[0].kind, 'Crash'); assert.equal(d.incidents[0].delay_min, 10); assert.equal(d.incidents[0].lon, -95.45);
