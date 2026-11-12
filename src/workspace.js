@@ -96,9 +96,12 @@ export function workspace(env) {
   }
 
   // ---------- 1 Intake ----------
+  // every field has a stable id (wsIn-<key>) so paint() can put focus and the caret back after the numbers redraw;
+  // numeric fields that redraw (asking price) are text inputs with a decimal keypad, since a type=number input can't have its
+  // caret restored (the survey's lat/lon don't redraw while typed, so they stay number inputs with a minus key)
   function intakeStep(p) {
     const f = fz(p), it = M0.intakeFromParcels(f.intake, p.parcels || []), parcels = p.parcels || [];
-    const field = (k, label, v, o = {}) => '<label class="ws-f' + (o.wide ? ' wide' : '') + '"><span>' + label + '</span><input data-in="' + k + '" ' + (o.type ? 'type="' + o.type + '" inputmode="decimal" ' : '') + 'value="' + esc(v ?? '') + '" autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '></label>';
+    const field = (k, label, v, o = {}) => '<label class="ws-f' + (o.wide ? ' wide' : '') + '"><span>' + label + '</span><input id="wsIn-' + k + '" data-in="' + k + '" ' + (o.type ? (/^sv/.test(k) ? 'type="number" ' : 'type="text" ') + 'inputmode="decimal" ' : '') + 'value="' + esc(v ?? '') + '" autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '></label>';
     const basis = '<label class="ws-f"><span>Land basis</span><select data-in="landBasis">' + [['appraised-land', 'Appraised land value'], ['appraised-total', 'Appraised total value'], ['asking', 'Asking / contract price'], ['house', 'Platform $ an acre']].map(([v, l]) => '<option value="' + v + '"' + (f.intake.landBasis === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>';
     const rows = parcels.length ? '<table class="ws-t"><caption class="sr">Parcels</caption><thead><tr><th scope="col">Parcel</th><th scope="col">Owner</th><th scope="col" class="r">Acres</th><th scope="col" class="r">Land value</th><th scope="col" class="r">Total value</th><th scope="col">Source</th></tr></thead><tbody>' +
       parcels.map(x => '<tr><th scope="row">' + esc(x.label) + (x.zip ? '<small>' + esc([x.city, x.zip].filter(Boolean).join(' ')) + '</small>' : '') + '</th><td>' + esc(x.owner || '—') + '</td><td class="r m">' + num(x.acres, 2) + '</td><td class="r m">' + usd(x.landValue) + '</td><td class="r m">' + usd(x.marketValue) + '</td><td>' + esc(x.source?.label || (x.propId ? 'Appraisal district' : 'Map')) + '</td></tr>').join('') + '</tbody></table>'
@@ -339,7 +342,7 @@ export function workspace(env) {
       if (t.dataset.mix) { const sc = f.scenarios.find(x => x.id === s.editing); if (!sc) return; if (!sc.mix) { const c = studyOf(p, { sensitivity: false }); if (!c?.study?.site) return; sc.mix = mixOf(c.study); } const [i, k] = t.dataset.mix.split(':'); if (Number.isFinite(+t.value)) sc.mix[+i][k] = +t.value; return changed(p); }
       if (t.dataset.in && !/^sv/.test(t.dataset.in)) {
         const k = t.dataset.in, v = t.value;
-        if (k === 'client') p.client = v; else if (k === 'landPrice') f.intake.landPrice = v === '' ? null : +v; else f.intake[k] = v;
+        if (k === 'landPrice') { const n = +v.replace(/[$,\s]/g, ''); if (v !== '' && !Number.isFinite(n)) return; f.intake.landPrice = v === '' ? null : n; } else if (k === 'client') p.client = v; else f.intake[k] = v;
         if (k === 'landPrice' && v !== '' && f.intake.landBasis !== 'asking') f.intake.landBasis = 'asking';
         return changed(p);
       }
