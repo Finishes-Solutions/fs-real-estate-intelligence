@@ -143,8 +143,12 @@ export function initCompare(ctx) {
     statsP = p; p.then(() => { if (statsP === p && ctx.view === 'compare') render(); });
     return p;
   }
-  const money = v => v == null ? '—' : v >= 1e6 ? '$' + (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : '$' + Math.round(v / 1e3) + 'K';
-  const numT = v => v == null ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : fmtN(v);
+  // one format per row, picked from the row's largest value, so cells side by side read at the same precision and unit
+  // (4,838,303 | 893,767 | 684,432, never 4.8M beside 893,767). kind '$' (money) or 'n' (a count)
+  const rowFmt = (vals, kind) => { const mx = Math.max(0, ...vals.filter(Number.isFinite).map(Math.abs));
+    if (kind === '$') { const [dv, u, dg] = mx >= 1e9 ? [1e9, 'B', 2] : mx >= 1e6 ? [1e6, 'M', 2] : [1e3, 'K', 0]; return v => v == null ? '—' : !v ? '–' : '$' + (v / dv).toFixed(dg) + u; }
+    return mx >= 1e7 ? v => v == null ? '—' : !v ? '–' : (v / 1e6).toFixed(1) + 'M' : v => v == null ? '—' : fmtN(Math.round(v)); };
+  const ROW_KIND = { value: '$', newValue: '$', avg: '$', median: '$', sqft: 'n' };
 
   // ---- the table, as data: shared by the page and Export (PDF / Excel / CSV) ----
   // sections: [{ title, rows: [{ label, unit, cells: [{ v: raw number or text, t: shown text, best }] }] }]
@@ -152,21 +156,24 @@ export function initCompare(ctx) {
     const base = ctx.filtered(), lists = areas.map(a => filingsIn(a, base));
     const cell = (v, t, best) => ({ v, t: t ?? String(v ?? ''), best: !!best });
     const sz = areas.map(a => sqmi(a.geom)), S = areas.map(a => stats.get(keyOf(a))), loading = areas.map(a => !stats.has(keyOf(a)));
-    const CS = (key, fmt, unit) => S.map((x, i) => loading[i] ? cell(null, '…') : x && x[key] != null ? cell(x[key], fmt(x[key])) : cell(null, '—'));
+    const lead = vals => { const ok = vals.filter(Number.isFinite), mx = Math.max(...ok); return areas.length > 1 && ok.length > 1 && ok.filter(v => v === mx).length === 1 ? vals.indexOf(mx) : -1; };
+    // a census row: kind '$' / 'n' formats the whole row on one scale; the largest value is bold, as in the filings rows
+    const CS = (key, fmt) => { const vals = S.map((x, i) => !loading[i] && x && x[key] != null ? x[key] : null), f = typeof fmt === 'string' ? rowFmt(vals, fmt) : fmt, b = lead(vals.map(v => v ?? NaN));
+      return S.map((x, i) => loading[i] ? cell(null, '…') : vals[i] != null ? cell(vals[i], f(vals[i]), i === b) : cell(null, '—')); };
     const yr = S.find(Boolean)?.baseYear;
     const census = { title: 'Area (US Census)', rows: [
-      { label: 'Size', unit: 'sq mi', cells: sz.map(v => cell(+v.toFixed(1), (v < 10 ? v.toFixed(1) : fmtN(Math.round(v))) + ' sq mi')) },
-      { label: 'Population', cells: CS('population', numT) },
+      { label: 'Size', unit: 'sq mi', cells: sz.map((v, i) => cell(+v.toFixed(1), (v < 10 ? v.toFixed(1) : fmtN(Math.round(v))) + ' sq mi', i === lead(sz))) },
+      { label: 'Population', cells: CS('population', 'n') },
       { label: 'Population growth' + (yr ? ' since ' + yr : ''), unit: '%', cells: CS('population_growth_pct', v => (v >= 0 ? '+' : '') + v + '%') },
-      { label: 'Median household income', unit: '$', cells: CS('median_household_income_approx', money) },
-      { label: 'Median home value', unit: '$', cells: CS('median_home_value_approx', money) },
+      { label: 'Median household income', unit: '$', cells: CS('median_household_income_approx', '$') },
+      { label: 'Median home value', unit: '$', cells: CS('median_home_value_approx', '$') },
       { label: 'Median rent', unit: '$ a month', cells: CS('median_gross_rent_approx', v => '$' + fmtN(v) + '/mo') },
-      { label: 'Households', cells: CS('households', numT) },
-      { label: 'Jobs located here', cells: CS('jobs', numT) }
+      { label: 'Households', cells: CS('households', 'n') },
+      { label: 'Jobs located here', cells: CS('jobs', 'n') }
     ] };
     const best = k => { const m = BY_KEY.get(k); if (m.text) return -1; const v = lists.map(l => m.fn(l)); const mx = Math.max(...v); return mx > 0 && v.filter(x => x === mx).length === 1 ? v.indexOf(mx) : -1; };
-    const rows = ROWS.map(k => { const m = BY_KEY.get(k), b = best(k);
-      return { label: m.label, unit: UNIT[k] || '', cells: lists.map((l, i) => { const v = m.fn(l); return cell(m.text ? v : +(+v).toFixed(2), m.fmt(v), i === b && areas.length > 1); }) }; });
+    const rows = ROWS.map(k => { const m = BY_KEY.get(k), b = best(k), vals = lists.map(l => m.fn(l)), f = ROW_KIND[k] ? rowFmt(vals, ROW_KIND[k]) : m.fmt;
+      return { label: m.label, unit: UNIT[k] || '', cells: vals.map((v, i) => cell(m.text ? v : +(+v).toFixed(2), f(v), i === b && areas.length > 1)) }; });
     rows.push({ label: 'Filings per sq mi', cells: areas.map((a, i) => { const v = lists[i].length / Math.max(sz[i], .01); return cell(+v.toFixed(2), v.toFixed(2)); }) });
     const src = S.find(Boolean);
     return { areas: areas.slice(), lists, loading: loading.some(Boolean), sections: [census, { title: FILINGS_TITLE, rows }],
