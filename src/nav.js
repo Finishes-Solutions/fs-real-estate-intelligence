@@ -110,12 +110,14 @@ export function renderNav(ctx) {
 // n: the count (0 hides it). alert: a "needs attention" pill that rolls up to the parent tab and More; otherwise a muted
 // count beside the label. roll: false keeps an alert on its own sub-tab / More row only (Changes: every nightly check has
 // new filings, so it would sit on the Filings tab for good). text: what to show instead of the number. title: a tooltip.
+// a badge is a nudge, not a statistic: past 99 it says 99+
+const cap = (n, fmtN) => n > 99 ? '99+' : fmtN(n);
 export function setBadge(leaf, n, { alert = false, roll = true, text = null, title = null } = {}) {
   badges.set(leaf, { n: n || 0, alert, roll });
   const fmtN = ctxRef?.fmtN || (x => String(x));
   for (const id of BADGE[leaf] || []) {
     const el = document.getElementById(id); if (!el) continue;
-    el.textContent = n ? (text ?? fmtN(n)) : ''; el.classList.toggle('muted', !alert);
+    el.textContent = n ? (text ?? cap(n, fmtN)) : ''; el.classList.toggle('muted', !alert);
     if (title) el.title = title; else el.removeAttribute('title');
   }
   rollUp();
@@ -123,8 +125,8 @@ export function setBadge(leaf, n, { alert = false, roll = true, text = null, tit
 function rollUp() {
   const fmtN = ctxRef?.fmtN || (x => String(x));
   const sum = pred => { let s = 0; for (const [leaf, b] of badges) if (b.alert && b.roll && pred(leaf)) s += b.n; return s; };
-  document.querySelectorAll('[data-roll]').forEach(el => { const g = el.dataset.roll, s = sum(l => parentOf(l) === g); el.textContent = s ? fmtN(s) : ''; });
-  const more = document.getElementById('mMoreN'); if (more) { const s = sum(l => !PHONE.includes(parentOf(l))); more.textContent = s ? fmtN(s) : ''; }
+  document.querySelectorAll('[data-roll]').forEach(el => { const g = el.dataset.roll, s = sum(l => parentOf(l) === g); el.textContent = s ? cap(s, fmtN) : ''; });
+  const more = document.getElementById('mMoreN'); if (more) { const s = sum(l => !PHONE.includes(parentOf(l))); more.textContent = s ? cap(s, fmtN) : ''; }
 }
 
 // called by setView: which tab is lit, which sub-tab row shows, and the group's memory

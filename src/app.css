@@ -4360,3 +4360,12 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 .pj-lbl{flex:0 0 100%;font-size:var(--fs-xs);font-weight:600;color:var(--text-2)}
 .pj-new input[aria-invalid=true],.pj-ren textarea[aria-invalid=true]{border-color:var(--danger)}
 
+/* counts (UX-608): a grey count is a small pill with a gap from its label; on the phone tab bar it's the same pill as
+   More's, at the icon's top right instead of on its stroke */
+.badge.muted{background:var(--ink-150);color:var(--text-2);padding:1px 6px;border-radius:var(--r-pill);margin-left:4px;font-weight:600;font-size:10.5px;line-height:1.3}
+.viewbar button[aria-pressed="true"] .badge.muted,.vt-row button[aria-current="true"] .badge.muted{color:var(--text-2)}
+@media (max-width:700px){
+  .mnav .badge{min-width:16px;height:16px;padding:0 5px;border-radius:var(--r-pill);font-size:10px;line-height:16px;text-align:center;top:2px;left:calc(50% + 11px);box-shadow:0 0 0 2px var(--panel)}
+  .mnav .badge.muted{margin-left:0;background:var(--ink-150);color:var(--text)}
+}
+

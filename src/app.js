@@ -1283,7 +1283,8 @@ const CHG_SEEN='fs-chg-seen';
 function changesBadge(){
   let seen=null; try{ seen=localStorage.getItem(CHG_SEEN); }catch(e){}
   const ids=new Set(); for(const r of DATA.changes.runs||[]){ if(seen&&r.built<=seen) break; for(const x of r.items) if(CHANGED.has(x.id)) ids.add(x.id); }
-  ctx.setBadge('changes',ids.size,{alert:true,roll:false,title:'New and changed filings since your last visit'}); // on the Changes sub-tab only, not the Filings tab
+  // green only for what's new since you last opened Changes; before the first visit it's this week's count, in grey
+  ctx.setBadge('changes',ids.size,{alert:!!seen,roll:false,title:seen?'New and changed filings since your last visit':'Filings new or changed this week'}); // on the Changes sub-tab only, not the Filings tab
 }
 function changesSeen(){ const last=DATA.changes.runs?.[0]?.built; if(!last) return; try{ localStorage.setItem(CHG_SEEN,last); }catch(e){} changesBadge(); }
 
