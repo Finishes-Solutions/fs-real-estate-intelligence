@@ -1139,11 +1139,12 @@ document.getElementById('home').onclick=()=>{ if(!resetPop.hidden) setResetOpen(
 document.getElementById('orbit').onclick=()=>{ if(!resetPop.hidden) setResetOpen(false); stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
 
 // ---------- toast ----------
-const toastEl=document.getElementById('toast'); let toastT=0, toastMs=0, toastAct=null;
+const toastEl=document.getElementById('toast'); let toastT=0, toastMs=0, toastAct=null, toastJump=false, toastBack=null;
 // toast(text) or toast(text, {action:{label, run}}): with an action (Undo) the note carries the button and a ×, stays at
-// least 10 s, and ⌘Z / Ctrl+Z runs it. Any note waits while the pointer is over it or focus is in it (WCAG 2.2.1).
+// least 10 s, and ⌘Z / Ctrl+Z runs it. The first Tab after it shows goes to its Undo (the note sits at the end of the page,
+// so it would be many Tab stops away), and Tab out of it carries on from where focus was. Any note waits while the pointer is over it or focus is in it (WCAG 2.2.1).
 const MOD_Z=/Mac|iPhone|iPad|iPod/.test(navigator.platform||navigator.userAgent)?'⌘Z':'Ctrl+Z';
-const hideToast=()=>{ toastEl.classList.remove('on','act'); toastAct=null; };
+const hideToast=()=>{ const back=toastEl.contains(document.activeElement)&&toastBack?.isConnected?toastBack:null; toastEl.classList.remove('on','act'); toastAct=null; toastJump=false; toastBack=null; back?.focus({preventScroll:true}); };
 const armToast=()=>{ clearTimeout(toastT); if(toastEl.matches(':hover')||toastEl.contains(document.activeElement)) return; toastT=setTimeout(hideToast,toastMs); };
 const toastHome0=toastEl.parentNode;
 function toast(m,o={}){ // on a page (Projects, Reports…) the note goes on the stage, over the page; on the Map it stays in the map's viewport
@@ -1153,9 +1154,13 @@ function toast(m,o={}){ // on a page (Projects, Reports…) the note goes on the
     const run=toastAct=()=>{ hideToast(); a.run(); }; b.onclick=run;
     const x=document.createElement('button'); x.type='button'; x.className='tx'; x.setAttribute('aria-label','Dismiss'); x.textContent='×'; x.onclick=hideToast;
     toastEl.append(' ',b,x); }
-  toastEl.classList.add('on'); toastMs=Math.max(o.ms||0,a?10000:3400); armToast(); }
+  toastEl.classList.add('on'); toastJump=!!a; toastBack=null; toastMs=Math.max(o.ms||0,a?10000:3400); armToast(); }
 toastEl.addEventListener('mouseenter',()=>clearTimeout(toastT)); toastEl.addEventListener('focusin',()=>clearTimeout(toastT));
 toastEl.addEventListener('mouseleave',armToast); toastEl.addEventListener('focusout',()=>setTimeout(armToast,0));
+document.addEventListener('keydown',e=>{ if(e.key!=='Tab'||!toastAct||e.defaultPrevented) return; const a=document.activeElement, bs=[...toastEl.querySelectorAll('button')];
+  if(!toastEl.contains(a)){ if(e.shiftKey||!toastJump||appEl.classList.contains('planning')||a?.closest?.('[role=dialog],dialog')) return; toastJump=false; toastBack=a&&a!==document.body?a:null; e.preventDefault(); bs[0]?.focus(); return; }
+  const back=toastBack?.isConnected?toastBack:null; if(!back) return;
+  if(e.shiftKey&&a===bs[0]){ e.preventDefault(); back.focus(); } else if(!e.shiftKey&&a===bs[bs.length-1]) back.focus(); }); // no preventDefault: Tab moves on from `back`
 // ⌘Z / Ctrl+Z while an Undo note shows: undo (not while typing, and not on the site plan, which has its own undo)
 document.addEventListener('keydown',e=>{ if(!toastAct||e.key.toLowerCase()!=='z'||e.shiftKey||!(e.metaKey||e.ctrlKey)||e.defaultPrevented) return;
   if(e.target.closest?.('input,textarea,select,[contenteditable="true"]')||appEl.classList.contains('planning')) return; e.preventDefault(); toastAct(); });
