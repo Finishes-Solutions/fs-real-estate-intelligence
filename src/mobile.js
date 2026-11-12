@@ -132,15 +132,29 @@ export function initMobile(ctx) {
     else if (top && a.parentNode !== top) top.insertBefore(a, top.querySelector('.bnav'));
   }
   new MutationObserver(placeActs).observe(card, { childList: true });
-  let y0 = null, dy = 0;
-  card.addEventListener('touchstart', e => { if (!isPhone()) return; const r = card.getBoundingClientRect(), t = e.touches[0]; if (t.clientY - r.top < 48 && card.scrollTop <= 0) { y0 = t.clientY; dy = 0; } }, { passive: true });
-  card.addEventListener('touchmove', e => { if (y0 == null) return; dy = e.touches[0].clientY - y0; if (dy > 0) card.style.transform = 'translateY(' + dy + 'px)'; }, { passive: true });
+  // A drag that starts on the card's header (the grab strip, or the pinned title block) moves the sheet and never scrolls
+  // its content, even when the content is scrolled; a drag lower down scrolls the content as usual (and moves the sheet
+  // only from the top). Stepping down puts the content back at its top. A sideways drag (the section chips) is left alone.
+  let y0 = null, x0 = 0, dy = 0, zone = null, axis = null;
+  card.addEventListener('touchstart', e => {
+    if (!isPhone()) return; const r = card.getBoundingClientRect(), t = e.touches[0];
+    const grab = t.clientY - r.top < 48, head = !!e.target.closest?.('#card > .top');
+    if (grab || head || card.scrollTop <= 0) { y0 = t.clientY; x0 = t.clientX; dy = 0; axis = null; zone = grab ? 'grab' : head ? 'head' : 'body'; }
+  }, { passive: true });
+  card.addEventListener('touchmove', e => {
+    if (y0 == null) return; const t = e.touches[0]; dy = t.clientY - y0; const dx = t.clientX - x0;
+    if (!axis && Math.abs(dx) + Math.abs(dy) > 6) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (axis === 'x') { y0 = null; card.style.transform = ''; return; }
+    if (zone === 'body' && (dy < 0 || card.scrollTop > 0)) { y0 = null; card.style.transform = ''; return; } // a content scroll
+    if (e.cancelable) e.preventDefault(); // a sheet drag: the content stays where it is
+    if (dy > 0) card.style.transform = 'translateY(' + dy + 'px)';
+  }, { passive: false });
   card.addEventListener('touchend', () => {
     if (y0 == null) return; card.style.transform = '';
     const min = card.classList.contains('min'), at = sheetAt();
-    if (dy > 90) { if (at === 'full') setSheet('half'); else if (at === 'half') setSheet('peek'); else if (!min) setMin(true); }
+    if (dy > 90) { card.scrollTop = 0; if (at === 'full') setSheet('half'); else if (at === 'half') setSheet('peek'); else if (!min) setMin(true); }
     else if (dy < -30) { if (min) setMin(false); else setSheet(at === 'peek' ? 'half' : 'full'); }
-    else if (Math.abs(dy) < 6 && !min) setSheet(at === 'peek' ? 'half' : at === 'half' ? 'full' : 'peek');
+    else if (Math.abs(dy) < 6 && !min && zone === 'grab') setSheet(at === 'peek' ? 'half' : at === 'half' ? 'full' : 'peek');
     y0 = null;
   });
   ctx.onCardClose(() => { setSheet('peek'); setMin(false); });
