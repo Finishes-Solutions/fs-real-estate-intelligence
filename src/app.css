@@ -4285,13 +4285,19 @@ a{color:var(--text)}
    crowding (the card's section chips) and text links (Retry) keep their look and get an invisible 44px hit area,
    as the card's × does. */
 @media (pointer:coarse){
-  .btn.sm,.chip,.seg button,.vt-row button,#card .sp-stg,#card .sp-hact .btn{min-height:var(--tap)}
+  .btn.sm,.chip,.seg button,.vt-row button,#card .sp-stg,#card .sp-hact .btn,#card .bacts .btn,#card .btnrow .btn,#card .bsec>.btn,#card .cact .btn,#card .cback,.lfrow select.chip,.vctl .btn,.team-chip,.vhead .tg2,.filters .chip,#card .sp-plans .chip,#card .sp-cr{min-height:var(--tap)}
+  #card .sp-ovb{height:var(--tap)}
+  #card .cact .cmore>summary{min-width:var(--tap)}
+  .vm-pop>button,.vm-pop>label,.vm-pop>a{min-height:var(--tap);box-sizing:border-box;padding-top:13px;padding-bottom:13px}
   .sp-tb,#card .sp-ib,#card .sp-htools .sp-ib,#card .top .mn,#card .sp-htools .x,#card .sp-hact .btn{width:var(--tap);min-width:var(--tap);height:var(--tap);flex-shrink:0}
   #card .sp-stg{min-width:var(--tap);justify-content:center}
   #card .bnav{padding-top:8px;padding-bottom:8px;margin-top:0}
-  #card .bnav button,.rnote.eb .eb-retry,.bot.err .lnk,.lnk.retry{position:relative}
-  #card .bnav button::before,.rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before{content:"";position:absolute;left:0;right:0;top:50%;height:var(--tap);transform:translateY(-50%)}
-  .rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before{left:-8px;right:-8px}
+  #card .bnav button,.rnote.eb .eb-retry,.bot.err .lnk,.lnk.retry,.card .raw summary,.vhead .lnk,#card .sp-link{position:relative}
+  #card .bnav button::before,.rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before,.card .raw summary::before,.vhead .lnk::before,#card .sp-link::before{content:"";position:absolute;left:0;right:0;top:50%;height:var(--tap);transform:translateY(-50%)}
+  .rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before,.vhead .lnk::before{left:-8px;right:-8px}
+  /* the plan's (i) buttons keep their look with a 44px hit area */
+  #card .sp-i{position:relative}
+  #card .sp-i::before{content:"";position:absolute;left:50%;top:50%;width:var(--tap);height:var(--tap);transform:translate(-50%,-50%)}
 }
 @media (pointer:coarse) and (max-width:700px){
   /* the plan header takes two rows so the full-size buttons leave room for the option's name */
