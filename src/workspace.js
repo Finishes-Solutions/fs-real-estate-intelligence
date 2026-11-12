@@ -263,7 +263,7 @@ export function workspace(env) {
       (editing ? '<p class="ws-note">Changes now go into <b>' + esc(editing.name) + '</b>; the base case keeps its numbers. The results above show this scenario' + (f.activeScenario === editing.id ? ', and so does the rail.' : '. <button type="button" class="lnk" data-act="showEditing">Show it in the rail and reports too</button>') + '</p>' : '') +
       (editing && (study.site.mix || []).length ? mixEditor(editing, study) : '');
     // results: returns, break-even, sensitivity, hold, scenarios
-    const be = study.pf.breakEven;
+    const be = (es || study).pf.breakEven; // (the scenario's, while one is being edited; its sensitivity and hold below stay the shown case's)
     const beTxt = breakEvenText(be, x => '<b>' + x + '</b>');
     const sv = study.sensitivity, tor = sv ? '<h5>What moves the ' + (sv.metric === 'margin' ? 'margin' : 'levered IRR') + ' most</h5>' + tornadoSvg(sv.tornado, esc, { W: 560, L: 170, classes: true }) + '<div class="ws-scroll" tabindex="0" role="region" aria-label="Sensitivity table"><table class="ws-t"><caption class="sr">Sensitivity</caption><thead><tr><th scope="col">Input</th><th scope="col">Low case</th><th scope="col" class="r">Result</th><th scope="col">High case</th><th scope="col" class="r">Result</th></tr></thead><tbody>' +
       sv.tornado.rows.map(r => '<tr><th scope="row">' + esc(r.label) + '</th><td>' + esc(r.loText) + '</td><td class="r m">' + pct(r.lo) + '</td><td>' + esc(r.hiText) + '</td><td class="r m">' + pct(r.hi) + '</td></tr>').join('') + '</tbody></table></div>' +
