@@ -534,8 +534,9 @@ document.getElementById('resetAll').onclick=clearFilters;
     if(floating) document.getElementById('lfFilings').open=true;
     pop.hidden=!open; btn.setAttribute('aria-expanded',open&&!floating); btn.classList.toggle('open',open&&!floating);
     document.querySelectorAll('[data-edit-filters]').forEach(b=>b.setAttribute('aria-expanded',String(floating&&b===at))); place();
-    if(open) (floating?pop.querySelector('#filtersBody select,#filtersBody button.chip,#filtersBody input'):pop.querySelector('select,button.chip,input'))?.focus({preventScroll:true}); };
+    if(open) requestAnimationFrame(()=>[...pop.querySelectorAll(floating?'#filtersBody select,#filtersBody button.chip,#filtersBody input':'select,button.chip,input,summary,button')].find(x=>x.offsetParent!==null)?.focus({preventScroll:true})); }; // the first control that shows
   addEventListener('resize',place); listeners.push(()=>{ if(!pop.hidden&&anchor) requestAnimationFrame(place); });
+  pop.addEventListener('keydown',e=>trapTab(pop,e)); // a role=dialog: Tab stays inside until Esc, × or Done
   const dismiss=()=>{ const a=anchor; setOpen(false); (a&&a.isConnected?a:btn).focus(); };
   btn.onclick=()=>setOpen(pop.hidden);
   document.getElementById('filterClose').onclick=dismiss;
@@ -598,6 +599,12 @@ function exportMenu(items,{label='Export',cls=''}={}){
 }
 // close an open menu on a click elsewhere, after picking an item, or on Esc
 document.addEventListener('click',e=>{ document.querySelectorAll('details.vmenu[open]').forEach(d=>{ if(!d.contains(e.target)||e.target.closest('.vm-pop [role=menuitem]')) d.open=false; }); });
+// role=menu promises arrow keys: Down/Up move through the items (from the button too), Home/End jump to the ends
+document.addEventListener('keydown',e=>{ if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key)) return; const d=e.target.closest?.('details.vmenu'); if(!d) return;
+  const items=[...d.querySelectorAll('.vm-pop [role=menuitem]')].filter(x=>x.offsetParent!==null&&!x.disabled); if(!items.length) return;
+  if(!d.open){ if(e.key!=='ArrowDown') return; d.open=true; }
+  e.preventDefault(); const i=items.indexOf(document.activeElement), n=items.length;
+  (e.key==='Home'?items[0]:e.key==='End'?items[n-1]:e.key==='ArrowDown'?items[(i+1)%n]:items[(i-1+n)%n]).focus(); });
 document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const d=document.querySelector('details.vmenu[open]'); if(d){ e.preventDefault(); d.open=false; d.querySelector('summary')?.focus(); } });
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
@@ -791,6 +798,24 @@ addEventListener('keydown',e=>{ if(e.key!=='Escape'||e.defaultPrevented||!card.c
   if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
   if(card.classList.contains('sp-mode')) return; // a site plan is never closed by Esc: it steps back itself (src/siteplan.js), and × or Done closes it
   e.preventDefault(); if(!cardBack()) closeCard(); });
+// Focus follows the card: opened from a page or the list (a Timeline row, a Changes item, a filing), focus goes to the
+// card's title; closed, it goes back to what opened it. Pages often redraw that row when it's picked, so the opener is
+// also remembered as a selector (its list's id and its data-i / data-k / data-id) and found again.
+const actKey=el=>{ const r=el?.closest?.('[data-i],[data-k],[data-id],[data-open]'), host=r?.parentElement?.closest('[id]'); if(!r||!host) return null;
+  const a=['data-i','data-k','data-id','data-open'].find(k=>r.hasAttribute(k)); return '#'+CSS.escape(host.id)+' ['+a+'="'+CSS.escape(r.getAttribute(a))+'"]'; };
+const findAct=k=>{ const r=k&&document.querySelector(k); return r&&(r.matches(FOCUSABLE)?r:r.querySelector(FOCUSABLE)); };
+let lastAct=null, cardFrom=null;
+const noteAct=e=>{ if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; const el=e.target.closest?.(FOCUSABLE+',tr[data-k]'); if(el&&!card.contains(el)) lastAct={el,key:actKey(el),page:!!el.closest('.view,#panel'),t:performance.now()}; };
+document.addEventListener('click',noteAct,true); document.addEventListener('keydown',noteAct,true);
+new MutationObserver(()=>{ const open=card.classList.contains('open'), a=document.activeElement;
+  // a new card from a page or the list (also while another card is open): remember the opener, focus the new title
+  const fresh=lastAct&&performance.now()-lastAct.t<1500&&lastAct.page&&(!a||a===document.body||!card.contains(a));
+  if(open&&fresh){ cardFrom=lastAct; lastAct=null; requestAnimationFrame(()=>{ const h=card.querySelector(':scope>.top h2'); if(!h||!card.classList.contains('open')) return; h.tabIndex=-1; h.focus({preventScroll:true}); }); }
+  else if(!open&&cardFrom){ const f=cardFrom; cardFrom=null; if(a&&a!==document.body&&!card.contains(a)) return;
+    // the page may redraw the list once more as the card goes (Timeline does): if focus falls to the page again, find the row again
+    const back=()=>{ const t=f.el.isConnected&&f.el.offsetParent!==null?f.el:findAct(f.key); t?.focus({preventScroll:true}); };
+    requestAnimationFrame(back); for(const ms of [150,400]) setTimeout(()=>{ const x=document.activeElement; if(!x||x===document.body) back(); },ms); }
+}).observe(card,{attributes:true,attributeFilter:['class'],childList:true});
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
 
 // hover + click on markers
@@ -1021,11 +1046,12 @@ function placeLayers(){ const a=layersOpen&&layersOpen.offsetParent?layersOpen:n
   // keep the panel inside the controls' column (#mapleft), so it doesn't spill over the camera rail or the assistant drawer
   const ml=document.getElementById('mapleft').getBoundingClientRect(), maxL=Math.max(ml.left,ml.right-(layersEl.offsetWidth||320))-host.left;
   layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(Math.max(16,Math.min(q.left-host.left,maxL,host.width-336)))+'px'); }
+const layersPop=popover(layersEl,{trigger:()=>layersOpen?.offsetParent?layersOpen:layersBtn,first:'#layersX'});
 function setLayersOpen(on){ const was=layersEl.classList.contains('on'); layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); layersOpen?.setAttribute('aria-expanded',on); layersOpen?.classList.toggle('open',on);
-  if(on&&!was){ try{ ctx.openLayerGroups?.(); }catch(e){} layersEl.scrollTop=0; } placeLayers(); }
+  if(on&&!was){ try{ ctx.openLayerGroups?.(); }catch(e){} layersEl.scrollTop=0; layersPop.opened(); } else if(!on&&was) layersPop.closed(); placeLayers(); }
 layersBtn.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); };
 layersOpen&&(layersOpen.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); });
-document.getElementById('layersX')?.addEventListener('click',()=>{ setLayersOpen(false); layersOpen?.offsetParent&&layersOpen.focus({preventScroll:true}); });
+document.getElementById('layersX')?.addEventListener('click',()=>setLayersOpen(false)); // focus goes back to the button that opened it (popover)
 document.getElementById('layersDone')?.addEventListener('click',()=>setLayersOpen(false));
 addEventListener('resize',placeLayers); if(layersOpen&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(document.getElementById('mapleft'));
 let swallowClick=false;
@@ -1089,10 +1115,23 @@ function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classLi
   if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
   toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
 // Tab and Shift+Tab stay inside an open dialog (Settings, Export): past the last control back to the first, and the reverse
+// inside a folded <details> (other than its own summary): rendered for layout, but not a Tab stop
+function inClosed(x){ for(let d=x.parentElement?.closest('details');d;d=d.parentElement?.closest('details')) if(!d.open&&!(x.tagName==='SUMMARY'&&x.parentElement===d)) return true; return false; }
 function trapTab(box,e){ if(e.key!=='Tab'||!box) return;
-  const f=[...box.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null); if(!f.length) return;
+  const f=[...box.querySelectorAll(FOCUSABLE)].filter(x=>x.offsetParent!==null&&getComputedStyle(x).visibility!=='hidden'&&!inClosed(x)); if(!f.length) return;
   const first=f[0], last=f[f.length-1], a=document.activeElement;
   if(e.shiftKey&&(a===first||a===box||!box.contains(a))){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&(a===last||!box.contains(a))){ e.preventDefault(); first.focus(); } }
+// One popover behaviour for every panel that opens over the page (Layers, Filters, Metrics, cards opened from a list):
+// popover(box, {trigger, first}) → {opened(), closed()}. opened() remembers what had focus and moves focus inside (the
+// `first` selector, else the first control); Tab stays inside while focus is there; closed() puts focus back on the
+// opener (or `trigger`) when focus was inside the box or had fallen to the page, never when the user clicked elsewhere.
+const FOCUSABLE='button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],summary,[tabindex]:not([tabindex="-1"])';
+function popover(box,{trigger=null,first=null}={}){ let opener=null;
+  box.addEventListener('keydown',e=>trapTab(box,e));
+  const lost=()=>{ const a=document.activeElement; return !a||a===document.body||box.contains(a); };
+  return { opened(){ const a=document.activeElement; opener=a&&a!==document.body&&!box.contains(a)?a:null;
+      requestAnimationFrame(()=>{ const b=document.activeElement; if(b&&b!==document.body&&b!==opener&&!box.contains(b)) return; const el=(first&&box.querySelector(first))||[...box.querySelectorAll(FOCUSABLE)].find(x=>x.offsetParent!==null); (el||box).focus({preventScroll:true}); }); },
+    closed(){ const o=opener; opener=null; if(!lost()) return; const t=o&&o.isConnected&&o.offsetParent!==null?o:(typeof trigger==='function'?trigger():trigger); t?.focus({preventScroll:true}); } }; }
 function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
@@ -1201,12 +1240,13 @@ document.getElementById('viewport').appendChild(backEl);
 function setBack(from){
   if(!from){ back=null; backEl.hidden=true; appEl.classList.remove('has-back'); return; }
   const sec=document.getElementById('view-'+from); // read the scroll positions now, before the page is hidden
-  back={from,top:sec?.scrollTop||0,inner:[...(sec?.querySelectorAll('.g-scroll')||[])].map(el=>el.scrollTop)};
+  back={from,top:sec?.scrollTop||0,inner:[...(sec?.querySelectorAll('.g-scroll')||[])].map(el=>el.scrollTop),key:lastAct&&lastAct.page&&performance.now()-lastAct.t<3000?lastAct.key:null};
   backEl.querySelector('span').textContent='Back to '+labelOf(from); backEl.hidden=false; appEl.classList.add('has-back');
 }
 backEl.querySelector('.bk-go').onclick=()=>{ const b=back; if(!b) return; setView(b.from);
   const put=()=>{ const sec=document.getElementById('view-'+b.from); if(!sec) return; sec.scrollTop=b.top; sec.querySelectorAll('.g-scroll').forEach((el,i)=>{ if(b.inner[i]!=null) el.scrollTop=b.inner[i]; }); };
-  put(); requestAnimationFrame(()=>{ put(); setTimeout(put,120); }); };
+  put(); requestAnimationFrame(()=>{ put(); setTimeout(()=>{ put(); // and focus where the user was: the row they followed, else the page title
+    const sec=document.getElementById('view-'+b.from); const h=sec?.querySelector('h1,h2'); h?.setAttribute('tabindex','-1'); (findAct(b.key)||h)?.focus({preventScroll:true}); },120); }); };
 backEl.querySelector('.bk-x').onclick=()=>setBack(null);
 // Changes badge: filings new or changed in nightly checks since you last opened Changes (all of this week's on a first visit)
 const CHG_SEEN='fs-chg-seen';
@@ -1297,7 +1337,7 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,esc,fmtM,fmtN,C,geocode,hashStr,
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,popover,esc,fmtM,fmtN,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, get reduceMotion(){ return reduceMotion; }, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.

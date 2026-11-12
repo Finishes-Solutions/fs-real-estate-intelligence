@@ -29,12 +29,13 @@ export function initKpis(ctx) {
       '</div><div class="kp-f"><button class="lnk" id="kpiReset" type="button">Reset to Default</button><button class="btn primary" id="kpiDone" type="button">Done</button></div>';
     pop.querySelectorAll('input').forEach(i => i.onchange = () => {
       const k = i.dataset.k; keys = i.checked ? [...keys, k].slice(0, MAX) : keys.length > MIN ? keys.filter(x => x !== k) : keys;
-      save(); render(); renderPop();
+      save(); render(); renderPop(); pop.querySelector('input[data-k="' + k + '"]')?.focus(); // the list is redrawn: keep focus on the box just ticked
     });
     pop.querySelector('#kpiReset').onclick = () => { keys = DEFAULT_KPIS.slice(); save(); render(); renderPop(); };
     pop.querySelector('#kpiDone').onclick = () => toggle(false);
   }
-  function toggle(on) { pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) { renderPop(); requestAnimationFrame(() => pop.scrollIntoView({ block: 'nearest' })); } } // it opens near the bottom of the panel: bring it into view
+  const kp = ctx.popover(pop, { trigger: btn, first: 'input:not([disabled])' }); // focus in, Tab stays in, Esc / Done back to Metrics
+  function toggle(on) { const was = pop.classList.contains('on'); pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) { renderPop(); requestAnimationFrame(() => pop.scrollIntoView({ block: 'nearest' })); if (!was) kp.opened(); } else if (was) kp.closed(); } // it opens near the bottom of the panel: bring it into view
   btn.onclick = e => { e.stopPropagation(); toggle(!pop.classList.contains('on')); };
   document.addEventListener('pointerdown', e => { if (pop.classList.contains('on') && !pop.contains(e.target) && !btn.contains(e.target)) toggle(false); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && pop.classList.contains('on')) { e.preventDefault(); toggle(false); } });

@@ -84,7 +84,8 @@ export function initAssistant(ctx) {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '/' || e.code === 'Slash')) {
       e.preventDefault(); if (app.classList.contains('ai-open') && document.activeElement === q) close(); else open();
     }
-    if (e.key === 'Escape' && app.classList.contains('ai-open') && document.activeElement === q) close();
+    // Esc closes it from anywhere inside the panel (the message box, New chat, an answer's buttons), like Settings and Export
+    if (e.key === 'Escape' && !e.defaultPrevented && app.classList.contains('ai-open') && el.contains(document.activeElement)) { e.preventDefault(); close(); }
   });
 
   // ---------- width: drag the drawer's left edge to widen it (never narrower than the default). Saved per browser. ----------
