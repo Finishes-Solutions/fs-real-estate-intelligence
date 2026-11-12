@@ -95,11 +95,12 @@ export function storageOf(els, prog = {}) {
     if (e.kind === 'parking' && e.rv) { out.rv += stalls(e).count; continue; }
     if (e.kind === 'parking' && e.trailer) continue; // (trailer parking in a truck court: not car spaces)
     if (e.kind !== 'building' || e.use !== 'storage') continue;
-    const k = storageKind(e), g = gfaOfEl(e);
-    if (k === 'office') out.officeGsf += g; else if (k === 'drive') { out.driveGsf += g; out.driveNrsf += g * st.driveEff; } else { out.climateGsf += g; out.climateNrsf += g * st.climateEff; }
+    const k = storageKind(e), g = gfaOfEl(e), own = +e.rentable > 0 ? Math.min(g, +e.rentable) : null, n = own != null && +e.storageUnits > 0 ? Math.round(+e.storageUnits) : null; // (a building from a drawn plan: its own rentable sf and unit count, as its unit table has them)
+    if (k === 'office') out.officeGsf += g; else if (k === 'drive') { out.driveGsf += g; out.driveNrsf += own ?? g * st.driveEff; if (n != null) { out.driveCounted = (out.driveCounted || 0) + n; out.driveCountedSf = (out.driveCountedSf || 0) + own; } } else { out.climateGsf += g; out.climateNrsf += own ?? g * st.climateEff; if (n != null) { out.climateCounted = (out.climateCounted || 0) + n; out.climateCountedSf = (out.climateCountedSf || 0) + own; } }
   }
   const ac = storageAvg(mix.climate) || 100, ad = storageAvg(mix.drive) || 200;
-  out.climateUnits = Math.floor(out.climateNrsf / ac); out.driveUnits = Math.floor(out.driveNrsf / ad);
+  out.climateUnits = (out.climateCounted || 0) + Math.floor((out.climateNrsf - (out.climateCountedSf || 0)) / ac + 1e-9); out.driveUnits = (out.driveCounted || 0) + Math.floor((out.driveNrsf - (out.driveCountedSf || 0)) / ad + 1e-9);
+  for (const c of ['climateCounted', 'climateCountedSf', 'driveCounted', 'driveCountedSf']) delete out[c];
   out.units = out.climateUnits + out.driveUnits; out.nrsf = out.climateNrsf + out.driveNrsf; out.gsf = out.climateGsf + out.driveGsf + out.officeGsf;
   return out;
 }
@@ -2045,6 +2046,9 @@ function storageProgram(q, p) {
   else if (driveSf == null && climateSf != null && tot && tot > climateSf && !p.max) driveSf = tot - climateSf;
   return { climateSf, driveSf, rowD: Math.round(clamp(s.rowD, 20, 60, STORAGE.rowD)), aisle: Math.round(clamp(s.aisle, 20, 40, STORAGE.aisle)), rv: Math.round(clamp(s.rv, 0, 400, 0)), fence: s.fence !== false,
     climateMix: mixOf(s.climateMix), driveMix: mixOf(s.driveMix),
+    // a plan's own rentable shares and street rents ($ a rentable sf a month), as a drawn plan's unit table and rent roll give them
+    ...(+s.climateEff > 0 ? { climateEff: clamp(s.climateEff, 0.4, 1, STORAGE.climateEff) } : {}), ...(+s.driveEff > 0 ? { driveEff: clamp(s.driveEff, 0.4, 1, STORAGE.driveEff) } : {}),
+    ...(s.rent && (+s.rent.climate > 0 || +s.rent.drive > 0) ? { rent: { ...(+s.rent.climate > 0 ? { climate: clamp(s.rent.climate, 0.1, 10, 1.35) } : {}), ...(+s.rent.drive > 0 ? { drive: clamp(s.rent.drive, 0.1, 10, 0.95) } : {}) } } : {}),
     ...(s.rvRows ? { rvRows: true, rvW: Math.round(clamp(s.rvW, 10, 40, STORAGE.rvW)), rvD: Math.round(clamp(s.rvD, 20, 80, STORAGE.rvD)) } : {}), ...(+s.officeSf > 0 ? { officeSf: Math.round(clamp(s.officeSf, 400, 20000, STORAGE.office)) } : {}) }; // rvRows: a yard of sites (an RV park) in rows both sides of the aisles, rvW × rvD each
 }
 // single-family lot rules: the least lot width (ft), the home's front setback from the right-of-way and its side setbacks
