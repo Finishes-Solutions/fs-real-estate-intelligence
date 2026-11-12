@@ -4898,7 +4898,7 @@ export function initSitePlan(ctx) {
   // ----- all projects -----
   function shown() {
     const q = pq.trim().toLowerCase(), by = { updated: (a, b) => t(b.updated) - t(a.updated), name: (a, b) => a.name.localeCompare(b.name), acres: (a, b) => acresOf(b) - acresOf(a), options: (a, b) => b.plans.length - a.plans.length || t(b.updated) - t(a.updated), status: (a, b) => PJ.STATUSES.indexOf(PJ.statusOf(a)) - PJ.STATUSES.indexOf(PJ.statusOf(b)) || a.name.localeCompare(b.name) }[psort];
-    return db.projects.filter(p => !q || [p.name, p.notes, p.by, ...p.parcels.flatMap(x => [x.label, x.owner]), ...p.plans.map(x => x.name)].join(' ').toLowerCase().includes(q)).sort(by);
+    return db.projects.filter(p => !q || [p.name, p.notes, p.by, p.status ? PJ.statusOf(p).label : '', p.client, ...p.parcels.flatMap(x => [x.label, x.owner]), ...p.plans.map(x => x.name)].join(' ').toLowerCase().includes(q)).sort(by);
   }
   // the status as the small coloured pill from the project page's header (nothing for a project that has none set)
   const stPill = p => p.status ? '<span class="pj-st" data-st="' + PJ.statusOf(p).id + '"><span class="pj-stp">' + esc(PJ.statusOf(p).label) + '</span></span>' : '';
@@ -4932,7 +4932,7 @@ export function initSitePlan(ctx) {
         '<div class="vctl">' + (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '<div class="team-slot" id="pjTeam"></div></div></div>' +
       (adding ? '<form class="pj-new" id="pjForm" novalidate><label class="pj-lbl" for="pjNm">Project name</label><input id="pjNm" maxlength="120" placeholder="e.g. Waller garden apartments" autocomplete="off" required aria-describedby="pjNmErr"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span><small class="field-err" id="pjNmErr" role="alert" hidden>Give the project a name</small>' +
         '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site plan</b> at the top of its card.</div></form>' : '') +
-      (all.length ? '<div class="pj-bar"><label class="search sm pj-q"><input type="search" id="pjQ" placeholder="Search projects" value="' + esc(pq) + '" aria-label="Search projects, parcels, owners and notes"></label>' +
+      (all.length ? '<div class="pj-bar"><label class="search sm pj-q"><input type="search" id="pjQ" placeholder="Search projects, parcels, owners or status" value="' + esc(pq) + '" aria-label="Search projects, parcels, owners, notes and status"></label>' +
         '<div class="pj-ctl"><label class="pj-sort">Sort <select class="chip" id="pjSort">' + Object.entries(SORTS).map(([k, l]) => '<option value="' + k + '"' + (psort === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
         '<div class="seg seg2 pj-mode" role="group" aria-label="Show projects as">' + [['cards', 'Cards', ICON_CARDS], ['list', 'List', ICON_LIST]].map(([k, l, ic]) => '<button type="button" data-v="' + k + '" aria-pressed="' + (mode === k) + '">' + ic + l + '</button>').join('') + '</div></div></div>' : '') +
       '<div id="pjList">' + listHtml() + '</div>';
