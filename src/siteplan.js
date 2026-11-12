@@ -2206,7 +2206,7 @@ export function initSitePlan(ctx) {
     const act = stage === 'deliver' ? '' : c.state === 'done'
       ? '<button type="button" class="btn sm primary" id="spStageNext">Go to ' + esc(next.label) + ' ›</button><button type="button" class="btn sm ghost" id="spStageReopen" title="Take the confirmation back to change the ' + esc(S0.label.toLowerCase()) + '">Reopen</button>'
       : '<button type="button" class="btn sm primary" id="spStageOk"' + (why ? ' disabled title="' + esc(why) + '"' : ' title="Confirm the ' + esc(S0.label.toLowerCase()) + ' and go on to ' + esc(next.label.toLowerCase()) + '"') + '>' + esc(S0.confirm) + ' ›</button>';
-    return '<div class="sp-stagehd" id="spStageHd"><div class="sp-sth-t"><span class="sp-sth-n">Step ' + S0.n + ' of 4</span><b>' + esc(S0.label) + '</b>' + (say ? '<span class="sp-sth-s ' + c.state + '">' + say + '</span>' : '') + '</div>' +
+    return '<div class="sp-stagehd" id="spStageHd"><div class="sp-sth-t"><span class="sp-sth-n" title="The site plan’s stages are part of the project’s Feasibility steps">Step ' + S0.n + ' of 4 · Feasibility: ' + esc(S0.step) + '</span><b>' + esc(S0.label) + '</b>' + (say ? '<span class="sp-sth-s ' + c.state + '">' + say + '</span>' : '') + '</div>' +
       '<p class="rnote">' + esc(S0.about) + (why && c.state !== 'done' ? ' <b>' + esc(why) + '</b>' : '') + (stage === 'site' && pl.frontGuess && c.state !== 'done' ? ' <b>The street side is a guess: set it with Street Side before confirming.</b>' : '') + '</p>' +
       (act ? '<div class="sp-row">' + act + '</div>' : '') + '</div>';
   }
