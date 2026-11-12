@@ -5,6 +5,10 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-12
 
+### 1:18 PM CT: Typing in the Feasibility forms no longer drops out of the field (`matthew/more-data-sources`)
+- **Intake fields keep the cursor:** typing in Client, Target use, Address, City, County, ZIP or Asking price used to stop after the first letter or two, because the page redrew the form and lost the field. Now you can type straight through.
+- **The same fix covers every number box in the workspace:** the scenario unit mix, the Pro Forma assumptions and the Budget rates. Before, a redraw could also move the cursor to the start of a number box, so a typed price came out jumbled.
+
 ### 2:22 AM CT: Property taxes for the agents: appraisal rolls and tax rates for the seven counties (`matthew/more-data-sources`)
 - **Agents can estimate a parcel's property tax:** every taxing unit (county, city, school district, water and emergency-services districts, college, hospital, drainage) with its rate and the year it is from, and the tax a year at the appraisal district's value and at a value they give, such as a purchase price.
 - **Assessment history:** a parcel's land, improvement and total values by year with the change each year.
