@@ -94,9 +94,10 @@ export function trimRecord(feature) {
 
 export default async function handler(req, res) {
   const token = process.env.REGRID_TOKEN || process.env.REGRID_API_KEY, q = req.query || {};
-  if (!token) return res.status(503).json({ error: 'Regrid isn’t set up on this deployment (REGRID_API_KEY is missing).' });
+  // not set up: one plain sentence and a code the card reads (the setting names go to the server log and the Data sources page)
+  if (!token) { console.warn('regrid: REGRID_API_KEY (or REGRID_TOKEN) is missing'); return res.status(503).json({ error: 'Regrid isn’t available on this site.', code: 'not_configured' }); }
   const db = supa();
-  if (!db) return res.status(503).json({ error: 'Regrid is paused: the usage counter needs SUPABASE_URL and SUPABASE_SECRET_KEY on the server.' });
+  if (!db) { console.warn('regrid: the usage counter needs SUPABASE_URL and SUPABASE_SECRET_KEY'); return res.status(503).json({ error: 'Regrid isn’t available on this site.', code: 'not_configured' }); }
 
   // ---- tile ----
   if (q.tile) {

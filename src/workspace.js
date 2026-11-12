@@ -29,7 +29,7 @@ const STEP_ICON = { done: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="
 export function workspace(env) {
   const ui = new Map(); // per project: { step, editing (scenario id or ''), busy, err, open (assumption groups), reportBusy, reportErr }
   const cache = new Map(); // per project: { key, study, scenarios }
-  let market = null, marketP = null, marketErr = false, root = null, cur = null, computeT = 0;
+  let market = null, marketP = null, marketErr = false, root = null, cur = null, computeT = 0, storageOn = null, storageP = null; // storageOn: can report sets be saved for the team here (api/feasibility op ping)
   const saveT = new Map(); // per project: a pending save (one project's edit never cancels another's)
   const st = p => { if (!ui.has(p.id)) ui.set(p.id, { step: null, editing: '', open: { cost: true, revenue: true, financing: true } }); return ui.get(p.id); };
 
@@ -285,13 +285,17 @@ export function workspace(env) {
   function reportsStep(p, study) {
     if (!study || study.missing) return empty('No report yet', 'The report set is made from a laid-out option, its budget and pro forma.', 'Go to Site', 'step:site');
     const s = st(p), f = fz(p), dis = s.reportBusy ? ' disabled' : '';
+    if (storageOn === null && !storageP) storageP = api({ op: 'ping' }).then(r => r.json()).then(d => { storageOn = d.storage !== false; }, () => { storageOn = true; }).finally(() => paint()); // (unknown: offered, and a failure says why)
+    const noStore = storageOn === false;
     const files = [['pdf', 'Feasibility report', 'PDF · summary, site, plan set, budget, pro forma, sensitivity, risks, register'], ['xlsx', 'Workbook', 'XLSX · assumptions with sources, budget lines, CSI, monthly and annual cash flow, hold, sensitivity'], ['register', 'Fact & assumption register', 'CSV · every input with its source'], ['budget', 'Budget lines', 'CSV · every line with qty, rate and source'], ['json', 'Study data', 'JSON · everything above, for other tools']];
     const hist = f.reports.length ? '<table class="ws-t"><caption class="sr">Saved report sets</caption><thead><tr><th scope="col">Saved</th><th scope="col">By</th><th scope="col">Inputs</th><th scope="col" class="r">Total cost</th><th scope="col" class="r">Levered IRR</th><th scope="col">Files</th></tr></thead><tbody>' +
       f.reports.slice().reverse().map(r => '<tr><th scope="row">' + esc(new Date(r.created).toLocaleString()) + '</th><td>' + esc(r.by || '') + '</td><td class="m">' + esc(r.inputsHash) + (r.inputsHash === study.inputsHash ? ' <small>(current)</small>' : ' <small>(older inputs)</small>') + '</td><td class="r m">' + usdM(r.headline?.totalCost) + '</td><td class="r m">' + pct(r.headline?.levIrr) + '</td><td>' +
         r.files.map(x => '<button type="button" class="lnk" data-link="' + esc(x.path) + '">' + esc(x.name.split('.').pop().toUpperCase().replace('CSV', /register/.test(x.name) ? 'Register' : 'Budget')) + '</button>').join(' ') + '</td></tr>').join('') + '</tbody></table>' : '<p class="ws-note">No report sets saved yet. Saved sets are kept in the team’s storage with the inputs they were made from.</p>';
     return '<div class="ws-card"><h4>Report set</h4><p>Made from <b>' + esc(study.option.name) + '</b>' + (study.scenario ? ', scenario <b>' + esc(study.scenario.name) + '</b>' : ', base case') + ' · inputs <span class="mono">' + esc(study.inputsHash) + '</span>.</p>' +
       '<ul class="ws-files">' + files.map(([k, t, d]) => '<li><button type="button" class="btn" data-file="' + k + '"' + dis + '>' + esc(t) + '</button><span>' + esc(d) + '</span></li>').join('') + '</ul>' +
-      '<div class="ws-row"><button type="button" class="btn primary" data-act="saveSet"' + dis + '>Save the whole set for the team</button><button type="button" class="btn" data-act="preview">Open the report here (print or save as PDF)</button></div>' +
+      (noStore ? '<div class="ws-row"><button type="button" class="btn" data-act="saveSet" disabled aria-describedby="wsNoStore">Save the whole set for the team</button><button type="button" class="btn primary" data-act="preview">Open the report here (print or save as PDF)</button></div>' +
+        '<p class="ws-note ws-off" id="wsNoStore"><b>Saving for the team isn’t available on this site.</b> Team storage isn’t connected, so report sets can’t be kept here. Download the files above, or ask your admin to connect team storage.</p>'
+        : '<div class="ws-row"><button type="button" class="btn primary" data-act="saveSet"' + dis + '>Save the whole set for the team</button><button type="button" class="btn" data-act="preview">Open the report here (print or save as PDF)</button></div>') +
       (s.reportBusy ? '<p class="ws-busy" role="status"><span class="ws-spin" aria-hidden="true"></span>' + esc(s.reportBusy) + '</p>' : '') + (s.reportErr ? '<div class="ws-err" role="alert">' + esc(s.reportErr) + '</div>' : '') + '</div>' +
       '<div class="ws-card"><h4>Saved sets <span class="ws-c">' + f.reports.length + '</span></h4>' + hist + '</div>';
   }
@@ -309,7 +313,9 @@ export function workspace(env) {
   const headers = () => ({ 'Content-Type': 'application/json', 'x-field-code': env.code() || '' });
   async function api(body) {
     const r = await fetch('api/feasibility', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
-    if (!r.ok) { let m; try { m = (await r.json()).error; } catch (e) { m = ''; } throw Object.assign(new Error(m || (r.status === 404 ? 'The report service isn’t available here (open the deployed site, or run npm run dev).' : 'The report service answered ' + r.status + '.')), { status: r.status }); }
+    if (!r.ok) { let m; try { m = (await r.json()).error; } catch (e) { m = ''; }
+      if (/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/.test(m || '')) { console.warn('feasibility:', m); m = r.status === 503 ? 'This isn’t set up on this site yet. Ask your admin, or download the files instead.' : ''; } // server setting names stay in the console
+      throw Object.assign(new Error(m || (r.status === 404 ? 'The report service isn’t available here (open the deployed site, or run npm run dev).' : 'The report service answered ' + r.status + '.')), { status: r.status }); }
     return r;
   }
   async function download(p, kind) {

@@ -429,6 +429,7 @@ export function initBuildings(ctx) {
   // the button here runs the Regrid section's own lookup, which shows its record right under this one
   const rgLeft = () => { const u = ctx.regridUsage?.(); return u?.records ? ' (' + fmtN(Math.max(0, u.records.cap - u.records.used)) + ' left)' : ''; };
   const rgFor = () => cur?.rgFor ? ' for parcel ' + esc(cur.rgFor) : '';
+  const rgOff = () => !!ctx.regridOff?.(), RG_OFF = '<span class="rg-off">Not available on this site</span>'; // Regrid not set up here (src/regrid.js)
   const toRegrid = () => { const r = card.querySelector('#bRegrid'); if (r) requestAnimationFrame(() => card.scrollTo({ top: Math.max(0, r.offsetTop - (card.querySelector(':scope>.top')?.offsetHeight || 0) - 80), behavior: ctx.reduceMotion ? 'auto' : 'smooth' })); };
   function wireRegrid(el) {
     el.querySelectorAll('[data-rg]').forEach(x => x.onclick = () => { const go = card.querySelector('#rgGo'); if (!go) { ctx.toast?.('Regrid isn’t ready yet. Try again in a moment.'); return; }
@@ -460,8 +461,8 @@ export function initBuildings(ctx) {
     setHead(cur, p);
     if (!p) {
       // nothing from the statewide parcel layer nor the county appraisal district's own (Harris, Waller, …): Regrid may have it
-      el.innerHTML = head + '<button class="btn md primary rg-cta" type="button" data-rg>Get owner, value &amp; zoning from Regrid<span data-rg-left>' + rgLeft() + '</span></button>' +
-        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : 'No appraisal record found at this point (often a street, a lake or a lot line).') + ' Regrid has the parcel record; one already looked up is free.</div>';
+      el.innerHTML = head + (rgOff() ? '' : '<button class="btn md primary rg-cta" type="button" data-rg>Get owner, value &amp; zoning from Regrid<span data-rg-left>' + rgLeft() + '</span></button>') +
+        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : 'No appraisal record found at this point (often a street, a lake or a lot line).') + (rgOff() ? '' : ' Regrid has the parcel record; one already looked up is free.') + '</div>';
       wireRegrid(el);
       if (t && !err) t.textContent = 'Unaddressed ' + kindOf(cur).toLowerCase();
       const near = ctx.nearestPlace?.(cur.center); if (sub) sub.textContent = 'No owner on file · ' + (near ? 'near ' + near : cur.center[1].toFixed(5) + ', ' + cur.center[0].toFixed(5));
@@ -474,7 +475,7 @@ export function initBuildings(ctx) {
     const many = all?.length > 1 ? all : null;
     cur.rgFor = many ? p.propId || '' : '';
     const rgRow = cur.rgDone || rgp ? '<a class="lnk" href="#bRegrid" data-rg-jump>Regrid record below</a>'
-      : '<button class="lnk" type="button" data-rg title="Zoning and last sale from Regrid. Uses 1 of your monthly records; a parcel looked up before is free.">Get from Regrid' + rgFor() + '<span data-rg-left>' + rgLeft() + '</span></button>';
+      : rgOff() ? RG_OFF : '<button class="lnk" type="button" data-rg title="Zoning and last sale from Regrid. Uses 1 of your monthly records; a parcel looked up before is free.">Get from Regrid' + rgFor() + '<span data-rg-left>' + rgLeft() + '</span></button>';
     el.innerHTML = head + (many ? '<div class="fl pgrid-h">Parcel 1 of ' + many.length + (p.owner ? ' · ' + esc(p.owner) : '') + '</div>' : '') + '<div class="fgrid">' +
       fld('Owner', esc(p.owner || '—'), { w: true }) +
       (val ? fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' })

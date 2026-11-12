@@ -4302,8 +4302,7 @@ a{color:var(--text)}
   .sp-strip:not(.open) .sp-tgrp:not(:has(.sp-tb:not(.sp-tb-x):not([data-tool=fit]):not([data-tool=layers]))){display:none}
 }
 
-/* ================= one look per role (UX-601) =================
-   The filled near-black pill meant five things. Now: (a) the main action is the one filled button, in the app's green;
+/* ================= one look per role (UX-601) ==========   The filled near-black pill meant five things. Now: (a) the main action is the one filled button, in the app's green;
    (b) where you are (top bar, sub-tabs) is bold text with an underline or a tinted pill, never filled; (c) a toggle's
    chosen value is a light grey fill with dark text; (d) jump links are underlined text; Ask AI is an outlined button. */
 :root{--btn-primary-bg:var(--green-700);--btn-primary-hover:var(--green-800);--btn-primary-ink:#fff;--sel-bg:var(--ink-100)}
@@ -4414,3 +4413,5 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 .cmp-in{align-self:center;font-size:12.5px;color:var(--green-700,#0b7a5f);font-weight:600;margin-right:4px}
 .glance .gl-scope{margin:-6px 0 10px;font-size:12px;color:var(--muted)}
 .kp-warn{margin:8px 6px 0;padding:7px 9px;border-radius:5px;background:var(--warn-bg,#fff4e5);color:var(--warn-ink,#7a4100);font-size:12.5px;line-height:1.35}
+=======
+.rg-off{color:var(--muted);font-size:12px}
