@@ -3,6 +3,19 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-12
+
+### 2:07 PM CT: UI/UX audit fixes: clearer search, honest report scope, keyboard, Undo and phone layout (`6b56de0`…`7d64e8b`, branch `ui-ux-audit-fixes`)
+- **Search says when it couldn't find a house number:** instead of quietly showing the street as an "Address" and opening a card for whatever parcel is there, the card says the number wasn't found and asks you to click your lot.
+- **Drive-Time and Air Traffic say what they cover:** on a picked area, Drive-Time starts from the area's middle (marked **Start** on the map, with **Pick a start point**), and Air Traffic's live count covers 15 miles around the middle (the circle is drawn).
+- **New project details keep every keystroke:** typing in Intake no longer loses focus or letters when you pause.
+- **Keyboard users keep their place:** Layers, Filters, Metrics, menus and filing cards take focus when they open and give it back when they close; **Skip to map tools** and **Skip to page content** are the first Tab stops.
+- **Undo you can reach:** Undo notes stay while you're on them, last 10 seconds and answer ⌘Z / Ctrl+Z; deleting a project uses an in-app dialog with Undo.
+- **Numbers that agree:** county filter counts match the results, every report and Compare use one size format, and Compare rows use one number scale.
+- **Projects say what they're doing:** one sharing state everywhere, "Saved" / "Synced" after edits with ⌘Z undo, steps say "To do", "Needs details" or "Waiting on …", and results follow the scenario you're editing.
+- **Tables sort by any column** with a header that stays in view; each page has one name; main buttons are green; an **Offline** chip shows when the connection drops.
+- **Phones:** active filters show as chips, one card opens at a time, the card swipes to half and full height, the project stepper no longer overlaps, controls are full-size (44px) and Getting started shows on the first visit.
+
 ## 2026-11-09
 
 ### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
