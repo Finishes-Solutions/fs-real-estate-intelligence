@@ -4,7 +4,7 @@
 //   share of the area in high / moderate / minimal flood risk, NFIP flood insurance claims paid nearby (by year and storm),
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
-import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable, fitArea, fmtSqmi, sqmiOf } from './reportkit.js';
+import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable, fitArea, fmtSqmi, sqmiOf, friendly } from './reportkit.js';
 import { reveal } from './motion.js';
 import { femaReport, femaCsvRows } from './lib/reports/fema.mjs';
 const SRC = 'fema-nfhl';
@@ -70,7 +70,7 @@ export function initFema(ctx) {
       '<div class="rnote" role="status"><span id="fmEl">' + elapsed() + '</span>' + (sq > 200 ? ' Large areas can take 1–3 minutes; each part appears below as soon as it’s in.' : '') + ' <button class="lnk" type="button" id="fmCancel">Cancel</button></div></div>';
     const paint = (first) => { if (!first && !mine()) return; const y = card.scrollTop;
       card.innerHTML = head(label, fmtSqmi(sq)) + progress() + body(d); card.classList.add('open'); card.scrollTop = y;
-      card.querySelector('.x').onclick = () => ctx.closeCard(); card.querySelector('#fmCancel').onclick = cancel; };
+      card.querySelector('.x').onclick = () => ctx.closeCard(); card.querySelector('#fmCancel').onclick = cancel; wireRetry(card, d, geometry, label, k => { state[k] = d[k]?.error ? 'err' : 'ok'; paint(); }); };
     const cancel = () => { if (!mine()) return; stop();
       card.querySelector('.fm-prog').replaceChildren(errorBox('Stopped. The parts that had loaded are shown below.', () => report({ geometry, label }))); card.querySelector('.fm-prog .eb-retry').textContent = 'Run it again';
       card.querySelectorAll('.bsec:has(> .rnote.loading)').forEach(b => b.remove()); }; // the parts that hadn't loaded go
@@ -94,6 +94,15 @@ export function initFema(ctx) {
     reveal(card, 'card:fema|' + label); // its charts draw in once per report (src/motion.js)
     card.querySelector('#fmLayer').onclick = () => { setOn(true); ctx.fitGeom?.(geometry); };
     card.querySelector('#fmPdf').onclick = exportReport; card.querySelector('#fmCsv').onclick = exportCsv;
+    wireRetry(card, d, geometry, label, () => { if (last?.d === d && card.querySelector('#fmPdf')) draw(card); });
+  }
+  // Retry on one failed part: ask for that part alone and redraw (the rest of the report stays as it is)
+  function wireRetry(card, d, geometry, label, redraw) {
+    card.querySelectorAll('[data-fretry]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.fretry; b.disabled = true; b.textContent = 'Retrying…';
+      try { const r = await reportFor(geometry, label, [k]); d[k] = r[k]; if (r.counties?.length) d.counties = r.counties; redraw(k); }
+      catch (e) { b.disabled = false; b.textContent = 'Retry'; ctx.toast?.(friendly(e, 'Flood and hazard data')); }
+    });
   }
   ctx.femaReport = report;
 
