@@ -4378,3 +4378,8 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 }
 
 #view-market .mk-tbl thead th{top:calc(var(--mk-nav, 0px) - var(--view-pt, 20px))} /* Market: the header stops under the sticky section bar */
+
+/* a type floor (UX-611): no text on the Map panel under --fs-xs (11.5px), chart axes at 11px. Only the rules that went
+   below it; the rest of the scale is unchanged. */
+.kpi span,.sc-k,.sc-k .sk-l,.fs-t em,#filingsPeriod,.fsw.tg2{font-size:var(--fs-xs)}
+.tl-chart .yax text,.tl-chart .xax text,.g-ticks span{font-size:11px}
