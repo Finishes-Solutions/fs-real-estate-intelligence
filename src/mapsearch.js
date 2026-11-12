@@ -146,8 +146,12 @@ export function initMapSearch(ctx) {
     const vis = new Set(ctx.visible), filingRow = f => '<b>' + esc(f.name) + '</b><i>' + fmtM(f.cost) + '</i><span>' + esc([f.addr || f.city, f.owner].filter(Boolean).join(' · ')) + (f.approx ? ' · <em>approx. location</em>' : '') + (vis.has(f) ? '' : ' · <em>hidden by filters</em>') + '</span>';
     items = []; let h = '';
     const push = (it, inner) => { items.push(it); h += btn(items.length - 1, inner); };
-    if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i' + (p.approxStreet ? ' class="ms-warn"' : '') + '>' + (p.approxStreet ? 'Street (number not found)' : 'Address') + '</i>')); }
-    if (places.length) { h += sec('Places'); places.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>' + esc(KIND_LABEL[p.kind] || 'Place') + '</i>')); }
+    // "Harris County" or "Tomball": the county / town you named comes first and is what Enter picks, not a street called "County …"
+    const ql = low(q).replace(/\s+county$/, '').replace(/,?\s*(tx|texas)$/, '').trim();
+    const placeFirst = places.some(p => /county|town/.test(p.kind) && low(p.name || p.label.split(',')[0]).replace(/\s+county$/, '') === ql);
+    const addrSec = () => { if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i' + (p.approxStreet ? ' class="ms-warn"' : '') + '>' + (p.approxStreet ? 'Street (number not found)' : 'Address') + '</i>')); } };
+    const placeSec = () => { if (places.length) { h += sec('Places'); places.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>' + esc(KIND_LABEL[p.kind] || 'Place') + '</i>')); } };
+    if (placeFirst) { placeSec(); addrSec(); if (active < 0 && !pending) active = 0; } else { addrSec(); placeSec(); }
     if (biz.length) { h += sec('Businesses');
       biz.forEach(b => push({ t: 'biz', b }, '<b>' + esc(b.name) + '</b><i>' + (b.miles != null ? (+b.miles).toFixed(1) + ' mi' : 'Business') + '</i><span>' + esc([b.kind && b.kind[0].toUpperCase() + b.kind.slice(1), b.address].filter(Boolean).join(' · ') || (b.src === 'osm' ? 'OpenStreetMap' : 'Texas Comptroller')) + '</span>')); }
     else if (bizPending && q.length >= 3) h += sec('Businesses') + '<div class="ms-none sm">Looking up businesses…</div>';
@@ -164,6 +168,10 @@ export function initMapSearch(ctx) {
       addrs.slice(0, shownA).forEach(f => push({ t: 'filing', f }, filingRow(f)));
       if (addrs.length > shownA) h += '<button class="ms-more" data-act="moreA" type="button">Showing ' + shownA + ' of ' + fmtN(addrs.length) + ' · show more</button>';
     }
+    // the geocoder always answers something ("zzqxv nothing" -> "Notting Hill Lane"): when no result shares a word with the query, say so
+    const words = low(expandAbbr(q)).replace(/[.,#]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !/^\d+$/.test(w));
+    const hits = it => { const l = hayOf(it.t === 'place' ? it.p.label + ' ' + (it.p.name || '') : it.t === 'biz' ? it.b.name + ' ' + (it.b.address || '') : it.t === 'google' ? it.g.main + ' ' + it.g.secondary : it.t === 'entity' ? it.e.hay : it.f.name + ' ' + (it.f.addr || '')); return words.some(w => l.includes(w)); };
+    if (!pending && words.length && items.length && !items.some(hits)) h = '<div class="ms-none ms-empty">No matches for “' + esc(q) + '”. Try a full address or paste lat, long.</div>' + h;
     if (pending) h = '<div class="ms-none">Searching addresses and places…</div>' + h;
     else if (!h) h = '<div class="ms-none">' + (q.length < 3 ? 'Keep typing…' : 'Nothing matches “' + esc(q) + '”. Try the street name without the number, or a ZIP code.') + '</div>';
     const top = res.scrollTop; res.innerHTML = h; res.scrollTop = top; if (document.activeElement === input || res.contains(document.activeElement) || res.classList.contains('on')) open();

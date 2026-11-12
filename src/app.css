@@ -735,6 +735,7 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .ms-more{display:block;width:100%;border:0;background:transparent;padding:10px 14px;font-size:12px;color:var(--muted);cursor:var(--cur-pointer,pointer);text-align:center}
 .ms-more:hover{color:var(--brand)}
 .ms-none{padding:14px;font-size:12.5px;color:var(--muted)}
+.ms-none.ms-empty{color:var(--text-2);border-bottom:1px solid var(--line,#e5e7eb)}
 .placebar{position:relative;display:none;gap:3px;background:var(--panel);border:1px solid var(--line-2);border-left:3px solid #d48806;border-radius:6px;padding:12px 14px;box-shadow:0 6px 18px rgba(11,13,12,.14)}
 .placebar.on{display:grid}
 .placebar .x{position:absolute;top:6px;right:6px;width:28px;height:28px;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:18px;cursor:var(--cur-pointer,pointer)}
