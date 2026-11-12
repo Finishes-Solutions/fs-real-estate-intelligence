@@ -131,7 +131,10 @@ export function initMapSearch(ctx) {
       const [g1, g2] = await Promise.all([ask(q, 'search'), full !== q ? ask(full, 'search2') : []]); if (my !== seq) return;
       const g = !g1.some(x => x.type === 'address') && g2.length ? g2.concat(g1.filter(x => !g2.some(y => y.t === x.t))) : g1;
       const have = new Set(localPlaces(q).map(p => low(p.label)));
-      remote = g.filter(x => !have.has(low(x.name) + ', tx')).map(x => ({ label: x.t, name: x.name, kind: kindFromMaptiler(x.type), c: x.c, bbox: x.bbox }));
+      // "22003 Tomball Pkwy" answered with only "Tomball Parkway": the geocoder dropped the house number, so say so
+      const num = (q.match(/^\s*(\d+[a-z]?)\b/i) || [])[1];
+      remote = g.filter(x => !have.has(low(x.name) + ', tx')).map(x => ({ label: x.t, name: x.name, kind: kindFromMaptiler(x.type), c: x.c, bbox: x.bbox,
+        ...(num && x.type === 'address' && !/^\s*\d/.test(x.t) ? { approxStreet: num } : {}) }));
       pending = false; render();
       if (enterWait) { enterWait = false; if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); }
     }, 60);
@@ -143,7 +146,7 @@ export function initMapSearch(ctx) {
     const vis = new Set(ctx.visible), filingRow = f => '<b>' + esc(f.name) + '</b><i>' + fmtM(f.cost) + '</i><span>' + esc([f.addr || f.city, f.owner].filter(Boolean).join(' · ')) + (f.approx ? ' · <em>approx. location</em>' : '') + (vis.has(f) ? '' : ' · <em>hidden by filters</em>') + '</span>';
     items = []; let h = '';
     const push = (it, inner) => { items.push(it); h += btn(items.length - 1, inner); };
-    if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>Address</i>')); }
+    if (addresses.length) { h += sec('Addresses'); addresses.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i' + (p.approxStreet ? ' class="ms-warn"' : '') + '>' + (p.approxStreet ? 'Street (number not found)' : 'Address') + '</i>')); }
     if (places.length) { h += sec('Places'); places.forEach(p => push({ t: 'place', p }, '<b>' + esc(p.label) + '</b><i>' + esc(KIND_LABEL[p.kind] || 'Place') + '</i>')); }
     if (biz.length) { h += sec('Businesses');
       biz.forEach(b => push({ t: 'biz', b }, '<b>' + esc(b.name) + '</b><i>' + (b.miles != null ? (+b.miles).toFixed(1) + ' mi' : 'Business') + '</i><span>' + esc([b.kind && b.kind[0].toUpperCase() + b.kind.slice(1), b.address].filter(Boolean).join(' · ') || (b.src === 'osm' ? 'OpenStreetMap' : 'Texas Comptroller')) + '</span>')); }
@@ -283,11 +286,12 @@ export function initMapSearch(ctx) {
   }
   async function showPlace(p) {
     ctx.setView('map'); ctx.closeCard?.();
-    const mine = place = { label: p.label, kind: p.kind, c: p.c, geom: null, ...(p.via ? { via: p.via, approx: !!p.approx } : {}), ...(p.within ? { within: p.within } : {}) }; setPlacePin(p.c, p.label);
-    bar.innerHTML = '<div class="pb-k">' + esc(KIND_LABEL[p.kind] || 'Place') + '</div><div class="pb-t">' + esc(p.label) + '</div><div class="pb-s">Finding the outline…</div>'; bar.classList.add('on');
+    const mine = place = { label: p.label, kind: p.kind, c: p.c, geom: null, ...(p.approxStreet ? { approxStreet: p.approxStreet } : {}), ...(p.via ? { via: p.via, approx: !!p.approx } : {}), ...(p.within ? { within: p.within } : {}) }; setPlacePin(p.c, p.label);
+    bar.innerHTML = '<div class="pb-k">' + esc(p.approxStreet ? 'Street (number not found)' : KIND_LABEL[p.kind] || 'Place') + '</div><div class="pb-t">' + esc(p.label) + '</div><div class="pb-s">Finding the outline…</div>'; bar.classList.add('on');
     // move now with what the search already knows (the point, or the geocoder's box). The outline from OpenStreetMap can take
     // seconds; when it lands it only sharpens the frame.
-    const spot = /address|poi|coords|business/.test(p.kind), loadedCounty = p.kind === 'county' && DATA.counties.some(x => x.name === p.name);
+    // a street without the typed number is not one building: frame the street, don't open an arbitrary parcel
+    const spot = /address|poi|coords|business/.test(p.kind) && !p.approxStreet, loadedCounty = p.kind === 'county' && DATA.counties.some(x => x.name === p.name);
     let framed = '';
     if (!p.geom && !loadedCounty) {
       if (spot && p.c && !(p.bbox && extentMeters(p.bbox) > BIG_PLACE_M)) { flyToBuilding(mine, p.c); framed = 'spot'; }
@@ -324,6 +328,7 @@ export function initMapSearch(ctx) {
     else if (pt && !framed) map.flyTo({ center: pt, zoom: p.kind === 'town' ? 12 : 14, duration: dur(800) });
     if (p.via === 'web') note = [note, 'Found with a web search' + (p.approx ? '; the spot is approximate (OpenStreetMap has no outline for it).' : ' and matched in OpenStreetMap.')].filter(Boolean).join(' ');
     if (!geom && !spot) note = 'No outline found for this place in OpenStreetMap, so it is shown as a point.';
+    if (p.approxStreet) note = 'We couldn’t find number ' + p.approxStreet + '; showing ' + (p.name || p.label.split(',')[0]) + '. Click your lot on the map to open its card.';
     placeCard(note);
     return place;
   }
@@ -358,15 +363,16 @@ export function initMapSearch(ctx) {
     const bare = !area && /^(town|county|area|zip)$/.test(place.kind); if (bare) list = [];
     const v = list.reduce((s, f) => s + f.cost, 0);
     const inCmp = ctx.compare?.list().some(a => a.key === 'place:' + place.label);
-    bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
-      (bare ? '' : '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>') + (note ? '<div class="pb-n">' + esc(note) + '</div>' : '') +
-      '<div class="pb-a"><button class="btn primary" id="pbInfo" title="' + (area ? 'Headline numbers, top uses and the largest projects inside it' : 'Owner, value, site and area details for the parcel here') + '">' + (area ? 'Area Summary' : 'Property Card') + '</button>' + (area ? '<button class="btn" id="pbFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
+    const approx = !!place.approxStreet;
+    bar.innerHTML = '<button class="x" aria-label="Clear" id="pbX">×</button><div class="pb-k">' + esc(approx ? 'Street (number not found)' : KIND_LABEL[place.kind] || 'Place') + '</div><div class="pb-t">' + esc(place.label) + '</div>' +
+      (bare ? '' : '<div class="pb-s">' + fmtN(list.length) + ' filing' + (list.length === 1 ? '' : 's') + ' ' + how + ' · est. ' + fmtM(v) + (ctx.filterText() ? '<span> (current filters)</span>' : '') + '</div>') + (note ? '<div class="pb-n' + (approx ? ' warn' : '') + '">' + esc(note) + '</div>' : '') +
+      '<div class="pb-a">' + (approx ? '' : '<button class="btn primary" id="pbInfo" title="' + (area ? 'Headline numbers, top uses and the largest projects inside it' : 'Owner, value, site and area details for the parcel here') + '">' + (area ? 'Area Summary' : 'Property Card') + '</button>') + (area ? '<button class="btn" id="pbFilter" title="Make this the picked area: the panel, Compare and Save search then use it">Use as Area</button><button class="btn" id="pbCmp"' + (inCmp ? ' disabled' : '') + '>+ Compare</button>' : '') +
         (list.length ? '<button class="btn" id="pbHl">Highlight ' + (list.length > 50 ? 'Top 50' : 'Them') + '</button>' : '') + '</div>';
     bar.classList.add('on');
     bar.querySelector('#pbX').onclick = clearPlace;
     bar.querySelector('#pbFilter')?.addEventListener('click', () => { const pl = place; ctx.setSelection('place', pl.label, pl.geom); clearPlace(); ctx.fitGeom(pl.geom); });
     bar.querySelector('#pbCmp')?.addEventListener('click', () => { if (ctx.compare.add({ key: 'place:' + place.label, label: place.label.split(',')[0], kind: place.kind, geom: place.geom })) placeCard(note); });
-    bar.querySelector('#pbInfo').addEventListener('click', () => area ? areaCard() : pointInfo());
+    bar.querySelector('#pbInfo')?.addEventListener('click', () => area ? areaCard() : pointInfo());
     bar.querySelector('#pbHl')?.addEventListener('click', () => { ctx.highlight(list.slice().sort((a, b) => b.cost - a.cost).slice(0, 50), place.label); });
   }
   ctx.onChange(() => { if (place && bar.classList.contains('on') && place.geom !== undefined) placeCard(); });
