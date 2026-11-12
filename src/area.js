@@ -212,7 +212,7 @@ export function initArea(ctx) {
   // ----- Construction pipeline (TDLR filings) -----
   const TYPE_KEYS = [{ k: 'New', label: 'New construction', c: 0 }, { k: 'Reno', label: 'Renovation', c: 4 }, { k: 'Addition', label: 'Addition', c: 5 }];
   const fRow = f => '<tr class="mk-fr" data-fid="' + esc(f.id) + '" tabindex="0"><td><b>' + esc(f.name) + '</b><span class="sc">' + esc([f.city || f.county, f.use, ctx.TYPE_LABEL?.[f.type] || f.type].filter(Boolean).join(' · ')) + '</span></td><td class="m r">' + money(f.cost) + '</td><td class="m">' + esc(String(f.ts).slice(0, 7)) + ' → ' + esc(String(f.te).slice(0, 7)) + '</td></tr>';
-  const fTable = list => '<div class="tablewrap"><table class="mk-tbl"><thead><tr><th>Project</th><th class="r">Est. value</th><th>Schedule</th></tr></thead><tbody>' + list.map(fRow).join('') + '</tbody></table></div>';
+  const fTable = list => '<div class="tablewrap" tabindex="0" role="region" aria-label="Construction filings table"><table class="mk-tbl"><thead><tr><th>Project</th><th class="r">Est. value</th><th>Schedule</th></tr></thead><tbody>' + list.map(fRow).join('') + '</tbody></table></div>';
   function pipelineSec(p) {
     if (!p.active.n && !p.upcoming.n) return '';
     const now = p.months.findIndex(r => !r.future && p.months[p.months.indexOf(r) + 1]?.future);
@@ -282,8 +282,8 @@ export function initArea(ctx) {
       (h ? box('Households and incomes', kg + (h.income ? '<h4 class="mk-h4">Household income</h4>' + C.hbars(h.income.map(b => ({ label: b.label, v: b.pct, c: 1, tip: b.label + ': ' + fmtN(b.n) + ' households (' + b.pct.toFixed(1) + '%)' })), v => v.toFixed(0) + '%', null, 'mk:housing:income') : '') +
         note('Area medians are household-weighted averages of the tract medians (approximate).', 'US Census ACS 5-year ' + (market?.year || '') + '.')) : '') +
       (rn ? box('Rents by ZIP', '<div class="kgrid mk-kg4"><div><b>$' + fmtN(Math.round(rn.typical)) + '</b><span>Typical rent (ZIP median)</span></div><div><b>' + (rn.yoy != null ? pct(rn.yoy) : '—') + '</b><span>In a year</span></div><div><b>$' + fmtN(rn.low.rent) + (Math.round(rn.low.rent) === Math.round(rn.high.rent) ? '' : '–' + fmtN(rn.high.rent)) + '</b><span>' + (rn.rows.length === 1 ? 'Based on 1 ZIP' : 'Range across ' + rn.rows.length + ' ZIPs') + '</span></div></div>' +
-        '<div class="tablewrap mk-zips"><table class="mk-tbl"><thead><tr><th>ZIP</th><th>Town</th><th class="r">Rent</th><th class="r">Year</th></tr></thead><tbody>' + rn.rows.slice(0, 10).map(zipRow).join('') + '</tbody></table></div>' +
-        (rn.rows.length > 10 ? '<details class="mk-more"><summary>All ' + rn.rows.length + ' ZIPs</summary><div class="tablewrap"><table class="mk-tbl"><tbody>' + rn.rows.slice(10).map(zipRow).join('') + '</tbody></table></div></details>' : '') +
+        '<div class="tablewrap mk-zips" tabindex="0" role="region" aria-label="Rent by ZIP"><table class="mk-tbl"><thead><tr><th>ZIP</th><th>Town</th><th class="r">Rent</th><th class="r">Year</th></tr></thead><tbody>' + rn.rows.slice(0, 10).map(zipRow).join('') + '</tbody></table></div>' +
+        (rn.rows.length > 10 ? '<details class="mk-more"><summary>All ' + rn.rows.length + ' ZIPs</summary><div class="tablewrap" tabindex="0" role="region" aria-label="Rent, all ZIPs"><table class="mk-tbl"><tbody>' + rn.rows.slice(10).map(zipRow).join('') + '</tbody></table></div></details>' : '') +
         note('Typical asking rent for all home types, ' + esc(monthLabel(rn.month)) + '. ZIPs are placed in a county by their town, so border ZIPs are approximate.', 'Zillow Observed Rent Index.')) : '') +
       (homes ? box('Houston for-sale market' + tag('Houston metro'), homes + note('Houston-metro monthly figures, the same for every county here. “Seasonally adjusted” means the usual seasonal swings are smoothed out.', 'Realtor.com and US Census via FRED.'), 'mk-wide') : '') + '</div></section>';
   }
@@ -335,7 +335,7 @@ export function initArea(ctx) {
       (s.news ? box('Local development news', '<div class="mk-ctl"><select class="chip" id="mkPlace" aria-label="News place">' + placeOpts + '</select></div>' +
         (s.news.length ? s.news.map((a, i) => (i === 10 ? '<details class="raw mk-more"><summary>' + (s.news.length - 10) + ' more</summary>' : '') + '<a class="chitem" target="_blank" rel="noopener" href="' + esc(a.url) + '"><span><b>' + esc(a.title) + '</b><em>' + esc(a.domain) + (a.date ? ' · ' + esc(shortDate(a.date)) : '') + ' · ' + esc(a.place) + '</em></span></a>').join('') + (s.news.length > 10 ? '</details>' : '') : note('No articles found in the last few months.')) +
         note('Development, construction, rezoning and real estate stories naming each county and its busiest towns, kept 120 days.', 'Google News.'), 'mk-wide') : '') +
-      (s.latest?.length ? '<section class="mk-box mk-wide" id="mkLatest"><h3>Newest business locations</h3><div class="tablewrap"><table class="who mk-tbl"><thead><tr><th>Business</th><th>Address</th><th>Type</th><th>Permit issued</th></tr></thead><tbody>' +
+      (s.latest?.length ? '<section class="mk-box mk-wide" id="mkLatest"><h3>Newest business locations</h3><div class="tablewrap" tabindex="0" role="region" aria-label="Newest business locations"><table class="who mk-tbl"><thead><tr><th>Business</th><th>Address</th><th>Type</th><th>Permit issued</th></tr></thead><tbody>' +
         s.latest.map((b, i) => '<tr' + (i >= 10 ? ' hidden' : '') + '><td>' + esc(b.name) + (b.owner ? '<div class="sc">' + esc(b.owner) + '</div>' : '') + '</td><td>' + esc([b.addr, b.city].filter(Boolean).join(', ')) + '</td><td>' + esc(b.sec != null ? SECTORS[b.sec][1] : (b.naics || '')) + '</td><td class="m">' + esc(b.date) + '</td></tr>').join('') +
         '</tbody></table></div>' + (s.latest.length > 10 ? '<button class="btn mk-morebtn" type="button" id="mkLatestMore">Show ' + Math.min(10, s.latest.length - 10) + ' more (' + (s.latest.length - 10) + ' left)</button>' : '') +
         note('Active sales-tax permits, newest first (the latest ' + s.latest.length + '). A new permit can also mean a change of owner.', 'Texas Comptroller.') + '</section>' : '') + '</div></section>';
@@ -581,7 +581,7 @@ export function initArea(ctx) {
       '<nav class="mk-nav" aria-label="Market sections"><button type="button" class="mk-here" id="mkHere" title="Change the area"><span>' + esc(areaLabel()) + '</span><em>Change</em></button><i class="mk-div" aria-hidden="true"></i>' +
       NAV.map(([k, l]) => '<button type="button" data-sec="' + k + '">' + l + '</button>').join('') +
       '<span class="mk-rng"><span>Monthly charts:</span><span class="mk-seg" role="group" aria-label="Months shown in monthly charts">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</span></span></nav>' +
-      '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-body">' + body + '</div>';
+      '<div class="mk-tip" id="mkTip" aria-hidden="true"></div><div class="mk-body">' + body + '</div>';
     root.scrollTop = y0;
     fit(root.querySelectorAll('.mk-body > .mk-sec'));
     root.querySelectorAll('table.mk-tbl').forEach(t => ctx.sortTable?.(t)); // sortable headers (UX-605)

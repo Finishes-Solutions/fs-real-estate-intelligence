@@ -1819,7 +1819,7 @@ button.mprow:hover b{color:var(--brand)}
 .mk-mini text.on{fill:var(--brand-ink)}
 
 /* ================= Market tab (redesigned 2026-10-05; src/area.js + src/mkcharts.js) ================= */
-:root{--mk-c0:var(--green-700);--mk-c1:#2a78d6;--mk-c2:#c26a00;--mk-c3:#7c3aed;--mk-c4:#8a9396;--mk-c5:#0e7c86;--mk-c6:#b3261e;--mk-up:var(--green-600);--mk-dn:#b3261e}
+:root{--mk-c0:var(--green-700);--mk-c1:#2a78d6;--mk-c2:#c26a00;--mk-c3:#7c3aed;--mk-c4:#8a9396;--mk-c5:#0e7c86;--mk-c6:#b3261e;--mk-up:var(--green-700);--mk-dn:#b3261e}
 #view-market .mk-vhead h1,#view-market .mk-vhead h2{font-size:24px}
 /* area picker: mini map + county chips */
 .mk-scope2{display:flex;align-items:center;gap:18px;margin:2px 0 12px;padding:10px 14px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel)}
