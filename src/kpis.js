@@ -22,20 +22,28 @@ export function initKpis(ctx) {
     last.clear();
     box.querySelectorAll('.kpi b[data-k]').forEach((b, i) => { const m = BY_KEY.get(keys[i]), v = vals[i]; if (m.text || typeof v !== 'number') return; last.set(keys[i], v); count(b, v, m.fmt, from.get(keys[i])); });
   }
-  function renderPop() {
-    pop.innerHTML = '<div class="kp-h"><b>Headline metrics</b><span>' + keys.length + ' of ' + MAX + ' · pick ' + MIN + '–' + MAX + '</span></div><div class="kp-list">' +
-      METRICS.map(m => { const on = keys.includes(m.k), dis = on ? keys.length <= MIN : keys.length >= MAX;
+  // the picked metrics first, in the order their tiles show (so the numbers read 1, 2, 3…), then the rest. Unpicked ones stay
+  // clickable at the limit: ticking one says what to do instead of silently doing nothing
+  let warn = '';
+  function renderPop(focusKey) {
+    const order = [...keys.map(k => METRICS.find(m => m.k === k)).filter(Boolean), ...METRICS.filter(m => !keys.includes(m.k))];
+    pop.innerHTML = '<div class="kp-h"><b>Headline metrics</b><span>' + keys.length + ' of ' + MAX + ' · pick ' + MIN + '–' + MAX + '</span></div>' +
+      '<div class="kp-warn" role="status" aria-live="polite"' + (warn ? '' : ' hidden') + '>' + ctx.esc(warn) + '</div><div class="kp-list">' +
+      order.map(m => { const on = keys.includes(m.k), dis = on && keys.length <= MIN;
         return '<label class="kp-it' + (dis ? ' dis' : '') + '"><input type="checkbox" data-k="' + m.k + '"' + (on ? ' checked' : '') + (dis ? ' disabled' : '') + '><span>' + ctx.esc(m.label) + '</span>' + (on ? '<i>' + (keys.indexOf(m.k) + 1) + '</i>' : '') + '</label>'; }).join('') +
       '</div><div class="kp-f"><button class="lnk" id="kpiReset" type="button">Reset to Default</button><button class="btn primary" id="kpiDone" type="button">Done</button></div>';
     pop.querySelectorAll('input').forEach(i => i.onchange = () => {
-      const k = i.dataset.k; keys = i.checked ? [...keys, k].slice(0, MAX) : keys.length > MIN ? keys.filter(x => x !== k) : keys;
-      save(); render(); renderPop(); pop.querySelector('input[data-k="' + k + '"]')?.focus(); // the list is redrawn: keep focus on the box just ticked
+      const k = i.dataset.k, m = BY_KEY.get(k);
+      if (i.checked && keys.length >= MAX) { i.checked = false; warn = MAX + ' is the most: untick one first, then tick ' + (m?.label || 'this one') + '.'; renderPop(k); return; }
+      warn = ''; keys = i.checked ? [...keys, k] : keys.length > MIN ? keys.filter(x => x !== k) : keys;
+      save(); render(); renderPop(k);
     });
-    pop.querySelector('#kpiReset').onclick = () => { keys = DEFAULT_KPIS.slice(); save(); render(); renderPop(); };
+    pop.querySelector('#kpiReset').onclick = () => { keys = DEFAULT_KPIS.slice(); warn = ''; save(); render(); renderPop(); };
     pop.querySelector('#kpiDone').onclick = () => toggle(false);
+    if (focusKey) pop.querySelector('input[data-k="' + focusKey + '"]')?.focus(); // re-rendering keeps your place
   }
   const kp = ctx.popover(pop, { trigger: btn, first: 'input:not([disabled])' }); // focus in, Tab stays in, Esc / Done back to Metrics
-  function toggle(on) { const was = pop.classList.contains('on'); pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) { renderPop(); requestAnimationFrame(() => pop.scrollIntoView({ block: 'nearest' })); if (!was) kp.opened(); } else if (was) kp.closed(); } // it opens near the bottom of the panel: bring it into view
+  function toggle(on) { const was = pop.classList.contains('on'); pop.classList.toggle('on', on); btn.setAttribute('aria-expanded', on); if (on) { warn = ''; renderPop(); requestAnimationFrame(() => pop.scrollIntoView({ block: 'nearest' })); if (!was) kp.opened(); } else if (was) kp.closed(); } // it opens near the bottom of the panel: bring it into view
   btn.onclick = e => { e.stopPropagation(); toggle(!pop.classList.contains('on')); };
   document.addEventListener('pointerdown', e => { if (pop.classList.contains('on') && !pop.contains(e.target) && !btn.contains(e.target)) toggle(false); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && pop.classList.contains('on')) { e.preventDefault(); toggle(false); } });
