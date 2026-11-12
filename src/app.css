@@ -3019,7 +3019,11 @@ table.who tr.nomatch td{border:0}
   .app.sel-open .mapleft .tools button[data-mode] span{display:inline}
   .modechip:not([hidden]){display:inline-flex;align-items:center;gap:4px;height:38px;padding:0 4px 0 14px;border-radius:999px;background:var(--text);color:var(--panel);font:600 13px var(--font-display);box-shadow:0 2px 8px rgba(11,13,12,.2)}
   .modechip button{height:30px;padding:0 12px;border:0;border-radius:999px;background:color-mix(in srgb,var(--panel) 18%,transparent);color:var(--panel);font:700 13px var(--font-display);cursor:var(--cur-pointer,pointer)}
-  .fchips{display:none!important}
+  /* the filters in effect stay visible on phones: one sideways-scrolling line under the layer chips, each removable */
+  .fchips{flex-wrap:nowrap;overflow-x:auto;width:100%;max-width:none;padding:2px 2px 4px;scrollbar-width:none;overscroll-behavior-x:contain}
+  .fchips::-webkit-scrollbar{display:none}
+  .fchip,.fc-all{flex:none}
+  .app:has(#fchips:not([hidden])) .backchip{top:calc(var(--st) + 206px)}
   .ctrls #layersBtn{display:grid}
   .ctrls .rgrp:first-child{display:none}
   .backchip{top:calc(var(--st) + 162px)}
