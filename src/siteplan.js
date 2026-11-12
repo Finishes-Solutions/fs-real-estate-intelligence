@@ -1863,7 +1863,7 @@ export function initSitePlan(ctx) {
   function confirmDeleteProject(p) {
     const nR = rendersOf(p).length, dlg = document.createElement('dialog');
     dlg.className = 'pj-dlg'; dlg.setAttribute('aria-labelledby', 'pjDelT'); dlg.setAttribute('aria-describedby', 'pjDelD');
-    dlg.innerHTML = '<h3 id="pjDelT">Delete “' + esc(p.name) + '”?</h3><p id="pjDelD">Its ' + plural(p.plans.length, 'site plan option') + (nR ? ' and ' + plural(nR, 'rendering') : '') + ' go with it. ' + esc(shareSay().del) + '</p><p class="pj-dlgn">You can undo this for 12 seconds.</p>' +
+    dlg.innerHTML = '<h3 id="pjDelT">Delete “' + esc(p.name) + '”?</h3><p id="pjDelD">Its ' + plural(p.plans.length, 'site plan option') + (nR ? ' and ' + plural(nR, 'rendering') : '') + (p.plans.length === 1 && !nR ? ' goes' : ' go') + ' with it. ' + esc(shareSay().del) + '</p><p class="pj-dlgn">You can undo this for 12 seconds.</p>' +
       '<div class="btnrow"><button type="button" class="btn danger" data-ok>Delete project</button><button type="button" class="btn" data-x autofocus>Cancel</button></div>';
     document.body.append(dlg);
     dlg.addEventListener('close', () => { dlg.remove(); if (dlg.returnValue !== 'ok') root.querySelector('[data-delp]')?.focus(); });
