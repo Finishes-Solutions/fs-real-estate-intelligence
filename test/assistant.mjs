@@ -98,6 +98,8 @@ assert.ok(suggestQuestions({ card: { kind: 'building', label: '2200 Texas Ave' }
 const sbl = suggestQuestions({ card: { kind: 'building', label: 'Loading parcel…' } }); assert.equal(sbl[0], 'Who owns this parcel?'); assert.equal(sbl[1], 'Flood risk and value of the selected property');
 assert.ok(suggestQuestions({ zoom: 6 }).every(q => !/filing|being built|construction/i.test(q)), 'region view: no filing prompts by default');
 // a failed assistant call is a sentence, never "Error 501", "Failed to fetch" or HTML
+assert.match(aiErrorMessage({ status: 503, error: 'AI is not configured on this deployment (OPENAI_API_KEY is missing).' }), /isn’t set up on this site/);
+assert.equal(aiErrorMessage({ status: 502, error: 'not configured' }), 'The assistant couldn’t answer. Try again.', 'only a 503 means not set up');
 assert.match(aiErrorMessage({ status: 429 }), /^Too many questions right now, try again in a minute/);
 for (const st of [500, 501, 502, 503]) assert.equal(aiErrorMessage({ status: st, error: '<html>Bad gateway</html>' }), 'The assistant couldn’t answer. Try again.');
 assert.equal(aiErrorMessage({ status: 500, error: 'Upstream said no' }), 'The assistant couldn’t answer. Try again.', '5xx details stay out of the chat');

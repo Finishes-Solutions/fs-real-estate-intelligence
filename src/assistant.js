@@ -6,7 +6,7 @@ import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
 import { plausibleHeight } from './lib/height.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, aiErrorMessage, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, aiErrorMessage, aiNotSetUp, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
 import { createTurns, withTimeout, createVoiceLog } from './lib/voice-state.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
@@ -221,7 +221,7 @@ export function initAssistant(ctx) {
   // api/chat sent it back; Claude keeps no thread). Switching provider mid-conversation starts a new one on the server.
   let thread = null;
   // a failed call is a sentence (never "Error 501" or "Failed to fetch"); the details go to the console
-  const aiErr = o => Object.assign(new Error(aiErrorMessage(o)), { friendly: true, status: o.status || 0 });
+  const aiErr = o => Object.assign(new Error(aiErrorMessage(o)), { friendly: true, status: o.status || 0, notSetUp: aiNotSetUp(o) });
   async function post(input) {
     const ai = ctx.aiFor?.('chat') || {}, th = Array.isArray(thread) ? { history: thread } : { previous_response_id: thread }; // (the server uses the one its provider keeps)
     let r; try { r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, ...th, context: context(), ...ai }) }); ctx.noteModel?.(r); }
@@ -234,7 +234,9 @@ export function initAssistant(ctx) {
   // the error bubble offers Retry, which asks the same question again (without repeating it in the chat)
   function errorBubble(e, text, mine) {
     const msg = e?.friendly ? e.message : aiErrorMessage({ status: 500 }); if (!e?.friendly) console.error(e);
-    const d = bubble('bot err', '<span>' + esc(msg) + '</span> <button class="lnk" type="button">Retry</button>');
+    // AI not set up on this site: a plain note, no Retry (asking again can never work)
+    if (e?.notSetUp) { bubble('bot info', '<span>' + esc(msg) + '</span>'); return; }
+    const d = bubble('bot err', '<span>' + esc(msg) + '</span> <button class="lnk ai-retry" type="button">Retry</button>');
     d.querySelector('button').onclick = () => { if (stillBusy()) return; d.remove(); ask(text, { retry: mine }); };
   }
   async function ask(text, opt = {}) {
