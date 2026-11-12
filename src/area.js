@@ -584,6 +584,7 @@ export function initArea(ctx) {
       '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-body">' + body + '</div>';
     root.scrollTop = y0;
     fit(root.querySelectorAll('.mk-body > .mk-sec'));
+    root.querySelectorAll('table.mk-tbl').forEach(t => ctx.sortTable?.(t)); // sortable headers (UX-605)
     root.querySelectorAll('.mk-nav [data-sec]').forEach(b => { b.hidden = !root.querySelector('#mk-' + b.dataset.sec); });
     root.style.setProperty('--mk-nav', nav().offsetHeight + 'px'); // jump targets (sections, the correlation box) stop below the sticky bar
     mark(); loadExtras();

@@ -1136,6 +1136,20 @@ function popover(box,{trigger=null,first=null}={}){ let opener=null;
   return { opened(){ const a=document.activeElement; opener=a&&a!==document.body&&!box.contains(a)?a:null;
       requestAnimationFrame(()=>{ const b=document.activeElement; if(b&&b!==document.body&&b!==opener&&!box.contains(b)) return; const el=(first&&box.querySelector(first))||[...box.querySelectorAll(FOCUSABLE)].find(x=>x.offsetParent!==null); (el||box).focus({preventScroll:true}); }); },
     closed(){ const o=opener; opener=null; if(!lost()) return; const t=o&&o.isConnected&&o.offsetParent!==null?o:(typeof trigger==='function'?trigger():trigger); t?.focus({preventScroll:true}); } }; }
+// Sortable data tables (UX-605): sortTable(table) turns each header (except those marked data-nosort) into a button that
+// sorts the body rows by that column (numbers by value: $1.2M, 5.9%, 1,234; else A–Z) and sets aria-sort. Tables drawn
+// from data that is cut to a top N (Companies) sort the data instead, with the same header markup (sortHead).
+const SORT_ICON={ascending:'▲',descending:'▼',none:'↕'};
+function sortHead(label,key,cur,dir,cls=''){ const s=cur===key?dir:'none';
+  return '<th'+(cls?' class="'+cls+'"':'')+' aria-sort="'+s+'"><button type="button" class="th-sort" data-sort="'+key+'">'+esc(label)+'<span class="th-ic" aria-hidden="true">'+SORT_ICON[s]+'</span></button></th>'; }
+const cellVal=td=>{ const t=(td?.dataset.v??td?.textContent??'').trim(), m=t.replace(/[,\s$]/g,'').match(/^([+−-]?\d*\.?\d+)([KMB%]?)/i);
+  return m?parseFloat(m[1].replace('−','-'))*({k:1e3,m:1e6,b:1e9}[m[2].toLowerCase()]||1):t.toLowerCase(); };
+function sortTable(table){ const head=table?.tHead?.rows[0], body=table?.tBodies[0]; if(!head||!body||head.dataset.sortable) return; head.dataset.sortable='1';
+  [...head.cells].forEach((th,i)=>{ if(th.dataset.nosort!=null) return; const b=document.createElement('button'); b.type='button'; b.className='th-sort';
+    b.append(...th.childNodes); const ic=document.createElement('span'); ic.className='th-ic'; ic.setAttribute('aria-hidden','true'); ic.textContent=SORT_ICON.none; b.append(ic); th.append(b); th.setAttribute('aria-sort','none');
+    b.onclick=()=>{ const num=[...body.rows].some(r=>typeof cellVal(r.cells[i])==='number'), dir=th.getAttribute('aria-sort')==='descending'?'ascending':th.getAttribute('aria-sort')==='ascending'||!num?(th.getAttribute('aria-sort')==='ascending'?'descending':'ascending'):'descending';
+      const rows=[...body.rows].sort((x,y)=>{ const a=cellVal(x.cells[i]),c=cellVal(y.cells[i]); const d=typeof a==='number'&&typeof c==='number'?a-c:String(a).localeCompare(String(c)); return dir==='ascending'?d:-d; });
+      body.append(...rows); [...head.cells].forEach(h=>{ if(h.hasAttribute('aria-sort')){ h.setAttribute('aria-sort',h===th?dir:'none'); const k=h.querySelector('.th-ic'); if(k) k.textContent=SORT_ICON[h===th?dir:'none']; } }); }; }); }
 function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
@@ -1341,7 +1355,7 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,popover,esc,fmtM,fmtN,C,geocode,hashStr,
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,popover,sortTable,sortHead,esc,fmtM,fmtN,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, get reduceMotion(){ return reduceMotion; }, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.

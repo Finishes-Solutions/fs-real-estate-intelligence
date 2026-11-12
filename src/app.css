@@ -4331,3 +4331,21 @@ a{color:var(--text)}
 .skip:focus{top:58px;left:40px;outline:2px solid var(--focus);outline-offset:2px}
 .skip+.skip:focus{left:40px}
 
+/* ================= data tables (UX-605): one header style, a header that stays in view, sortable columns =================
+   table.who (Companies, Market lists), .mk-tbl, .src-tbl and table.cmp share it. The page scrolls the table, so on wider
+   screens the wrapper clips sideways instead of becoming its own scroller (which would stop the header sticking). */
+table.who th,.mk-tbl th,#view-market .mk-tbl th,.src-tbl th,table.cmp th,table.cmp th:first-child{font-family:var(--font-mono);font-size:var(--fs-xs);letter-spacing:0;text-transform:none;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+table.who thead th,.mk-tbl thead th,.src-tbl thead th,table.cmp thead th{position:sticky;top:calc(-1 * var(--view-pt, 20px));z-index:2;background:var(--panel)}
+@media (min-width:701px){ .view .tablewrap:has(> table > thead){overflow-x:clip} }
+.th-sort{all:unset;display:inline-flex;align-items:center;gap:4px;cursor:var(--cur-pointer,pointer);border-radius:4px;color:inherit;font:inherit}
+.th-sort:hover{color:var(--text)}
+.th-sort:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+th[aria-sort=ascending] .th-sort,th[aria-sort=descending] .th-sort{color:var(--text);font-weight:700}
+.th-ic{font-size:9px;opacity:.55}
+th[aria-sort=ascending] .th-ic,th[aria-sort=descending] .th-ic{opacity:1}
+th.r .th-sort{flex-direction:row-reverse}
+/* rows that open something: the row highlights and ends in a chevron */
+table.who tr[data-k] td:last-child{position:relative;padding-right:22px}
+table.who tr[data-k] td:last-child::after{content:"›";position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px}
+table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
+
