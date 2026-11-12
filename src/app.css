@@ -4243,3 +4243,6 @@ a{color:var(--text)}
 
 /* Companies: other spellings merged into one row */
 .who .aka{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+/* watchlist: what changed on a watched filing, and when */
+.witem .chitem em{display:block}
+.witem .wchg{color:var(--text-2);margin-top:5px}
