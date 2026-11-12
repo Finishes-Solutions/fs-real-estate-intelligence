@@ -78,6 +78,8 @@ export const fmtSqmi = v => !Number.isFinite(+v) ? '' : v < 1 ? Math.round(v * 6
 export const latLon = c => c ? c[1].toFixed(3) + ', ' + c[0].toFixed(3) : '';
 // 'Map view near Katy', or plain 'Map view' where no place is known (never a guessed town)
 export const viewLabel = ctx => { const p = ctx.viewPlace?.(); return p ? 'Map view near ' + p : 'Map view'; };
+// the area as it reads after 'the middle of': a view label becomes 'the map view' (its nearby place is shown with the start point)
+export const midOf = label => /^Map view\b/.test(label) ? 'the map view' : label;
 
 // ---------- the Real Estate Intelligence report look (every report, on screen and as a PDF) ----------
 // Letter, portrait unless a report needs the width (a wide filing list). Inter for text, labels and

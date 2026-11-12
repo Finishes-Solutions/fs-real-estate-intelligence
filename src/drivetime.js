@@ -4,7 +4,7 @@
 // the map selection, so every area report (crime, FEMA, traffic…) works on a "20-minute drive" trade area.
 // Data: api/isochrone (TomTom reachable range with traffic; Valhalla / OpenStreetMap without).
 import { inGeom, tractsFor, summarizeTracts } from './lib/demographics.mjs';
-import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, sqmiOf, latLon, errorBox } from './reportkit.js';
+import { esc, fmt, kgrid, table, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, sqmiOf, latLon, errorBox, midOf } from './reportkit.js';
 import { readJSON } from './lib/http.mjs';
 
 export const BAND_COL = ['#16a34a', '#eab308', '#f97316', '#dc2626'];
@@ -141,5 +141,5 @@ export function initDriveTime(ctx) {
   ctx.addAreaReport?.({ key: 'drivetime', label: 'Drive-Time Map', desc: 'How far you can drive in 10, 20 and 30 minutes from a point, now or at rush hour, with the people, jobs and filings inside each band. PDF or CSV.',
     note: 'From the middle of the selected area or the map view', run: ({ geometry, label, center }) => { const l = label.replace(/^[\d.]+ mi around /, '');
       // a radius is already a point (its centre); anything bigger than a neighborhood starts from its middle, and says so
-      return show({ center: center || centerOf(geometry), label: l, from: l === label && sqmiOf(geometry) > 50 ? label : null }); } });
+      return show({ center: center || centerOf(geometry), label: l, from: l === label && sqmiOf(geometry) > 50 ? midOf(label) : null }); } });
 }

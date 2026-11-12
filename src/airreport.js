@@ -5,7 +5,7 @@
 //   area, nearby airports and whether the area is under a runway's approach path, and the planes overhead right now.
 //   Flight Report for one aircraft (plane card → Export Flight Report): photo, registration, route, the flight path map,
 //   the altitude and speed profile, today's earlier flights; HTML (print to PDF) and CSV of the track points.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, getJSON, errorBox, friendly, nearHouston, unavailable, circle, fitArea } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, getJSON, errorBox, friendly, nearHouston, unavailable, circle, fitArea, midOf } from './reportkit.js';
 
 const HOUR = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
 const KIND = { jet: ['Jets', '#1d4ed8'], prop: ['Props and small planes', '#16a34a'], heli: ['Helicopters', '#a855f7'], mil: ['Military', '#b45309'] };
@@ -55,7 +55,7 @@ export function initAirReport(ctx) {
     last = { d, label, geometry };
     const p = d.profile, live = d.live?.aircraft || [], lowNow = live.filter(x => !x.ground && x.alt != null && x.alt < 3000);
     // a big area (a county): the history covers all of it, but planes now and low flights are a circle around its middle; say so and draw it
-    const R = fmt(Math.max(2, d.radius_mi)), circ = d.partial ? 'within ' + R + ' mi of the middle of ' + label : 'within ' + R + ' mi';
+    const R = fmt(Math.max(2, d.radius_mi)), circ = d.partial ? 'within ' + R + ' mi of the middle of ' + midOf(label) : 'within ' + R + ' mi';
     showScope(d.partial ? d : null);
     // neither the history nor the live planes came back: one sentence with Retry, and nothing to export
     const dead = !!p.error && !!d.live?.error, unavail = unavailable('Air traffic data');
@@ -99,7 +99,7 @@ export function initAirReport(ctx) {
     if (!last) return; const { d, label, geometry } = last, p = d.profile, live = d.live?.aircraft || [];
     const body = '<div class="kp">' + [[p.per_day != null ? fmt(p.per_day) : '—', 'Sightings a day'], [p.busiest_hour != null ? HOUR(p.busiest_hour) : '—', 'Busiest hour'], [p.low_pct != null ? p.low_pct + '%' : '—', 'Under 3,000 ft'], [fmt(live.length), 'Overhead at report time']].map(([v, l]) => '<div><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>' +
       (d.path ? '<p><b>Under the approach path</b> to ' + esc(d.path.name || d.path.code) + ' runway ' + esc(d.path.landing_runway) + ': ' + d.path.beyond_nm + ' nm from the runway end, ' + d.path.offset_nm + ' nm off the centerline.</p>' : '') +
-      (d.partial ? '<p class="meta">Sightings by hour, mix and month cover the whole area. Aircraft overhead, low flights and nearby airports are within ' + fmt(d.radius_mi) + ' mi of the middle of ' + esc(label) + ' (' + d.center[1].toFixed(3) + ', ' + d.center[0].toFixed(3) + ') (the orange dashed circle).</p>' : '') +
+      (d.partial ? '<p class="meta">Sightings by hour, mix and month cover the whole area. Aircraft overhead, low flights and nearby airports are within ' + fmt(d.radius_mi) + ' mi of the middle of ' + esc(midOf(label)) + ' (' + d.center[1].toFixed(3) + ', ' + d.center[0].toFixed(3) + ') (the orange dashed circle).</p>' : '') +
       '<div class="map">' + areaSvg([{ geometry, stroke: '#1d4ed8', fill: 'rgba(29,78,216,.05)', dash: true }, ...(d.partial ? [{ geometry: circle(d.center, d.radius_mi), stroke: '#c2410c', fill: 'rgba(0,0,0,0)', dash: true }] : [])], { points: [...d.airports.slice(0, 4).map(a => ({ c: [a.lon, a.lat], r: 5, color: '#1d4ed8', label: a.iata || a.icao || a.ident })), ...live.map(x => ({ c: [x.lon, x.lat], r: 2.5, color: x.alt < 3000 ? '#c2410c' : '#64748b' }))] }) + '</div>' +
       '<div class="lg"><span><i style="background:#1d4ed8"></i>Airport</span><span><i style="background:#c2410c"></i>Aircraft under 3,000 ft (at report time)</span><span><i style="background:#64748b"></i>Higher</span></div>' +
       (p.per_day ? '<h2>By hour of day</h2><div class="bars">' + bars(p.hours.map(x => ({ label: HOUR(x.h), v: Math.round(x.per_hour || 0) })), { every: 2 }) + '</div>' : '<p class="meta">' + esc(p.error || 'No history yet for this area.') + '</p>') +
