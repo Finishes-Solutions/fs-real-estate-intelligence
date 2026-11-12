@@ -98,7 +98,10 @@ export function initAssistant(ctx) {
     let want = null; try { want = +localStorage.getItem(KEY) || null; } catch (e) {}
     let raf = 0; const pad = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; ctx.mapPadding(); }); };
     const apply = () => { const w = want && innerWidth > 700 ? Math.min(maxW(), want) : 0;
-      if (w > base() + 1) app.style.setProperty('--aiw', Math.round(w) + 'px'); else app.style.removeProperty('--aiw'); pad(); };
+      if (w > base() + 1) app.style.setProperty('--aiw', Math.round(w) + 'px'); else app.style.removeProperty('--aiw'); pad();
+      // the separator's value is the drawer width in px, so a screen reader can tell how wide it is and that the arrows change it
+      grip.setAttribute('aria-valuemin', String(Math.round(base()))); grip.setAttribute('aria-valuemax', String(Math.round(Math.max(base(), maxW()))));
+      grip.setAttribute('aria-valuenow', String(Math.round(w > base() + 1 ? w : base()))); grip.setAttribute('aria-valuetext', Math.round(w > base() + 1 ? w : base()) + ' pixels wide'); };
     const save = () => { try { want ? localStorage.setItem(KEY, String(Math.round(want))) : localStorage.removeItem(KEY); } catch (e) {} };
     apply(); addEventListener('resize', apply); reclamp = apply;
     new MutationObserver(apply).observe(cardEl, { attributes: true, attributeFilter: ['class'] }); // a card opened, closed or widened (site plan) re-fits the drawer
