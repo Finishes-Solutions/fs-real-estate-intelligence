@@ -171,7 +171,7 @@
 @media (max-width:1480px){.ws-two.wide{grid-template-columns:1fr}.ws-two.wide>.ws-card+.ws-card{margin-top:var(--sp-4)}}
 @media (max-width:1100px){.ws-kpis.big{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:900px){.ws-grid{grid-template-columns:1fr}.ws-rail{position:static;order:-1}.ws-rail .ws-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ws-two{grid-template-columns:1fr}}
-@media (max-width:560px){.ws-steps li{min-width:56px}.ws-sl{display:none}.ws-step[aria-current="step"] .ws-sl{display:inline}.ws-step[aria-current="step"]{flex:2 1 auto;min-width:150px}.ws-step[aria-current="step"] .ws-sl{overflow:hidden;text-overflow:ellipsis}
+@media (max-width:560px){.ws-steps li{min-width:56px}.ws-sl{display:none}.ws-step[aria-current="step"] .ws-sl{display:inline}.ws-steps li:has(> .ws-step[aria-current="step"]){flex:2 1 auto;min-width:150px}.ws-step[aria-current="step"] .ws-sl{overflow:hidden;text-overflow:ellipsis}
   .ws-rail .ws-kpis{grid-template-columns:1fr 1fr}.ws-a{grid-template-columns:1fr auto}.ws-a .ws-src{grid-column:1}.ws-dl>div{grid-template-columns:1fr}.ws-files .btn{min-width:0;width:100%}.ws-t{font-size:11px}}
 .ws-scroll:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 
