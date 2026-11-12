@@ -3171,6 +3171,7 @@ table.who tr.nomatch td{border:0}
 #card.sp-mode .top{padding:12px 16px 10px;row-gap:0}
 #card.sp-mode .top>.sp-head{flex:1 1 100%;width:100%}
 #card .sp-head{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"back back" "crumb tools" "ttl act";align-items:center;column-gap:12px}
+#card .sp-pback{display:none}
 #card .sp-head>.cback{grid-area:back;justify-self:start;margin:-2px 0 6px -6px}
 #card .sp-crumb{grid-area:crumb;display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;white-space:nowrap;font:500 12px/1.2 var(--font-display);color:var(--muted)}
 #card .sp-cr{flex:none;max-width:100%;border:0;background:none;padding:3px 5px;border-radius:5px;color:var(--text-2);font:inherit;cursor:var(--cur-pointer,pointer);overflow:hidden;text-overflow:ellipsis}
@@ -3229,7 +3230,11 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
   #card.sp-mode .top{padding:4px 12px 8px}
   #card .sp-head{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"ttl act tools";column-gap:2px}
   #card .sp-crumb,#card .sp-ttl .bsub,#card .sp-head>.cback{display:none!important}
-  #card .sp-ttl{margin:0}
+  #card .sp-ttl{margin:0;display:flex;align-items:center;gap:8px;min-width:0}
+  #card .sp-ttl h2{min-width:0;flex:1}
+  /* the way back to the project lives in the sheet's header on phones, not as a chip over the plan */
+  #card .sp-pback{display:grid;place-items:center;flex:none;margin-left:-8px}
+  .app.planning .backchip{display:none}
   #card .sp-ttl h2{font-size:17px}
   #card .sp-hact{gap:2px}
   #card .sp-hact .btn{width:36px;min-height:36px;padding:0;justify-content:center}
