@@ -4262,3 +4262,25 @@ a{color:var(--text)}
 /* watchlist: what changed on a watched filing, and when */
 .witem .chitem em{display:block}
 .witem .wchg{color:var(--text-2);margin-top:5px}
+/* ================= touch: the compact controls that were still under a fingertip (44px) =================
+   Last in the file so it wins over the compact desktop and phone sizes above. Small buttons, chips, segmented toggles,
+   the site plan's tool strip, its header icons and stage chips get the full size. Rows that can't grow without
+   crowding (the card's section chips) and text links (Retry) keep their look and get an invisible 44px hit area,
+   as the card's × does. */
+@media (pointer:coarse){
+  .btn.sm,.chip,.seg button,.vt-row button,#card .sp-stg,#card .sp-hact .btn{min-height:var(--tap)}
+  .sp-tb,#card .sp-ib,#card .sp-htools .sp-ib,#card .top .mn,#card .sp-htools .x,#card .sp-hact .btn{width:var(--tap);min-width:var(--tap);height:var(--tap);flex-shrink:0}
+  #card .sp-stg{min-width:var(--tap);justify-content:center}
+  #card .bnav{padding-top:8px;padding-bottom:8px;margin-top:0}
+  #card .bnav button,.rnote.eb .eb-retry,.bot.err .lnk,.lnk.retry{position:relative}
+  #card .bnav button::before,.rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before{content:"";position:absolute;left:0;right:0;top:50%;height:var(--tap);transform:translateY(-50%)}
+  .rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before{left:-8px;right:-8px}
+}
+@media (pointer:coarse) and (max-width:700px){
+  /* the plan header takes two rows so the full-size buttons leave room for the option's name */
+  #card .sp-head{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ttl ttl" "act tools";row-gap:2px}
+  #card .sp-hact{justify-self:start}
+  /* full-size tools need the room: Fit plan and Layers (both also on the map's own buttons) move under More */
+  .sp-strip:not(.open) .sp-tb:is([data-tool=fit],[data-tool=layers]){display:none}
+  .sp-strip:not(.open) .sp-tgrp:not(:has(.sp-tb:not(.sp-tb-x):not([data-tool=fit]):not([data-tool=layers]))){display:none}
+}
