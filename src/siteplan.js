@@ -94,7 +94,12 @@ const clone = o => JSON.parse(JSON.stringify(o));
 export function initSitePlan(ctx) {
   const { map, esc, fmtN } = ctx, card = ctx.card, root = document.getElementById('view-projects');
   const store = projectStore(KEY, safeLS(), browserIdb()), boot = store.load();
-  let db = boot.db, loaded = !boot.later, ed = null, shared = null, syncT = 0, syncing = false, raf = 0;
+  let db = boot.db, loaded = !boot.later, ed = null, shared = null, shareWhy = '', syncT = 0, syncing = false, raf = 0;
+  // the one sharing state for projects, said the same way everywhere (the list's subtitle, its team chip, the delete
+  // confirm): what /api/projects last answered, not the field-notes setting (src/team.js), which is a different store
+  const shareSay = () => shared === true ? { chip: 'Shared with the team', sub: 'shared with the team', del: 'Projects are shared with the team, so this removes it for everyone.' }
+    : shared === false ? { chip: 'On this device only' + (shareWhy === 'passcode' ? ': passcode needed' : ''), sub: 'on this device only' + (shareWhy === 'passcode' ? ' (enter the team passcode in Settings to share)' : ' (team sharing isn’t set up on this site)'), del: 'Projects are on this device only, so this removes it from this device.' }
+    : { chip: 'Connecting to the team…', sub: 'on this device; connecting to the team…', del: 'This removes it from this device and, once it reconnects, for the team.' };
   const f0 = v => (Math.round(v) || 0).toLocaleString('en-US'), pct = v => (v * 100).toFixed(v < 0.1 ? 1 : 0) + '%';
   // the numbers and checks of a plan, under the Waller guardrails when they're on for it (lib/guardrails.mjs); exactly
   // lib/siteplan.mjs's for every other plan
@@ -129,7 +134,7 @@ export function initSitePlan(ctx) {
   async function sync() {
     if (syncing || !loaded || !navigator.onLine) return; syncing = true;
     const h = { 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY) };
-    const notUp = r => { shared = r.status === 503 || r.status === 401 ? false : shared; syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); };
+    const notUp = r => { if (r.status === 503 || r.status === 401) { shared = false; shareWhy = r.status === 401 ? 'passcode' : 'setup'; } syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); };
     try {
       if (db.dirty.length || db.gone.length) {
         const copies = db.projects.filter(p => db.dirty.includes(p.id)).map(p => { const c = RUN.syncCopy(p); return { id: p.id, u: p.updated, c, n: JSON.stringify(c).length }; });
@@ -147,7 +152,7 @@ export function initSitePlan(ctx) {
         }
       }
       const r = await fetch('api/projects?index=1', { headers: h }); if (!r.ok) { notUp(r); return; }
-      const d = await r.json(); shared = true; let changed = false;
+      const d = await r.json(); shared = true; shareWhy = ''; let changed = false;
       const ix = d.index || [], skip = id => ed?.pid === id || db.dirty.includes(id);
       for (const e of ix) if (e.deleted) { const i = db.projects.findIndex(p => p.id === e.id); if (i >= 0 && !skip(e.id)) { db.projects.splice(i, 1); changed = true; } }
       let want = ix.filter(e => !e.deleted && seenAt.get(e.id) !== e.updated).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
@@ -4895,7 +4900,7 @@ export function initSitePlan(ctx) {
   }
   function indexHtml() {
     const all = db.projects, nPlans = all.reduce((s, p) => s + p.plans.length, 0);
-    const share = shared === true ? 'shared with the team' : shared === false ? 'saved on this device only' : 'saved on this device';
+    const share = shareSay().sub;
     return '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('projects')) + '</div><h1>Projects</h1><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
         '<div class="vctl">' + (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '<div class="team-slot" id="pjTeam"></div></div></div>' +
       (adding ? '<form class="pj-new" id="pjForm" novalidate><label class="pj-lbl" for="pjNm">Project name</label><input id="pjNm" maxlength="120" placeholder="e.g. Waller garden apartments" autocomplete="off" required aria-describedby="pjNmErr"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span><small class="field-err" id="pjNmErr" role="alert" hidden>Give the project a name</small>' +
@@ -5450,7 +5455,7 @@ export function initSitePlan(ctx) {
     const key = a && root.contains(a) ? (a.id ? '#' + a.id : ['open', 'plan', 'v', 'parcel', 'rid', 'copy', 'rmore'].map(k => a.dataset[k] != null ? '[data-' + k + '="' + CSS.escape(a.dataset[k]) + '"]' : '').find(Boolean) || (a.classList[0] ? '.' + a.classList[0] : null)) : null;
     const p = cur && db.projects.find(x => x.id === cur); if (!p) { cur = null; renaming = false; }
     root.innerHTML = '<div class="pj-wrap">' + (p ? detailHtml(p) : indexHtml()) + '</div>'; ctx.scheduleHash?.(); // the open project (pj=) and its tab (pt=) go in the address, so a reload comes back to them
-    ctx.team?.chip?.(root.querySelector('#pjTeam')); // who you are and whether projects are shared; opens Settings
+    ctx.team?.chip?.(root.querySelector('#pjTeam'), () => shareSay().chip); // who you are and whether projects are shared (the projects' own state, as the subtitle); opens Settings
     wire(p);
     if (key) try { root.querySelector(key)?.focus(); } catch (e) { /* the control is gone */ }
   }
@@ -5526,7 +5531,7 @@ export function initSitePlan(ctx) {
     root.querySelectorAll('[data-rdelall]').forEach(b => b.onclick = () => { const id = b.dataset.rdelall, pl = id === '*' ? null : planOf2(id); if (id === '*' || pl) deleteAllRenders(p, pl); });
     on('[data-tabgo]', e => setTab(p, e.currentTarget.dataset.tabgo, true));
     on('[data-jref]', () => { siteFail.delete(p.id); gatherSite(p); render(true); });
-    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + (shared === true ? 'This removes it for the team too.' : 'This removes it from this device.'))) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null;
+    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + shareSay().del)) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null;
       for (const pl of p.plans) for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); } // its pictures on this device
       if (away?.pid === p.id) hideAway(); if (resume?.pid === p.id) clearResume(); save(); ctx.scheduleHash?.(); });
     if (tab === 'overview') { // Regrid fetched on one of the parcels' cards since: its city and zoning count now; the jurisdiction is looked up once
