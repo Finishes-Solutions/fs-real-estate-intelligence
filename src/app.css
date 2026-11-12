@@ -4388,3 +4388,15 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 .dt-start i{width:14px;height:14px;border-radius:50%;background:#16191a;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)}
 .dt-start b{font:700 12px/1 var(--font-display,Inter,sans-serif);color:#16191a;background:#fff;border-radius:4px;padding:3px 6px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 #card .dt-from{margin:0 0 10px;padding:8px 10px;border-radius:6px;background:var(--chip,#f3f4f4);color:var(--text-2,#3b4245)}
+/* FEMA report: each part's state while a big area loads */
+#card .fm-steps{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:6px;font-size:13px}
+#card .fm-steps li{display:flex;align-items:center;gap:8px}
+#card .fm-steps li span{margin-left:auto;font-size:12px;color:var(--muted)}
+#card .fm-steps li i{flex:none;width:12px;height:12px;box-sizing:border-box;border-radius:50%;border:1.6px solid var(--line-2);border-top-color:var(--brand);animation:sp-spin .8s linear infinite}
+#card .fm-steps li.ok i{animation:none;border:0;background:var(--green-700,#0b7a5f);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='6'/%3E%3C/svg%3E")}
+#card .fm-steps li.ok span{color:var(--green-700,#0b7a5f);font-weight:600}
+#card .fm-steps li.err i{animation:none;border:0;background:var(--danger,#b42318)}
+#card .fm-steps li.err span{color:var(--danger,#b42318)}
+/* Environmental report on a large area: three columns, each record type's nearest record on one clipped line */
+.card table.env-big{table-layout:fixed}.card table.env-big th:nth-child(n+2),.card table.env-big td:nth-child(n+2){width:64px;text-align:right}
+.card table.env-big .env-db{display:block}.card table.env-big .env-eg{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
