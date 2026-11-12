@@ -169,13 +169,15 @@ export function initMapSearch(ctx) {
     res.querySelector('[data-act=more]')?.addEventListener('click', more);
     res.querySelector('[data-act=moreA]')?.addEventListener('click', moreA);
   }
-  const btn = (i, inner) => '<button type="button" role="option" class="ms-it' + (i === active ? ' on' : '') + '" data-i="' + i + '">' + inner + '</button>';
+  const btn = (i, inner) => '<button type="button" role="option" id="msres-opt-' + i + '" aria-selected="' + (i === active) + '" class="ms-it' + (i === active ? ' on' : '') + '" data-i="' + i + '">' + inner + '</button>';
   function more() { if (shown < names.length) { shown = Math.min(names.length, shown + PAGE); render(); } else moreA(); }
   function moreA() { if (shownA >= addrs.length) return; shownA = Math.min(addrs.length, shownA + PAGE); render(); }
   res.addEventListener('scroll', () => { if (res.scrollTop + res.clientHeight > res.scrollHeight - 40) more(); });
-  function setActive(i, scroll = true) { active = i; res.querySelectorAll('.ms-it').forEach(b => b.classList.toggle('on', +b.dataset.i === i)); if (scroll) res.querySelector('.ms-it.on')?.scrollIntoView({ block: 'nearest' }); }
-  function open() { res.classList.add('on'); input.setAttribute('aria-expanded', 'true'); }
-  function close() { res.classList.remove('on'); input.setAttribute('aria-expanded', 'false'); }
+  // the highlighted option is announced: aria-selected on it, aria-activedescendant on the box (focus stays in the box)
+  function setActive(i, scroll = true) { active = i; res.querySelectorAll('.ms-it').forEach(b => { const on = +b.dataset.i === i; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); }); syncActive(); if (scroll) res.querySelector('.ms-it.on')?.scrollIntoView({ block: 'nearest' }); }
+  function syncActive() { const el = active >= 0 && res.classList.contains('on') && document.getElementById('msres-opt-' + active); if (el) input.setAttribute('aria-activedescendant', el.id); else input.removeAttribute('aria-activedescendant'); }
+  function open() { res.classList.add('on'); input.setAttribute('aria-expanded', 'true'); syncActive(); }
+  function close() { res.classList.remove('on'); input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); }
   function applyKeyword() { seq++; clearTimeout(geoT); ctx.state.q = q; ctx.applyFilters(); close(); ctx.setView('map'); ctx.showFilings(); ctx.fitToVisible(); ctx.toast('Filtered to ' + fmtN(ctx.visible.length) + ' filings matching “' + q + '”.'); }
   // a company or person: the Activity filter when it covers all their projects, otherwise a keyword search on the name
   function showEntity(e) {
@@ -215,7 +217,8 @@ export function initMapSearch(ctx) {
       // "1004 Priya Ln" while the address lookup is still out: wait for it, so Enter lands on the address and not a filing
       if (pending && (looksLikeAddress(q) || !items.length && !names.length && !addrs.length)) enterWait = true;
       else if (items.length) pick(0); else if (names.length || addrs.length) applyKeyword(); else enterWait = pending; }
-    else if (e.key === 'Escape') { e.preventDefault(); close(); input.blur(); }
+    // Esc closes the list and keeps focus in the box; a second Esc clears the text
+    else if (e.key === 'Escape') { e.preventDefault(); if (res.classList.contains('on')) { close(); active = -1; } else if (input.value) { input.value = ''; run(''); } }
   });
   clearB.onclick = () => { input.value = ''; run(''); clearPlace(); if (ctx.state.q) { ctx.state.q = ''; ctx.applyFilters(); } input.focus(); };
   document.addEventListener('pointerdown', e => { if (!wrap.contains(e.target)) close(); });
