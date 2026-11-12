@@ -143,6 +143,8 @@ export function initBuildings(ctx) {
       const act = groundClick({ adding, zoom: map.getZoom(), cardOpen: card.classList.contains('open'), point: c, shapes: shown });
       if (act === 'add') { add({ footprint: null, height: null, base: 0, center: c, tile: tileParcel(c) }); return true; }
       if (act === 'open') { open({ footprint: null, height: null, base: 0, center: c, tile: tileParcel(c) }); return true; }
+      // too far out for parcels: say so (and offer to go there) instead of doing nothing
+      if (!adding && !card.classList.contains('open') && map.getZoom() < 16) ctx.toast('Zoom in to street level to open a property.', { action: { label: 'Zoom in here', run: () => map.flyTo({ center: c, zoom: 17, duration: ctx.reduceMotion ? 0 : 900 }) } });
       return false;
     }
     const b = { footprint: wholeFootprint(hit, c), piece: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
