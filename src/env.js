@@ -5,7 +5,7 @@
 //   nearest first, wells and pipelines, wetlands and soils; opens in the card and exports as PDF or CSV.
 import { KINDS, SETS } from './lib/env.mjs';
 import { envReport, envCsvRows } from './lib/reports/env.mjs';
-import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK } from './reportkit.js';
+import { esc, fmt, kgrid, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, areaMap, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, fitArea } from './reportkit.js';
 
 const SRC = 'env-sites', AREA = 'env-areas';
 const RASTERS = { rrc: { box: 'lyRrc', note: 'lyRrcNote', minz: 11, opacity: .9, attr: 'Wells & pipelines: Railroad Commission of Texas', msg: 'Oil and gas wells (symbols by type: oil, gas, plugged, dry, injection) and pipelines from the Railroad Commission. Zoom in past neighborhood level.' },
@@ -102,7 +102,7 @@ export function initEnv(ctx) {
   let last = null;
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
-    const card = openCard(ctx, { kicker: 'Environmental report', title: label, loading: 'Searching state and federal environmental records…' });
+    const card = openCard(ctx, { kicker: 'Environmental report', title: label, loading: 'Searching state and federal environmental records…' }); fitArea(ctx, geometry);
     let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Environmental data')); return { error: friendly(e, 'Environmental data') }; }
     last = { d, label, geometry }; draw(card);
     return d;

@@ -3,7 +3,7 @@
 //   Traffic report for any area: the busiest roads and every counted segment (TxDOT), average traffic by road type,
 //   live speed vs free flow on the busiest roads and current crashes / closures / road works (TomTom, live, not stored).
 //   Opens in the card; exports a PDF report and CSV.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, inTexas } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, getJSON, errorBox, unavailable, friendly, layerFailed, layerOK, inTexas, fitArea } from './reportkit.js';
 
 const STOPS = [[5000, '#22c55e'], [20000, '#eab308'], [60000, '#f97316'], [150000, '#dc2626'], [300000, '#7f1d1d']];
 const colorOf = v => (STOPS.find(s => v < s[0]) || STOPS[STOPS.length - 1])[1];
@@ -60,7 +60,7 @@ export function initTraffic(ctx) {
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
     const card = openCard(ctx, { kicker: 'Traffic report', title: label, loading: 'Reading traffic counts and live conditions…' });
-    showArea(geometry);
+    showArea(geometry); fitArea(ctx, geometry);
     let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Traffic data')); return; }
     last = { d, label, geometry };
     const c = d.counts || {}, roads = c.roads || [], live = Array.isArray(d.live) ? d.live : [], inc = Array.isArray(d.incidents) ? d.incidents : [];

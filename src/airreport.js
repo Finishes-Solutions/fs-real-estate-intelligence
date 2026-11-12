@@ -5,7 +5,7 @@
 //   area, nearby airports and whether the area is under a runway's approach path, and the planes overhead right now.
 //   Flight Report for one aircraft (plane card → Export Flight Report): photo, registration, route, the flight path map,
 //   the altitude and speed profile, today's earlier flights; HTML (print to PDF) and CSV of the track points.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, getJSON, errorBox, friendly, nearHouston, unavailable, circle } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, getJSON, errorBox, friendly, nearHouston, unavailable, circle, fitArea } from './reportkit.js';
 
 const HOUR = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
 const KIND = { jet: ['Jets', '#1d4ed8'], prop: ['Props and small planes', '#16a34a'], heli: ['Helicopters', '#a855f7'], mil: ['Military', '#b45309'] };
@@ -50,7 +50,7 @@ export function initAirReport(ctx) {
 
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
-    const card = openCard(ctx, { kicker: 'Air traffic report', title: label, loading: 'Reading the air traffic history…' });
+    const card = openCard(ctx, { kicker: 'Air traffic report', title: label, loading: 'Reading the air traffic history…' }); fitArea(ctx, geometry);
     let d; try { d = await data({ geometry }); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Air traffic data')); return; }
     last = { d, label, geometry };
     const p = d.profile, live = d.live?.aircraft || [], lowNow = live.filter(x => !x.ground && x.alt != null && x.alt < 3000);

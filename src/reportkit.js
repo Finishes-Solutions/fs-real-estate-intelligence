@@ -246,6 +246,13 @@ export function openCard(ctx, { kicker, title, sub = '', loading = 'Loading…' 
   card.classList.add('open'); card.scrollTop = 0; card.querySelector('.x').onclick = () => ctx.closeCard(); return card;
 }
 export const cardTop = (kicker, title, sub = '') => '<div class="top"><div><div class="kicker">' + esc(kicker) + '</div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div><button class="x" aria-label="Close">×</button></div>';
+// an area report's area, framed in the part of the map the open card and the toolbar leave clear (every area report)
+export function fitArea(ctx, g) {
+  g = g?.geometry || g; let w = 180, s = 90, e = -180, n = -90; const walk = a => typeof a[0] === 'number' ? (w = Math.min(w, a[0]), e = Math.max(e, a[0]), s = Math.min(s, a[1]), n = Math.max(n, a[1])) : a.forEach(walk);
+  if (!g?.coordinates || !ctx.fitBox) return; walk(g.coordinates); if (e < w) return;
+  // after the card has opened, so coverPad() counts it; the top clears the search bar, tools and chips over the map
+  requestAnimationFrame(() => { const p = ctx.coverPad?.() || {}; ctx.fitBox([[w, s], [e, n]], { padding: { ...p, top: Math.max(p.top || 0, 190) }, maxZoom: 15 }); });
+}
 // the filled card's charts draw in once per report (its kicker and title), when first seen (src/motion.js)
 export function fillCard(ctx, card, html) { card.innerHTML = html; card.classList.add('open'); card.querySelector('.x')?.addEventListener('click', () => ctx.closeCard()); ctx.wireCites?.(card);
   reveal(card, 'card:' + (card.querySelector('.kicker')?.textContent || '') + '|' + (card.querySelector('h2')?.textContent || '')); }
