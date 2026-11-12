@@ -817,6 +817,10 @@ new MutationObserver(()=>{ const open=card.classList.contains('open'), a=documen
     requestAnimationFrame(back); for(const ms of [150,400]) setTimeout(()=>{ const x=document.activeElement; if(!x||x===document.body) back(); },ms); }
 }).observe(card,{attributes:true,attributeFilter:['class'],childList:true});
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
+// skip links: to the map's search (on the Map; opened first from any page), and to the current page's title (the map itself on the Map)
+document.getElementById('skipTools')?.addEventListener('click',e=>{ e.preventDefault(); if(view!=='map') setView('map'); requestAnimationFrame(()=>document.getElementById('msq')?.focus()); });
+document.getElementById('skipMain')?.addEventListener('click',e=>{ e.preventDefault(); const sec=document.getElementById('view-'+view), h=view==='map'?map.getCanvas():sec?.querySelector('h1,h2');
+  if(!h) return; if(view!=='map') h.setAttribute('tabindex','-1'); h.focus(); });
 
 // hover + click on markers
 const tip=document.getElementById('tip'), stage=document.getElementById('stage'), viewport=document.getElementById('viewport');

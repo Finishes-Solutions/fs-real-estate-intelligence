@@ -4325,3 +4325,9 @@ a{color:var(--text)}
 /* Market: the range switch in the jump bar and the county pickers are toggle values too */
 .mk-nav .mk-seg button[aria-pressed="true"]{background:var(--sel-bg);color:var(--text);box-shadow:inset 0 0 0 1px var(--ink-400)}
 .mk-cty[aria-pressed="true"],.mk-scope2 .mk-cty[aria-pressed="true"]{background:var(--sel-bg);border-color:var(--ink-950);color:var(--text)}
+
+/* skip links (UX-604): off screen until focused, then a small panel at the top left, above everything */
+.skip{position:absolute;left:8px;top:-60px;z-index:var(--z-modal);background:var(--panel);color:var(--text);padding:10px 14px;border-radius:var(--r-sm);box-shadow:var(--sh-2);font:600 13px var(--font-display);text-decoration:none}
+.skip:focus{top:58px;left:40px;outline:2px solid var(--focus);outline-offset:2px}
+.skip+.skip:focus{left:40px}
+
