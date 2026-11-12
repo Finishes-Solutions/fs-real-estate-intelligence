@@ -155,7 +155,7 @@ export function initSitePlan(ctx) {
       const d = await r.json(); shared = true; shareWhy = ''; let changed = false;
       const ix = d.index || [], skip = id => ed?.pid === id || db.dirty.includes(id);
       for (const e of ix) if (e.deleted) { const i = db.projects.findIndex(p => p.id === e.id); if (i >= 0 && !skip(e.id)) { db.projects.splice(i, 1); changed = true; } }
-      let want = ix.filter(e => !e.deleted && seenAt.get(e.id) !== e.updated).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
+      let want = ix.filter(e => !e.deleted && !projDel.has(e.id) && seenAt.get(e.id) !== e.updated).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
       for (let k = 0; want.length && k < 40; k++) {
         const ask = want.slice(0, 20), q = await fetch('api/projects?ids=' + ask.map(encodeURIComponent).join(','), { headers: h }); if (!q.ok) { notUp(q); return; }
         const got = await q.json(), more = got.more || [];
@@ -1853,6 +1853,33 @@ export function initSitePlan(ctx) {
   // only once Undo can't happen any more (or the page is closed). From the editor the next option opens, or after the last
   // one the project page, where New Option starts again from the same site (p.keptSite).
   const delPending = new Map(); // option id → { t (the timer), keys (its pictures) }
+  // Delete Project: the app's own dialog (a modal <dialog>: focus stays in it, Esc cancels, Cancel has focus), then a soft
+  // delete: the project leaves the list at once but is only deleted for the team (db.gone) and its pictures dropped after
+  // 12 s, so Undo in the note brings it back whole
+  const projDel = new Map(); // project id → the timer that makes the delete final
+  function confirmDeleteProject(p) {
+    const nR = rendersOf(p).length, dlg = document.createElement('dialog');
+    dlg.className = 'pj-dlg'; dlg.setAttribute('aria-labelledby', 'pjDelT'); dlg.setAttribute('aria-describedby', 'pjDelD');
+    dlg.innerHTML = '<h3 id="pjDelT">Delete “' + esc(p.name) + '”?</h3><p id="pjDelD">Its ' + plural(p.plans.length, 'site plan option') + (nR ? ' and ' + plural(nR, 'rendering') : '') + ' go with it. ' + esc(shareSay().del) + '</p><p class="pj-dlgn">You can undo this for 12 seconds.</p>' +
+      '<div class="btnrow"><button type="button" class="btn danger" data-ok>Delete project</button><button type="button" class="btn" data-x autofocus>Cancel</button></div>';
+    document.body.append(dlg);
+    dlg.addEventListener('close', () => { dlg.remove(); if (dlg.returnValue !== 'ok') root.querySelector('[data-delp]')?.focus(); });
+    dlg.querySelector('[data-x]').onclick = () => dlg.close('cancel');
+    dlg.querySelector('[data-ok]').onclick = () => { dlg.close('ok'); deleteProject(p); };
+    dlg.showModal();
+  }
+  function deleteProject(p) {
+    const wasDirty = db.dirty.includes(p.id);
+    db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); cur = null;
+    if (away?.pid === p.id) hideAway(); if (resume?.pid === p.id) clearResume();
+    projDel.set(p.id, setTimeout(() => { projDel.delete(p.id); db.gone.push(p.id);
+      for (const pl of p.plans) for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); } // its pictures on this device
+      save(); }, 12000));
+    persist(); badge(); render(true); ctx.scheduleHash?.();
+    ctx.toast('Deleted ' + p.name + (shared === true ? ' for the team' : '') + '.', { ms: 12000, action: { label: 'Undo', run: () => {
+      if (!projDel.has(p.id)) return; clearTimeout(projDel.get(p.id)); projDel.delete(p.id);
+      db.projects.push(p); if (wasDirty) db.dirty.push(p.id); persist(); badge(); show(p.id, 'overview'); ctx.toast('Restored ' + p.name + ' with its ' + plural(p.plans.length, 'option') + '.'); } } });
+  }
   const dropImages = (keys, pid = null) => { for (const k of keys) rdel(k); if (pid) cloudDel(pid, keys.map(mediaOf)); }; // pid: the team copies go too
   function flushDeletes() { for (const d of delPending.values()) { clearTimeout(d.t); dropImages(d.keys, d.pid); } delPending.clear(); }
   window.addEventListener('pagehide', flushDeletes);
@@ -5540,9 +5567,7 @@ export function initSitePlan(ctx) {
     root.querySelectorAll('[data-rdelall]').forEach(b => b.onclick = () => { const id = b.dataset.rdelall, pl = id === '*' ? null : planOf2(id); if (id === '*' || pl) deleteAllRenders(p, pl); });
     on('[data-tabgo]', e => setTab(p, e.currentTarget.dataset.tabgo, true));
     on('[data-jref]', () => { siteFail.delete(p.id); gatherSite(p); render(true); });
-    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + shareSay().del)) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null;
-      for (const pl of p.plans) for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); } // its pictures on this device
-      if (away?.pid === p.id) hideAway(); if (resume?.pid === p.id) clearResume(); save(); ctx.scheduleHash?.(); });
+    on('[data-delp]', () => confirmDeleteProject(p));
     if (tab === 'overview') { // Regrid fetched on one of the parcels' cards since: its city and zoning count now; the jurisdiction is looked up once
       let ch = false; for (const x of p.parcels) ch = regridOn(x) || ch; if (ch) { quietSave(p); setTimeout(() => render()); }
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)
