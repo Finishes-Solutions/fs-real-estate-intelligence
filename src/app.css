@@ -4401,3 +4401,4 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 .card table.env-big{table-layout:fixed}.card table.env-big th:nth-child(n+2),.card table.env-big td:nth-child(n+2){width:64px;text-align:right}
 .card table.env-big .env-db{display:block}.card table.env-big .env-eg{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmp-in{align-self:center;font-size:12.5px;color:var(--green-700,#0b7a5f);font-weight:600;margin-right:4px}
+.glance .gl-scope{margin:-6px 0 10px;font-size:12px;color:var(--muted)}

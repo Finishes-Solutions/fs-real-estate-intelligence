@@ -356,13 +356,32 @@ const SEL_IC={view:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d
   shape:'<path d="M3 4.5 9 2l4.5 5-2.5 6.5-7.5-1.5z"/>',radius:'<circle cx="8" cy="8" r="5.8"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/>',
   county:'<path d="M3 2.5h6l1 3h3.5v8H3z"/>',place:'<path d="M8 14.5s5-4.3 5-8.2A5 5 0 0 0 3 6.3c0 3.9 5 8.2 5 8.2z"/><circle cx="8" cy="6.3" r="1.8"/>'};
 let selIcK='';
+// with nothing picked, the figures are the census tracts on screen, and tracts exist only for the counties the app covers
+// (DATA.counties). Name that, not the view's middle (which read as a town: "near Tomball" over 6.6M people): the covered
+// counties that reach into the view and how much of their land is on screen (each outline clipped to the view)
+function viewScope(){ try{ const b=map.getBounds(), w=b.getWest(), e=b.getEast(), s=b.getSouth(), n=b.getNorth(), lat=(s+n)/2*Math.PI/180;
+  const kx=69.17*Math.cos(lat), ky=69.17;
+  // Sutherland–Hodgman against the view rectangle, then the shoelace area in square miles
+  const clip=(ring,inside,cut)=>{ const out=[]; for(let i=0;i<ring.length;i++){ const p=ring[i], q=ring[(i+1)%ring.length], pi=inside(p), qi=inside(q); if(pi) out.push(p); if(pi!==qi) out.push(cut(p,q)); } return out; };
+  const at=(p,q,t)=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t];
+  const edges=[[p=>p[0]>=w,(p,q)=>at(p,q,(w-p[0])/(q[0]-p[0]))],[p=>p[0]<=e,(p,q)=>at(p,q,(e-p[0])/(q[0]-p[0]))],[p=>p[1]>=s,(p,q)=>at(p,q,(s-p[1])/(q[1]-p[1]))],[p=>p[1]<=n,(p,q)=>at(p,q,(n-p[1])/(q[1]-p[1]))]];
+  const area=r=>{ let a=0; for(let i=0,j=r.length-1;i<r.length;j=i++) a+=r[j][0]*kx*r[i][1]*ky-r[i][0]*kx*r[j][1]*ky; return Math.abs(a)/2; };
+  const inView=ring=>{ let r=ring.slice(0,-1); for(const [f,c] of edges){ if(!r.length) break; r=clip(r,f,c); } return r.length>2?area(r):0; };
+  let sqmi=0; const names=[];
+  for(const c of countyGeo){ const a=c.geom.coordinates.reduce((t,poly)=>t+inView(poly[0])-poly.slice(1).reduce((h,x)=>h+inView(x),0),0); if(a>1){ names.push(c.name); sqmi+=a; } }
+  return { names, sqmi, all:countyGeo.length, zoom:map.getZoom() }; }catch(e){ return null; } }
+// short: the area bar's one line ('7 covered counties, 6,400 sq mi'); long: the Glance sentence
+const scopeText=(v,short)=>{ if(!(v&&v.names.length&&v.zoom>=6.5)) return ''; const n=v.names.length, sq=fmtN(v.sqmi>=1000?Math.round(v.sqmi/100)*100:Math.round(v.sqmi))+' sq mi';
+  return short?(n===v.all?n:n+' of '+v.all)+' covered counties, '+sq:(n===v.all?'the '+n:n+' of the '+v.all)+' covered counties, about '+sq; };
 const viewPlaceSafe=()=>{ try{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }catch(e){ return null; } }; // farLabel (below) is filled after the first move
 // with nothing selected the header names the place in view (the far-away name arrives about 600 ms after a move)
 let selNameT=0; map.on('moveend',()=>{ if(sel.feature) return; clearTimeout(selNameT); selNameT=setTimeout(syncSelBar,800); });
 function syncSelBar(){
   const k=sel.feature?(SEL_IC[sel.kind]?sel.kind:'shape'):'view';
   document.getElementById('selKind').innerHTML=sel.feature?'<span class="sk-l">Selected area · </span>'+(SEL_KIND[sel.kind]||'Area'):'<span class="sk-l">No area picked</span>'; // phones show only the kind
-  const vp=sel.feature?null:viewPlaceSafe(); document.getElementById('selName').textContent=sel.feature?sel.label:vp?'Map view near '+vp:'Map view';
+  // zoomed in to a neighborhood the nearest place is a fair name; further out, the extent
+  const vs=sel.feature?null:viewScope(), vp=sel.feature||!vs||vs.zoom<11?null:viewPlaceSafe();
+  document.getElementById('selName').textContent=sel.feature?sel.label:vp?'Map view near '+vp:scopeText(vs)?'Map view · '+scopeText(vs,true):'Map view';
   if(selIcK!==k){ selIcK=k; document.getElementById('selIcon').innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+SEL_IC[k]+'</svg>'; }
   // with no area picked the count is for the whole region (and your filters), not what's in view: say so
   const stEl=document.getElementById('selStats'); stEl.textContent=fmtN(visible.length)+' filing'+(visible.length===1?'':'s')+(sel.feature?'':' region-wide')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
@@ -1455,7 +1474,7 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
     ctx.foldLegend=v=>{ if(v==null){ if(held!=null){ min=held; held=null; sync(); } return; } if(held==null) held=min; min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice; null puts it back as it was
     sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
-Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, baseLayers:()=>baseIds, imageryStyle:()=>ESRI_STYLE, streetStyle:()=>OFM+'/styles/liberty', mapTilerDown:()=>mtDown, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ viewScope, viewScopeText:()=>scopeText(viewScope()), viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, baseLayers:()=>baseIds, imageryStyle:()=>ESRI_STYLE, streetStyle:()=>OFM+'/styles/liberty', mapTilerDown:()=>mtDown, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },

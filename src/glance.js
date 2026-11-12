@@ -19,7 +19,7 @@ export function initGlance(ctx) {
     el.querySelectorAll('b[data-g]').forEach(b => { const n = nums[b.dataset.g]; if (!n || n[0] == null || !Number.isFinite(+n[0])) return; last.set(b.dataset.g, +n[0]); count(b, +n[0], n[1], from.get(b.dataset.g)); });
   }
   // the area itself is named once, in the panel's scope header above
-  const shell = body => '<div class="g-h"><span class="kicker">Area at a Glance</span></div>' + body;
+  const shell = (body, scope) => '<div class="g-h"><span class="kicker">Area at a Glance</span></div>' + (scope ? '<p class="gl-scope">' + esc(scope) + '</p>' : '') + body;
 
   // the tracts of an area (the selection or the view): those centred inside it, or (an area smaller than a tract, e.g. zoomed
   // in on a block) the tract under its middle
@@ -47,7 +47,7 @@ export function initGlance(ctx) {
     else { const b = map.getBounds(), w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
       list = selTracts(m.tracts, { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }); place = ctx.viewPlace?.() || ''; where = 'in view'; }
     const x = summarizeTracts(list);
-    if (!x) { last.clear(); el.innerHTML = shell('<p class="g-n">' + (sg ? 'No census data for the selected area: census numbers cover the counties loaded on the map.' : 'Census data covers the counties loaded on the map. Move the map over them to see the area’s numbers.') + '</p>', place); return; }
+    if (!x) { last.clear(); el.innerHTML = shell('<p class="g-n">' + (sg ? 'No census data for the selected area: census numbers cover the counties loaded on the map.' : 'Census data covers the counties loaded on the map. Move the map over them to see the area’s numbers.') + '</p>'); return; }
     const gr = x.population_growth_pct;
     el.innerHTML = shell('<div class="g-grid">' +
       tile('Population', num(x.population), gr == null ? '' : '<span class="' + (gr >= 0 ? 'up' : 'dn') + '">' + (gr >= 0 ? '+' : '') + gr + '%</span> since ' + m.baseYear) +
@@ -56,7 +56,8 @@ export function initGlance(ctx) {
       tile('Median Rent', x.median_gross_rent_approx == null ? '—' : '$' + fmtN(x.median_gross_rent_approx) + '/mo', x.median_gross_rent_approx == null ? '' : 'census (ACS)') +
       tile('Households', num(x.households), x.vacancy_rate_pct == null ? '' : x.vacancy_rate_pct + '% of homes vacant') +
       tile('Jobs', x.jobs == null ? '—' : num(x.jobs), x.jobs == null ? '' : 'located here') +
-      '</div><div class="g-s src">US Census ACS 5-year ' + m.year + ', ' + fmtN(x.tracts) + ' tract' + (x.tracts > 1 ? 's' : '') + ' ' + where + '; medians are household-weighted.</div>', place);
+      '</div><div class="g-s src">US Census ACS 5-year ' + m.year + ', ' + fmtN(x.tracts) + ' tract' + (x.tracts > 1 ? 's' : '') + ' ' + where + '; medians are household-weighted.</div>',
+      sg ? '' : 'Everything on screen' + (ctx.viewScopeText?.() ? ' in ' + ctx.viewScopeText() : '') + ' (census data covers only these). Pick an area for one place.');
     counts({ Population: [x.population, num], 'Median Income': [x.median_household_income_approx, money], 'Home Value': [x.median_home_value_approx, money],
       'Median Rent': [x.median_gross_rent_approx, v => '$' + fmtN(Math.round(v)) + '/mo'], Households: [x.households, num], Jobs: [x.jobs, num] });
   }
