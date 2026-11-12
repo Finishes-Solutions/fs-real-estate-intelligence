@@ -330,7 +330,7 @@ export function initSitePlan(ctx) {
       '<div class="lt sp-lt-site" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up, and parcels apart are joined over the gap between them).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + ', dashed on the map.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (in Harris and Waller County, use “Get owner, value &amp; zoning from Regrid” on the property card first). You’ll draw the site on the map.') + '</div>' +
       gapNote(b) + (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels are more than ' + SP.BRIDGE_FT + ' ft from the rest, so they’re left out of the site.</div>' : '') +
       (noGeom && b ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels have no outline from the county and are left out.</div>' : '') +
-      '<div class="bacts" style="padding:12px 0 0"><button class="btn askai" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
+      '<div class="bacts" style="padding:12px 0 0"><button class="btn primary" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
       card.classList.add('open'); card.scrollTop = 0; };
     if (ctx.cardPush && card.classList.contains('open') && !ed) ctx.cardPush(null, back, paint); else paint();
     fromCard = ctx.cardChild?.() === 'open' ? back : '';
