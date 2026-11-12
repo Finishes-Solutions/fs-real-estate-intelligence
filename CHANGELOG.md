@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-12
 
+### 3:40 PM CT: UI/UX audit follow-ups: FEMA progress and per-part Retry, named toll roads, a project's next step (`eecef86`…`3837f08`, branch `ui-ux-audit-followups`)
+- **FEMA reports show their progress:** the card lists each part (flood zones, insurance claims, disaster declarations, risk index) as Working…, Done or Didn't load, with the time so far, a 1–3 minute note on big areas and **Cancel**. Each part appears as soon as it's in, so a county's risk index no longer waits minutes for the claims count.
+- **Retry just the part that failed:** a FEMA part that didn't load has its own **Retry**, and a short claims count has **Count the claims again**; neither re-runs the whole report.
+- **Toll roads by name:** the Traffic report lists **Sam Houston Tollway (Beltway 8)** once, under **Toll roads**, instead of three raw TxDOT codes (TL0008-RG / -KG / -LG); other codes are said in words.
+- **Who's next on a project:** under the status, a **Next step** row (owner, action, due date, optional **Blocked by**) or **No next step set** with **Set next step**, plus what the steps still need. A new **Approved** status follows Under review. Projects without a next step open as before; nothing sends notifications.
+
 ### 2:07 PM CT: UI/UX audit fixes: clearer search, honest report scope, keyboard, Undo and phone layout (`6b56de0`…`7d64e8b`, branch `ui-ux-audit-fixes`)
 - **Search says when it couldn't find a house number:** instead of quietly showing the street as an "Address" and opening a card for whatever parcel is there, the card says the number wasn't found and asks you to click your lot.
 - **Drive-Time and Air Traffic say what they cover:** on a picked area, Drive-Time starts from the area's middle (marked **Start** on the map, with **Pick a start point**), and Air Traffic's live count covers 15 miles around the middle (the circle is drawn).
