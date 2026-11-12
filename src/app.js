@@ -371,7 +371,9 @@ function syncSelBar(){
   // Save search and alerts only mean something once there is a filter or an area; Copy link always works
   const custom=filterChips({area:true}).some(c=>!c.fixed);
   // (shown but off with nothing to save, so the menu doesn't change shape)
-  for(const id of ['saveSearch','rssLink']){ const b=document.getElementById(id); b.removeAttribute('hidden'); b.toggleAttribute('disabled',!custom&&id==='saveSearch'); b.setAttribute('aria-disabled',String(!custom)); b.classList.toggle('is-off',!custom); b.title=custom?'':'Pick an area or set a filter first'; }
+  for(const id of ['saveSearch','rssLink']){ const b=document.getElementById(id); b.removeAttribute('hidden'); b.toggleAttribute('disabled',!custom&&id==='saveSearch'); b.setAttribute('aria-disabled',String(!custom)); b.classList.toggle('is-off',!custom); b.title='';
+    // the reason is shown in the item itself (not only a hover tooltip), and read out with it
+    const em=b.querySelector('em'); if(em){ em.id||=id+'Why'; em.dataset.sub??=em.textContent; em.textContent=custom?em.dataset.sub:'Pick an area or set a filter first'; b.setAttribute('aria-describedby',em.id); } }
   if(!custom) document.getElementById('saveForm').hidden=true;
   syncFilingsHead();
 }
