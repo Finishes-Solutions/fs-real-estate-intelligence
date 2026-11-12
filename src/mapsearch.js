@@ -390,6 +390,7 @@ export function initMapSearch(ctx) {
   function pointInfo() {
     const pt = place.c || centerOf(place.geom);
     const fp = /building|business/.test(place.kind) && isArea(place.geom) ? place.geom : ctx.buildingAt?.(pt)?.footprint || null;
+    bar.classList.remove('on'); // the card takes over: the search card would sit on top of the map (the outline chip still clears it)
     ctx.openBuildingAt(pt, fp);
   }
   // "Area Summary" on a town, county, neighborhood or ZIP: an area summary card with the headline metrics,

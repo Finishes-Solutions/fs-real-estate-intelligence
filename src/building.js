@@ -243,6 +243,19 @@ export function initBuildings(ctx) {
     const k = card.querySelector('#bKick'), co = p?.county ? title(p.county) : countyAt(b.center);
     if (k) k.textContent = kindOf(b) + (co ? ' · ' + co.replace(/\s+county$/i, '') + ' County' : '');
   }
+  // the card sits over the right of the map: when the property is under it, slide the map so it shows left of the card
+  function clearOfCard(b) {
+    if (cur !== b || !card.classList.contains('open') || innerWidth <= 700) return;
+    const g = b.footprint || b.parcel?.geometry || b.d?.parcel?.geometry || b.tile?.geometry, pts = [];
+    const walk = a => { if (typeof a[0] === 'number') pts.push(map.project(a)); else a.forEach(walk); }; if (g) walk(g.coordinates); else pts.push(map.project(b.center));
+    const mr = map.getContainer().getBoundingClientRect(), cr = card.getBoundingClientRect(), left = cr.left - mr.left;
+    if (left <= 0 || cr.right < mr.left) return;
+    const x0 = Math.min(...pts.map(p => p.x)), x1 = Math.max(...pts.map(p => p.x)), y0 = Math.min(...pts.map(p => p.y)), y1 = Math.max(...pts.map(p => p.y));
+    if (x1 <= left - 24) return; // already clear of the card
+    // centre the property in the visible strip left of the card (and inside the map vertically)
+    const dx = (x0 + x1) / 2 - left / 2, dy = y0 < 140 ? y0 - 140 : y1 > mr.height - 24 ? Math.min(y1 - (mr.height - 24), y0 - 140) : 0;
+    map.panBy([dx, dy], { duration: ctx.reduceMotion ? 0 : 500 });
+  }
   async function open(b) {
     ctx.clearSelection?.(); stopOrbit(); cur = b; b.rg = null; b.rgDone = false; highlight(); // (the Regrid record is gone from a re-opened card, so is what it filled in)
     const gsv = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6);
@@ -264,7 +277,7 @@ export function initBuildings(ctx) {
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
       '<div class="bsec" id="bSite"></div><div class="bsec" id="bDev"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote loading">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsrc"></div>';
-    card.classList.add('open'); card.scrollTop = 0; setHead(b, null);
+    card.classList.add('open'); card.scrollTop = 0; setHead(b, null); requestAnimationFrame(() => clearOfCard(b));
     const mark = card.querySelector('#bParcel'), alive = () => cur === b && mark.isConnected; // still this card (not a report opened from it)
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#bOrbit')?.addEventListener('click', orbit);
@@ -284,7 +297,7 @@ export function initBuildings(ctx) {
     let d = null, early = false;
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
     const onParcel = pd => {
-      if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
+      if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); clearOfCard(b); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
       renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready(); planBtn(b);
       ctx.cardStatus?.(pd.parcel ? 'Owner and value loaded for ' + (pd.parcel.situs || 'this parcel') + '.' : 'No appraisal record here; Regrid can look it up.');
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, pd.parcel);
