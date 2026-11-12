@@ -4,7 +4,7 @@
 //   share of the area in high / moderate / minimal flood risk, NFIP flood insurance claims paid nearby (by year and storm),
 //   federal disaster declarations since 2000, and FEMA's National Risk Index (expected annual loss by hazard).
 //   The report opens in the card and exports as a PDF report or CSV.
-import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable, fitArea } from './reportkit.js';
+import { reportDoc, savePdf, saveCsv, areaMap, getJSON, errorBox, unavailable, fitArea, fmtSqmi } from './reportkit.js';
 import { reveal } from './motion.js';
 import { femaReport, femaCsvRows } from './lib/reports/fema.mjs';
 const SRC = 'fema-nfhl';
@@ -55,7 +55,7 @@ export function initFema(ctx) {
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard(); fitArea(ctx, geometry);
     let d; try { d = await reportFor(geometry, label); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Flood and hazard data')); return; }
     last = { d, label, geometry };
-    card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2><div class="bsub">' + (d.area_sqmi < 10 ? d.area_sqmi.toFixed(2) : fmtN(d.area_sqmi)) + ' sq mi</div></div><button class="x" aria-label="Close">×</button></div>' + body(d) +
+    card.innerHTML = '<div class="top"><div><div class="kicker">FEMA report</div><h2>' + esc(label) + '</h2><div class="bsub">' + fmtSqmi(d.area_sqmi) + '</div></div><button class="x" aria-label="Close">×</button></div>' + body(d) +
       '<div class="bacts"><button class="btn" id="fmLayer" type="button">Show Flood Zones on Map</button><button class="btn primary" id="fmPdf" type="button">Export PDF</button><button class="btn" id="fmCsv" type="button">Export CSV</button></div>' +
       '<div class="rnote bsec">Flood maps show regulatory risk, not every flood; Houston floods outside them too. For a single parcel, confirm with an elevation certificate or a FEMA flood zone determination.<span class="src"> ' + esc(d.sources) + '</span></div>';
     card.classList.add('open'); card.querySelector('.x').onclick = () => ctx.closeCard();
