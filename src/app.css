@@ -3001,6 +3001,11 @@ table.who tr.nomatch td{border:0}
   .mapleft{display:flex;flex-direction:column;align-items:flex-start;gap:8px;grid-template-columns:none}
   .maptop{flex-direction:row;grid-row:auto;align-self:auto}
   .mapleft .hint,.mapleft .radius,.mapleft .placebar{width:100%;grid-column:auto}
+  /* the place card keeps its own box (so its × sits inside it, at a full fingertip size) and steps aside while the
+     property card for the same pick is open: one card at a time, and the parcel stays visible above the sheet */
+  .mapleft .placebar{position:relative;padding-right:52px}
+  .mapleft .placebar .x{top:2px;right:2px;width:var(--tap);height:var(--tap)}
+  .app:has(#card.open) .mapleft .placebar{display:none}
   .lybtn{display:none}
   .selpill{display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 11px 0 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--panel);color:var(--text);font:600 13.5px var(--font-display);box-shadow:0 1px 3px rgba(11,13,12,.12);cursor:var(--cur-pointer,pointer)}
   .selpill.on,.app.sel-open .selpill{background:var(--text);border-color:var(--text);color:var(--panel)}
