@@ -57,11 +57,17 @@ export function initChanges(ctx) {
   const runs = DATA.changes.runs || [], week = mergeRecent(DATA.changes);
   // "Last 7 days" (the default) is every nightly check in the week up to the latest, merged the way the badge and the
   // "New this week / Any change" filters count them, so the numbers agree; each single check is still listed after it.
-  let ri = week.runs ? 'w' : 0, onlyVisible = true;
+  // one option per check that found something; a date that repeats (several checks in a day) gets its time
+  const dayOf = r => new Date(r.built).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const runIdx = runs.map((r, i) => i).filter(i => runs[i].items.length), dayN = {};
+  runIdx.forEach(i => { const d = dayOf(runs[i]); dayN[d] = (dayN[d] || 0) + 1; });
+  const runOptions = () => runIdx.map(i => { const r = runs[i], d = dayOf(r), n = r.items.length;
+    return `<option value="${i}">${d}${dayN[d] > 1 ? ' · ' + new Date(r.built).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''} · ${n} change${n === 1 ? '' : 's'}</option>`; }).join('');
+  let ri = week.runs ? 'w' : (runIdx[0] ?? 0), onlyVisible = true;
   const dl = x => new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const nIds = items => new Set(items.map(x => x.id)).size, plural = (n, w) => fmtN(n) + ' ' + w + (n === 1 ? '' : 's');
   root.innerHTML = `<div class="vhead"><div><div class="kicker">Changes</div><h2 id="chTitle">What changed in TDLR</h2><div class="vsub" id="chSub"></div><div class="vsub vsub-n" id="chN"></div></div>
-    <div class="vctl"><label>Found <select class="chip" id="chRun">${week.runs ? `<option value="w">Last 7 days · ${plural(week.ids.size, 'filing')}</option>` : ''}${runs.map((r, i) => `<option value="${i}">${new Date(r.built).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · ${r.items.length} change${r.items.length === 1 ? '' : 's'}</option>`).join('')}</select></label>
+    <div class="vctl"><label>Found <select class="chip" id="chRun">${week.runs ? `<option value="w">Last 7 days · ${plural(week.ids.size, 'filing')}</option>` : ''}${runOptions()}</select></label>
     <label class="tg2"><input type="checkbox" id="chOnly" checked><span>Only within current filters</span></label></div></div><div id="chScope"></div><nav id="chJump" class="ch-jump" aria-label="Jump to a section" hidden></nav><div id="chBody" class="chbody"></div>`;
   const runSel = root.querySelector('#chRun'), onlyEl = root.querySelector('#chOnly');
   runSel.value = String(ri); runSel.onchange = () => { ri = runSel.value === 'w' ? 'w' : +runSel.value; render(); };
