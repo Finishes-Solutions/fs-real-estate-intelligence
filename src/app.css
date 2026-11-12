@@ -4369,3 +4369,11 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
   .mnav .badge.muted{margin-left:0;background:var(--ink-150);color:var(--text)}
 }
 
+/* offline (UX-609) */
+.netchip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--warn) 14%,var(--panel));color:#7a4f0e;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);font-size:12px;white-space:nowrap}
+.netchip[hidden]{display:none}
+.netchip b{font-weight:700}
+@media (max-width:700px){
+  .netchip{position:fixed;left:10px;right:10px;bottom:calc(var(--navh,58px) + var(--sb,0px) + 8px);z-index:var(--z-nav);justify-content:center;height:34px;box-shadow:var(--sh-2)}
+}
+

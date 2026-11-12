@@ -817,6 +817,13 @@ new MutationObserver(()=>{ const open=card.classList.contains('open'), a=documen
     requestAnimationFrame(back); for(const ms of [150,400]) setTimeout(()=>{ const x=document.activeElement; if(!x||x===document.body) back(); },ms); }
 }).observe(card,{attributes:true,attributeFilter:['class'],childList:true});
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
+// Offline (UX-609): one status chip for the whole app, in the top bar (desktop) or just above the tab bar (phone). Pages
+// keep showing what they loaded; notes are kept on the device and sync when the connection is back.
+{ const chip=document.createElement('div'); chip.className='netchip'; chip.setAttribute('role','status'); chip.hidden=true;
+  chip.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M1.5 5.5a10 10 0 0 1 13 0M4 8.3a6.5 6.5 0 0 1 8 0M6.4 11a3 3 0 0 1 3.2 0M2 2l12 12"/></svg><span><b>Offline</b> · showing saved data · changes will sync</span>';
+  const phone=matchMedia('(max-width:700px)'), place=()=>{ if(phone.matches) document.getElementById('mnav')?.before(chip); else document.querySelector('#appbar .ab-util, .ab-util')?.prepend(chip); };
+  const sync=()=>{ const off=navigator.onLine===false; chip.hidden=!off; document.querySelector('.app')?.classList.toggle('offline',off); };
+  place(); phone.addEventListener('change',place); addEventListener('online',sync); addEventListener('offline',sync); sync(); }
 // skip links: to the map's search (on the Map; opened first from any page), and to the current page's title (the map itself on the Map)
 document.getElementById('skipTools')?.addEventListener('click',e=>{ e.preventDefault(); if(view!=='map') setView('map'); requestAnimationFrame(()=>document.getElementById('msq')?.focus()); });
 document.getElementById('skipMain')?.addEventListener('click',e=>{ e.preventDefault(); const sec=document.getElementById('view-'+view), h=view==='map'?map.getCanvas():sec?.querySelector('h1,h2');
