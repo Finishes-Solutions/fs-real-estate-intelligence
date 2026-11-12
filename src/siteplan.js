@@ -4898,7 +4898,7 @@ export function initSitePlan(ctx) {
     const share = shared === true ? 'shared with the team' : shared === false ? 'saved on this device only' : 'saved on this device';
     return '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('projects')) + '</div><h1>Projects</h1><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
         '<div class="vctl">' + (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '<div class="team-slot" id="pjTeam"></div></div></div>' +
-      (adding ? '<form class="pj-new" id="pjForm"><label class="sr" for="pjNm">New project name</label><input id="pjNm" maxlength="120" placeholder="Project name" autocomplete="off"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span>' +
+      (adding ? '<form class="pj-new" id="pjForm" novalidate><label class="pj-lbl" for="pjNm">Project name</label><input id="pjNm" maxlength="120" placeholder="e.g. Waller garden apartments" autocomplete="off" required aria-describedby="pjNmErr"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span><small class="field-err" id="pjNmErr" role="alert" hidden>Give the project a name</small>' +
         '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site plan</b> at the top of its card.</div></form>' : '') +
       (all.length ? '<div class="pj-bar"><label class="search sm pj-q"><input type="search" id="pjQ" placeholder="Search projects" value="' + esc(pq) + '" aria-label="Search projects, parcels, owners and notes"></label>' +
         '<div class="pj-ctl"><label class="pj-sort">Sort <select class="chip" id="pjSort">' + Object.entries(SORTS).map(([k, l]) => '<option value="' + k + '"' + (psort === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
@@ -4935,7 +4935,7 @@ export function initSitePlan(ctx) {
   function headHtml(p) {
     const ac = acresOf(p), st = PJ.statusOf(p), addr = addrOf(p);
     return '<button type="button" class="lnk pj-back" data-back="1">‹ All projects</button><header class="pj-head"><div class="kicker">Project</div>' +
-      (renaming ? '<form class="pj-ren" id="pjRenForm"><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span></form>'
+      (renaming ? '<form class="pj-ren" id="pjRenForm" novalidate><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120" required aria-describedby="pjRenErr">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span><small class="field-err" id="pjRenErr" role="alert" hidden>Give the project a name</small></form>'
         : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
       '<div class="pj-hmeta"><span class="pj-st" data-st="' + st.id + '"><label class="sr" for="pjStatus">Status</label><select id="pjStatus" title="The project’s status (shared with the team)">' + PJ.STATUSES.map(x => '<option value="' + x.id + '"' + (x.id === st.id ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></span>' +
         (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') +
@@ -5481,7 +5481,8 @@ export function initSitePlan(ctx) {
       on('[data-clear]', () => { pq = ''; render(true); });
       const form = $('#pjForm');
       if (form) {
-        form.onsubmit = e => { e.preventDefault(); const name = $('#pjNm').value.trim(); if (!name) { $('#pjNm').focus(); return; }
+        const nm = $('#pjNm'), nmErr = $('#pjNmErr'); nm.oninput = () => { nm.removeAttribute('aria-invalid'); nmErr.hidden = true; };
+        form.onsubmit = e => { e.preventDefault(); const name = nm.value.trim(); if (!name) { nm.setAttribute('aria-invalid', 'true'); nmErr.hidden = false; nm.focus(); return; } // the Save search pattern: say what's missing, under the field
           const np = { id: uid(), name, notes: '', parcels: [], plans: [], created: new Date().toISOString(), by: get(NAME_KEY) };
           db.projects.push(np); adding = false; pq = ''; document.activeElement?.blur(); const was = cur; cur = np.id; save(np); root.scrollTop = 0; pjMoved(was); };
         $('#pjCancel').onclick = () => { adding = false; render(true); };
@@ -5500,7 +5501,8 @@ export function initSitePlan(ctx) {
     const rf = $('#pjRenForm');
     if (rf) {
       const r = $('#pjRen'); grow(r); r.oninput = () => grow(r);
-      rf.onsubmit = e => { e.preventDefault(); const v = r.value.replace(/\s+/g, ' ').trim(); renaming = false; document.activeElement?.blur(); if (v && v !== p.name) { p.name = v; save(p); } render(true); };
+      r.addEventListener('input', () => { r.removeAttribute('aria-invalid'); $('#pjRenErr').hidden = true; });
+      rf.onsubmit = e => { e.preventDefault(); const v = r.value.replace(/\s+/g, ' ').trim(); if (!v) { r.setAttribute('aria-invalid', 'true'); $('#pjRenErr').hidden = false; r.focus(); return; } renaming = false; document.activeElement?.blur(); if (v && v !== p.name) { p.name = v; save(p); } render(true); };
       r.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); rf.requestSubmit(); } else if (e.key === 'Escape') $('#pjRenX').click(); };
       $('#pjRenX').onclick = () => { renaming = false; render(true); };
     }

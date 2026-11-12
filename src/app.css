@@ -4354,3 +4354,9 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 .toast .tx:hover,.toast .tx:focus-visible{opacity:1;background:color-mix(in srgb,var(--panel) 18%,transparent)}
 @media (pointer:coarse){ .toast .tx{width:var(--tap);height:var(--tap);margin:-10px -10px -10px 0} }
 
+/* required names (UX-607): a visible label above the field, and the Save search error style for every form */
+.field-err{flex:0 0 100%;color:var(--danger);font-size:11.5px;font-weight:600}
+.field-err[hidden]{display:none}
+.pj-lbl{flex:0 0 100%;font-size:var(--fs-xs);font-weight:600;color:var(--text-2)}
+.pj-new input[aria-invalid=true],.pj-ren textarea[aria-invalid=true]{border-color:var(--danger)}
+
