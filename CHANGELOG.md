@@ -3,6 +3,11 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-12
+
+### 1:15 AM CT: Research: where to get appraisal rolls and tax rates for the seven counties (`matthew/more-data-sources`, docs only)
+- No change to the app. A new note lists the official sources for each county's appraisal roll and every taxing unit's tax rates, what each one contains, and which counties need a public records request (Waller, Austin, Montgomery). It's the plan for adding property tax estimates.
+
 ## 2026-11-09
 
 ### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
