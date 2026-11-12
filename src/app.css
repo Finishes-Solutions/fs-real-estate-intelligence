@@ -4349,3 +4349,8 @@ table.who tr[data-k] td:last-child{position:relative;padding-right:22px}
 table.who tr[data-k] td:last-child::after{content:"›";position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px}
 table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
 
+/* the Undo note (UX-606): its × sits after the action */
+.toast .tx{text-decoration:none;margin-left:6px;width:24px;height:24px;border:0;border-radius:50%;background:transparent;color:inherit;opacity:.75;font-size:16px;line-height:1;cursor:var(--cur-pointer,pointer)}
+.toast .tx:hover,.toast .tx:focus-visible{opacity:1;background:color-mix(in srgb,var(--panel) 18%,transparent)}
+@media (pointer:coarse){ .toast .tx{width:var(--tap);height:var(--tap);margin:-10px -10px -10px 0} }
+

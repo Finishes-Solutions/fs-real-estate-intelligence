@@ -43,7 +43,13 @@ export function initSaved(ctx) {
   // deleting is undoable for a few seconds
   function remove(i) {
     const all = read(), [gone] = all.splice(i, 1); if (!gone) return; write(all); render();
-    ctx.toast('Deleted “' + gone.name + '” ·', { ms: 6500, action: { label: 'Undo', run: () => { const a = read(); a.splice(Math.min(i, a.length), 0, gone); write(a); render(); } } });
+    ctx.toast('Deleted “' + gone.name + '” ·', { action: { label: 'Undo', run: () => { const a = read(); a.splice(Math.min(i, a.length), 0, gone); write(a); render(); focusRow(i); } } });
+    focusRow(i); // focus stays in the list: the row that moved up into this place, else the one before, else the page title
+  }
+  function focusRow(i) {
+    const root = ctx.view === 'saved' ? page : listEl, bs = [...root.querySelectorAll('[data-open]')], b = bs[Math.min(i, bs.length - 1)];
+    const h = root.closest?.('.view')?.querySelector('h1') || page.querySelector('h1'); if (!b && h) h.setAttribute('tabindex', '-1');
+    (b || h)?.focus({ preventScroll: false });
   }
   function render() {
     box.style.display = read().length ? '' : 'none';

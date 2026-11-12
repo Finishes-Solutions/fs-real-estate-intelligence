@@ -93,7 +93,11 @@ export function initCompare(ctx) {
       (fresh.length > added.length ? '. ' + (fresh.length - added.length) + ' more didn’t fit: Compare holds ' + MAX + '.' : '.'));
     return added.length;
   }
-  const remove = i => { areas.splice(i, 1); save(); sync(); };
+  // removing says so, offers Undo (back in its slot, with its name and colour) and keeps focus in the chip row
+  const focusChip = i => requestAnimationFrame(() => { const rm = [...root.querySelectorAll('[data-rm]')], h = root.querySelector('h1');
+    const t = rm[Math.min(i, rm.length - 1)]; if (!t && h) h.setAttribute('tabindex', '-1'); (t || h)?.focus({ preventScroll: true }); });
+  const remove = i => { const [a] = areas.splice(i, 1); if (!a) return; save(); sync(); focusChip(i);
+    ctx.toast('Removed ' + a.label + ' ·', { action: { label: 'Undo', run: () => { if (!has(a.key) && areas.length < MAX) { areas.splice(Math.min(i, areas.length), 0, a); save(); sync(); focusChip(i); } } } }); };
   const rename = (i, text) => {
     const a = areas[i], t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 40); if (!a || !t || t === a.label) return;
     a.label = unique(t, a); save(); sync();

@@ -1113,11 +1113,23 @@ document.getElementById('home').onclick=()=>{ if(!resetPop.hidden) setResetOpen(
 document.getElementById('orbit').onclick=()=>{ if(!resetPop.hidden) setResetOpen(false); stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
 
 // ---------- toast ----------
-const toastEl=document.getElementById('toast'); let toastT=0;
-// toast(text) or toast(text, {action:{label, run}}): with an action the note carries a button and stays a little longer
-function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a);
-  if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
-  toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
+const toastEl=document.getElementById('toast'); let toastT=0, toastMs=0, toastAct=null;
+// toast(text) or toast(text, {action:{label, run}}): with an action (Undo) the note carries the button and a ×, stays at
+// least 10 s, and ⌘Z / Ctrl+Z runs it. Any note waits while the pointer is over it or focus is in it (WCAG 2.2.1).
+const MOD_Z=/Mac|iPhone|iPad|iPod/.test(navigator.platform||navigator.userAgent)?'⌘Z':'Ctrl+Z';
+const hideToast=()=>{ toastEl.classList.remove('on','act'); toastAct=null; };
+const armToast=()=>{ clearTimeout(toastT); if(toastEl.matches(':hover')||toastEl.contains(document.activeElement)) return; toastT=setTimeout(hideToast,toastMs); };
+function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a); toastAct=null;
+  if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.title=a.label+' ('+MOD_Z+')'; b.setAttribute('aria-keyshortcuts',MOD_Z==='⌘Z'?'Meta+Z':'Control+Z');
+    const run=toastAct=()=>{ hideToast(); a.run(); }; b.onclick=run;
+    const x=document.createElement('button'); x.type='button'; x.className='tx'; x.setAttribute('aria-label','Dismiss'); x.textContent='×'; x.onclick=hideToast;
+    toastEl.append(' ',b,x); }
+  toastEl.classList.add('on'); toastMs=Math.max(o.ms||0,a?10000:3400); armToast(); }
+toastEl.addEventListener('mouseenter',()=>clearTimeout(toastT)); toastEl.addEventListener('focusin',()=>clearTimeout(toastT));
+toastEl.addEventListener('mouseleave',armToast); toastEl.addEventListener('focusout',()=>setTimeout(armToast,0));
+// ⌘Z / Ctrl+Z while an Undo note shows: undo (not while typing, and not on the site plan, which has its own undo)
+document.addEventListener('keydown',e=>{ if(!toastAct||e.key.toLowerCase()!=='z'||e.shiftKey||!(e.metaKey||e.ctrlKey)||e.defaultPrevented) return;
+  if(e.target.closest?.('input,textarea,select,[contenteditable="true"]')||appEl.classList.contains('planning')) return; e.preventDefault(); toastAct(); });
 // Tab and Shift+Tab stay inside an open dialog (Settings, Export): past the last control back to the first, and the reverse
 // inside a folded <details> (other than its own summary): rendered for layout, but not a Tab stop
 function inClosed(x){ for(let d=x.parentElement?.closest('details');d;d=d.parentElement?.closest('details')) if(!d.open&&!(x.tagName==='SUMMARY'&&x.parentElement===d)) return true; return false; }
@@ -1150,7 +1162,7 @@ function sortTable(table){ const head=table?.tHead?.rows[0], body=table?.tBodies
     b.onclick=()=>{ const num=[...body.rows].some(r=>typeof cellVal(r.cells[i])==='number'), dir=th.getAttribute('aria-sort')==='descending'?'ascending':th.getAttribute('aria-sort')==='ascending'||!num?(th.getAttribute('aria-sort')==='ascending'?'descending':'ascending'):'descending';
       const rows=[...body.rows].sort((x,y)=>{ const a=cellVal(x.cells[i]),c=cellVal(y.cells[i]); const d=typeof a==='number'&&typeof c==='number'?a-c:String(a).localeCompare(String(c)); return dir==='ascending'?d:-d; });
       body.append(...rows); [...head.cells].forEach(h=>{ if(h.hasAttribute('aria-sort')){ h.setAttribute('aria-sort',h===th?dir:'none'); const k=h.querySelector('.th-ic'); if(k) k.textContent=SORT_ICON[h===th?dir:'none']; } }); }; }); }
-function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
+function clearToast(){ clearTimeout(toastT); hideToast(); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
 const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
