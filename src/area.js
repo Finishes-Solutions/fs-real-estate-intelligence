@@ -466,7 +466,9 @@ export function initArea(ctx) {
     try { await ctx.exportCsv(rows, fileBase('market', label)); } finally { ctx.exportMeta = null; }
   }
   // the area the Market page is showing, for the Reports page (and a way to change it)
-  ctx.marketAreaLabel = () => area ? areaLabel() : '';
+  // the same rule the export uses: follow the Map's selection first (adopt), so the Reports card names the area the PDF covers
+  // even before the Market page has been opened
+  ctx.marketAreaLabel = () => { if (!area) return ''; adopt(); return areaLabel() + (sel !== 'all' && sel === adopted ? ' (from the Map)' : ''); };
   ctx.marketChangeArea = () => { scopeOpen = true; ctx.setView('market'); setTimeout(() => { root.querySelector('.mk-scopebar summary')?.focus({ preventScroll: false }); }, 60); };
   ctx.exportMarket = async (format = 'html', county, { stay = false } = {}) => { await load(); if (county === 'all' || /^\d{5}(,\d{5})*$/.test(county || '')) { sel = county; adopted = mapCounties(); } else if (county) { const c = area?.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase()); if (c) { sel = c.fips; adopted = mapCounties(); } }
     if (format === 'csv') return exportData(); if (!stay) { ctx.setView('market'); await new Promise(r => setTimeout(r, 120)); } return exportReport(); };
