@@ -4392,28 +4392,17 @@ table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
    below it; the rest of the scale is unchanged. */
 .kpi span,.sc-k,.sc-k .sk-l,.fs-t em,#filingsPeriod,.fsw.tg2{font-size:var(--fs-xs)}
 .tl-chart .yax text,.tl-chart .xax text,.g-ticks span{font-size:11px}
-=======
 /* drive times: where the bands start (an area's drive times start from its middle) */
 .dt-start{display:flex;align-items:center;gap:5px;pointer-events:none}
 .dt-start i{width:14px;height:14px;border-radius:50%;background:#16191a;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)}
 .dt-start b{font:700 12px/1 var(--font-display,Inter,sans-serif);color:#16191a;background:#fff;border-radius:4px;padding:3px 6px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 #card .dt-from{margin:0 0 10px;padding:8px 10px;border-radius:6px;background:var(--chip,#f3f4f4);color:var(--text-2,#3b4245)}
-/* FEMA report: each part's state while a big area loads */
-#card .fm-steps{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:6px;font-size:13px}
-#card .fm-steps li{display:flex;align-items:center;gap:8px}
-#card .fm-steps li span{margin-left:auto;font-size:12px;color:var(--muted)}
-#card .fm-steps li i{flex:none;width:12px;height:12px;box-sizing:border-box;border-radius:50%;border:1.6px solid var(--line-2);border-top-color:var(--brand);animation:sp-spin .8s linear infinite}
-#card .fm-steps li.ok i{animation:none;border:0;background:var(--green-700,#0b7a5f);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='6'/%3E%3C/svg%3E")}
-#card .fm-steps li.ok span{color:var(--green-700,#0b7a5f);font-weight:600}
-#card .fm-steps li.err i{animation:none;border:0;background:var(--danger,#b42318)}
-#card .fm-steps li.err span{color:var(--danger,#b42318)}
 /* Environmental report on a large area: three columns, each record type's nearest record on one clipped line */
 .card table.env-big{table-layout:fixed}.card table.env-big th:nth-child(n+2),.card table.env-big td:nth-child(n+2){width:64px;text-align:right}
 .card table.env-big .env-db{display:block}.card table.env-big .env-eg{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmp-in{align-self:center;font-size:12.5px;color:var(--green-700,#0b7a5f);font-weight:600;margin-right:4px}
 .glance .gl-scope{margin:-6px 0 10px;font-size:12px;color:var(--muted)}
 .kp-warn{margin:8px 6px 0;padding:7px 9px;border-radius:5px;background:var(--warn-bg,#fff4e5);color:var(--warn-ink,#7a4100);font-size:12.5px;line-height:1.35}
-=======
 .rg-off{color:var(--muted);font-size:12px}
 
 #card .b-fail{margin:0 0 10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--danger) 35%,transparent);border-left-width:3px;border-radius:6px;background:color-mix(in srgb,var(--danger) 6%,var(--panel));font-size:12.5px;line-height:1.45}
