@@ -187,9 +187,16 @@ export function initCompare(ctx) {
     if (ctx.view !== 'compare') return;
     const ft = ctx.filterText();
     const cur = fromSelection(), canAdd = cur && areas.length < MAX && !has(cur.key);
+    // several counties picked: name the "together" area by its counties, and once each of them is already here, neither add
+    // button is an action (adding them together again would only overlap what's in the table)
+    const each = eachCounty(), allIn = each.length > 0 && each.every(c => has(c.key));
+    const names = each.map(c => c.label.replace(/ County$/, '')), togetherName = each.length && each.length <= 4 ? names.join(' + ') : cur?.label;
     let h = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('compare')) + '</div><h1>Compare areas</h1><div class="vsub">' + 'Up to four areas side by side: population, income, housing and jobs for each area, then its construction filings. ' + (ft ? 'Filings use the same filters for every area (everything except the area itself), so they can differ from the Market page.' : 'Filings are counted with no other filters.') + '</div></div>' +
-      '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”' + (eachCounty().length ? ' Together' : '') + '</button>' : '') +
-        (eachCounty().length && areas.length < MAX ? '<button class="btn" id="cmpAddEach">+ Add Each County (' + eachCounty().length + ')</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') +
+      '<div class="vctl">' + (allIn ? '<span class="cmp-in" role="status">✓ ' + esc(names.join(', ')) + ' already in Compare</span>' +
+          (canAdd ? '<button class="btn" id="cmpAddSel" disabled title="Each of these counties is already in Compare; adding them together would overlap them">+ Add “' + esc(togetherName) + '” Together</button>' : '') +
+          '<button class="btn" id="cmpAddEach" disabled title="Already in Compare">Each County In Compare ✓</button>'
+        : (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(each.length ? togetherName : cur.label) + '”' + (each.length ? ' Together' : '') + '</button>' : '') +
+          (each.length && areas.length < MAX ? '<button class="btn" id="cmpAddEach">+ Add Each County (' + each.length + ')</button>' : '')) + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') +
         (areas.length && ctx.exportMenu ? ctx.exportMenu([{ label: 'Comparison · PDF', attrs: ' data-cx="pdf"' }, { label: 'Comparison · Excel', attrs: ' data-cx="xlsx"' }, { label: 'Comparison · CSV', attrs: ' data-cx="csv"' }]) : '') + '</div></div>';
     h += '<div id="cmpScope"></div>' + (areas.length ? '<div class="cmp-chips">' : '<div class="cmp-chips" hidden>') + areas.map((a, i) => '<span class="cmp-chip" style="--c:' + color(i) + '"><i></i><button class="lnk" data-go="' + i + '" title="Show on the map">' + esc(a.label) + '</button><button class="ed" data-ed="' + i + '" aria-label="Rename ' + esc(a.label) + '" title="Rename">✎</button><button class="x" data-rm="' + i + '" aria-label="Remove ' + esc(a.label) + '">×</button></span>').join('') +
       (areas.length < MAX ? '<span class="cmp-slot">' + (MAX - areas.length) + ' open slot' + (MAX - areas.length > 1 ? 's' : '') + '</span>' : '') + '</div>';
