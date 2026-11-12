@@ -8,12 +8,12 @@ const ROLE_SHORT = { dev: 'Developers', arch: 'Architects', gc: 'Contractors' };
 export function initWho(ctx) {
   const { fmtM, fmtN, esc } = ctx, root = document.getElementById('view-who');
   let role = 'dev', q = '';
-  root.innerHTML = `<div class="vhead"><div><div class="kicker">Companies</div><h2>Most active developers, architects and builders</h2><div class="vsub" id="whoSub"></div></div>
+  root.innerHTML = `<div class="vhead"><div><div class="kicker">${ctx.esc(ctx.navPath('who'))}</div><h1>Companies</h1><div class="vsub" id="whoSub"></div></div>
     <div class="vctl"><div class="seg seg3" id="whoRole">${Object.entries(ROLE).map(([k, v]) => `<button data-k="${k}" aria-pressed="${k === role}">${ROLE_SHORT[k]}</button>`).join('')}</div>
     <label class="search sm"><input id="whoQ" type="search" placeholder="Find a name" aria-label="Find a name"></label>
     ${ctx.exportMenu?.([{ label: 'Activity report · PDF', attrs: ' data-x="pdf"' }, { label: 'Activity report · Excel', attrs: ' data-x="xlsx"' }, { label: 'Activity report · CSV', attrs: ' data-x="csv"' }]) || ''}</div></div>
     <div id="whoScope"></div>
-    <div class="who-note" id="whoNote"></div><div class="tablewrap"><table class="who"><thead><tr><th>Name</th><th class="r">Projects</th><th class="r">Est. value</th><th>Mostly</th><th>Where</th><th>Last 8 quarters</th><th>Latest</th></tr></thead><tbody id="whoBody"></tbody></table></div>
+    <div class="who-note" id="whoNote"></div><div class="tablewrap"><table class="who"><thead><tr><th>Name</th><th class="r">Filings</th><th class="r">Est. value</th><th>Mostly</th><th>Where</th><th>Last 8 quarters</th><th>Latest</th></tr></thead><tbody id="whoBody"></tbody></table></div>
     <div class="vfoot" id="whoFoot"></div>`;
   root.querySelectorAll('[data-x]').forEach(b => b.onclick = () => ctx.openExport?.('activity', { format: b.dataset.x }));
   root.querySelectorAll('#whoRole button').forEach(b => b.onclick = () => { role = b.dataset.k; root.querySelectorAll('#whoRole button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
@@ -36,7 +36,7 @@ export function initWho(ctx) {
     let rows = [...groups.values()].map(g => ({ ...g, label: top(g.names)[0][0] })).sort((a, b) => b.v - a.v);
     if (q) rows = rows.filter(g => g.k.includes(q) || g.label.toLowerCase().includes(q));
     const covered = list.filter(f => entityKey(role === 'dev' ? (f.dev || f.owner) : f[role])).length;
-    root.querySelector('#whoSub').textContent = fmtN(groups.size) + ' ' + ROLE[role].toLowerCase() + ' across ' + fmtN(list.length) + ' filings';
+    root.querySelector('#whoSub').textContent = 'Most active developers, architects and builders: ' + fmtN(groups.size) + ' ' + ROLE[role].toLowerCase() + ' across ' + fmtN(list.length) + ' filings';
     ctx.scopeBar?.(root.querySelector('#whoScope'));
     root.querySelector('#whoFoot').textContent = rows.length > 150 ? 'Showing the top 150 of ' + fmtN(rows.length) + ' by value. Search to find others.' : '';
     root.querySelector('#whoNote').textContent = role === 'dev' ? 'Grouped by owner name as filed (or the developer the AI identified), with LLC/Inc. variants merged. Single-asset LLCs often hide the real sponsor.'
@@ -66,7 +66,7 @@ export function initChanges(ctx) {
   let ri = week.runs ? 'w' : (runIdx[0] ?? 0), onlyVisible = true;
   const dl = x => new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const nIds = items => new Set(items.map(x => x.id)).size, plural = (n, w) => fmtN(n) + ' ' + w + (n === 1 ? '' : 's');
-  root.innerHTML = `<div class="vhead"><div><div class="kicker">Changes</div><h2 id="chTitle">What changed in TDLR</h2><div class="vsub" id="chSub"></div><div class="vsub vsub-n" id="chN"></div></div>
+  root.innerHTML = `<div class="vhead"><div><div class="kicker">${ctx.esc(ctx.navPath('changes'))}</div><h1 id="chTitle">Changes</h1><div class="vsub" id="chSub"></div><div class="vsub vsub-n" id="chN"></div></div>
     <div class="vctl"><label>Found <select class="chip" id="chRun">${week.runs ? `<option value="w">Last 7 days · ${plural(week.ids.size, 'filing')}</option>` : ''}${runOptions()}</select></label>
     <label class="tg2"><input type="checkbox" id="chOnly" checked><span>Only within current filters</span></label></div></div><div id="chScope"></div><nav id="chJump" class="ch-jump" aria-label="Jump to a section" hidden></nav><div id="chBody" class="chbody"></div>`;
   const runSel = root.querySelector('#chRun'), onlyEl = root.querySelector('#chOnly');

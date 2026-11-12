@@ -565,14 +565,14 @@ export function initArea(ctx) {
   function draw() {
     if (!shown()) return;
     if (!area) {
-      root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals by county</h2></div></div><div class="empty">' + (loadP ? 'Market data isn’t available yet. It’s added by the nightly data refresh.' : 'Loading…') + '</div>' +
+      root.innerHTML = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('market')) + '</div><h1>Growth signals by county</h1></div></div><div class="empty">' + (loadP ? 'Market data isn’t available yet. It’s added by the nightly data refresh.' : 'Loading…') + '</div>' +
         (loadP ? '' : '<div class="mk-skels">' + skel(110) + '<div class="mk-grid">' + skel(220) + skel(220) + '</div></div>');
       load().then(() => { if (area) render(); else if (shown()) { root.querySelector('.empty').textContent = 'Market data isn’t available yet. It’s added by the nightly data refresh.'; root.querySelector('.mk-skels')?.remove(); } });
       return;
     }
     adopt(); measure(); curStats = stats();
     const y0 = root.scrollTop, body = Object.keys(SECTIONS).map(build).join('');
-    root.innerHTML = '<div class="vhead mk-vhead"><div><div class="kicker">Market</div><h2>' + esc(areaLabel()) + '</h2>' +
+    root.innerHTML = '<div class="vhead mk-vhead"><div><div class="kicker">' + esc(ctx.navPath('market')) + '</div><h1>' + esc(areaLabel()) + '</h1>' +
       '<div class="vsub">Growth, housing, costs, markets and construction from free public sources, refreshed nightly' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sale prices: Texas doesn’t disclose them.</div></div>' +
       '<div class="vctl">' + (ctx.exportMenu ? ctx.exportMenu([{ label: 'Market report · PDF', attrs: ' id="mkExport"' }, { label: 'Market data · CSV', attrs: ' id="mkCsv"' }])
         : '<button class="btn" type="button" id="mkCsv">Export Data</button><button class="btn primary" type="button" id="mkExport">Export PDF</button>') + '</div></div>' +

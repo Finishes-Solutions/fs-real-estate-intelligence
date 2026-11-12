@@ -33,7 +33,7 @@ export function initTimeline(ctx) {
 
   root.innerHTML = `
     <div class="vhead">
-      <div><div class="kicker">Timeline</div><h2 id="tlTitle">Projects under construction</h2><div class="vsub" id="tlSub"></div></div>
+      <div><div class="kicker">${esc(ctx.navPath('timeline'))}</div><h1 id="tlTitle">Timeline</h1><div class="vsub" id="tlSub"></div></div>
       <div class="vctl">
         <label>Group by <select class="chip" id="tlGroup"><option value="type">Type</option><option value="county">County</option>${USE_ORDER.length ? '<option value="use">Use</option>' : ''}</select></label>
         <label>Measure <select class="chip" id="tlMeasure"><option value="value">Est. value</option><option value="count">Projects</option></select></label>
@@ -224,7 +224,7 @@ export function initTimeline(ctx) {
     const groups = groupsFor(opt.group, list);
     const est = list.filter(f => f.tsE || f.teE).length;
     const pct = Math.round(est / Math.max(1, list.length) * 100);
-    $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + (pct < 1 ? '<1%' : pct + '%') + ' have estimated dates' : '');
+    $('tlSub').textContent = 'Filings under construction: ' + fmtN(list.length) + ' · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + (pct < 1 ? '<1%' : pct + '%') + ' have estimated dates' : '');
     ctx.scopeBar?.($('tlScope'));
     if (!list.length) { $('tlChart').querySelector('svg')?.remove(); G = null; $('gInner').innerHTML = ctx.vempty ? ctx.vempty({ icon: 'search', title: 'No filings match these filters', text: 'Remove a filter above, or reset them.', actions: [{ label: 'Reset filters', id: 'tlReset', primary: true }] }) : '<div class="empty">No filings match these filters.</div>';
       $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; $('tlReset')?.addEventListener('click', () => ctx.resetFilings?.()); return; }

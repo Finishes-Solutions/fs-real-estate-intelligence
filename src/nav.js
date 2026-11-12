@@ -102,7 +102,7 @@ export function renderNav(ctx) {
     '<div class="mt-h">Export</div><div class="mrows">' + row('export', 'Quick export', ' aria-label="Quick export: a spreadsheet or PDF of what the map shows"') + '</div>' +
     '<div class="mt-h">Map tools</div><div class="mrows">' + row('layers', 'Layers') + row('near', 'Nearby', ' aria-label="Nearby: the area around my location"') + row('note', 'Pin a note', ' aria-label="Pin a site note at my location"') + '</div>' +
     '<div class="mt-h">Settings</div><div class="mrows">' + row('settings', 'Settings', ' aria-label="Settings: your name and team, map, install, layout"') + '</div>' +
-    '<div class="mt-h">Data &amp; help</div><div class="mrows">' + row('sources', 'Data sources &amp; freshness') + '</div>';
+    '<div class="mt-h">Data &amp; help</div><div class="mrows">' + row('sources', 'Data &amp; help', ' aria-label="Data &amp; help: sources and freshness"') + '</div>';
 
   ctx.setBadge = setBadge; ctx.navPath = pathOf;
 }

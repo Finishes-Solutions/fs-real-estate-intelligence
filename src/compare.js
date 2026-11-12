@@ -176,7 +176,7 @@ export function initCompare(ctx) {
     if (ctx.view !== 'compare') return;
     const ft = ctx.filterText();
     const cur = fromSelection(), canAdd = cur && areas.length < MAX && !has(cur.key);
-    let h = '<div class="vhead"><div><div class="kicker">Compare areas</div><h2>Compare up to four areas</h2><div class="vsub">' + 'Population, income, housing and jobs for each area, then its construction filings. ' + (ft ? 'Filings use the same filters for every area (everything except the area itself), so they can differ from the Market page.' : 'Filings are counted with no other filters.') + '</div></div>' +
+    let h = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('compare')) + '</div><h1>Compare areas</h1><div class="vsub">' + 'Up to four areas side by side: population, income, housing and jobs for each area, then its construction filings. ' + (ft ? 'Filings use the same filters for every area (everything except the area itself), so they can differ from the Market page.' : 'Filings are counted with no other filters.') + '</div></div>' +
       '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”' + (eachCounty().length ? ' Together' : '') + '</button>' : '') +
         (eachCounty().length && areas.length < MAX ? '<button class="btn" id="cmpAddEach">+ Add Each County (' + eachCounty().length + ')</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') +
         (areas.length && ctx.exportMenu ? ctx.exportMenu([{ label: 'Comparison · PDF', attrs: ' data-cx="pdf"' }, { label: 'Comparison · Excel', attrs: ' data-cx="xlsx"' }, { label: 'Comparison · CSV', attrs: ' data-cx="csv"' }]) : '') + '</div></div>';
