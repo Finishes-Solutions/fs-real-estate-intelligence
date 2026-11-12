@@ -1145,7 +1145,10 @@ const toastEl=document.getElementById('toast'); let toastT=0, toastMs=0, toastAc
 const MOD_Z=/Mac|iPhone|iPad|iPod/.test(navigator.platform||navigator.userAgent)?'⌘Z':'Ctrl+Z';
 const hideToast=()=>{ toastEl.classList.remove('on','act'); toastAct=null; };
 const armToast=()=>{ clearTimeout(toastT); if(toastEl.matches(':hover')||toastEl.contains(document.activeElement)) return; toastT=setTimeout(hideToast,toastMs); };
-function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a); toastAct=null;
+const toastHome0=toastEl.parentNode;
+function toast(m,o={}){ // on a page (Projects, Reports…) the note goes on the stage, over the page; on the Map it stays in the map's viewport
+  if(toastEl.parentNode!==document.body){ const st=document.getElementById('stage'), home=!st||(st.dataset.view||'map')==='map'?toastHome0:st; if(home&&toastEl.parentNode!==home) home.append(toastEl); }
+  toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a); toastAct=null;
   if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.title=a.label+' ('+MOD_Z+')'; b.setAttribute('aria-keyshortcuts',MOD_Z==='⌘Z'?'Meta+Z':'Control+Z');
     const run=toastAct=()=>{ hideToast(); a.run(); }; b.onclick=run;
     const x=document.createElement('button'); x.type='button'; x.className='tx'; x.setAttribute('aria-label','Dismiss'); x.textContent='×'; x.onclick=hideToast;

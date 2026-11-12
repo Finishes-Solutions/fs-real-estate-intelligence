@@ -53,9 +53,41 @@ export function workspace(env) {
   // lands on the project, not on a copy
   const normal = new WeakSet();
   const fz = p => { if (!p.fz || !normal.has(p.fz)) { p.fz = M0.fzOf(p); normal.add(p.fz); } return p.fz; };
+  // ---------- undo / redo: one entry per edit (a field typed in counts once until you pause 4 s or move on) ----------
+  // the entry is the project's study inputs (project.fz and the client) from before the edit
+  const snapOf = p => JSON.stringify({ fz: p.fz ?? null, client: p.client ?? null });
+  const keyOf = t => t?.dataset ? (t.dataset.as || t.dataset.line || t.dataset.mix || t.dataset.in || t.dataset.lineoff || t.dataset.opt || t.dataset.reset || t.dataset.act || t.dataset.f || '') : '';
+  const labelOf = t => (t?.closest?.('.ws-a,.ws-f,tr')?.querySelector('label,span,th')?.textContent || '').trim() || 'Change';
+  let burst = null;
+  function record(p, t) { // call before an edit is applied
+    const s = st(p), key = keyOf(t);
+    if (burst && burst.pid === p.id && burst.key === key && Date.now() - burst.t < 4000) { burst.t = Date.now(); return; }
+    (s.hist ||= []).push({ snap: snapOf(p), key, label: labelOf(t), from: t?.getAttribute?.('value') }); if (s.hist.length > 60) s.hist.shift(); s.fut = [];
+    burst = { pid: p.id, key, t: Date.now() };
+  }
+  const fieldOf = key => key && root?.querySelector('[data-as="' + CSS.escape(key) + '"],[data-line="' + CSS.escape(key) + '"],[data-in="' + CSS.escape(key) + '"]');
+  const step = (h, now) => h.label + (h.from != null && now != null && h.from !== now ? ': ' + h.from + ' → ' + now : '');
+  function restore(p, from, to) { // move the newest entry of `from` onto `to` and put the project back as it was
+    const s = st(p), h = (s[from] || []).pop(); if (!h) { env.toast(from === 'hist' ? 'Nothing to undo.' : 'Nothing to redo.'); return null; }
+    const now = fieldOf(h.key)?.value; (s[to] ||= []).push({ snap: snapOf(p), key: h.key, label: h.label, from: now });
+    const o = JSON.parse(h.snap); if (o.fz) p.fz = o.fz; else delete p.fz; if (o.client == null) delete p.client; else p.client = o.client;
+    burst = null; changed(p, true); return { ...h, now };
+  }
+  function undo(p) { const h = restore(p, 'hist', 'fut'); if (h) env.toast('Undone: ' + step({ ...h, from: h.now }, h.from), { action: { label: 'Redo', run: () => redo(p) } }); }
+  function redo(p) { const h = restore(p, 'fut', 'hist'); if (h) env.toast('Redone: ' + step({ ...h, from: h.now }, h.from), { action: { label: 'Undo', run: () => undo(p) } }); }
+  // ⌘Z / Ctrl+Z (⇧ to redo) on the Feasibility tab: outside text fields, and in the step's own fields (they're redrawn as
+  // the numbers change, so the browser's own undo has nothing to go back to)
+  document.addEventListener('keydown', e => {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'z') return;
+    const el = document.getElementById('wsRoot'), a = document.activeElement; if (!el || !cur || !el.offsetParent) return;
+    if (a && (a.isContentEditable || (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !(el.contains(a) && a.matches('[data-as],[data-line],[data-mix],[data-in]'))))) return;
+    e.preventDefault(); if (e.shiftKey) redo(cur); else undo(cur);
+  });
+  // once an edit is saved, say what changed, with Undo
+  function savedNote(p) { const h = st(p).hist?.at(-1), f = h && fieldOf(h.key); if (!f || h.from == null || f.value === h.from) return; env.toast(step(h, f.value) + ' · saved', { action: { label: 'Undo', run: () => undo(p) } }); }
   function changed(p, now = false) { // saved on the project (debounced while typing) and the numbers redrawn
     cache.delete(p.id); clearTimeout(computeT); computeT = setTimeout(() => paint(), now ? 0 : 220);
-    clearTimeout(saveT.get(p.id)); saveT.set(p.id, setTimeout(() => { saveT.delete(p.id); env.save(p); }, now ? 0 : 900));
+    clearTimeout(saveT.get(p.id)); saveT.set(p.id, setTimeout(() => { saveT.delete(p.id); env.save(p); if (!now) savedNote(p); }, now ? 0 : 900));
   }
 
   // ---------- the frame: stepper, step, summary rail ----------
@@ -291,6 +323,7 @@ export function workspace(env) {
       const f = fz(p), s = st(p);
       if (t.dataset.step) { if (t.getAttribute('aria-disabled') === 'true') { s.err = t.title; paint(); return; } return go(p, t.dataset.step); }
       if (t.dataset.edit) return env.openOption(p.id, t.dataset.edit);
+      if (t.dataset.reset || ['clearLines', 'dropUnknown', 'newScenario', 'delScenario', 'survey'].includes(t.dataset.act)) record(p, t);
       if (t.dataset.reset) { const o = (f.scenarios.find(x => x.id === s.editing)?.overrides) || f.overrides; delete o[t.dataset.reset]; return changed(p, true); }
       if (t.dataset.file) return download(p, t.dataset.file);
       if (t.dataset.link) { try { const r = await api({ op: 'link', path: t.dataset.link }); window.open((await r.json()).url, '_blank', 'noopener'); } catch (err) { s.reportErr = err.message; paint(); } return; }
@@ -337,6 +370,7 @@ export function workspace(env) {
     });
     el.addEventListener('input', e => {
       const t = e.target, f = fz(p), s = st(p);
+      if (t.dataset.as || t.dataset.line || t.dataset.mix || (t.dataset.in && !/^sv/.test(t.dataset.in))) record(p, t);
       if (t.dataset.as) { const o = s.editing ? f.scenarios.find(x => x.id === s.editing)?.overrides : f.overrides; if (!o) return; if (t.value === '' || !Number.isFinite(+t.value)) return; o[t.dataset.as] = +t.value; return changed(p); }
       if (t.dataset.line) { if (!Number.isFinite(+t.value) || t.value === '') return; (f.budgetEdits[t.dataset.line] ||= {}).rate = +t.value; return changed(p); }
       if (t.dataset.mix) { const sc = f.scenarios.find(x => x.id === s.editing); if (!sc) return; if (!sc.mix) { const c = studyOf(p, { sensitivity: false }); if (!c?.study?.site) return; sc.mix = mixOf(c.study); } const [i, k] = t.dataset.mix.split(':'); if (Number.isFinite(+t.value)) sc.mix[+i][k] = +t.value; return changed(p); }
@@ -349,6 +383,7 @@ export function workspace(env) {
     });
     el.addEventListener('change', e => {
       const t = e.target, f = fz(p), s = st(p);
+      if (t.dataset.opt || t.dataset.lineoff || t.dataset.f === 'activeScenario' || t.dataset.in === 'landBasis') record(p, t);
       if (t.dataset.opt) { f.optionId = t.dataset.opt; return changed(p, true); }
       if (t.dataset.lineoff) { const ed = f.budgetEdits[t.dataset.lineoff] ||= {}; if (t.checked) delete ed.off; else ed.off = true; if (!Object.keys(ed).length) delete f.budgetEdits[t.dataset.lineoff]; return changed(p, true); }
       if (t.dataset.f === 'activeScenario') { f.activeScenario = t.value || null; return changed(p, true); }

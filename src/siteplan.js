@@ -125,7 +125,7 @@ export function initSitePlan(ctx) {
   window.addEventListener('pagehide', () => { if (persistT) persistNow(); });
   function save(p) {
     if (p) { p.updated = new Date().toISOString(); p.by = get(NAME_KEY) || p.by || ''; if (!db.dirty.includes(p.id)) db.dirty.push(p.id); }
-    persist(); badge(); if (ctx.view === 'projects') render();
+    persist(); badge(); if (ctx.view === 'projects') { render(); paintUpd(); }
     clearTimeout(syncT); syncT = setTimeout(sync, 1500);
   }
   // the team's copy is the real one (api/projects.js): changes go up in batches the server can take, and only projects
@@ -167,7 +167,7 @@ export function initSitePlan(ctx) {
       if (tooBig.size) { const names = db.projects.filter(p => tooBig.has(p.id)).map(p => p.name); tooBig = new Set(); if (names.length) ctx.toast(names.join(', ') + ' is too big for the team’s copy, so it is kept on this device only. Delete some options or renderings to make it smaller.'); }
       if (changed) { persist(); badge(); if (ctx.view === 'projects') render(); }
     } catch (e) { syncSaid(false); /* offline: try again on the next change or when back online */ }
-    finally { syncing = false; if (ctx.view === 'projects') render(); }
+    finally { syncing = false; if (ctx.view === 'projects') { render(); paintUpd(); } }
   }
   // A project open here (or changed here and not sent yet) isn't replaced by the team's newer copy; only what server runs
   // added to it comes in: renderings and plan sets (not ones deleted here this visit), and a build that finished
@@ -4944,7 +4944,15 @@ export function initSitePlan(ctx) {
         : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
       '<div class="pj-hmeta"><span class="pj-st" data-st="' + st.id + '"><label class="sr" for="pjStatus">Status</label><select id="pjStatus" title="The project’s status (shared with the team)">' + PJ.STATUSES.map(x => '<option value="' + x.id + '"' + (x.id === st.id ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></span>' +
         (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') +
-        '<span class="pj-upd">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + (p.created ? ' · started ' + when(p.created) : '') + '</span></div></header>';
+        updHtml(p) + '</div></header>';
+  }
+  // "Updated … by …" and where the last save went (the editor's save mark, in words), repainted by paintUpd() after each
+  // save and sync even while someone is typing (render() waits for them to leave the field)
+  function updHtml(p) {
+    const s = Date.now() - t(ver(p)), k = db.dirty.includes(p.id) ? (shared === false ? 'local' : 'saving') : shared === true ? 'synced' : shared === false ? 'local' : '';
+    const say = { saving: 'Saving to the team…', synced: 'Synced with team', local: 'Saved on this device only' }[k];
+    return '<span class="pj-upd" aria-live="polite">Updated ' + (s >= 0 && s < 60e3 ? 'just now' : s < 3600e3 ? Math.max(1, Math.round(s / 60e3)) + ' min ago' : when(ver(p))) + (p.by ? ' by ' + esc(p.by) : '') + (p.created ? ' · started ' + when(p.created) : '') +
+      (say ? ' · <span class="pj-sync" data-k="' + k + '">' + say + '</span>' : '') + '</span>';
   }
   const rendersOf = p => p.plans.flatMap(pl => (pl.renders || []).map(r => ({ pl, r })));
   function tabsHtml(p, tab) {
@@ -4955,7 +4963,7 @@ export function initSitePlan(ctx) {
   }
   // the Feasibility tab: the step-by-step workspace (src/workspace.js), saving and opening options through this page
   const WS = workspace({ save, openOption: (pid, plid) => open(pid, plid), newPlan: (p, extra) => newPlan(p, extra), setTab: (p, t) => setTab(p, t, true), goMap: () => ctx.setView('map'),
-    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: m => ctx.toast?.(m), saveFile: (n, d, m) => ctx.saveFile(n, d, m) });
+    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: (m, o) => ctx.toast?.(m, o), saveFile: (n, d, m) => ctx.saveFile(n, d, m) });
   function detailHtml(p) {
     const tab = tabFor(p), body = { workspace: WS.html, overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
@@ -5461,6 +5469,7 @@ export function initSitePlan(ctx) {
   }
   // the project page is in the address (#pj=<id>): opening one adds a history entry, so Back returns to the list (src/app.js)
   const pjMoved = was => { if (was !== cur) ctx.scheduleHash?.(ctx.view === 'projects' ? { push: true } : undefined); };
+  function paintUpd() { const p = cur && db.projects.find(x => x.id === cur), u = p && root?.querySelector('.pj-head .pj-upd'); if (u) u.outerHTML = updHtml(p); }
   function show(id, tab) { const was = cur; cur = id; renaming = false; adding = false; if (id && tab) ptab.set(id, PJ.tabOf(tab)); render(true); root.scrollTop = 0; pjMoved(was); }
   ctx.currentProject = () => ctx.view === 'projects' ? cur : null;
   ctx.openProject = (id, tab) => { if (ctx.view !== 'projects') ctx.setView('projects'); if (!id || db.projects.some(x => x.id === id)) show(id || null, tab); };
