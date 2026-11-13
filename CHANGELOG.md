@@ -11,6 +11,20 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **If the site outline is the county's** (a few feet off the survey on this parcel), the plan is placed by the best fit and says so; drawing the boundary to the survey makes it exact.
 - Walled ponds are drawn with their wall on the site plan sheet instead of a 10 ft sloped bank.
 
+### 1:18 PM CT: Typing in the Feasibility forms no longer drops out of the field (`matthew/more-data-sources`)
+- **Intake fields keep the cursor:** typing in Client, Target use, Address, City, County, ZIP or Asking price used to stop after the first letter or two, because the page redrew the form and lost the field. Now you can type straight through.
+- **The same fix covers every number box in the workspace:** the scenario unit mix, the Pro Forma assumptions and the Budget rates. Before, a redraw could also move the cursor to the start of a number box, so a typed price came out jumbled.
+
+### 2:22 AM CT: Property taxes for the agents: appraisal rolls and tax rates for the seven counties (`matthew/more-data-sources`)
+- **Agents can estimate a parcel's property tax:** every taxing unit (county, city, school district, water and emergency-services districts, college, hospital, drainage) with its rate and the year it is from, and the tax a year at the appraisal district's value and at a value they give, such as a purchase price.
+- **Assessment history:** a parcel's land, improvement and total values by year with the change each year.
+- **Tax-comparable tables:** what similar properties are valued at per unit, per square foot and per acre, filtered by area, land use, year built, units and size.
+- **Where it comes from:** the appraisal districts' own published rolls (Harris, Fort Bend, Washington and Grimes in full; Waller and Austin current year only) and the published tax rates (the districts' tables and the Texas Comptroller's). Montgomery has rates only until its appraisal district answers a records request.
+- Nothing changes in the app's screens yet, and the data loads once the new database tables are set up and the job is run.
+
+### 1:15 AM CT: Research: where to get appraisal rolls and tax rates for the seven counties (`matthew/more-data-sources`, docs only)
+- No change to the app. A new note lists the official sources for each county's appraisal roll and every taxing unit's tax rates, what each one contains, and which counties need a public records request (Waller, Austin, Montgomery). It's the plan for adding property tax estimates.
+
 ## 2026-11-09
 
 ### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)

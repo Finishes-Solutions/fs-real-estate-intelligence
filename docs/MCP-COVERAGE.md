@@ -184,6 +184,19 @@ patch their output):
 - **Angled parking on a mix:** a program of zones with `parkAngle` lays square stalls and says nothing; the MCP says
   it in "Not done" (and in the `site_plan` answer).
 
+## Property tax and assessments (round 3, 2026-11-12)
+
+New tools over the appraisal-roll and tax-rate tables loaded by `build/cad-rolls.mjs` (reference: `docs/MCP_TOOLS.md`;
+sources: `docs/data-sources/cad-and-tax-rates.md`). The app's own screens don't show these yet; agents get them first.
+
+| Capability | Tool | |
+|---|---|---|
+| Property tax for a parcel: taxing units, rates (M&O, I&S), exemptions, tax at the district value and at a given value | `tax_estimate` | ✓ Harris, Fort Bend, Washington, Grimes (full units); Waller, Austin (county, city, school only); Montgomery rates only |
+| A parcel's values by year with the change | `assessment_history` | ✓ (history builds up from the first load) |
+| Tax-comparable values a unit / sf / acre | `assessment_comps` | ✓ (units: Harris commercial buildings; radius: where coordinates are loaded) |
+
+Tool list (read-only connection): 93,568 characters with the three tools; the test cap went from 95,000 to 110,000.
+
 ## How it is tested
 
 `test/mcp-agent-e2e.mjs` drives the server with a real MCP client the way an agent does: address → `find_property` →
@@ -197,4 +210,5 @@ parking count governs and is met; the hotel is a typed building with 120 keys; t
 again; said when not drawn) and settings (front setback 60 ft) → buildings added by type (words "add a bank at the
 front", typed daycare) → `plan_compare` → `plan_export` → `report_filings` (summary, activity with CSV, area
 comparison, filing list) and `report_traffic`. Every outside service is stood in for; storage is in memory.
-`test/mcp-projects.mjs` covers `plan_from_project`, `save_plan_to_project` and `upload_project_file`.
+`test/mcp-projects.mjs` covers `plan_from_project`, `save_plan_to_project` and `upload_project_file`. `test/cad.mjs`
+covers the property-tax tools on real extracts of each county's files (in memory, no network).

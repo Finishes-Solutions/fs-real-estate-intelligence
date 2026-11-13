@@ -137,6 +137,14 @@ infra grep: 126 patterns from docs/AUDIT.md, 0 matches (excluding docs/AUDIT.md,
 
 ## Infra I need to set up
 
+0. **Appraisal rolls and tax rates (2026-11-12):** apply `supabase/migrations/20261112000000_cad_rolls.sql` in the
+   Supabase SQL editor (additive: six tables, two functions, the private `cad-raw` bucket), then run the "CAD rolls and
+   tax rates" workflow once by hand (it uses the existing Production secrets). Database size: Harris alone is about 1.6
+   million accounts and 1.4 million buildings a year; on the current Micro compute (1 GB) consider loading
+   `ONLY=comptroller,rates,fbcad,washington,grimes,layers` first and Harris after the compute upgrade listed below.
+   Send the public information requests drafted in `docs/data-sources/cad-and-tax-rates.md` (Waller, Austin,
+   Montgomery, and Grimes for a structured export).
+
 1. **Done (2026-10-25):** `supabase/migrations/20261026000000_report_sets.sql` is applied to this platform's own Supabase project (Finishes Real Estate Intelligence). The private `report-sets` bucket exists (checked: private, 25 MB file limit, PDF/XLSX/CSV/JSON only), so "Save the whole set for the team" works.
 2. **Vercel (this project):** nothing new is required. `vercel.json` already configures `api/feasibility.js` (120 s; data files, logo, fonts and Chromium included). Optional:
    - `REPORT_SETS_BUCKET` if the bucket gets another name;

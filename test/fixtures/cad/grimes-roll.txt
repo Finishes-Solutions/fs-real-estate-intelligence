@@ -1,0 +1,200 @@
+------------------------------------------------------------------------------------------------------------------------------------
+GRIMESCAD                                                                                                        08/05/2026  08:39AM
+2026 CERTIFIED ROLL                                                                                              PAGE              1
+------------------------------------------------------------------------------------------------------------------------------------
+
+
+    OWNER NAME AND ADDRESS            PROPERTY DESCRIPTION         EXEMPTIONS                    VALUES
+
+PID: R79106  (O0077767)        A0407 W R SANDERS, TRACT 20-2,                      LANDHS   $         0                             
+407-000-0202                   ACRES 256.21                                        LANDNHS  $         0                             
+LOCAL ID:                                                                          IMPHS    $         0                             
+1031 PROS TITLEHOLDER 1274, LL SITUS: LEANING OAKS LN                              IMPNHS   $         0                             
+PO BOX 283                            ANDERSON, TX 77830                           HSCAPADJ $         0                             
+IOLA TX 77861                  ENTS: GGR,SNA                                       CBLCAPADJ$         0                             
+                               LAND SPTB: D1                                       AGUSE    $    31,280                             
+                                                                                   AGMKT    $ 2,492,670                             
+                                                                                   TIMUSE   $         0                             
+                                                                                   TIMMKT   $         0                             
+                                                                                   ASSESSED $    31,280 GGR - GRIMES COUNTY         
+                                                                                   TAXABLE  $    31,280                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   ASSESSED $    31,280 SNA - NAVASOTA ISD          
+                                                                                   TAXABLE  $    31,280                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: R15025  (O0051245)        A0063 A YEAMAN, TRACT 7, ACRES                      LANDHS   $         0                             
+63-000-0070                    315.3485                                            LANDNHS  $    17,260                             
+LOCAL ID:                                                                          IMPHS    $         0                             
+105 LAND & CATTLE LLC          SITUS: 18121 HWY105 E                               IMPNHS   $     5,730                             
+18121 HWY 105 E                       PLANTERSVILLE, TX 77363                      HSCAPADJ $         0                             
+PLANTERSVILLE TX 77363         ENTS: GGR,SNA                                       CBLCAPADJ$         0                             
+                               LAND SPTB: D1, IMP SPTB: D2                         AGUSE    $    23,580                             
+                                                                                   AGMKT    $ 5,424,400                             
+                                                                                   TIMUSE   $         0                             
+                                                                                   TIMMKT   $         0                             
+                                                                                   ASSESSED $    46,570 GGR - GRIMES COUNTY         
+                                                                                   TAXABLE  $    46,570                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   ASSESSED $    46,570 SNA - NAVASOTA ISD          
+                                                                                   TAXABLE  $    46,570                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: N80837  (O0036209)        WS                          3002                    MINERAL  $         0                             
+026515000-R-032618             CML EXPLORATIO/MADISONVILLE, W.                     ASSESSED $         0 FDI - GRIMES ESD #1         
+LOCAL ID:                      (WOOD , 0.0123%, RI, RI 0.0123%                     TAXABLE  $         0                             
+1202 DOUGLAS LP                                                                                                                     
+1202 DOUGLAS AVE               ENTS: FDI,GGR,SIO                                                                                    
+MIDLAND TX 79701-4052          IMP SPTB: G1                                        ASSESSED $         0 GGR - GRIMES COUNTY         
+                                                                                   TAXABLE  $         0                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   ASSESSED $         0 SIO - IOLA ISD              
+                                                                                   TAXABLE  $         0                             
+------------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------
+GRIMESCAD                                                                                                        08/05/2026  08:39AM
+2026 CERTIFIED ROLL                                                                                              PAGE              2
+------------------------------------------------------------------------------------------------------------------------------------
+
+
+    OWNER NAME AND ADDRESS            PROPERTY DESCRIPTION         EXEMPTIONS                    VALUES
+
+PID: N80949  (O0036209)        SUTTON                      3002                    MINERAL  $       364                             
+026253000-R-032618             CML EXPLORATIO/MADISONVILLE, W.                     ASSESSED $       364 FDI - GRIMES ESD #1         
+LOCAL ID:                      (WOOD , 0.0434%, RI, RI 0.0434%                     TAXABLE  $       364                             
+1202 DOUGLAS LP                                                                                                                     
+1202 DOUGLAS AVE               ENTS: FDI,GGR,SIO                                                                                    
+MIDLAND TX 79701-4052          IMP SPTB: G1                                        ASSESSED $       364 GGR - GRIMES COUNTY         
+                                                                                   TAXABLE  $       364                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   ASSESSED $       364 SIO - IOLA ISD              
+                                                                                   TAXABLE  $       364                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: N80679  (O0036209)        OCONNOR-GOINS UNIT ETAL WL#13109                    MINERAL  $       265                             
+094912000-R-032618             SANDEL OPERATI/IOLA                                 ASSESSED $       265 FDI - GRIMES ESD #1         
+LOCAL ID:                      (SUB-CLARKSVILLE) AB 42 /DANIEL                     TAXABLE  $       265                             
+1202 DOUGLAS LP                MCMAHAN SUR, 0.0268%, RI, RI                                                                         
+1202 DOUGLAS AVE               0.0268%                                                                                              
+MIDLAND TX 79701-4052                                                              ASSESSED $       265 GGR - GRIMES COUNTY         
+                               ENTS: FDI,GGR,SIO                                   TAXABLE  $       265                             
+                               IMP SPTB: G1                                                                                         
+                                                                                                                                    
+                                                                                   ASSESSED $       265 SIO - IOLA ISD              
+                                                                                   TAXABLE  $       265                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: R36947  (O0069413)        SCENIC VIEW EST, LOT 19, ACRES                      LANDNHS  $   330,000                             
+4550-000-0190                  10.00                                               IMPNHS   $    61,168                             
+LOCAL ID:                      DBA: RV & MH SITES                                  ASSESSED $   391,168 GGR - GRIMES COUNTY         
+135 RAILROAD LLC                                                                   TAXABLE  $   391,168                             
+859 E GLENN ST                 SITUS: 7432 FM3090                                                                                   
+BELLVILLE TX 77418                    NAVASOTA, TX 77868                                                                            
+                               ENTS: GGR,SNA                                       ASSESSED $   391,168 SNA - NAVASOTA ISD          
+                               LAND SPTB: E, IMP SPTB: E1                          TAXABLE  $   391,168                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: R77043  (O0058891)        A0471 T H WALKER, TRACT 25, ACRES                   LANDHS   $         0                             
+471-000-0250                   139.62, (88.35 ACS SOLAR PANELS)                    LANDNHS  $   760,690                             
+LOCAL ID:                                                                          IMPHS    $         0                             
+140 ACRES SERIES               SITUS: CR164                                        IMPNHS   $         0                             
+A SERIES OF GEMM BEEN INVESTME        IOLA, TX 77861                               HSCAPADJ $         0                             
+14390 FM 244                   ENTS: FDI,GGR,SIO                                   CBLCAPADJ$         0                             
+IOLA TX 77861                  LAND SPTB: J3                                       AGUSE    $     5,590                             
+                                                                                   AGMKT    $   441,430                             
+                                                                                   TIMUSE   $         0                             
+                                                                                   TIMMKT   $         0                             
+                                                                                   ASSESSED $   766,280 FDI - GRIMES ESD #1         
+                                                                                   TAXABLE  $   766,280                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   ASSESSED $   766,280 GGR - GRIMES COUNTY         
+                                                                                   TAXABLE  $   766,280                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   ASSESSED $   766,280 SIO - IOLA ISD              
+                                                                                   TAXABLE  $   766,280                             
+------------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------
+GRIMESCAD                                                                                                        08/05/2026  08:39AM
+2026 CERTIFIED ROLL                                                                                              PAGE              3
+------------------------------------------------------------------------------------------------------------------------------------
+PID: R27948  (O0085259)        PINEBROOK, UNIT 2, BLOCK 5, LOT 5                   LANDNHS  $    10,730                             
+7632-005-0050                                                                      ASSESSED $    10,730 GGR - GRIMES COUNTY         
+LOCAL ID:                      SITUS: 7804 N CREEK LN                              TAXABLE  $    10,730                             
+GONZALEZ, HUGO M & GRISELDA MA        PLANTERSVILLE, TX 77363                                                                       
+7804 N CREEK                   ENTS: GGR,SNA                                                                                        
+PLANTERSVILLE TX 77363-4402    LAND SPTB: C1                                       ASSESSED $    10,730 SNA - NAVASOTA ISD          
+                                                                                   TAXABLE  $    10,730                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: R31129  (O0062910)        W MAGNOLIA FRST SEC 21, LOT 2,                      LANDHS   $    41,800                             
+8671-000-0020                  ACRES 10.00                                         LANDNHS  $         0                             
+LOCAL ID:                                                                          IMPHS    $   686,530                             
+GONZALEZ, HUGO M & MARTINEZ,GR SITUS: 16555 CEDAR RD                               IMPNHS   $    15,000                             
+P. O BOX 4048                         PLANTERSVILLE, TX 77363                      HSCAPADJ $         0                             
+PRAIRIE VIEW TX 77446          ENTS: GGR,SNA                                       CBLCAPADJ$         0                             
+                               LAND SPTB: D1, IMP SPTB: E1                         AGUSE    $         0                             
+                                                                                   AGMKT    $         0                             
+                                                                                   TIMUSE   $     2,040                             
+                                                                                   TIMMKT   $   376,200                             
+                                                                                   ASSESSED $   745,370 GGR - GRIMES COUNTY         
+                                                                                   TAXABLE  $   745,370                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                                   ASSESSED $   745,370 SNA - NAVASOTA ISD          
+                                                                                   TAXABLE  $   745,370                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: R78812  (O0078034)        HIDDEN HILLS PHASE 2, BLOCK 5, LOT  HS  $         0 LANDHS   $    20,000                             
+4841-005-0070                  7, ACRES 0.103                      TOT $         0 LANDNHS  $         0                             
+LOCAL ID:                                                                          IMPHS    $   192,390                             
+GONZALEZ, JAZZMIN              SITUS: 1217 HIGHGARDEN DR                           IMPNHS   $         0                             
+1217 HIGHGARDEN DR                    NAVASOTA, TX 77868                           HSCAPADJ $         0                             
+NAVASOTA TX 77868              ENTS: CNA,GGR,SNA                                   CBLCAPADJ$         0                             
+                               LAND SPTB: A1, IMP SPTB: A1                         AGUSE    $         0                             
+                                                                                   AGMKT    $         0                             
+                                                                                   TIMUSE   $         0                             
+                                                                                   TIMMKT   $         0                             
+                                                                                   ASSESSED $   212,390 CNA - CITY NAVASOTA         
+                                                                                   TAXABLE  $   212,390                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                   HS  $         0 ASSESSED $   212,390 GGR - GRIMES COUNTY         
+                                                                   TOT $         0 TAXABLE  $   212,390                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                   HS  $   140,000 ASSESSED $   212,390 SNA - NAVASOTA ISD          
+                                                                   TOT $   140,000 TAXABLE  $    72,390                             
+------------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------
+GRIMESCAD                                                                                                        08/05/2026  08:40AM
+2026 CERTIFIED ROLL                                                                                              PAGE           4306
+------------------------------------------------------------------------------------------------------------------------------------
+
+
+    OWNER NAME AND ADDRESS            PROPERTY DESCRIPTION         EXEMPTIONS                    VALUES
+
+PID: R55907  (O0049175)        DICKENS, LOT 19, ACRES 3.54         CBL $         0 LANDHS   $   155,760                             
+3620-000-0190                                                      TOT $         0 LANDNHS  $         0                             
+LOCAL ID:                      ENTS: GGR,SNA                                       IMPHS    $         0                             
+GONZALEZ, JESUS ET AL          LAND SPTB: A2                                       IMPNHS   $         0                             
+31250 OAKBOURNE DR                                                                 HSCAPADJ $         0                             
+WALLER TX 77484                                                                    CBLCAPADJ$    38,011                             
+                                                                                   AGUSE    $         0                             
+                                                                                   AGMKT    $         0                             
+                                                                                   TIMUSE   $         0                             
+                                                                                   TIMMKT   $         0                             
+                                                                                   ASSESSED $   117,749 GGR - GRIMES COUNTY         
+                                                                                   TAXABLE  $   117,749                             
+                                                                                                                                    
+                                                                                                                                    
+                                                                   CBL $         0 ASSESSED $   117,749 SNA - NAVASOTA ISD          
+                                                                   TOT $         0 TAXABLE  $   117,749                             
+------------------------------------------------------------------------------------------------------------------------------------
+PID: R63138  (O0049301)        S7637 - PINEBROOK, UNIT 7, BLOCK                    IMPHS    $     6,760                             
+7637-045-0032                  45, LOT 3-2, SERIAL #                               CBLCAPADJ$         0                             
+LOCAL ID:                      HOTX08803956, LABEL # NTA0547910,                   ASSESSED $     6,760 GGR - GRIMES COUNTY         
+GONZALEZ, JOSE FRANCISCO JOAQU IMP ONLY                                            TAXABLE  $     6,760                             
+SANDRA SALINAS                                                                                                                      
+8290 MAGNOLIA SPGS             SITUS: MAGNOLIA SPGS                                                                                 
+PLANTERSVILLE TX 77363                PLANTERSVILLE, TX 77363                      ASSESSED $     6,760 SNA - NAVASOTA ISD          
+                               ENTS: GGR,SNA                                       TAXABLE  $     6,760                             
+                               IMP SPTB: M1                                                             
