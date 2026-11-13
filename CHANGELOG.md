@@ -3,9 +3,23 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-13
+
+### 11:30 AM CT (Nov 13): UI/UX audit fixes merged into experimental, after a verification pass (`73185a3`…`48e4c28`, merge `ce9d224`)
+- **Every audit fix re-checked in the app:** each of the 58 fixes was run again on the merged code and compared with the audit report's pictures. Ten small gaps were closed:
+  - Phone tap targets: every button on the card, plan sheet, filters and page headers is now at least 44px.
+  - Undo is the next Tab key after a delete.
+  - Pages have proper headings, and "filings" is no longer called "projects".
+  - Start Site Plan is a filled green button again.
+  - Save set waits until storage is checked.
+  - The Environmental note names sources that returned only part of their records.
+  - The map-view report cards say "the middle of the map view".
+  - The Metrics picker takes focus as it opens.
+  - Site plan stages use the project's step names.
+
 ## 2026-11-12
 
-### 3:40 PM CT: UI/UX audit follow-ups: FEMA progress and per-part Retry, named toll roads, a project's next step (`eecef86`…`3837f08`, branch `ui-ux-audit-followups`)
+### 3:40 PM CT: UI/UX audit follow-ups: FEMA progress and per-part Retry, named toll roads, a project's next step (`fc48e69`…`883b34a`, branch `ui-ux-audit-followups`)
 - **FEMA reports show their progress:** the card lists each part (flood zones, insurance claims, disaster declarations, risk index) as Working…, Done or Didn't load, with the time so far, a 1–3 minute note on big areas and **Cancel**. Each part appears as soon as it's in, so a county's risk index no longer waits minutes for the claims count.
 - **Retry just the part that failed:** a FEMA part that didn't load has its own **Retry**, and a short claims count has **Count the claims again**; neither re-runs the whole report.
 - **Toll roads by name:** the Traffic report lists **Sam Houston Tollway (Beltway 8)** once, under **Toll roads**, instead of three raw TxDOT codes (TL0008-RG / -KG / -LG); other codes are said in words.
