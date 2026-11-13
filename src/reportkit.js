@@ -68,8 +68,18 @@ export const inHouston = c => !!c && c[0] > -95.95 && c[0] < -95.0 && c[1] > 29.
 export const nearHouston = (c, nm = 100) => { if (!c) return false; const R = Math.PI / 180, h = Math.sin((c[1] - HOU[1]) * R / 2) ** 2 + Math.cos(c[1] * R) * Math.cos(HOU[1] * R) * Math.sin((c[0] - HOU[0]) * R / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)) <= nm * 1.15078; };
 // the middle of a Polygon / MultiPolygon's bounding box
 export const middleOf = g => { let w = 180, s = 90, e = -180, n = -90; const walk = a => typeof a[0] === 'number' ? (w = Math.min(w, a[0]), e = Math.max(e, a[0]), s = Math.min(s, a[1]), n = Math.max(n, a[1])) : a.forEach(walk); if (!g?.coordinates) return null; walk(g.coordinates); return e < w ? null : [(w + e) / 2, (s + n) / 2]; };
+// an outline's size in square miles (the same flat-earth sum the report APIs use, lib/fema.mjs areaSqMi)
+export const sqmiOf = g => { g = g?.geometry || g; const polys = g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : []; const c = middleOf(g); if (!c) return 0;
+  const kx = 69.17 * Math.cos(c[1] * Math.PI / 180), ky = 69.17, ring = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += r[j][0] * kx * r[i][1] * ky - r[i][0] * kx * r[j][1] * ky; return Math.abs(s) / 2; };
+  return polys.reduce((a, p) => a + ring(p[0]) - p.slice(1).reduce((t, r) => t + ring(r), 0), 0); };
+// one way to write an area's size on every screen: acres under a square mile, one decimal under 10, whole miles above
+export const fmtSqmi = v => !Number.isFinite(+v) ? '' : v < 1 ? Math.round(v * 640).toLocaleString('en-US') + ' acres' : (v < 10 ? (+v).toFixed(1) : Math.round(v).toLocaleString('en-US')) + ' sq mi';
+// a point as '29.891, -95.394'
+export const latLon = c => c ? c[1].toFixed(3) + ', ' + c[0].toFixed(3) : '';
 // 'Map view near Katy', or plain 'Map view' where no place is known (never a guessed town)
 export const viewLabel = ctx => { const p = ctx.viewPlace?.(); return p ? 'Map view near ' + p : 'Map view'; };
+// the area as it reads after 'the middle of': a view label becomes 'the map view' (its nearby place is shown with the start point)
+export const midOf = label => /^Map view\b/.test(label) ? 'the map view' : label;
 
 // ---------- the Real Estate Intelligence report look (every report, on screen and as a PDF) ----------
 // Letter, portrait unless a report needs the width (a wide filing list). Inter for text, labels and
@@ -119,13 +129,18 @@ export function table(headers, rows) {
   return '<table><thead><tr>' + h.map(x => '<th' + (x.r ? ' class="r"' : '') + '>' + esc(x.t) + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map(r => '<tr>' + r.map((c, i) => '<td' + (h[i]?.r ? ' class="m r"' : h[i]?.m ? ' class="m"' : '') + '>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
 }
-// vertical bars: [{ label, v, color? }]; labels under every nth bar
-export function bars(list, { color = '#0b7a5f', height = 120, every = 1, unit = '' } = {}) {
+// vertical bars: [{ label, v, color? }]; labels under every nth bar.
+//   px: the width the chart is drawn at (the side card is about 340 px): labels are sized to read at 11 px there and thinned
+//   so they never overlap. labels: false leaves them off (a list beside the chart names the bars).
+export function bars(list, { color = '#0b7a5f', height = 120, every = 1, unit = '', px = 0, labels = true } = {}) {
   const W = 620, H = height, n = list.length || 1, bw = W / n, mx = Math.max(1, ...list.map(x => +x.v || 0));
-  return '<svg viewBox="0 0 ' + W + ' ' + (H + 16) + '" xmlns="http://www.w3.org/2000/svg" role="img">' + list.map((x, i) => {
+  const fs = px ? 11 * W / px : 9, longest = Math.max(1, ...list.map(x => String(x.label).length));
+  if (px) every = Math.max(every, Math.ceil((longest * fs * 0.6 + fs) / bw));
+  const foot = labels ? Math.round(fs * 1.5) + 2 : 4;
+  return '<svg viewBox="0 0 ' + W + ' ' + (H + foot) + '" xmlns="http://www.w3.org/2000/svg" role="img">' + list.map((x, i) => {
     const h = Math.max(x.v > 0 ? 1.5 : 0, (+x.v || 0) / mx * (H - 14)), X = i * bw;
     return '<g><title>' + esc(x.label + ': ' + fmt(x.v) + unit) + '</title><rect class="m-bar" x="' + (X + bw * .12).toFixed(1) + '" y="' + (H - h).toFixed(1) + '" width="' + (bw * .76).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.5" fill="' + (x.color || color) + '"/>' +
-      (i % every === 0 ? '<text x="' + (X + bw / 2).toFixed(1) + '" y="' + (H + 12) + '" font-size="9" text-anchor="middle" fill="currentColor" opacity=".6">' + esc(x.label) + '</text>' : '') + '</g>';
+      (labels && i % every === 0 ? '<text x="' + (X + bw / 2).toFixed(1) + '" y="' + (H + fs * 1.25).toFixed(1) + '" font-size="' + fs.toFixed(1) + '" text-anchor="middle" fill="currentColor" opacity=".7">' + esc(x.label) + '</text>' : '') + '</g>';
   }).join('') + '</svg>';
 }
 // ---------- report maps: a street map under the area ----------
@@ -240,6 +255,13 @@ export function openCard(ctx, { kicker, title, sub = '', loading = 'Loading…' 
   card.classList.add('open'); card.scrollTop = 0; card.querySelector('.x').onclick = () => ctx.closeCard(); return card;
 }
 export const cardTop = (kicker, title, sub = '') => '<div class="top"><div><div class="kicker">' + esc(kicker) + '</div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="bsub">' + sub + '</div>' : '') + '</div><button class="x" aria-label="Close">×</button></div>';
+// an area report's area, framed in the part of the map the open card and the toolbar leave clear (every area report)
+export function fitArea(ctx, g) {
+  g = g?.geometry || g; let w = 180, s = 90, e = -180, n = -90; const walk = a => typeof a[0] === 'number' ? (w = Math.min(w, a[0]), e = Math.max(e, a[0]), s = Math.min(s, a[1]), n = Math.max(n, a[1])) : a.forEach(walk);
+  if (!g?.coordinates || !ctx.fitBox) return; walk(g.coordinates); if (e < w) return;
+  // after the card has opened, so coverPad() counts it; the top clears the search bar, tools and chips over the map
+  requestAnimationFrame(() => { const p = ctx.coverPad?.() || {}; ctx.fitBox([[w, s], [e, n]], { padding: { ...p, top: Math.max(p.top || 0, 190) }, maxZoom: 15 }); });
+}
 // the filled card's charts draw in once per report (its kicker and title), when first seen (src/motion.js)
 export function fillCard(ctx, card, html) { card.innerHTML = html; card.classList.add('open'); card.querySelector('.x')?.addEventListener('click', () => ctx.closeCard()); ctx.wireCites?.(card);
   reveal(card, 'card:' + (card.querySelector('.kicker')?.textContent || '') + '|' + (card.querySelector('h2')?.textContent || '')); }
@@ -259,6 +281,10 @@ export const centerOf = g => { const r = (g.type === 'Polygon' ? g.coordinates[0
 //   modes: which ways to pick the area the Reports tab offers (default all three: 'selection', 'view', 'pick')
 //   noPanel / noSite: the Map panel / the Site section already have their own button for it
 const SHORT = { drivetime: '10–30 minute drives', traffic: 'Busiest roads, speeds', airtraffic: 'Planes overhead', fema: 'Flood zones, claims', environmental: 'Cleanup sites, permits' };
+// reports that start from one point of the area (drive times) or a circle around it (planes now): above this size the row
+// says so, so a county pick isn't read as county-wide figures
+const POINTY = { drivetime: [50, 'From the area’s middle'], airtraffic: [700, 'Planes near its middle'] };
+const hintFor = (key, sel) => { const p = POINTY[key]; return p && sel?.feature && sqmiOf(sel.feature) > p[0] ? p[1] : SHORT[key]; };
 export function initAreaReports(ctx) {
   const list = ctx.areaReports = [];
   const grid = document.getElementById('arepGrid');
@@ -268,7 +294,7 @@ export function initAreaReports(ctx) {
   const covered = (r, c) => !r.cover || r.cover.test(c);
   const syncSel = () => list.forEach(r => { if (!r.sb) return; let ok = true; try { ok = covered(r, ctx.areaCenter()); } catch (e) {}
     r.sb.disabled = !ok; r.sb.setAttribute('aria-disabled', String(!ok));
-    r.sb.querySelector('.ar-d').textContent = !ok ? r.cover.short : ctx.sel?.feature ? SHORT[r.key] || r.label : 'Run on map view'; r.sb.title = ok ? r.desc || r.label : r.cover.why; });
+    r.sb.querySelector('.ar-d').textContent = !ok ? r.cover.short : ctx.sel?.feature ? hintFor(r.key, ctx.sel) || r.label : 'Run on map view'; r.sb.title = ok ? r.desc || r.label : r.cover.why; });
   ctx.addAreaReport = r => {
     if (list.some(x => x.key === r.key)) return; list.push(r);
     if (grid && !r.noPanel) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ar-row'; b.dataset.ic = r.key; b.title = r.desc || r.label;

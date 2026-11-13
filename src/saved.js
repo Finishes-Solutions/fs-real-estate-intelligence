@@ -26,10 +26,10 @@ export function initSaved(ctx) {
     if (!el) return 0; const a = read(); let total = 0;
     const row = (s, i) => { const n = newSince(s); total += n; const nb = n ? '<span class="bdg new">' + fmtN(n) + ' new</span>' : '';
       const sm = esc(summary(s));
-      return isPage ? '<div class="svp-r"><div class="svp-t"><b>' + esc(s.name) + '</b>' + (nb ? ' ' + nb : '') + '<div class="svp-s" title="' + sm + '">' + sm + '</div></div><div class="svp-a"><button type="button" class="btn sm primary" data-open="' + i + '">Show on map</button>' +
+      return isPage ? '<div class="svp-r"><div class="svp-t"><b>' + esc(s.name) + '</b>' + (nb ? ' ' + nb : '') + '<div class="svp-s" title="' + sm + '">' + sm + '</div></div><div class="svp-a"><button type="button" class="btn sm" data-open="' + i + '">Show on map</button>' +
           '<a class="btn sm" href="' + rss(s) + '" target="_blank" rel="noopener" title="New matching filings as an RSS feed">RSS feed</a><button type="button" class="btn sm ghost" data-del="' + i + '" aria-label="Delete saved search ' + esc(s.name) + '" title="Delete saved search">Delete</button></div></div>'
         : '<div class="sv"><button class="lnk sv-n" data-open="' + i + '">' + esc(s.name) + '</button>' + nb + '<a class="lnk" href="' + rss(s) + '" target="_blank" rel="noopener" title="New matching filings as an RSS feed">RSS feed</a><button class="lnk x" data-del="' + i + '" aria-label="Delete saved search ' + esc(s.name) + '" title="Delete saved search">×</button><span class="sv-s" title="' + sm + '">' + sm + '</span></div>'; };
-    if (isPage) el.innerHTML = '<div class="vhead"><div><div class="kicker">My Work</div><h2>Saved searches</h2><div class="vsub">Searches you saved in this browser, with how many new filings match each one since you last opened it.</div></div>' +
+    if (isPage) el.innerHTML = '<div class="vhead"><div><div class="kicker">' + ctx.esc(ctx.navPath('saved')) + '</div><h1>Saved searches</h1><div class="vsub">Searches you saved in this browser, with how many new filings match each one since you last opened it.</div></div>' +
         (a.length ? '<div class="vctl"><button type="button" class="btn md" id="svpGo">Go to the Map</button></div>' : '') + '</div>' +
       (a.length ? '<div class="svp">' + a.map(row).join('') + '</div><p class="vfoot">To save a search, set filters or pick an area on the Map, then choose ⋯ › Save search at the top of the Map panel.</p>'
         : ctx.vempty ? ctx.vempty({ icon: 'bookmark', title: 'No saved searches yet', text: 'Save a filter set to see how many new filings match each visit, or get an RSS alert. Set filters or pick an area on the Map, then choose ⋯ › Save search at the top of the Map panel.', actions: [{ label: 'Go to the Map', id: 'svpGo', primary: true }] })
@@ -43,7 +43,13 @@ export function initSaved(ctx) {
   // deleting is undoable for a few seconds
   function remove(i) {
     const all = read(), [gone] = all.splice(i, 1); if (!gone) return; write(all); render();
-    ctx.toast('Deleted “' + gone.name + '” ·', { ms: 6500, action: { label: 'Undo', run: () => { const a = read(); a.splice(Math.min(i, a.length), 0, gone); write(a); render(); } } });
+    ctx.toast('Deleted “' + gone.name + '” ·', { action: { label: 'Undo', run: () => { const a = read(); a.splice(Math.min(i, a.length), 0, gone); write(a); render(); focusRow(i); } } });
+    focusRow(i); // focus stays in the list: the row that moved up into this place, else the one before, else the page title
+  }
+  function focusRow(i) {
+    const root = ctx.view === 'saved' ? page : listEl, bs = [...root.querySelectorAll('[data-open]')], b = bs[Math.min(i, bs.length - 1)];
+    const h = root.closest?.('.view')?.querySelector('h1') || page.querySelector('h1'); if (!b && h) h.setAttribute('tabindex', '-1');
+    (b || h)?.focus({ preventScroll: false });
   }
   function render() {
     box.style.display = read().length ? '' : 'none';

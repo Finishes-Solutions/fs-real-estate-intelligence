@@ -96,7 +96,9 @@ assert.deepEqual(M0.validateProject({ ...apt, fz: { ...apt.fz, overrides: { nope
 
 // ---- for-sale townhomes and a retail center run end to end ----
 { const p = project('townhomes'); p.fz.overrides = {}; const t = P.runStudy(p, { market, sensitivity: false });
-  assert.ok(!t.missing && t.pf.headline.totalCost > 0, 'townhomes priced'); assert.ok(t.budget.lines.some(l => l.id.startsWith('lib:')), 'townhomes use the workbook lines'); }
+  assert.ok(!t.missing && t.pf.headline.totalCost > 0, 'townhomes priced'); assert.ok(t.budget.lines.some(l => l.id.startsWith('fs:townhomes|')) && !t.budget.lines.some(l => l.id.startsWith('lib:')), 'townhomes use the Finishes budget library lines');
+  assert.ok(Object.values(t.metrics.uses.townhomes.byFloors).reduce((a, b) => a + b, 0) === t.metrics.uses.townhomes.units, 'the plan says each townhome\'s storeys');
+  assert.ok(t.budgetLib.some(n => /placeholders/.test(n.text)) && t.budget.fsLib.low < t.budget.fsLib.likely, 'the library\'s notes and range reach the study'); }
 { const p = project({ use: 'retail', gfa: 40000 }), t = P.runStudy(p, { market, sensitivity: false });
   assert.ok(!t.budget.lines.some(l => l.id.startsWith('lib:')), 'retail has no workbook lines');
   // (retail is priced from the team's 2024–25 budgets, line by line: shell and services; the interiors are the TI allowance's)

@@ -14,7 +14,7 @@ import { areaSqMi, bbox } from '../lib/fema.mjs';
 import { inGeom } from '../lib/demographics.mjs';
 
 export const AADT = 'https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_AADT/FeatureServer/0';
-export const TYPE = { IH: 'Interstates', US: 'US highways', SH: 'State highways', SL: 'Loops', FM: 'Farm-to-market roads', BI: 'Business routes', BU: 'Business routes', BF: 'Business routes', SS: 'Spurs', CS: 'City streets', CR: 'County roads' };
+export const TYPE = { IH: 'Interstates', US: 'US highways', SH: 'State highways', SL: 'Loops', FM: 'Farm-to-market roads', BI: 'Business routes', BU: 'Business routes', BF: 'Business routes', SS: 'Spurs', CS: 'City streets', CR: 'County roads', TL: 'Toll roads' };
 
 const get = (u, fetchImpl) => fetchImpl(u, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'RealEstateIntelligence/1.0' } }).then(async r => { if (!r.ok) throw new Error('TxDOT ' + r.status); const d = await r.json(); if (d.error) throw new Error('TxDOT: ' + (d.error.message || 'query failed')); return d; });
 const area = b => ({ geometry: JSON.stringify({ xmin: b[0], ymin: b[1], xmax: b[2], ymax: b[3], spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' });

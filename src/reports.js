@@ -188,7 +188,7 @@ export function initReports(ctx) {
           '<span>' + fmtBytes(bytes) + ' stored</span><button type="button" class="lnk" id="rpClear">Clear All</button></div>' : '') + '</div>' +
         '<div class="rp-list" id="rpList">' + rows() + '</div>';
     const mk = marketCard();
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Reports</div><h2>Reports</h2><div class="vsub">Make a report for an area or from your filters, and download past exports again. Past exports stay in this browser only.</div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('reports')) + '</div><h1>Reports</h1><div class="vsub">Make a report for an area or from your filters, and download past exports again. Past exports stay in this browser only.</div></div>' +
         '<div class="vctl"><button type="button" class="btn primary md" id="rpNew">New report</button></div></div>' +
       parcelGroup() +
       '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">For an area <span class="rp-n">' + esc(sel || 'the map view') + '</span></div>' +

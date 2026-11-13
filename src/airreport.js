@@ -5,7 +5,7 @@
 //   area, nearby airports and whether the area is under a runway's approach path, and the planes overhead right now.
 //   Flight Report for one aircraft (plane card → Export Flight Report): photo, registration, route, the flight path map,
 //   the altitude and speed profile, today's earlier flights; HTML (print to PDF) and CSV of the track points.
-import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, getJSON, errorBox, friendly, nearHouston, unavailable } from './reportkit.js';
+import { esc, fmt, kgrid, table, bars, areaSvg, reportDoc, savePdf, saveCsv, openCard, cardTop, fillCard, centerOf, getJSON, errorBox, friendly, nearHouston, unavailable, circle, fitArea, midOf } from './reportkit.js';
 
 const HOUR = h => (h % 12 || 12) + (h < 12 ? 'a' : 'p');
 const KIND = { jet: ['Jets', '#1d4ed8'], prop: ['Props and small planes', '#16a34a'], heli: ['Helicopters', '#a855f7'], mil: ['Military', '#b45309'] };
@@ -33,7 +33,8 @@ export function initAirReport(ctx) {
   let last = null;
   const pmi = (a, b) => { const R = Math.PI / 180, h = Math.sin((b[1] - a[1]) * R / 2) ** 2 + Math.cos(a[1] * R) * Math.cos(b[1] * R) * Math.sin((b[0] - a[0]) * R / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)); };
   // the area's size as a radius in miles (for the low-flight history, the live snapshot and the nearby airports)
-  const radiusOf = g => { const c = centerOf(g), r = (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates[0][0]) || []; return Math.max(0.5, Math.min(15, Math.max(...r.map(p => pmi(c, p))) || 1)); };
+  const reachOf = g => { const c = centerOf(g), r = (g.type === 'Polygon' ? g.coordinates[0] : g.coordinates[0][0]) || []; return Math.max(...r.map(p => pmi(c, p))) || 1; };
+  const radiusOf = g => Math.max(0.5, Math.min(15, reachOf(g)));
 
   async function data({ geometry, months = 3 }) {
     const center = centerOf(geometry), mi = radiusOf(geometry);
@@ -42,27 +43,31 @@ export function initAirReport(ctx) {
     const low = ctx.airHistory ? ctx.airHistory(center, Math.min(5, Math.max(1, Math.round(mi * 1.609)))).catch(() => null) : null;
     const live = ctx.planesNear ? ctx.planesNear(center, Math.min(15, Math.max(2, mi))).catch(e => ({ error: friendly(e, 'Live plane data') })) : null;
     const [p, a, l, n] = await Promise.all([prof, near, low, live]);
-    return { center, radius_mi: Math.round(mi * 10) / 10, profile: p?.error ? p : p?.history === false ? { error: p.note } : { ...profileOf(p), by_month: p.by_month || [], since: p.since }, airports: a?.airports || [], path: a?.path || null, low: l, live: n };
+    // partial: the area reaches past the 15-mile circle the live planes, low flights and airports use
+    return { center, radius_mi: Math.round(mi * 10) / 10, partial: reachOf(geometry) > 15.5, profile: p?.error ? p : p?.history === false ? { error: p.note } : { ...profileOf(p), by_month: p.by_month || [], since: p.since }, airports: a?.airports || [], path: a?.path || null, low: l, live: n };
   }
   ctx.airReportData = data;
 
   async function report({ geometry, label }) {
     if (ctx.view !== 'map') ctx.setView?.('map');
-    const card = openCard(ctx, { kicker: 'Air traffic report', title: label, loading: 'Reading the air traffic history…' });
+    const card = openCard(ctx, { kicker: 'Air traffic report', title: label, loading: 'Reading the air traffic history…' }); fitArea(ctx, geometry);
     let d; try { d = await data({ geometry }); } catch (e) { card.querySelector('.bsec').replaceChildren(errorBox(e, () => report({ geometry, label }), 'Air traffic data')); return; }
     last = { d, label, geometry };
     const p = d.profile, live = d.live?.aircraft || [], lowNow = live.filter(x => !x.ground && x.alt != null && x.alt < 3000);
+    // a big area (a county): the history covers all of it, but planes now and low flights are a circle around its middle; say so and draw it
+    const R = fmt(Math.max(2, d.radius_mi)), circ = d.partial ? 'within ' + R + ' mi of the middle of ' + midOf(label) : 'within ' + R + ' mi';
+    showScope(d.partial ? d : null);
     // neither the history nor the live planes came back: one sentence with Retry, and nothing to export
     const dead = !!p.error && !!d.live?.error, unavail = unavailable('Air traffic data');
-    fillCard(ctx, card, cardTop('Air traffic report', label, p.error ? '' : 'Since ' + esc(p.since || '') + ' · ~5 km cells around the area') +
+    fillCard(ctx, card, cardTop('Air traffic report', label, (p.error ? '' : 'History since ' + esc(p.since || '') + ' · ~5 km cells across the area') + (d.partial ? (p.error ? '' : '<br>') + 'Planes now: ' + esc(circ) + ' (dashed circle)' : '')) +
       '<div class="bsec">' + (p.error ? '<div class="rnote">' + esc(p.error) + '</div>' : kgrid([[p.per_day != null ? fmt(p.per_day) : '—', 'Aircraft sightings a day'], [p.busiest_hour != null ? HOUR(p.busiest_hour) : '—', 'Busiest hour'], [p.low_pct != null ? p.low_pct + '%' : '—', 'Under 3,000 ft'], [fmt(live.length), 'Overhead now']])) +
       (d.path ? '<div class="apt-path"><b>Under the approach path</b> to ' + esc(d.path.code) + ' runway ' + esc(d.path.landing_runway) + ' (' + d.path.beyond_nm + ' nm from the runway end).</div>' : '') + '</div>' +
-      (p.hours?.length && p.per_day ? '<div class="bsec"><div class="lt">By hour of day (sightings an hour)</div>' + bars(p.hours.map(x => ({ label: HOUR(x.h), v: Math.round(x.per_hour || 0) })), { height: 90, every: 3 }) + '</div>' : '') +
+      (p.hours?.length && p.per_day ? '<div class="bsec"><div class="lt">By hour of day (sightings an hour)</div>' + bars(p.hours.map(x => ({ label: HOUR(x.h), v: Math.round(x.per_hour || 0) })), { height: 90, every: 3, px: 340 }) + '</div>' : '') +
       (p.mix && p.per_day ? '<div class="bsec"><div class="lt">What flies over</div><dl>' + Object.entries(KIND).map(([k, [n]]) => p.mix[k] != null ? '<dt>' + n + '</dt><dd class="mono">' + p.mix[k] + '%</dd>' : '').join('') + '</dl>' +
         '<div class="rnote">Lowest seen ' + (p.lowest_ft != null ? fmt(p.lowest_ft) + ' ft' : '—') + '. Shares of all sightings; the rest are unclassified.</div></div>' : '') +
       (d.low?.history ? '<div class="bsec"><div class="lt">Low flights at the center</div><div>' + fmt(d.low.low_per_day) + ' low sightings a day within ~' + Math.min(5, Math.max(1, Math.round(d.radius_mi * 1.609))) + ' km, lowest ' + (d.low.lowest_ft != null ? fmt(d.low.lowest_ft) + ' ft' : '—') + '.</div></div>' : '') +
       (d.airports.length ? '<div class="bsec"><div class="lt">Airports nearby</div>' + d.airports.slice(0, 5).map(a => '<div class="pl"><b><button class="lnk" type="button" data-apt="' + esc(a.ident) + '">' + esc(a.name) + '</button></b><span>' + esc((a.iata || a.icao || a.ident) + ' · ' + (a.km * 0.621371).toFixed(1) + ' mi') + '</span></div>').join('') + '</div>' : '') +
-      '<div class="bsec"><div class="lt">Right now</div>' + (d.live?.error ? '<div class="rnote">' + esc(d.live.error) + '</div>' : '<div>' + fmt(live.length) + ' aircraft within ' + fmt(Math.max(2, d.radius_mi)) + ' mi, ' + fmt(lowNow.length) + ' under 3,000 ft.</div>' + (live.length ? '<div class="rnote">' + live.slice(0, 8).map(x => esc((x.flight || x.reg || x.hex) + (x.desc ? ' · ' + x.desc : '') + (x.alt != null ? ' · ' + fmt(x.alt) + ' ft' : ''))).join('; ') + '</div>' : '')) + '</div>' +
+      '<div class="bsec"><div class="lt">Right now</div>' + (d.live?.error ? '<div class="rnote">' + esc(d.live.error) + '</div>' : '<div>' + fmt(live.length) + ' aircraft ' + esc(circ) + ', ' + fmt(lowNow.length) + ' under 3,000 ft.</div>' + (live.length ? '<div class="rnote">' + live.slice(0, 8).map(x => esc((x.flight || x.reg || x.hex) + (x.desc ? ' · ' + x.desc : '') + (x.alt != null ? ' · ' + fmt(x.alt) + ' ft' : ''))).join('; ') + '</div>' : '')) + '</div>' +
       '<div class="bacts"><button class="btn primary" id="arPdf" type="button"' + (dead ? ' disabled title="Nothing to export yet"' : '') + '>Export PDF</button><button class="btn" id="arCsv" type="button"' + (dead ? ' disabled title="Nothing to export yet"' : '') + '>Export CSV</button><button class="btn" id="arLive" type="button">Show Live Planes</button></div>' +
       '<div class="rnote bsec">A sighting is one aircraft seen in the area at one of our once-a-minute samples, so a plane that circles counts more than one that passes. Coverage: ~100 nm around Houston, from community ADS-B receivers (some military and private aircraft are hidden). History starts October 2026.<span class="src"> adsb.lol; OurAirports.</span></div>');
     card.querySelector('#arPdf').onclick = exportReport; card.querySelector('#arCsv').onclick = exportCsv;
@@ -71,6 +76,16 @@ export function initAirReport(ctx) {
     card.querySelectorAll('[data-apt]').forEach(b => b.onclick = () => ctx.airportCard?.(b.dataset.apt, { fly: true }));
   }
   ctx.airReport = report;
+  // the circle "planes now" covers, on the map while the card is open
+  function showScope(d) {
+    const SRC = 'air-scope', data = { type: 'FeatureCollection', features: d ? [{ type: 'Feature', properties: {}, geometry: circle(d.center, Math.max(2, d.radius_mi)) }, { type: 'Feature', properties: { c: 1 }, geometry: { type: 'Point', coordinates: d.center } }] : [] };
+    try { const s = ctx.map.getSource(SRC); if (s) { s.setData(data); return; } if (!d) return;
+      ctx.map.addSource(SRC, { type: 'geojson', data });
+      ctx.map.addLayer({ id: SRC, type: 'line', source: SRC, filter: ['!', ['has', 'c']], paint: { 'line-color': '#1d4ed8', 'line-width': 2.2, 'line-dasharray': [2.5, 1.5] } });
+      ctx.map.addLayer({ id: SRC + '-c', type: 'circle', source: SRC, filter: ['has', 'c'], paint: { 'circle-radius': 5, 'circle-color': '#1d4ed8', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+    } catch (e) { /* style loading */ }
+  }
+  ctx.onCardClose?.(() => showScope(null));
   function exportCsv() {
     if (!last) return; const { d, label } = last, p = d.profile, rows = [];
     for (const x of p.hours || []) rows.push({ Table: 'By hour', Item: HOUR(x.h), Value: x.per_hour != null ? Math.round(x.per_hour * 10) / 10 : '', Unit: 'sightings an hour', Samples: x.s });
@@ -84,7 +99,8 @@ export function initAirReport(ctx) {
     if (!last) return; const { d, label, geometry } = last, p = d.profile, live = d.live?.aircraft || [];
     const body = '<div class="kp">' + [[p.per_day != null ? fmt(p.per_day) : '—', 'Sightings a day'], [p.busiest_hour != null ? HOUR(p.busiest_hour) : '—', 'Busiest hour'], [p.low_pct != null ? p.low_pct + '%' : '—', 'Under 3,000 ft'], [fmt(live.length), 'Overhead at report time']].map(([v, l]) => '<div><b>' + v + '</b><span>' + esc(l) + '</span></div>').join('') + '</div>' +
       (d.path ? '<p><b>Under the approach path</b> to ' + esc(d.path.name || d.path.code) + ' runway ' + esc(d.path.landing_runway) + ': ' + d.path.beyond_nm + ' nm from the runway end, ' + d.path.offset_nm + ' nm off the centerline.</p>' : '') +
-      '<div class="map">' + areaSvg([{ geometry, stroke: '#1d4ed8', fill: 'rgba(29,78,216,.05)', dash: true }], { points: [...d.airports.slice(0, 4).map(a => ({ c: [a.lon, a.lat], r: 5, color: '#1d4ed8', label: a.iata || a.icao || a.ident })), ...live.map(x => ({ c: [x.lon, x.lat], r: 2.5, color: x.alt < 3000 ? '#c2410c' : '#64748b' }))] }) + '</div>' +
+      (d.partial ? '<p class="meta">Sightings by hour, mix and month cover the whole area. Aircraft overhead, low flights and nearby airports are within ' + fmt(d.radius_mi) + ' mi of the middle of ' + esc(midOf(label)) + ' (' + d.center[1].toFixed(3) + ', ' + d.center[0].toFixed(3) + ') (the orange dashed circle).</p>' : '') +
+      '<div class="map">' + areaSvg([{ geometry, stroke: '#1d4ed8', fill: 'rgba(29,78,216,.05)', dash: true }, ...(d.partial ? [{ geometry: circle(d.center, d.radius_mi), stroke: '#c2410c', fill: 'rgba(0,0,0,0)', dash: true }] : [])], { points: [...d.airports.slice(0, 4).map(a => ({ c: [a.lon, a.lat], r: 5, color: '#1d4ed8', label: a.iata || a.icao || a.ident })), ...live.map(x => ({ c: [x.lon, x.lat], r: 2.5, color: x.alt < 3000 ? '#c2410c' : '#64748b' }))] }) + '</div>' +
       '<div class="lg"><span><i style="background:#1d4ed8"></i>Airport</span><span><i style="background:#c2410c"></i>Aircraft under 3,000 ft (at report time)</span><span><i style="background:#64748b"></i>Higher</span></div>' +
       (p.per_day ? '<h2>By hour of day</h2><div class="bars">' + bars(p.hours.map(x => ({ label: HOUR(x.h), v: Math.round(x.per_hour || 0) })), { every: 2 }) + '</div>' : '<p class="meta">' + esc(p.error || 'No history yet for this area.') + '</p>') +
       '<div class="two"><div><h2>What flies over</h2>' + table(['Kind', { t: 'Share', r: 1 }], Object.entries(KIND).filter(([k]) => p.mix?.[k] != null).map(([k, [n]]) => [n, p.mix[k] + '%'])) + '</div>' +

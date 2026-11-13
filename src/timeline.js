@@ -33,7 +33,7 @@ export function initTimeline(ctx) {
 
   root.innerHTML = `
     <div class="vhead">
-      <div><div class="kicker">Timeline</div><h2 id="tlTitle">Projects under construction</h2><div class="vsub" id="tlSub"></div></div>
+      <div><div class="kicker">${esc(ctx.navPath('timeline'))}</div><h1 id="tlTitle">Timeline</h1><div class="vsub" id="tlSub"></div></div>
       <div class="vctl">
         <label>Group by <select class="chip" id="tlGroup"><option value="type">Type</option><option value="county">County</option>${USE_ORDER.length ? '<option value="use">Use</option>' : ''}</select></label>
         <label>Measure <select class="chip" id="tlMeasure"><option value="value">Est. value</option><option value="count">Projects</option></select></label>
@@ -141,7 +141,7 @@ export function initTimeline(ctx) {
     if (fresh) G = build(el, W);
     const bw = Math.max(1, (x(mStart(months[1] || months[0])) - x(mStart(months[0]))) || 8), gap = bw > 6 ? 2 : 0, y0 = G.y || y;
     cur = { rowsM, groups, fmtY, bw };
-    G.svg.attr('aria-label', (opt.measure === 'value' ? 'Estimated value' : 'Number') + ' of projects under construction by month');
+    G.svg.attr('aria-label', (opt.measure === 'value' ? 'Estimated value' : 'Number') + ' of filings under construction by month');
     const tr = quick ? null : d3.transition().duration(DUR.base + 100).ease(d3.easeCubicOut), go = s => quick ? s.interrupt() : s.transition(tr);
     // y axis and gridlines keyed by value: new ticks come in from where the old scale had them, old ones leave toward the new
     const ticks = y.ticks(4);
@@ -174,7 +174,7 @@ export function initTimeline(ctx) {
   function byValue(groups, list) { const tot = {}; for (const f of list) { const k = keyOf[opt.group](f); tot[k] = (tot[k] || 0) + f.cost; } return groups.slice().sort((a, b) => (tot[b] || 0) - (tot[a] || 0)); }
   $('tlLegend').addEventListener('click', e => {
     const b = e.target.closest('button[data-g]'); if (!b) return; const r = rows.find(x => x.g === b.dataset.g), sc = $('gScroll');
-    if (!r) { ctx.toast('No ' + labelOf(opt.group, b.dataset.g) + ' projects in the list below.'); return; }
+    if (!r) { ctx.toast('No ' + labelOf(opt.group, b.dataset.g) + ' filings in the list below.'); return; }
     $('gantt').scrollIntoView({ block: 'nearest', behavior: ctx.reduceMotion ? 'auto' : 'smooth' });
     sc.scrollTo({ top: r.y, behavior: ctx.reduceMotion ? 'auto' : 'smooth' });
   });
@@ -191,7 +191,7 @@ export function initTimeline(ctx) {
     }
     $('gInner').style.height = y + 'px';
     const ax = $('gAxis'); const ticks = gx.ticks(W < 700 ? 4 : 10);
-    ax.innerHTML = '<div class="g-lab">' + fmtN(list.length) + ' projects</div><div class="g-ticks" style="width:' + cw + 'px">' + ticks.map(t => '<span style="left:' + gx(t) + 'px">' + d3.utcFormat(t.getUTCMonth() === 0 ? '%Y' : '%b')(t) + '</span>').join('') + '</div>';
+    ax.innerHTML = '<div class="g-lab">' + fmtN(list.length) + ' filings</div><div class="g-ticks" style="width:' + cw + 'px">' + ticks.map(t => '<span style="left:' + gx(t) + 'px">' + d3.utcFormat(t.getUTCMonth() === 0 ? '%Y' : '%b')(t) + '</span>').join('') + '</div>';
     const draw = () => {
       const top = sc.scrollTop, bot = top + sc.clientHeight, inner = $('gInner'), sel = ctx.state.sel;
       let lo = 0, hi = rows.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (rows[mid].y + rows[mid].h < top - 200) lo = mid + 1; else hi = mid; }
@@ -224,14 +224,14 @@ export function initTimeline(ctx) {
     const groups = groupsFor(opt.group, list);
     const est = list.filter(f => f.tsE || f.teE).length;
     const pct = Math.round(est / Math.max(1, list.length) * 100);
-    $('tlSub').textContent = fmtN(list.length) + ' projects · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + (pct < 1 ? '<1%' : pct + '%') + ' have estimated dates' : '');
+    $('tlSub').textContent = 'Filings under construction: ' + fmtN(list.length) + ' · ' + fmtM(list.reduce((s, f) => s + f.cost, 0)) + ' est. value' + (est ? ' · ' + (pct < 1 ? '<1%' : pct + '%') + ' have estimated dates' : '');
     ctx.scopeBar?.($('tlScope'));
     if (!list.length) { $('tlChart').querySelector('svg')?.remove(); G = null; $('gInner').innerHTML = ctx.vempty ? ctx.vempty({ icon: 'search', title: 'No filings match these filters', text: 'Remove a filter above, or reset them.', actions: [{ label: 'Reset filters', id: 'tlReset', primary: true }] }) : '<div class="empty">No filings match these filters.</div>';
       $('gInner').style.height = 'auto'; $('tlLegend').innerHTML = ''; $('tlReset')?.addEventListener('click', () => ctx.resetFilings?.()); return; }
     renderChart(chartList, groupsFor(opt.group, chartList)); renderGantt(list, byValue(groups, list));
     const d = ctx.state.d, r = $('tlRange');
     if (d && d.f === 'active') { const f = s => s ? d3.utcFormat('%b %Y')(mStart(s)) : '…';
-      r.innerHTML = '<b>Under construction ' + esc(f(d.from)) + (d.to !== d.from ? ' – ' + esc(f(d.to)) : '') + '</b> · ' + fmtN(list.length) + ' projects <button class="lnk" type="button">Clear</button>';
+      r.innerHTML = '<b>Under construction ' + esc(f(d.from)) + (d.to !== d.from ? ' – ' + esc(f(d.to)) : '') + '</b> · ' + fmtN(list.length) + ' filings <button class="lnk" type="button">Clear</button>';
       r.querySelector('button').onclick = clearRange; $('tlHelp').style.display = 'none'; }
     else { r.innerHTML = ''; $('tlHelp').style.display = ''; }
   }

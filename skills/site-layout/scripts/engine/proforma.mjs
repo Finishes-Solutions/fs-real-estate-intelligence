@@ -165,7 +165,7 @@ export function metricsOf(plan) {
     else if (use === 'sfr' && (e.padSpaces != null || e.tiny)) { // a tiny home (a community's, or one from the library) or a community's manufactured home: its own count and living area
       const n = e.units ?? 1, k = e.cottage || homePlanById(e.type)?.kind === 'cottage' ? 'cottage' : e.tiny || homePlanById(e.type)?.kind === 'tiny' || homePlanById(e.type)?.tiny ? 'tiny' : 'manufactured'; u.units += n; u.homes ||= {}; u.homes[k] = (u.homes[k] || 0) + n; u[k + 'Sf'] = (u[k + 'Sf'] || 0) + (+e.sf || S.gfaOf(e));
       if (e.padSpaces != null) { u.community ||= { tiny: 0, manufactured: 0, cottage: 0, tinySf: 0, manufacturedSf: 0, cottageSf: 0 }; u.community[k] += n; u.community[k + 'Sf'] += g; } } // (a community's: rented with its pad, factory-built)
-    else if (S.USES[use].garage) { u.units += e.units ?? 1; if (use === 'sfr') { u.homes ||= {}; u.homes[e.floors || 2] = (u.homes[e.floors || 2] || 0) + 1; } }
+    else if (S.USES[use].garage) { u.units += e.units ?? 1; if (use === 'sfr') { u.homes ||= {}; u.homes[e.floors || 2] = (u.homes[e.floors || 2] || 0) + 1; } else if (use === 'townhomes') { const f = e.floors || S.USES[use].floors; u.byFloors ||= {}; u.byFloors[f] = (u.byFloors[f] || 0) + (e.units ?? 1); } } // (byFloors: townhomes by their storeys, for the budget library's frame and stair lines)
     else if (use === 'storage') { const k = S.storageKind(e); u[k + 'Gsf'] = (u[k + 'Gsf'] || 0) + g; }
     else if (use === 'foodtrucks') { if (S.ftKind(e) === 'bar') u.barSf = (u.barSf || 0) + g; }
     else if (use === 'amenity' && e.custom) u.pavilionSf = (u.pavilionSf || 0) + g; // an AI-crafted type's pavilion: an open structure, not a clubhouse

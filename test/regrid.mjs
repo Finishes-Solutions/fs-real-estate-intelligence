@@ -71,6 +71,6 @@ assert.equal(calls.filter(c => c.startsWith('tiles.regrid.com')).length, 2);
 // usage
 r = await call({ usage: '1' }); assert.equal(r.body.records.used, 3); assert.equal(r.body.tiles.used, 2); assert.equal(r.body.records.cap, 3);
 // fail closed: no token / no counter
-delete process.env.SUPABASE_URL; r = await call({ lat: '30.4', lon: '-95.9' }); assert.equal(r.code, 503); assert.match(r.body.error, /usage counter/);
+delete process.env.SUPABASE_URL; r = await call({ lat: '30.4', lon: '-95.9' }); assert.equal(r.code, 503); assert.match(r.body.error, /isn’t available on this site/); assert.equal(r.body.code, 'not_configured'); assert.doesNotMatch(r.body.error, /[A-Z]+_[A-Z_]+/); // plain words, no setting names (UX-407)
 process.env.SUPABASE_URL = 'https://db.test'; delete process.env.REGRID_API_KEY; r = await call({ tile: '15/1/1' }); assert.equal(r.code, 503);
 console.log('regrid tests passed');

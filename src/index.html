@@ -23,6 +23,8 @@
 </head>
 <body>
 <div class="app" data-view="map">
+  <!-- skip links: the first Tab stops, shown on focus (the map's search sits after the whole filing list otherwise) -->
+  <a class="skip" href="#msq" id="skipTools">Skip to map tools</a><a class="skip" href="#stage" id="skipMain">Skip to page content</a>
   <header class="appbar" id="appbar">
     <button class="ptoggle" id="panelToggle" aria-label="Show or hide the side panel" title="Show or hide the side panel" aria-expanded="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11"/></svg></button>
     <img class="ab-logo l-light" alt="Real Estate Intelligence" src="logo.png">
@@ -38,7 +40,7 @@
     <!-- first visit: what the app does (Got it hides it; Data & help › Getting started brings it back) -->
     <section class="ptip" id="introTip" aria-labelledby="introTipH" hidden>
       <div class="ptip-h"><b id="introTipH">Getting started</b><button class="btn sm" id="introTipOk" type="button">Got it</button></div>
-      <p class="ptip-t">Click any parcel or building for its owner, value, zoning and site risks, then lay out a building on it with <b>Site plan</b> (saved under Projects). Pick an area below for its demographics and reports, and turn on layers like parcels, flood zones and demographics from the map’s buttons.</p>
+      <p class="ptip-t">Search an address or zoom in to street level, then click any parcel or building for its owner, value, zoning and site risks, then lay out a building on it with <b>Site plan</b> (saved under Projects). Pick an area below for its demographics and reports, and turn on layers like parcels, flood zones and demographics from the map’s buttons.</p>
     </section>
     <!-- where am I: the selected area (or the map view), pinned while the panel scrolls -->
     <div class="scope" id="selbar">
@@ -104,6 +106,7 @@
     <div class="viewport" id="viewport">
     <div id="map" aria-label="Interactive real estate map"></div>
     <div class="mapleft" id="mapleft">
+    <h1 class="vh-sr">Map</h1><!-- the page title for screen readers (the map has no visible header); hidden with the map tools on other pages -->
     <div class="msearch" id="msearch">
       <label class="msbox"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="msq" type="search" placeholder="Search addresses, places, projects, owners, developers…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="msres" aria-label="Search the map"><button class="msx" id="msx" type="button" aria-label="Clear search" hidden>×</button></label>
       <div class="msres" id="msres" role="listbox"></div>

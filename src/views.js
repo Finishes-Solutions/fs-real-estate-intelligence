@@ -4,16 +4,17 @@ import { mergeRecent } from './lib/changes.mjs';
 
 const ROLE = { dev: 'Developers & owners', arch: 'Architects & designers', gc: 'General contractors' };
 const ROLE_SHORT = { dev: 'Developers', arch: 'Architects', gc: 'Contractors' };
+const SORT_NAME = { n: 'number of filings', v: 'est. value', last: 'latest filing', name: 'name' };
 
 export function initWho(ctx) {
   const { fmtM, fmtN, esc } = ctx, root = document.getElementById('view-who');
-  let role = 'dev', q = '';
-  root.innerHTML = `<div class="vhead"><div><div class="kicker">Companies</div><h2>Most active developers, architects and builders</h2><div class="vsub" id="whoSub"></div></div>
+  let role = 'dev', q = '', sort = 'v', dir = 'descending'; // ranked by est. value until a header says otherwise
+  root.innerHTML = `<div class="vhead"><div><div class="kicker">${ctx.esc(ctx.navPath('who'))}</div><h1>Companies</h1><div class="vsub" id="whoSub"></div></div>
     <div class="vctl"><div class="seg seg3" id="whoRole">${Object.entries(ROLE).map(([k, v]) => `<button data-k="${k}" aria-pressed="${k === role}">${ROLE_SHORT[k]}</button>`).join('')}</div>
     <label class="search sm"><input id="whoQ" type="search" placeholder="Find a name" aria-label="Find a name"></label>
     ${ctx.exportMenu?.([{ label: 'Activity report · PDF', attrs: ' data-x="pdf"' }, { label: 'Activity report · Excel', attrs: ' data-x="xlsx"' }, { label: 'Activity report · CSV', attrs: ' data-x="csv"' }]) || ''}</div></div>
     <div id="whoScope"></div>
-    <div class="who-note" id="whoNote"></div><div class="tablewrap"><table class="who"><thead><tr><th>Name</th><th class="r">Projects</th><th class="r">Est. value</th><th>Mostly</th><th>Where</th><th>Last 8 quarters</th><th>Latest</th></tr></thead><tbody id="whoBody"></tbody></table></div>
+    <div class="who-note" id="whoNote"></div><div class="tablewrap"><table class="who"><thead><tr id="whoHead"></tr></thead><tbody id="whoBody"></tbody></table></div>
     <div class="vfoot" id="whoFoot"></div>`;
   root.querySelectorAll('[data-x]').forEach(b => b.onclick = () => ctx.openExport?.('activity', { format: b.dataset.x }));
   root.querySelectorAll('#whoRole button').forEach(b => b.onclick = () => { role = b.dataset.k; root.querySelectorAll('#whoRole button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
@@ -33,19 +34,26 @@ export function initWho(ctx) {
       const qi = qIdx(f.reg || ''); if (qi >= 0 && qi < 8) g.q[qi]++; if ((f.reg || '') > g.last) g.last = f.reg;
     }
     const top = o => Object.entries(o).sort((a, b) => b[1] - a[1]);
-    let rows = [...groups.values()].map(g => ({ ...g, label: top(g.names)[0][0] })).sort((a, b) => b.v - a.v);
+    const by = { n: (a, b) => a.n - b.n || a.v - b.v, v: (a, b) => a.v - b.v, last: (a, b) => (a.last || '').localeCompare(b.last || '') || a.v - b.v, name: (a, b) => a.label.localeCompare(b.label) }[sort]; // lowest first
+    let rows = [...groups.values()].map(g => ({ ...g, label: top(g.names)[0][0] })).sort(by); if (dir === 'descending') rows.reverse();
     if (q) rows = rows.filter(g => g.k.includes(q) || g.label.toLowerCase().includes(q));
     const covered = list.filter(f => entityKey(role === 'dev' ? (f.dev || f.owner) : f[role])).length;
-    root.querySelector('#whoSub').textContent = fmtN(groups.size) + ' ' + ROLE[role].toLowerCase() + ' across ' + fmtN(list.length) + ' filings';
+    root.querySelector('#whoSub').textContent = 'Most active developers, architects and builders: ' + fmtN(groups.size) + ' ' + ROLE[role].toLowerCase() + ' across ' + fmtN(list.length) + ' filings, ranked by ' + SORT_NAME[sort] + (sort === 'name' ? (dir === 'ascending' ? ' (A–Z)' : ' (Z–A)') : dir === 'ascending' ? ' (lowest first)' : '');
+    // the header row: Filings, Est. value and Latest sort (a click again flips the order); the others don't
+    const th = ctx.sortHead, hr = root.querySelector('#whoHead');
+    hr.innerHTML = th('Name', 'name', sort, dir) + th('Filings', 'n', sort, dir, 'r') + th('Est. value', 'v', sort, dir, 'r') + '<th>Mostly</th><th>Where</th><th>Last 8 quarters</th>' + th('Latest', 'last', sort, dir);
+    hr.querySelectorAll('[data-sort]').forEach(b => b.onclick = () => { const k = b.dataset.sort; dir = k === sort ? (dir === 'descending' ? 'ascending' : 'descending') : (k === 'name' ? 'ascending' : 'descending'); sort = k; render(); root.querySelector('#whoHead [data-sort="' + k + '"]')?.focus(); });
     ctx.scopeBar?.(root.querySelector('#whoScope'));
-    root.querySelector('#whoFoot').textContent = rows.length > 150 ? 'Showing the top 150 of ' + fmtN(rows.length) + ' by value. Search to find others.' : '';
+    root.querySelector('#whoFoot').textContent = rows.length > 150 ? 'Showing the top 150 of ' + fmtN(rows.length) + ' by ' + SORT_NAME[sort] + '. Search to find others.' : '';
     root.querySelector('#whoNote').textContent = role === 'dev' ? 'Grouped by owner name as filed (or the developer the AI identified), with LLC/Inc. variants merged. Single-asset LLCs often hide the real sponsor.'
       : 'Only ' + fmtN(covered) + ' of ' + fmtN(list.length) + ' filings name ' + (role === 'gc' ? 'a general contractor' : 'a design firm') + ', so this list is partial.';
     const cur = ctx.state.who;
-    root.querySelector('#whoBody').innerHTML = rows.slice(0, 150).map(g => '<tr data-k="' + esc(g.k) + '" class="' + (cur && cur.k === role && cur.v === g.k ? 'on' : '') + '"><td><button class="lnk">' + esc(g.label) + '</button></td><td class="m r">' + fmtN(g.n) + '</td><td class="m r">' + fmtM(g.v) + '</td><td>' + esc(top(g.uses)[0][0] === 'Reno' ? 'Renovation' : top(g.uses)[0][0]) + '</td><td>' + esc(top(g.cos).slice(0, 2).map(x => x[0]).join(', ')) + '</td><td>' + spark(g.q) + '</td><td class="m">' + esc(g.last) + '</td></tr>').join('')
+    root.querySelector('#whoBody').innerHTML = rows.slice(0, 150).map(g => '<tr data-k="' + esc(g.k) + '" class="' + (cur && cur.k === role && cur.v === g.k ? 'on' : '') + '"><td><button class="lnk">' + esc(g.label) + '</button>' + (Object.keys(g.names).length > 1 ? '<span class="aka">also filed as ' + esc(top(g.names).slice(1, 3).map(x => x[0]).join(', ')) + '</span>' : '') + '</td><td class="m r">' + fmtN(g.n) + '</td><td class="m r">' + fmtM(g.v) + '</td><td>' + esc(top(g.uses)[0][0] === 'Reno' ? 'Renovation' : top(g.uses)[0][0]) + '</td><td>' + esc(top(g.cos).slice(0, 2).map(x => x[0]).join(', ')) + '</td><td>' + spark(g.q) + '</td><td class="m">' + esc(g.last) + '</td></tr>').join('')
       || '<tr class="nomatch"><td colspan="7">' + (ctx.vempty ? ctx.vempty({ icon: 'search', title: q ? 'No names match “' + q + '”' : 'No companies with these filters', text: q ? 'Check the spelling, or try part of the name.' : 'Loosen the filters above to see more filings.' }) : 'No names match.') + '</td></tr>';
     const byK = new Map(rows.map(g => [g.k, g]));
-    root.querySelectorAll('#whoBody tr[data-k]').forEach(tr => tr.onclick = () => { const g = byK.get(tr.dataset.k); ctx.state.who = { k: role, v: g.k, label: g.label }; ctx.showFilings?.(); ctx.applyFilters(); ctx.setView('map'); ctx.toast('Showing ' + fmtN(g.n) + ' filings for ' + g.label + '. Reset filters to see everything.'); });
+    root.querySelectorAll('#whoBody tr[data-k]').forEach(tr => tr.onclick = () => { const g = byK.get(tr.dataset.k); ctx.state.who = { k: role, v: g.k, label: g.label }; ctx.showFilings?.(); ctx.applyFilters(); ctx.setView('map');
+      requestAnimationFrame(() => ctx.fitToVisible?.()); // frame the company's filings (one filing: zoom in on it)
+      ctx.toast('Showing ' + fmtN(g.n) + ' filings for ' + g.label + '. Reset filters to see everything.'); });
   }
   ctx.onChange(render); ctx.onView('who', render);
 }
@@ -55,11 +63,17 @@ export function initChanges(ctx) {
   const runs = DATA.changes.runs || [], week = mergeRecent(DATA.changes);
   // "Last 7 days" (the default) is every nightly check in the week up to the latest, merged the way the badge and the
   // "New this week / Any change" filters count them, so the numbers agree; each single check is still listed after it.
-  let ri = week.runs ? 'w' : 0, onlyVisible = true;
+  // one option per check that found something; a date that repeats (several checks in a day) gets its time
+  const dayOf = r => new Date(r.built).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const runIdx = runs.map((r, i) => i).filter(i => runs[i].items.length), dayN = {};
+  runIdx.forEach(i => { const d = dayOf(runs[i]); dayN[d] = (dayN[d] || 0) + 1; });
+  const runOptions = () => runIdx.map(i => { const r = runs[i], d = dayOf(r), n = r.items.length;
+    return `<option value="${i}">${d}${dayN[d] > 1 ? ' · ' + new Date(r.built).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''} · ${n} change${n === 1 ? '' : 's'}</option>`; }).join('');
+  let ri = week.runs ? 'w' : (runIdx[0] ?? 0), onlyVisible = true;
   const dl = x => new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const nIds = items => new Set(items.map(x => x.id)).size, plural = (n, w) => fmtN(n) + ' ' + w + (n === 1 ? '' : 's');
-  root.innerHTML = `<div class="vhead"><div><div class="kicker">Changes</div><h2 id="chTitle">What changed in TDLR</h2><div class="vsub" id="chSub"></div><div class="vsub vsub-n" id="chN"></div></div>
-    <div class="vctl"><label>Found <select class="chip" id="chRun">${week.runs ? `<option value="w">Last 7 days · ${plural(week.ids.size, 'filing')}</option>` : ''}${runs.map((r, i) => `<option value="${i}">${new Date(r.built).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} · ${r.items.length} change${r.items.length === 1 ? '' : 's'}</option>`).join('')}</select></label>
+  root.innerHTML = `<div class="vhead"><div><div class="kicker">${ctx.esc(ctx.navPath('changes'))}</div><h1 id="chTitle">Changes</h1><div class="vsub" id="chSub"></div><div class="vsub vsub-n" id="chN"></div></div>
+    <div class="vctl"><label>Found <select class="chip" id="chRun">${week.runs ? `<option value="w">Last 7 days · ${plural(week.ids.size, 'filing')}</option>` : ''}${runOptions()}</select></label>
     <label class="tg2"><input type="checkbox" id="chOnly" checked><span>Only within current filters</span></label></div></div><div id="chScope"></div><nav id="chJump" class="ch-jump" aria-label="Jump to a section" hidden></nav><div id="chBody" class="chbody"></div>`;
   const runSel = root.querySelector('#chRun'), onlyEl = root.querySelector('#chOnly');
   runSel.value = String(ri); runSel.onchange = () => { ri = runSel.value === 'w' ? 'w' : +runSel.value; render(); };

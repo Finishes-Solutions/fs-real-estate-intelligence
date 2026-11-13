@@ -6,6 +6,7 @@ import { BY_KEY } from './metrics.js';
 import { contains as inArea } from './lib/geomatch.mjs';
 import { reveal } from './motion.js';
 import { centroid } from './lib/demographics.mjs';
+import { sqmiOf, fmtSqmi } from './reportkit.js';
 
 const MAX = 4;
 const COLORS = ['#0b7a5f', '#b7791f', '#2b6cb0', '#9b2c6f'];
@@ -35,7 +36,7 @@ export function initCompare(ctx) {
   const color = i => COLORS[i % COLORS.length];
   const keyOf = a => a.key || a.label;
   const has = key => areas.some(x => keyOf(x) === key);
-  const sqmi = g => d3.geoArea(g) * 3958.8 ** 2;
+  const sqmi = g => sqmiOf(g); // the same size the area reports print
   // counties named by a county selection ('county:Harris|Waller'): these count by the county on each filing, exactly as the
   // area bar does, so the numbers agree; drawn shapes, circles and places count what lies inside the outline
   const countyNames = a => a.kind === 'county' && String(keyOf(a)).startsWith('county:') ? new Set(keyOf(a).slice(7).split('|').filter(Boolean)) : null;
@@ -93,7 +94,11 @@ export function initCompare(ctx) {
       (fresh.length > added.length ? '. ' + (fresh.length - added.length) + ' more didn’t fit: Compare holds ' + MAX + '.' : '.'));
     return added.length;
   }
-  const remove = i => { areas.splice(i, 1); save(); sync(); };
+  // removing says so, offers Undo (back in its slot, with its name and colour) and keeps focus in the chip row
+  const focusChip = i => requestAnimationFrame(() => { const rm = [...root.querySelectorAll('[data-rm]')], h = root.querySelector('h1');
+    const t = rm[Math.min(i, rm.length - 1)]; if (!t && h) h.setAttribute('tabindex', '-1'); (t || h)?.focus({ preventScroll: true }); });
+  const remove = i => { const [a] = areas.splice(i, 1); if (!a) return; save(); sync(); focusChip(i);
+    ctx.toast('Removed ' + a.label + ' ·', { action: { label: 'Undo', run: () => { if (!has(a.key) && areas.length < MAX) { areas.splice(Math.min(i, areas.length), 0, a); save(); sync(); focusChip(i); } } } }); };
   const rename = (i, text) => {
     const a = areas[i], t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 40); if (!a || !t || t === a.label) return;
     a.label = unique(t, a); save(); sync();
@@ -135,12 +140,16 @@ export function initCompare(ctx) {
   function loadStats() {
     const todo = areas.filter(a => !stats.has(keyOf(a)));
     if (!todo.length) return Promise.resolve();
-    const p = Promise.all(todo.map(a => Promise.resolve(ctx.areaStats?.(a.geom)).catch(() => null).then(x => { stats.set(keyOf(a), x || null); })));
+    const p = Promise.all(todo.map(a => Promise.resolve(ctx.areaStats?.(a.geom, { county: a.kind === 'county' })).catch(() => null).then(x => { stats.set(keyOf(a), x || null); })));
     statsP = p; p.then(() => { if (statsP === p && ctx.view === 'compare') render(); });
     return p;
   }
-  const money = v => v == null ? '—' : v >= 1e6 ? '$' + (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : '$' + Math.round(v / 1e3) + 'K';
-  const numT = v => v == null ? '—' : v >= 1e6 ? (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : fmtN(v);
+  // one format per row, picked from the row's largest value, so cells side by side read at the same precision and unit
+  // (4,838,303 | 893,767 | 684,432, never 4.8M beside 893,767). kind '$' (money) or 'n' (a count)
+  const rowFmt = (vals, kind) => { const mx = Math.max(0, ...vals.filter(Number.isFinite).map(Math.abs));
+    if (kind === '$') { const [dv, u, dg] = mx >= 1e9 ? [1e9, 'B', 2] : mx >= 1e6 ? [1e6, 'M', 2] : [1e3, 'K', 0]; return v => v == null ? '—' : !v ? '–' : '$' + (v / dv).toFixed(dg) + u; }
+    return mx >= 1e7 ? v => v == null ? '—' : !v ? '–' : (v / 1e6).toFixed(1) + 'M' : v => v == null ? '—' : fmtN(Math.round(v)); };
+  const ROW_KIND = { value: '$', newValue: '$', avg: '$', median: '$', sqft: 'n' };
 
   // ---- the table, as data: shared by the page and Export (PDF / Excel / CSV) ----
   // sections: [{ title, rows: [{ label, unit, cells: [{ v: raw number or text, t: shown text, best }] }] }]
@@ -148,21 +157,24 @@ export function initCompare(ctx) {
     const base = ctx.filtered(), lists = areas.map(a => filingsIn(a, base));
     const cell = (v, t, best) => ({ v, t: t ?? String(v ?? ''), best: !!best });
     const sz = areas.map(a => sqmi(a.geom)), S = areas.map(a => stats.get(keyOf(a))), loading = areas.map(a => !stats.has(keyOf(a)));
-    const CS = (key, fmt, unit) => S.map((x, i) => loading[i] ? cell(null, '…') : x && x[key] != null ? cell(x[key], fmt(x[key])) : cell(null, '—'));
+    const lead = vals => { const ok = vals.filter(Number.isFinite), mx = Math.max(...ok); return areas.length > 1 && ok.length > 1 && ok.filter(v => v === mx).length === 1 ? vals.indexOf(mx) : -1; };
+    // a census row: kind '$' / 'n' formats the whole row on one scale; the largest value is bold, as in the filings rows
+    const CS = (key, fmt) => { const vals = S.map((x, i) => !loading[i] && x && x[key] != null ? x[key] : null), f = typeof fmt === 'string' ? rowFmt(vals, fmt) : fmt, b = lead(vals.map(v => v ?? NaN));
+      return S.map((x, i) => loading[i] ? cell(null, '…') : vals[i] != null ? cell(vals[i], f(vals[i]), i === b) : cell(null, '—')); };
     const yr = S.find(Boolean)?.baseYear;
     const census = { title: 'Area (US Census)', rows: [
-      { label: 'Size', unit: 'sq mi', cells: sz.map(v => cell(+v.toFixed(1), (v < 10 ? v.toFixed(1) : fmtN(Math.round(v))) + ' sq mi')) },
-      { label: 'Population', cells: CS('population', numT) },
+      { label: 'Size', unit: 'sq mi', cells: sz.map((v, i) => cell(+v.toFixed(1), fmtSqmi(v), i === lead(sz))) },
+      { label: 'Population', cells: CS('population', 'n') },
       { label: 'Population growth' + (yr ? ' since ' + yr : ''), unit: '%', cells: CS('population_growth_pct', v => (v >= 0 ? '+' : '') + v + '%') },
-      { label: 'Median household income', unit: '$', cells: CS('median_household_income_approx', money) },
-      { label: 'Median home value', unit: '$', cells: CS('median_home_value_approx', money) },
+      { label: 'Median household income', unit: '$', cells: CS('median_household_income_approx', '$') },
+      { label: 'Median home value', unit: '$', cells: CS('median_home_value_approx', '$') },
       { label: 'Median rent', unit: '$ a month', cells: CS('median_gross_rent_approx', v => '$' + fmtN(v) + '/mo') },
-      { label: 'Households', cells: CS('households', numT) },
-      { label: 'Jobs located here', cells: CS('jobs', numT) }
+      { label: 'Households', cells: CS('households', 'n') },
+      { label: 'Jobs located here', cells: CS('jobs', 'n') }
     ] };
     const best = k => { const m = BY_KEY.get(k); if (m.text) return -1; const v = lists.map(l => m.fn(l)); const mx = Math.max(...v); return mx > 0 && v.filter(x => x === mx).length === 1 ? v.indexOf(mx) : -1; };
-    const rows = ROWS.map(k => { const m = BY_KEY.get(k), b = best(k);
-      return { label: m.label, unit: UNIT[k] || '', cells: lists.map((l, i) => { const v = m.fn(l); return cell(m.text ? v : +(+v).toFixed(2), m.fmt(v), i === b && areas.length > 1); }) }; });
+    const rows = ROWS.map(k => { const m = BY_KEY.get(k), b = best(k), vals = lists.map(l => m.fn(l)), f = ROW_KIND[k] ? rowFmt(vals, ROW_KIND[k]) : m.fmt;
+      return { label: m.label, unit: UNIT[k] || '', cells: vals.map((v, i) => cell(m.text ? v : +(+v).toFixed(2), f(v), i === b && areas.length > 1)) }; });
     rows.push({ label: 'Filings per sq mi', cells: areas.map((a, i) => { const v = lists[i].length / Math.max(sz[i], .01); return cell(+v.toFixed(2), v.toFixed(2)); }) });
     const src = S.find(Boolean);
     return { areas: areas.slice(), lists, loading: loading.some(Boolean), sections: [census, { title: FILINGS_TITLE, rows }],
@@ -176,9 +188,16 @@ export function initCompare(ctx) {
     if (ctx.view !== 'compare') return;
     const ft = ctx.filterText();
     const cur = fromSelection(), canAdd = cur && areas.length < MAX && !has(cur.key);
-    let h = '<div class="vhead"><div><div class="kicker">Compare areas</div><h2>Compare up to four areas</h2><div class="vsub">' + 'Population, income, housing and jobs for each area, then its construction filings. ' + (ft ? 'Filings use the same filters for every area (everything except the area itself), so they can differ from the Market page.' : 'Filings are counted with no other filters.') + '</div></div>' +
-      '<div class="vctl">' + (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(cur.label) + '”' + (eachCounty().length ? ' Together' : '') + '</button>' : '') +
-        (eachCounty().length && areas.length < MAX ? '<button class="btn" id="cmpAddEach">+ Add Each County (' + eachCounty().length + ')</button>' : '') + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') +
+    // several counties picked: name the "together" area by its counties, and once each of them is already here, neither add
+    // button is an action (adding them together again would only overlap what's in the table)
+    const each = eachCounty(), allIn = each.length > 0 && each.every(c => has(c.key));
+    const names = each.map(c => c.label.replace(/ County$/, '')), togetherName = each.length && each.length <= 4 ? names.join(' + ') : cur?.label;
+    let h = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('compare')) + '</div><h1>Compare areas</h1><div class="vsub">' + 'Up to four areas side by side: population, income, housing and jobs for each area, then its construction filings. ' + (ft ? 'Filings use the same filters for every area (everything except the area itself), so they can differ from the Market page.' : 'Filings are counted with no other filters.') + '</div></div>' +
+      '<div class="vctl">' + (allIn ? '<span class="cmp-in" role="status">✓ ' + esc(names.join(', ')) + ' already in Compare</span>' +
+          (canAdd ? '<button class="btn" id="cmpAddSel" disabled title="Each of these counties is already in Compare; adding them together would overlap them">+ Add “' + esc(togetherName) + '” Together</button>' : '') +
+          '<button class="btn" id="cmpAddEach" disabled title="Already in Compare">Each County In Compare ✓</button>'
+        : (canAdd ? '<button class="btn primary" id="cmpAddSel">+ Add “' + esc(each.length ? togetherName : cur.label) + '”' + (each.length ? ' Together' : '') + '</button>' : '') +
+          (each.length && areas.length < MAX ? '<button class="btn" id="cmpAddEach">+ Add Each County (' + each.length + ')</button>' : '')) + (areas.length ? '<button class="btn" id="cmpClear">Clear All</button>' : '') +
         (areas.length && ctx.exportMenu ? ctx.exportMenu([{ label: 'Comparison · PDF', attrs: ' data-cx="pdf"' }, { label: 'Comparison · Excel', attrs: ' data-cx="xlsx"' }, { label: 'Comparison · CSV', attrs: ' data-cx="csv"' }]) : '') + '</div></div>';
     h += '<div id="cmpScope"></div>' + (areas.length ? '<div class="cmp-chips">' : '<div class="cmp-chips" hidden>') + areas.map((a, i) => '<span class="cmp-chip" style="--c:' + color(i) + '"><i></i><button class="lnk" data-go="' + i + '" title="Show on the map">' + esc(a.label) + '</button><button class="ed" data-ed="' + i + '" aria-label="Rename ' + esc(a.label) + '" title="Rename">✎</button><button class="x" data-rm="' + i + '" aria-label="Remove ' + esc(a.label) + '">×</button></span>').join('') +
       (areas.length < MAX ? '<span class="cmp-slot">' + (MAX - areas.length) + ' open slot' + (MAX - areas.length > 1 ? 's' : '') + '</span>' : '') + '</div>';

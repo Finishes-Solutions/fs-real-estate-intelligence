@@ -29,7 +29,7 @@ const STEP_ICON = { done: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="
 export function workspace(env) {
   const ui = new Map(); // per project: { step, editing (scenario id or ''), busy, err, open (assumption groups), reportBusy, reportErr }
   const cache = new Map(); // per project: { key, study, scenarios }
-  let market = null, marketP = null, marketErr = false, root = null, cur = null, computeT = 0;
+  let market = null, marketP = null, marketErr = false, root = null, cur = null, computeT = 0, storageOn = null, storageP = null; // storageOn: can report sets be saved for the team here (api/feasibility op ping)
   const saveT = new Map(); // per project: a pending save (one project's edit never cancels another's)
   const st = p => { if (!ui.has(p.id)) ui.set(p.id, { step: null, editing: '', open: { cost: true, revenue: true, financing: true } }); return ui.get(p.id); };
 
@@ -53,9 +53,41 @@ export function workspace(env) {
   // lands on the project, not on a copy
   const normal = new WeakSet();
   const fz = p => { if (!p.fz || !normal.has(p.fz)) { p.fz = M0.fzOf(p); normal.add(p.fz); } return p.fz; };
+  // ---------- undo / redo: one entry per edit (a field typed in counts once until you pause 4 s or move on) ----------
+  // the entry is the project's study inputs (project.fz and the client) from before the edit
+  const snapOf = p => JSON.stringify({ fz: p.fz ?? null, client: p.client ?? null });
+  const keyOf = t => t?.dataset ? (t.dataset.as || t.dataset.line || t.dataset.mix || t.dataset.in || t.dataset.lineoff || t.dataset.opt || t.dataset.reset || t.dataset.act || t.dataset.f || '') : '';
+  const labelOf = t => (t?.closest?.('.ws-a,.ws-f,tr')?.querySelector('label,span,th')?.textContent || '').trim() || 'Change';
+  let burst = null;
+  function record(p, t) { // call before an edit is applied
+    const s = st(p), key = keyOf(t);
+    if (burst && burst.pid === p.id && burst.key === key && Date.now() - burst.t < 4000) { burst.t = Date.now(); return; }
+    (s.hist ||= []).push({ snap: snapOf(p), key, label: labelOf(t), from: t?.getAttribute?.('value') }); if (s.hist.length > 60) s.hist.shift(); s.fut = [];
+    burst = { pid: p.id, key, t: Date.now() };
+  }
+  const fieldOf = key => key && root?.querySelector('[data-as="' + CSS.escape(key) + '"],[data-line="' + CSS.escape(key) + '"],[data-in="' + CSS.escape(key) + '"]');
+  const step = (h, now) => h.label + (h.from != null && now != null && h.from !== now ? ': ' + h.from + ' → ' + now : '');
+  function restore(p, from, to) { // move the newest entry of `from` onto `to` and put the project back as it was
+    const s = st(p), h = (s[from] || []).pop(); if (!h) { env.toast(from === 'hist' ? 'Nothing to undo.' : 'Nothing to redo.'); return null; }
+    const now = fieldOf(h.key)?.value; (s[to] ||= []).push({ snap: snapOf(p), key: h.key, label: h.label, from: now });
+    const o = JSON.parse(h.snap); if (o.fz) p.fz = o.fz; else delete p.fz; if (o.client == null) delete p.client; else p.client = o.client;
+    burst = null; changed(p, true); return { ...h, now };
+  }
+  function undo(p) { const h = restore(p, 'hist', 'fut'); if (h) env.toast('Undone: ' + step({ ...h, from: h.now }, h.from), { action: { label: 'Redo', run: () => redo(p) } }); }
+  function redo(p) { const h = restore(p, 'fut', 'hist'); if (h) env.toast('Redone: ' + step({ ...h, from: h.now }, h.from), { action: { label: 'Undo', run: () => undo(p) } }); }
+  // ⌘Z / Ctrl+Z (⇧ to redo) on the Feasibility tab: outside text fields, and in the step's own fields (they're redrawn as
+  // the numbers change, so the browser's own undo has nothing to go back to)
+  document.addEventListener('keydown', e => {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'z') return;
+    const el = document.getElementById('wsRoot'), a = document.activeElement; if (!el || !cur || !el.offsetParent) return;
+    if (a && (a.isContentEditable || (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !(el.contains(a) && a.matches('[data-as],[data-line],[data-mix],[data-in]'))))) return;
+    e.preventDefault(); if (e.shiftKey) redo(cur); else undo(cur);
+  });
+  // once an edit is saved, say what changed, with Undo
+  function savedNote(p) { const h = st(p).hist?.at(-1), f = h && fieldOf(h.key); if (!f || h.from == null || f.value === h.from) return; env.toast(step(h, f.value) + ' · saved', { action: { label: 'Undo', run: () => undo(p) } }); }
   function changed(p, now = false) { // saved on the project (debounced while typing) and the numbers redrawn
     cache.delete(p.id); clearTimeout(computeT); computeT = setTimeout(() => paint(), now ? 0 : 220);
-    clearTimeout(saveT.get(p.id)); saveT.set(p.id, setTimeout(() => { saveT.delete(p.id); env.save(p); }, now ? 0 : 900));
+    clearTimeout(saveT.get(p.id)); saveT.set(p.id, setTimeout(() => { saveT.delete(p.id); env.save(p); if (!now) savedNote(p); }, now ? 0 : 900));
   }
 
   // ---------- the frame: stepper, step, summary rail ----------
@@ -66,7 +98,8 @@ export function workspace(env) {
     if (!s.step) s.step = M0.STEPS.find(x => status[x.id].state !== 'done')?.id || 'reports';
     const steps = '<nav class="ws-steps" aria-label="Feasibility steps"><ol>' + M0.STEPS.map(x => { const k = status[x.id].state, on = x.id === s.step;
       return '<li><button type="button" class="ws-step" data-step="' + x.id + '" data-state="' + k + '"' + (on ? ' aria-current="step"' : '') + '>' + // (the name is what shows, plus the step's state for screen readers)
-        '<span class="ws-dot">' + (k === 'done' ? STEP_ICON.done + '<span class="sr">' + x.n + '</span>' : x.n) + '</span> <span class="ws-sl">' + x.label + '</span><span class="sr"> (' + ({ done: 'done', ready: 'ready', blocked: 'waiting on an earlier step' })[k] + ')</span></button></li>'; }).join('') + '</ol></nav>';
+        '<span class="ws-dot">' + (k === 'done' ? STEP_ICON.done + '<span class="sr">' + x.n + '</span>' : x.n) + '</span> <span class="ws-sl">' + x.label + '</span>' +
+        (k === 'done' ? '<span class="sr"> (done)</span>' : '<small class="ws-ss" data-state="' + k + '"><span class="sr">, </span>' + (k === 'ready' ? esc(status[x.id].word || 'To do') : 'Waiting on ' + esc(M0.stepById(status[x.id].on || 'site').label)) + '</small>') + '</button></li>'; }).join('') + '</ol></nav>';
     const step = M0.stepById(s.step);
     let body;
     if (!market) body = loading('Loading the platform’s market data (rates, costs, rents)…');
@@ -87,18 +120,24 @@ export function workspace(env) {
   function rail(p, study) {
     const h = study && !study.missing ? study.pf.headline : null, s = study?.site, f = fz(p);
     const kpi = (v, l) => '<div class="ws-kpi"><b>' + v + '</b><span>' + esc(l) + '</span></div>';
-    const scen = f.scenarios.length ? '<label class="ws-f"><span>Scenario shown</span><select data-f="activeScenario"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === f.activeScenario ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' : '';
+    const ed = st(p).editing && st(p).editing !== (f.activeScenario || '') ? f.scenarios.find(x => x.id === st(p).editing) : null;
+    const scen = f.scenarios.length ? '<label class="ws-f"><span>Scenario shown</span><select data-f="activeScenario"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === f.activeScenario ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' + (ed ? '<p class="ws-railnote">You’re editing <b>' + esc(ed.name) + '</b>; its numbers are on the Pro Forma step. <button type="button" class="lnk" data-act="showEditing">Show it here</button></p>' : '') : '';
     return '<aside class="ws-rail" aria-labelledby="wsRailH"><div class="ws-card"><div class="kicker" id="wsRailH">Project summary</div>' +
-      '<div class="ws-kpis">' + kpi(s ? num(s.acres, 2) : num((p.parcels || []).reduce((a, x) => a + (x.acres || 0), 0), 2), 'Acres') + kpi(s ? (s.units ? num(s.units) : num(s.gfa)) : '—', s?.units ? 'Units' : 'Gross sf') +
+      '<div class="ws-kpis">' + (s ? '<div class="ws-kpi" title="The merged site outline (parcels joined, overlaps closed up), which the study uses. The header’s figure is the parcels’ recorded acreage added up."><b>' + num(s.acres, 2) + '</b><span>Site acres (merged outline)</span></div>' : kpi(num((p.parcels || []).reduce((a, x) => a + (x.acres || 0), 0), 2), 'Acres in parcels')) + kpi(s ? (s.units ? num(s.units) : num(s.gfa)) : '—', s?.units ? 'Units' : 'Gross sf') +
         kpi(h ? pct(h.levIrr) : '—', 'Levered IRR') + kpi(h ? num(h.multiple, 2) + '×' : '—', 'Equity multiple') + (h?.forSale ? kpi(pct(h.margin, 1), 'Margin') : kpi(h?.cocAvg != null ? pct(h.cocAvg) : '—', 'Cash-on-cash, ' + (h?.cocByYear?.length || 10) + '-yr avg')) + kpi(h ? usdM(h.totalCost) : '—', 'Total cost') + '</div>' +
-      scen + (study?.risks?.length ? '<div class="ws-risks"><div class="kicker">Top risks</div><ul>' + study.risks.filter(r => r.level !== 'low').slice(0, 4).map(r => '<li data-level="' + r.level + '"><span class="ws-lv">' + r.level + '</span>' + esc(r.title) + '</li>').join('') + '</ul></div>' : '') +
+      scen + (study?.risks?.length ? '<div class="ws-risks"><div class="kicker">Top risks</div><ul>' + study.risks.filter(r => r.level !== 'low').slice(0, 4).map(r => { const blocks = typeof p.next?.blocker === 'string' && !!r.title && p.next.blocker.toLowerCase().startsWith(r.title.toLowerCase()); // picked as the next step's blocker (src/siteplan.js nextHtml)
+        return '<li data-level="' + r.level + '"' + (blocks ? ' class="blocks"' : '') + '><span class="ws-lv">' + r.level + '</span>' + esc(r.title) + (blocks ? ' <small class="ws-blocks">Blocking the next step</small>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
       (study?.option ? '<p class="ws-meta">Option: <b>' + esc(study.option.name) + '</b>' + (study.scenario ? ' · ' + esc(study.scenario.name) : '') + '<br>Inputs <span class="mono">' + esc(study.inputsHash || '') + '</span></p>' : '') + '</div></aside>';
   }
 
   // ---------- 1 Intake ----------
+  // every field has a stable id (wsIn-<key>) so paint() can put focus and the caret back after the numbers redraw;
+  // numeric fields that redraw (asking price) are text inputs with a decimal keypad, since a type=number input can't have its
+  // caret restored (the survey's lat/lon don't redraw while typed, so they stay number inputs with a minus key)
   function intakeStep(p) {
     const f = fz(p), it = M0.intakeFromParcels(f.intake, p.parcels || []), parcels = p.parcels || [];
-    const field = (k, label, v, o = {}) => '<label class="ws-f' + (o.wide ? ' wide' : '') + '"><span>' + label + '</span><input data-in="' + k + '" ' + (o.type ? 'type="' + o.type + '" inputmode="decimal" ' : '') + 'value="' + esc(v ?? '') + '" autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '></label>';
+    const need = { client: !String(p.client || '').trim(), targetUse: !String(f.intake.targetUse || p.use || '').trim() }, missing = need.client || need.targetUse; // (intake isn't done without them: pipeline stepStatus)
+    const field = (k, label, v, o = {}) => '<label class="ws-f' + (o.wide ? ' wide' : '') + (need[k] ? ' need' : '') + '"><span>' + label + (need[k] ? ' <em class="ws-req">Needed</em>' : '') + '</span><input id="wsIn-' + k + '" data-in="' + k + '" ' + (need[k] ? 'aria-describedby="wsNeed" ' : '') + (o.type ? (/^sv/.test(k) ? 'type="number" ' : 'type="text" ') + 'inputmode="decimal" ' : '') + 'value="' + esc(v ?? '') + '" autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '></label>';
     const basis = '<label class="ws-f"><span>Land basis</span><select data-in="landBasis">' + [['appraised-land', 'Appraised land value'], ['appraised-total', 'Appraised total value'], ['asking', 'Asking / contract price'], ['house', 'Platform $ an acre']].map(([v, l]) => '<option value="' + v + '"' + (f.intake.landBasis === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>';
     const rows = parcels.length ? '<table class="ws-t"><caption class="sr">Parcels</caption><thead><tr><th scope="col">Parcel</th><th scope="col">Owner</th><th scope="col" class="r">Acres</th><th scope="col" class="r">Land value</th><th scope="col" class="r">Total value</th><th scope="col">Source</th></tr></thead><tbody>' +
       parcels.map(x => '<tr><th scope="row">' + esc(x.label) + (x.zip ? '<small>' + esc([x.city, x.zip].filter(Boolean).join(' ')) + '</small>' : '') + '</th><td>' + esc(x.owner || '—') + '</td><td class="r m">' + num(x.acres, 2) + '</td><td class="r m">' + usd(x.landValue) + '</td><td class="r m">' + usd(x.marketValue) + '</td><td>' + esc(x.source?.label || (x.propId ? 'Appraisal district' : 'Map')) + '</td></tr>').join('') + '</tbody></table>'
@@ -106,7 +145,8 @@ export function workspace(env) {
     const survey = '<details class="ws-box"><summary>Enter a survey (metes and bounds)</summary><p class="ws-note">One call a line, e.g. <span class="mono">N 42°00\'00" E 250.00 ft</span>. Placed at the point you give (the survey’s point of beginning). Closure must be 1:10,000 or better; curves aren’t supported yet.</p>' +
       '<label class="ws-f wide"><span>Calls</span><textarea id="wsCalls" rows="5"></textarea></label><div class="ws-row">' + field('svLat', 'Latitude of the point of beginning', '', { type: 'number', ph: '29.78' }) + field('svLon', 'Longitude', '', { type: 'number', ph: '-95.98' }) + '</div>' +
       '<button type="button" class="btn" data-act="survey">Add the surveyed parcel</button></details>';
-    return '<div class="ws-card"><h4>The project</h4><div class="ws-row">' + field('client', 'Client / prepared for', p.client) + field('targetUse', 'Target use', f.intake.targetUse || p.use, { ph: 'e.g. Garden apartments' }) + '</div>' +
+    const needBox = parcels.length && missing ? '<div class="ws-warnbox" id="wsNeed" role="status"><b>Intake needs details.</b> Add the ' + [need.client && 'client', need.targetUse && 'target use'].filter(Boolean).join(' and ') + ': Intake isn’t done until ' + (need.client && need.targetUse ? 'they’re' : 'it’s') + ' in. ' + (f.intake.landPrice == null ? 'Land is priced at the appraisal district’s land value until you enter an asking price.' : '') + '</div>' : '';
+    return needBox + '<div class="ws-card"><h4>The project</h4><div class="ws-row">' + field('client', 'Client / prepared for', p.client) + field('targetUse', 'Target use', f.intake.targetUse || p.use, { ph: 'e.g. Garden apartments' }) + '</div>' +
       '<div class="ws-row">' + field('address', 'Address', it.address) + field('city', 'City', it.city) + field('county', 'County', it.county) + field('zip', 'ZIP', it.zip) + '</div>' +
       '<div class="ws-row">' + basis + field('landPrice', 'Asking price ($)', f.intake.landPrice ?? '', { type: 'number', ph: 'used with Asking / contract price' }) + '</div>' +
       '<p class="ws-note">Address, city, county and ZIP fill from the parcels; the ZIP sets the rent market check. Land defaults to the appraisal district’s <b>land</b> value (not the total, which includes buildings) until you enter a price.</p></div>' +
@@ -132,7 +172,8 @@ export function workspace(env) {
       '<div class="ws-gal">' + shown.map(card).join('') + '</div>' + (g.list.length > shown.length ? '<button type="button" class="btn" data-act="moreGallery">Show ' + Math.min(12, g.list.length - shown.length) + ' more</button>' : '');
   }
   function runGallery(p) {
-    const s = st(p), f = fz(p), parcels = p.parcels || [], base = P.siteFromParcels(parcels); if (!base) throw new Error('The parcels have no outline to lay out.');
+    const s = st(p); fz(p); // fz() fills in the project's feasibility record if it has none yet
+    const parcels = p.parcels || [], base = P.siteFromParcels(parcels); if (!base) throw new Error('The parcels have no outline to lay out.');
     const ask = s.ask, prog = ask ? P.programFromWords(ask) : { use: s.use || 'multifamily' }, np = S.normalizeProgram(prog), parts = parcels.length > 1 && s.per !== false ? partsOf(base, parcels) : [], per = parts.length > 1 && (np.parcels || s.per !== false);
     const t0 = Date.now(); let list;
     if (per) list = layoutOptions(base, prog, { count: 4, netEvals: 6, parcels: parts, perParcel: true });
@@ -159,7 +200,7 @@ export function workspace(env) {
       '<button type="button" class="btn sm" data-edit="' + esc(pl.id) + '">Open in site plan</button></label>').join('') + '</fieldset>' : '';
     const gen = galleryTool(p);
     const s = study?.site;
-    const facts = s ? '<div class="ws-two"><dl class="ws-dl">' + [['Site', num(s.acres, 2) + ' acres · ' + num(s.siteSf) + ' sf'], ['Buildable envelope', s.envelope ? num(s.envelope.envelopeSf) + ' sf (' + pct(s.envelope.ratio, 0) + ') at a ' + s.envelope.setbackFt + ' ft setback' : '—'],
+    const facts = s ? '<div class="ws-two"><dl class="ws-dl">' + [['Site (merged outline)', num(s.acres, 2) + ' acres · ' + num(s.siteSf) + ' sf'], ['Buildable envelope', s.envelope ? num(s.envelope.envelopeSf) + ' sf (' + pct(s.envelope.ratio, 0) + ') at a ' + s.envelope.setbackFt + ' ft setback' : '—'],
       ['Building area', num(s.gfa) + ' gross sf'], ['Units', s.units ? num(s.units) : '—'], ['Parking', num(s.spaces) + ' of ' + num(s.required) + ' required'], ['Coverage / FAR', pct(s.coverage, 1) + ' / ' + num(s.far, 2)], ['Detention', num(s.detentionAcFt, 2) + ' ac-ft'],
       ...Object.entries(s.jurisdiction || {})].map(([k, v]) => '<div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>').join('') + '</dl><figure class="ws-plan">' + (opt && (opt.ring || []).length >= 3 ? planSVG(opt, { px: 520 }).svg : '') + '<figcaption>' + esc(opt?.name || '') + ': concept layout, not a survey.</figcaption></figure></div>' +
       (s.issues?.length ? '<div class="ws-warnbox">Layout checks: ' + s.issues.map(esc).join(' ') + '</div>' : '') : study?.missing === 'layout' ? empty('Not laid out yet', 'Generate a layout option above, or open the option in the site plan editor and lay it out.', null, null) : '';
@@ -189,7 +230,8 @@ export function workspace(env) {
         '<td class="r"><label class="sr" for="' + id + '">Rate for ' + esc(l.desc) + '</label><input id="' + id + '" class="ws-num" data-line="' + esc(l.id) + '" type="number" step="any" inputmode="decimal" value="' + +l.rate.toFixed(l.unit === '$ base' ? 4 : 2) + '"' + (l.off ? ' disabled' : '') + '></td><td class="r m">' + usd(l.amount) + '</td><td>' + chip(l.source) + '</td>' +
         '<td><label class="ws-chk"><input type="checkbox" data-lineoff="' + esc(l.id) + '"' + (l.off ? '' : ' checked') + '><span class="sr">Include ' + esc(l.desc) + '</span></label></td></tr>'; }).join('') + '</tbody></table></details>').join('');
     const edits = Object.keys(fz(p).budgetEdits).length;
-    return '<div class="ws-card"><h4>Budget summary</h4>' + sum + '<p class="ws-note">Escalated × ' + num(E.library.factor, 4) + ' on library lines (' + esc(E.library.toDate.note) + '; ' + esc(E.library.forward.note) + ') and × ' + num(E.parametric.factor, 4) + ' on parametric lines; location factor ' + num(E.location, 2) + '. Change these under Pro Forma › Cost.</p>' +
+    return '<div class="ws-card"><h4>Budget summary</h4>' + sum + '<p class="ws-note">Escalated × ' + num(E.library.factor, 4) + ' on library lines (' + esc(E.library.toDate.note) + '; ' + esc(E.library.forward.note) + ')' + (study.budget.fsUses?.length ? ', × ' + num(E.fs.factor, 4) + ' on Finishes budget library lines' : '') + ' and × ' + num(E.parametric.factor, 4) + ' on parametric lines; location factor ' + num(E.location, 2) + '. Change these under Pro Forma › Cost.</p>' +
+      (study.budgetLib?.length ? '<details class="ws-box"' + (study.budgetLib.some(c => c.level === 'note') ? ' open' : '') + '><summary><span>Finishes budget library</span><span class="m">' + (study.budget.fsLib?.likely ? usd(study.budget.fsLib.low) + ' – ' + usd(study.budget.fsLib.high) : 'cross-check') + '</span></summary>' + study.budgetLib.map(c => '<p class="ws-note">' + (c.level === 'note' ? '<b>Check:</b> ' : '') + esc(c.text) + '</p>').join('') + '</details>' : '') +
       (study.budgetBench && Math.abs(study.budgetBench.diff) <= 20 ? '<p class="ws-note">' + esc(study.budgetBench.text) + '</p>' : '') +
       (study.budgetChecks.length ? '<div class="ws-warnbox">' + study.budgetChecks.map(c => esc(c.text)).join(' ') + '</div>' : '') + '</div>' +
       '<div class="ws-card"><h4>Line items <span class="ws-c">' + study.budget.lines.length + '</span>' + (edits ? '<button type="button" class="lnk" data-act="clearLines">Undo ' + edits + ' line edit' + (edits > 1 ? 's' : '') + '</button>' : '') + '</h4><p class="ws-note">Rates are editable; untick a line to leave it out. Your changes are marked “Yours” and listed in the report’s register.</p>' + lines + '</div>';
@@ -199,14 +241,18 @@ export function workspace(env) {
   // ---------- 5 Pro Forma ----------
   function proformaStep(p, study, c) {
     if (!study || study.missing) return empty('Nothing to model yet', 'The pro forma runs on a laid-out site option and its budget.', 'Go to Site', 'step:site');
-    const f = fz(p), s = st(p), h = study.pf.headline, editing = f.scenarios.find(x => x.id === s.editing) || null;
+    const f = fz(p), s = st(p), editing = f.scenarios.find(x => x.id === s.editing) || null;
+    // while a scenario is being edited the results are its numbers (the rail keeps the scenario picked there)
+    let es = null; if (editing && editing.id !== (study.scenario?.id || null)) { try { es = P.runStudy(p, { market, scenarioId: editing.id, sensitivity: false }); if (es.missing) es = null; } catch (e) { es = null; } }
+    const base = study.pf.headline, h = es ? es.pf.headline : base;
     const over = editing ? editing.overrides : f.overrides;
     // the three returns the team decides on first (levered IRR, equity multiple, cash-on-cash over the hold), then the rest
     const yrs = h.cocByYear?.length || 0, lead = [[pct(h.levIrr), 'Levered IRR'], [num(h.multiple, 2) + '×', 'Equity multiple'], h.forSale ? [pct(h.margin, 1), 'Margin on sales'] : [h.cocAvg != null ? pct(h.cocAvg) : '—', 'Cash-on-cash, ' + (yrs || h.hold || 10) + '-year average']];
     const rest = [[usdM(h.totalCost), 'Total development cost'], h.forSale ? [usdM(h.profit), 'Profit'] : [usdM(h.noi), 'Stabilized NOI'], h.forSale ? null : [pct(h.yoc), 'Yield on cost'], h.forSale ? null : [h.coc != null ? pct(h.coc) : '—', 'Cash-on-cash, year 1'], [pct(h.unlevIrr), 'Unlevered IRR'], [usdM(h.npvLev), 'Levered NPV'], [h.dscr != null ? num(h.dscr, 2) + '×' : '—', 'DSCR']].filter(Boolean);
     const kpiH = ([v, l]) => '<div class="ws-kpi"><b>' + v + '</b><span>' + esc(l) + '</span></div>';
+    const vsBase = editing ? '<p class="ws-vs" role="status"><b>Showing ' + esc(editing.name) + '</b> · vs ' + (study.scenario ? esc(study.scenario.name) : 'base case') + ': levered IRR ' + pct(h.levIrr) + ' (' + delta(h.levIrr, base.levIrr) + '), total cost ' + usdM(h.totalCost) + ' (' + (h.totalCost - base.totalCost >= 0 ? '+' : '−') + usdM(Math.abs(h.totalCost - base.totalCost)) + ')</p>' : '';
     const cocRow = yrs ? '<div class="ws-scroll" tabindex="0" role="region" aria-label="Cash-on-cash by year"><table class="ws-t ws-coc"><caption>Cash-on-cash by year of the hold (cash flow after debt service ÷ equity)</caption><thead><tr>' + h.cocByYear.map((_, i) => '<th scope="col" class="r">Yr ' + (i + 1) + '</th>').join('') + '</tr></thead><tbody><tr>' + h.cocByYear.map(v => '<td class="r m">' + pct(v) + '</td>').join('') + '</tr></tbody></table></div>' : '';
-    const kpis = '<div class="ws-kpis big ws-lead">' + lead.map(kpiH).join('') + '</div>' + cocRow + '<div class="ws-kpis">' + rest.map(kpiH).join('') + '</div>';
+    const kpis = vsBase + '<div class="ws-kpis big ws-lead">' + lead.map(kpiH).join('') + '</div>' + cocRow + '<div class="ws-kpis">' + rest.map(kpiH).join('') + '</div>';
     // the assumptions, grouped, each with its source
     const groups = GROUPS.map(([g, label]) => { const rows = study.register.filter(a => a.group === g); if (!rows.length) return '';
       return '<details class="ws-box" data-group="' + g + '"' + (s.open[g] ? ' open' : '') + '><summary><span>' + label + '</span><span class="ws-c">' + rows.length + '</span></summary><div class="ws-as">' + rows.map(a => {
@@ -215,11 +261,12 @@ export function workspace(env) {
           chip(a.source) + (o ? '<button type="button" class="lnk" data-reset="' + esc(a.key) + '" aria-label="Reset ' + esc(a.label) + ' to ' + esc(fmtVal({ ...a, value: a.default ?? a.value })) + '">Reset</button>' : '') +
           (a.range ? '<small id="' + id + 'r" class="' + (out ? 'out' : '') + '">' + (out ? 'Outside the usual ' : 'Usual ') + esc(a.range[0] + '–' + a.range[1]) + '</small>' : '') + (a.marketCheck ? '<small class="ws-mc">' + esc(a.marketCheck) + '</small>' : '') + '</div>'; }).join('') + '</div></details>'; }).join('');
     const edBar = '<div class="ws-edbar"><label class="ws-f"><span>Editing</span><select data-f="editing"><option value="">Base case</option>' + f.scenarios.map(x => '<option value="' + esc(x.id) + '"' + (x.id === s.editing ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' +
+      (editing ? '<label class="ws-f"><span>Scenario name</span><input id="wsScName" data-scname="1" maxlength="60" value="' + esc(editing.name) + '" autocomplete="off"></label>' : '') +
       '<button type="button" class="btn" data-act="newScenario">New scenario</button>' + (editing ? '<button type="button" class="btn" data-act="delScenario">Delete “' + esc(editing.name) + '”</button>' : '') + '</div>' +
-      (editing ? '<p class="ws-note">Changes now go into <b>' + esc(editing.name) + '</b>; the base case keeps its numbers. The rail shows ' + (f.activeScenario === editing.id ? 'this scenario.' : 'the base case — pick the scenario there to see it.') + '</p>' : '') +
+      (editing ? '<p class="ws-note">Changes now go into <b>' + esc(editing.name) + '</b>; the base case keeps its numbers. The results above show this scenario' + (f.activeScenario === editing.id ? ', and so does the rail.' : '. <button type="button" class="lnk" data-act="showEditing">Show it in the rail and reports too</button>') + '</p>' : '') +
       (editing && (study.site.mix || []).length ? mixEditor(editing, study) : '');
     // results: returns, break-even, sensitivity, hold, scenarios
-    const be = study.pf.breakEven;
+    const be = (es || study).pf.breakEven; // (the scenario's, while one is being edited; its sensitivity and hold below stay the shown case's)
     const beTxt = breakEvenText(be, x => '<b>' + x + '</b>');
     const sv = study.sensitivity, tor = sv ? '<h5>What moves the ' + (sv.metric === 'margin' ? 'margin' : 'levered IRR') + ' most</h5>' + tornadoSvg(sv.tornado, esc, { W: 560, L: 170, classes: true }) + '<div class="ws-scroll" tabindex="0" role="region" aria-label="Sensitivity table"><table class="ws-t"><caption class="sr">Sensitivity</caption><thead><tr><th scope="col">Input</th><th scope="col">Low case</th><th scope="col" class="r">Result</th><th scope="col">High case</th><th scope="col" class="r">Result</th></tr></thead><tbody>' +
       sv.tornado.rows.map(r => '<tr><th scope="row">' + esc(r.label) + '</th><td>' + esc(r.loText) + '</td><td class="r m">' + pct(r.lo) + '</td><td>' + esc(r.hiText) + '</td><td class="r m">' + pct(r.hi) + '</td></tr>').join('') + '</tbody></table></div>' +
@@ -244,13 +291,17 @@ export function workspace(env) {
   function reportsStep(p, study) {
     if (!study || study.missing) return empty('No report yet', 'The report set is made from a laid-out option, its budget and pro forma.', 'Go to Site', 'step:site');
     const s = st(p), f = fz(p), dis = s.reportBusy ? ' disabled' : '';
+    if (storageOn === null && !storageP) storageP = api({ op: 'ping' }).then(r => r.json()).then(d => { storageOn = d.storage !== false; }, () => { storageOn = true; }).finally(() => paint()); // (unknown: offered, and a failure says why)
+    const noStore = storageOn === false, checking = storageOn === null ? ' disabled aria-busy="true" title="Checking whether team storage is connected…"' : ''; // (not offered until the answer is in)
     const files = [['pdf', 'Feasibility report', 'PDF · summary, site, plan set, budget, pro forma, sensitivity, risks, register'], ['xlsx', 'Workbook', 'XLSX · assumptions with sources, budget lines, CSI, monthly and annual cash flow, hold, sensitivity'], ['register', 'Fact & assumption register', 'CSV · every input with its source'], ['budget', 'Budget lines', 'CSV · every line with qty, rate and source'], ['json', 'Study data', 'JSON · everything above, for other tools']];
     const hist = f.reports.length ? '<table class="ws-t"><caption class="sr">Saved report sets</caption><thead><tr><th scope="col">Saved</th><th scope="col">By</th><th scope="col">Inputs</th><th scope="col" class="r">Total cost</th><th scope="col" class="r">Levered IRR</th><th scope="col">Files</th></tr></thead><tbody>' +
       f.reports.slice().reverse().map(r => '<tr><th scope="row">' + esc(new Date(r.created).toLocaleString()) + '</th><td>' + esc(r.by || '') + '</td><td class="m">' + esc(r.inputsHash) + (r.inputsHash === study.inputsHash ? ' <small>(current)</small>' : ' <small>(older inputs)</small>') + '</td><td class="r m">' + usdM(r.headline?.totalCost) + '</td><td class="r m">' + pct(r.headline?.levIrr) + '</td><td>' +
         r.files.map(x => '<button type="button" class="lnk" data-link="' + esc(x.path) + '">' + esc(x.name.split('.').pop().toUpperCase().replace('CSV', /register/.test(x.name) ? 'Register' : 'Budget')) + '</button>').join(' ') + '</td></tr>').join('') + '</tbody></table>' : '<p class="ws-note">No report sets saved yet. Saved sets are kept in the team’s storage with the inputs they were made from.</p>';
     return '<div class="ws-card"><h4>Report set</h4><p>Made from <b>' + esc(study.option.name) + '</b>' + (study.scenario ? ', scenario <b>' + esc(study.scenario.name) + '</b>' : ', base case') + ' · inputs <span class="mono">' + esc(study.inputsHash) + '</span>.</p>' +
       '<ul class="ws-files">' + files.map(([k, t, d]) => '<li><button type="button" class="btn" data-file="' + k + '"' + dis + '>' + esc(t) + '</button><span>' + esc(d) + '</span></li>').join('') + '</ul>' +
-      '<div class="ws-row"><button type="button" class="btn primary" data-act="saveSet"' + dis + '>Save the whole set for the team</button><button type="button" class="btn" data-act="preview">Open the report here (print or save as PDF)</button></div>' +
+      (noStore ? '<div class="ws-row"><button type="button" class="btn" data-act="saveSet" disabled aria-describedby="wsNoStore">Save the whole set for the team</button><button type="button" class="btn primary" data-act="preview">Open the report here (print or save as PDF)</button></div>' +
+        '<p class="ws-note ws-off" id="wsNoStore"><b>Saving for the team isn’t available on this site.</b> Team storage isn’t connected, so report sets can’t be kept here. Download the files above, or ask your admin to connect team storage.</p>'
+        : '<div class="ws-row"><button type="button" class="btn primary" data-act="saveSet"' + (dis || checking) + '>Save the whole set for the team</button><button type="button" class="btn" data-act="preview">Open the report here (print or save as PDF)</button></div>') +
       (s.reportBusy ? '<p class="ws-busy" role="status"><span class="ws-spin" aria-hidden="true"></span>' + esc(s.reportBusy) + '</p>' : '') + (s.reportErr ? '<div class="ws-err" role="alert">' + esc(s.reportErr) + '</div>' : '') + '</div>' +
       '<div class="ws-card"><h4>Saved sets <span class="ws-c">' + f.reports.length + '</span></h4>' + hist + '</div>';
   }
@@ -268,7 +319,9 @@ export function workspace(env) {
   const headers = () => ({ 'Content-Type': 'application/json', 'x-field-code': env.code() || '' });
   async function api(body) {
     const r = await fetch('api/feasibility', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
-    if (!r.ok) { let m; try { m = (await r.json()).error; } catch (e) { m = ''; } throw Object.assign(new Error(m || (r.status === 404 ? 'The report service isn’t available here (open the deployed site, or run npm run dev).' : 'The report service answered ' + r.status + '.')), { status: r.status }); }
+    if (!r.ok) { let m; try { m = (await r.json()).error; } catch (e) { m = ''; }
+      if (/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/.test(m || '')) { console.warn('feasibility:', m); m = r.status === 503 ? 'This isn’t set up on this site yet. Ask your admin, or download the files instead.' : ''; } // server setting names stay in the console
+      throw Object.assign(new Error(m || (r.status === 404 ? 'The report service isn’t available here (open the deployed site, or run npm run dev).' : 'The report service answered ' + r.status + '.')), { status: r.status }); }
     return r;
   }
   async function download(p, kind) {
@@ -288,6 +341,7 @@ export function workspace(env) {
       const f = fz(p), s = st(p);
       if (t.dataset.step) { if (t.getAttribute('aria-disabled') === 'true') { s.err = t.title; paint(); return; } return go(p, t.dataset.step); }
       if (t.dataset.edit) return env.openOption(p.id, t.dataset.edit);
+      if (t.dataset.reset || ['clearLines', 'dropUnknown', 'newScenario', 'delScenario', 'survey'].includes(t.dataset.act)) record(p, t);
       if (t.dataset.reset) { const o = (f.scenarios.find(x => x.id === s.editing)?.overrides) || f.overrides; delete o[t.dataset.reset]; return changed(p, true); }
       if (t.dataset.file) return download(p, t.dataset.file);
       if (t.dataset.link) { try { const r = await api({ op: 'link', path: t.dataset.link }); window.open((await r.json()).url, '_blank', 'noopener'); } catch (err) { s.reportErr = err.message; paint(); } return; }
@@ -321,6 +375,7 @@ export function workspace(env) {
         p.parcels = [...(p.parcels || []), M0.parcelFrom({ key: 'sv-' + M0.hashOf(calls), label: 'Surveyed tract (' + num(r.acres, 2) + ' ac)', acres: +r.acres.toFixed(3), geometry: r.geometry }, M0.src('user', 'Metes and bounds entered at intake, closure ' + r.precisionText, { confidence: 'medium' }))];
         env.toast('Added the surveyed tract: ' + num(r.acres, 2) + ' acres, closure ' + r.precisionText + '.'); s.err = ''; return changed(p, true);
       }
+      if (act === 'showEditing') { record(p, t); f.activeScenario = s.editing || null; return changed(p, true); }
       if (act === 'newScenario') { const id = 'sc' + Date.now().toString(36), n = f.scenarios.length + 1; f.scenarios.push({ id, name: 'Scenario ' + n, overrides: {} }); s.editing = id; return changed(p, true); }
       if (act === 'delScenario') { f.scenarios = f.scenarios.filter(x => x.id !== s.editing); if (f.activeScenario === s.editing) f.activeScenario = null; s.editing = ''; return changed(p, true); }
       if (act === 'preview') { const c = studyOf(p, { sensitivity: true }); if (!c?.study) return; const opt = M0.optionOf(p), w = window.open('', '_blank'); if (!w) { s.reportErr = 'Your browser blocked the new window.'; return paint(); }
@@ -334,18 +389,21 @@ export function workspace(env) {
     });
     el.addEventListener('input', e => {
       const t = e.target, f = fz(p), s = st(p);
+      if (t.dataset.as || t.dataset.line || t.dataset.mix || t.dataset.scname || (t.dataset.in && !/^sv/.test(t.dataset.in))) record(p, t);
+      if (t.dataset.scname) { const sc = f.scenarios.find(x => x.id === s.editing); if (!sc) return; sc.name = t.value.replace(/\s+/g, ' ').trimStart().slice(0, 60) || sc.name; return changed(p); }
       if (t.dataset.as) { const o = s.editing ? f.scenarios.find(x => x.id === s.editing)?.overrides : f.overrides; if (!o) return; if (t.value === '' || !Number.isFinite(+t.value)) return; o[t.dataset.as] = +t.value; return changed(p); }
       if (t.dataset.line) { if (!Number.isFinite(+t.value) || t.value === '') return; (f.budgetEdits[t.dataset.line] ||= {}).rate = +t.value; return changed(p); }
       if (t.dataset.mix) { const sc = f.scenarios.find(x => x.id === s.editing); if (!sc) return; if (!sc.mix) { const c = studyOf(p, { sensitivity: false }); if (!c?.study?.site) return; sc.mix = mixOf(c.study); } const [i, k] = t.dataset.mix.split(':'); if (Number.isFinite(+t.value)) sc.mix[+i][k] = +t.value; return changed(p); }
       if (t.dataset.in && !/^sv/.test(t.dataset.in)) {
         const k = t.dataset.in, v = t.value;
-        if (k === 'client') p.client = v; else if (k === 'landPrice') f.intake.landPrice = v === '' ? null : +v; else f.intake[k] = v;
+        if (k === 'landPrice') { const n = +v.replace(/[$,\s]/g, ''); if (v !== '' && !Number.isFinite(n)) return; f.intake.landPrice = v === '' ? null : n; } else if (k === 'client') p.client = v; else f.intake[k] = v;
         if (k === 'landPrice' && v !== '' && f.intake.landBasis !== 'asking') f.intake.landBasis = 'asking';
         return changed(p);
       }
     });
     el.addEventListener('change', e => {
       const t = e.target, f = fz(p), s = st(p);
+      if (t.dataset.opt || t.dataset.lineoff || t.dataset.f === 'activeScenario' || t.dataset.in === 'landBasis') record(p, t);
       if (t.dataset.opt) { f.optionId = t.dataset.opt; return changed(p, true); }
       if (t.dataset.lineoff) { const ed = f.budgetEdits[t.dataset.lineoff] ||= {}; if (t.checked) delete ed.off; else ed.off = true; if (!Object.keys(ed).length) delete f.budgetEdits[t.dataset.lineoff]; return changed(p, true); }
       if (t.dataset.f === 'activeScenario') { f.activeScenario = t.value || null; return changed(p, true); }
@@ -359,5 +417,5 @@ export function workspace(env) {
       e.preventDefault(); el.querySelector('.ws-step[data-step="' + ids[to] + '"]')?.focus();
     });
   }
-  return { html, wire, studyOf, paint };
+  return { html, wire, studyOf, paint, steps: p => P.stepStatus(p, null) };
 }

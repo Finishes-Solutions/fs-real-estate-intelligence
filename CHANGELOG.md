@@ -3,7 +3,71 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-13
+
+### 12:40 PM CT (Nov 13): UI/UX audit plan and coverage added to docs (`6b63dac`)
+- **The audit's plan is in the repository:** `docs/ui-ux-audit-2026-11/` holds the implementation plan and the coverage table from the November UI/UX audit, so the reason behind each `UX-xxx` fix can be looked up.
+
+### 12:15 PM CT (Nov 13): EV charging in site layouts merged into experimental (`bb5bd30`…`739ec4a`)
+- **Planned EV charging is now on experimental:** the Plan EV charging option, the per-lot charger counts, the tinted stalls and the 3D chargers and canopy (see Nov 10 and Nov 11 below) are merged in with the UI/UX audit fixes. The site-layout skill bundle was rebuilt to include the EV engine file.
+
+### 11:30 AM CT (Nov 13): UI/UX audit fixes merged into experimental, after a verification pass (`73185a3`…`48e4c28`, merge `ce9d224`)
+- **Every audit fix re-checked in the app:** each of the 58 fixes was run again on the merged code and compared with the audit report's pictures. Ten small gaps were closed:
+  - Phone tap targets: every button on the card, plan sheet, filters and page headers is now at least 44px.
+  - Undo is the next Tab key after a delete.
+  - Pages have proper headings, and "filings" is no longer called "projects".
+  - Start Site Plan is a filled green button again.
+  - Save set waits until storage is checked.
+  - The Environmental note names sources that returned only part of their records.
+  - The map-view report cards say "the middle of the map view".
+  - The Metrics picker takes focus as it opens.
+  - Site plan stages use the project's step names.
+
+## 2026-11-12
+
+### 3:40 PM CT: UI/UX audit follow-ups: FEMA progress and per-part Retry, named toll roads, a project's next step (`fc48e69`…`883b34a`, branch `ui-ux-audit-followups`)
+- **FEMA reports show their progress:** the card lists each part (flood zones, insurance claims, disaster declarations, risk index) as Working…, Done or Didn't load, with the time so far, a 1–3 minute note on big areas and **Cancel**. Each part appears as soon as it's in, so a county's risk index no longer waits minutes for the claims count.
+- **Retry just the part that failed:** a FEMA part that didn't load has its own **Retry**, and a short claims count has **Count the claims again**; neither re-runs the whole report.
+- **Toll roads by name:** the Traffic report lists **Sam Houston Tollway (Beltway 8)** once, under **Toll roads**, instead of three raw TxDOT codes (TL0008-RG / -KG / -LG); other codes are said in words.
+- **Who's next on a project:** under the status, a **Next step** row (owner, action, due date, optional **Blocked by**) or **No next step set** with **Set next step**, plus what the steps still need. A new **Approved** status follows Under review. Projects without a next step open as before; nothing sends notifications.
+
+### 2:07 PM CT: UI/UX audit fixes: clearer search, honest report scope, keyboard, Undo and phone layout (`6b56de0`…`7d64e8b`, branch `ui-ux-audit-fixes`)
+- **Search says when it couldn't find a house number:** instead of quietly showing the street as an "Address" and opening a card for whatever parcel is there, the card says the number wasn't found and asks you to click your lot.
+- **Drive-Time and Air Traffic say what they cover:** on a picked area, Drive-Time starts from the area's middle (marked **Start** on the map, with **Pick a start point**), and Air Traffic's live count covers 15 miles around the middle (the circle is drawn).
+- **New project details keep every keystroke:** typing in Intake no longer loses focus or letters when you pause.
+- **Keyboard users keep their place:** Layers, Filters, Metrics, menus and filing cards take focus when they open and give it back when they close; **Skip to map tools** and **Skip to page content** are the first Tab stops.
+- **Undo you can reach:** Undo notes stay while you're on them, last 10 seconds and answer ⌘Z / Ctrl+Z; deleting a project uses an in-app dialog with Undo.
+- **Numbers that agree:** county filter counts match the results, every report and Compare use one size format, and Compare rows use one number scale.
+- **Projects say what they're doing:** one sharing state everywhere, "Saved" / "Synced" after edits with ⌘Z undo, steps say "To do", "Needs details" or "Waiting on …", and results follow the scenario you're editing.
+- **Tables sort by any column** with a header that stays in view; each page has one name; main buttons are green; an **Offline** chip shows when the connection drops.
+- **Phones:** active filters show as chips, one card opens at a time, the card swipes to half and full height, the project stepper no longer overlaps, controls are full-size (44px) and Getting started shows on the first visit.
+
+## 2026-11-11
+
+### 5:25 PM CT: EV charging stalls tinted on the map and chargers shown in 3D (`f5a5ce5`, on the `test/ev-stations` preview branch)
+- **See which stalls are for EV cars:** stalls with a charger are shaded green (blue for DC fast charging) on the map and the site plan sheet.
+- **In 3D on the tilted map:** chargers stand as posts about 5.5 ft tall, and a canopy shows as a roof 12 ft up on columns along the chargers' side.
+
+### 2:03 PM CT: EV chargers counted on each parking lot (`92151c4`, on the `test/ev-stations` preview branch)
+- **Each lot says how many of its stalls have chargers:** a parking lot with EV chargers is now labelled like "7 spaces · 6 EV" on the map, the site plan sheet and the editor's Items list, and "7 SPACES, 6 EV" in the CAD (DXF) export. Lots without chargers are labelled as before.
+
+## 2026-11-10
+
+### 5:29 PM CT: Planned EV charging in site layouts (`bb5bd30`, on the `test/ev-stations` preview branch)
+- **EV chargers on existing parking:** turn on **Plan EV charging** under Program and choose a number of chargers or a share of the parking, Level 2 or DC fast charging, and optionally the size of the power equipment and a canopy. Chargers reserve stalls the plan already has (straight or angled), so parking counts and the layout around them stay the same.
+- **Kept clear and said when it doesn't fit:** accessible stalls and aisles, drives and the walks round buildings stay clear. When the chargers, power equipment or canopy don't fit, the plan's notes and check say so instead of squeezing them in; a canopy shorter than the row of chargers covers as many as it can and says how many.
+- **Everywhere the plan goes:** Build, Quick layouts, Change With AI edits and hand-drawn plans place the chargers; Numbers, the map, the site and electrical sheets and the CAD (DXF) export show them.
+
 ## 2026-11-09
+
+### 6:18 PM CT: Feasibility budgets: houses and townhomes priced from the Finishes budget library (`experimental` branch, `6a5394d`)
+- **Houses, cottages and townhomes are budgeted line by line** from the purchasing team's budget library: about 65 lines a home (slab, framing, roof, plumbing, electrical, cabinets, flooring, driveway and so on), each quantity worked out from the home's size and storeys and each rate taken from real bids, quotes and the cost of homes already built.
+- **A low, likely and high cost:** the budget carries the likely figure; a new **Finishes budget library** box under the budget summary shows the range in total and per home, and the Budget spreadsheet has Low and High columns for these lines.
+- **A check against real jobs:** the box says where the homes land per living square foot against the library's own jobs, and flags a budget outside that range or a house size the library was never bid on.
+- **Townhome rates are marked as placeholders** (none has been built from them yet). Apartments stay on the team's budget workbook, with the library's apartment figure shown beside it as a cross-check and its four unpriced lines named.
+- **Everything else is priced exactly as before:** duplexes, shops, restaurants, offices, hotels, industrial, storage, convenience stores, tiny and manufactured home communities, and all site work.
+- **Expect lower house and townhome budgets than before:** the library's rates are what Hart Homes paid, which run well under the team's 2024–25 budgets (about a third lower on the test plans). The app says so beside the budget; change any rate you know better.
+- Vendor names, contacts, individual bids and payables from the library are **not** in the app. They wait for proper sign-in.
 
 ### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
 - **Hotel + retail is its own quick layout type:** one hotel building on its own parcel at one end of the frontage, sized to the land it and its parking need, and the rest of the site retail. Five versions: the hotel at either end, a 5-story hotel, retail with a pad site, or restaurant pads. It needs about 4 acres and 300 ft of frontage. **Office & hotel** is now **Office & medical**.

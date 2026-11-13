@@ -54,10 +54,24 @@ export function initField(ctx) {
     return true;
   });
 
+  // A watched filing needs attention only for a change the nightly check found after it was watched and after this page
+  // was last opened (fs-field-seen, this browser only). The row says what changed: field, old → new, and when.
+  const RUNS = ctx.DATA?.changes?.runs || [], SEEN = 'fs-field-seen';
+  const seenAt = () => { try { return localStorage.getItem(SEEN) || ''; } catch (e) { return ''; } };
+  let seenOnEntry = seenAt();
+  const t = x => x ? new Date(x).getTime() || 0 : 0;
+  function changeSince(w, seen) {
+    const since = Math.max(t(w.added), t(seen));
+    for (const r of RUNS) { if (t(r.built) <= since) break; const x = r.items.find(i => i.id === w.ref); if (x) return { ...x, built: r.built }; }
+    return null;
+  }
+  const KLABEL = { new: 'New filing', status: 'Status', cost: 'Value', start: 'Start date', end: 'End date', sqft: 'Size', gone: 'No longer listed' };
+  const fv = (k, v) => v == null || v === '' ? '—' : k === 'cost' ? fmtM(v) : k === 'sqft' ? fmtN(v) + ' sq ft' : String(v);
+  const changeText = c => (KLABEL[c.k] || 'Changed') + (c.k === 'new' || c.k === 'gone' ? '' : ': ' + fv(c.k, c.from) + ' → ' + fv(c.k, c.to)) + ' · ' + new Date(c.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   function syncBadges() {
-    const n = db.notes.length + db.watch.length, alerts = db.watch.filter(w => w.kind === 'filing' && CHANGED.has(w.ref)).length;
+    const n = db.notes.length + db.watch.length, alerts = db.watch.filter(w => w.kind === 'filing' && changeSince(w, seenAt())).length;
     // only watched filings that changed need attention (a badge that rolls up to My Work / More); otherwise a muted count
-    if (alerts) ctx.setBadge?.('field', alerts, { alert: true, text: fmtN(alerts) + ' updated', title: 'Watched filings that changed in the latest nightly check' });
+    if (alerts) ctx.setBadge?.('field', alerts, { alert: true, text: fmtN(alerts) + ' updated', title: 'Watched filings that changed since you last opened Notes & watchlist' });
     else ctx.setBadge?.('field', n);
   }
 
@@ -88,7 +102,7 @@ export function initField(ctx) {
     const icon = on => '<svg width="' + (slot ? 14 : 16) + '" height="' + (slot ? 14 : 16) + '" viewBox="0 0 16 16" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>';
     const paint = b._paint = () => { const on = !!findWatch(info); b.setAttribute('aria-pressed', on); b.title = on ? 'On your watchlist (My Work › Notes & watchlist). Click to remove.' : 'Add to your watchlist: you’ll see when it changes';
       b.innerHTML = icon(on) + (slot ? (on ? 'Watching' : 'Watch') : ''); if (slot) b.removeAttribute('aria-label'); };
-    b.onclick = () => { const w = findWatch(info); if (w) { unwatch(w); paint(); return; } setWatch(info, true); paint(); ctx.toast('Added to My Work › Watchlist.'); };
+    b.onclick = () => { const w = findWatch(info); if (w) { unwatch(w); paint(); return; } setWatch(info, true); paint(); ctx.toast('Watching. Find it in My Work › Notes & watchlist.'); };
     paint(); if (slot) slot.replaceWith(b); else x.before(b);
   });
 
@@ -176,19 +190,19 @@ export function initField(ctx) {
   function render() {
     const ctr = map.getCenter().toArray();
     const notes = db.notes.slice().sort((a, b) => b.updated.localeCompare(a.updated));
-    const watch = db.watch.map(w => ({ ...w, f: w.kind === 'filing' ? BY_ID.get(w.ref) : null }));
-    const watchSec = '<section><h3>Watchlist</h3>' + (watch.length ? watch.map(w => '<div class="witem"><button class="chitem" data-w="' + w.id + '"><span><b>' + (w.f && CHANGED.has(w.ref) ? '<span class="bdg new">' + (CHANGED.get(w.ref) === 'new' ? 'New' : 'Updated') + '</span>' : '') + esc(w.f ? w.f.name : w.label) + '</b><em>' + (w.kind === 'filing' ? (w.f ? esc((w.f.city || w.f.county) + ' · ' + (w.f.status || '') + ' · ' + w.f.ts + ' → ' + w.f.te) : 'No longer in the current data') : 'Building · ' + esc(w.sub || '')) + '</em></span><span class="m">' + (w.f ? fmtM(w.f.cost) : '') + '</span></button><button class="x" data-unw="' + w.id + '" aria-label="Remove">×</button></div>').join('')
+    const watch = db.watch.map(w => { const x = { ...w, f: w.kind === 'filing' ? BY_ID.get(w.ref) : null }; x.c = x.f && changeSince(x, seenOnEntry); return x; });
+    const watchSec = '<section><h3>Watchlist</h3>' + (watch.length ? watch.map(w => '<div class="witem"><button class="chitem" data-w="' + w.id + '"><span><b>' + (w.c ? '<span class="bdg new">' + (w.c.k === 'new' ? 'New' : 'Updated') + '</span>' : '') + esc(w.f ? w.f.name : w.label) + '</b><em>' + (w.kind === 'filing' ? (w.f ? esc((w.f.city || w.f.county) + ' · ' + (w.f.status || '') + ' · ' + w.f.ts + ' → ' + w.f.te) : 'No longer in the current data') : 'Building · ' + esc(w.sub || '')) + '</em>' + (w.c ? '<em class="wchg">' + esc(changeText(w.c)) + '</em>' : '') + '</span><span class="m">' + (w.f ? fmtM(w.f.cost) : '') + '</span></button><button class="x" data-unw="' + w.id + '" aria-label="Remove">×</button></div>').join('')
         : '<div class="empty">' + WATCH_HOW + '</div>') + '</section>';
     const notesSec = '<section><h3>Site notes</h3>' + (notes.length ? notes.map(n => '<button class="chitem" data-n="' + n.id + '"><span><b>' + esc(n.title || 'Untitled site') + '</b><em>' + esc(n.tag) + ' · ' + esc(new Date(n.updated).toLocaleDateString()) + (n.photos.length ? ' · ' + n.photos.length + ' photo' + (n.photos.length > 1 ? 's' : '') : '') + (n.text ? ' · ' + esc(n.text.slice(0, 60)) : '') + '</em></span><span class="m">' + dist(ctr, [n.lng, n.lat]).toFixed(1) + ' mi</span></button>').join('')
         : '<div class="empty">No site notes yet. Tap the pin button on the map (or “+ Site note”) while you’re on site to save a location with notes and photos.</div>') + '</section>';
     const none = !notes.length && !watch.length;
-    // header: + Site note, one Export ▾ menu (Import… is a real file picker inside it), and the team chip
+    // header: + Site note (the main action, unless the empty state offers its own), one Export ▾ menu (Import… is a real file picker inside it), and the team chip
     const menu = '<details class="vmenu"><summary class="btn">Export <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 3.5 3 3 3-3"/></svg></summary><div class="vm-pop" role="menu">' +
       '<button type="button" role="menuitem" id="fGeo">GeoJSON<em>Notes and watchlist, for GIS or another device</em></button><button type="button" role="menuitem" id="fGeoPh">GeoJSON with photos<em>Larger file; photos travel with the notes</em></button>' +
       '<button type="button" role="menuitem" id="fCsv">CSV<em>For a spreadsheet</em></button><button type="button" role="menuitem" id="fKml">KML<em>For Google Earth</em></button><hr>' +
       '<label role="menuitem" tabindex="0" class="vm-imp">Import…<em>A GeoJSON file exported from here</em><input type="file" accept=".geojson,.json,application/geo+json,application/json" hidden id="fImp"></label></div></details>';
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Notes &amp; watchlist</div><h2>Your sites &amp; watchlist</h2><div class="vsub">' + fmtN(notes.length) + ' site note' + (notes.length === 1 ? '' : 's') + ' · ' + fmtN(watch.length) + ' watched</div></div>' +
-      '<div class="vctl"><button class="btn primary" id="fAdd">+ Site note</button>' + menu + '<div class="team-slot" id="fTeam"></div></div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('field')) + '</div><h1>Notes &amp; watchlist</h1><div class="vsub">' + fmtN(notes.length) + ' site note' + (notes.length === 1 ? '' : 's') + ' · ' + fmtN(watch.length) + ' watched</div></div>' +
+      '<div class="vctl"><button class="btn' + (none ? '' : ' primary') + '" id="fAdd">+ Site note</button>' + menu + '<div class="team-slot" id="fTeam"></div></div></div>' +
       (none ? (ctx.vempty ? ctx.vempty({ icon: 'pin', title: 'No site notes or watched filings yet', text: 'Pin a note with photos while you’re on site, or star a filing or building to watch it.', extra: '<p class="ve-more" id="fHow" hidden>' + WATCH_HOW + '</p>', actions: [{ label: '+ Site note at map center', id: 'fAddC', primary: true }, { label: 'How the watchlist works', id: 'fHowBtn' }] }) : '')
         : '<div class="fcols">' + watchSec + notesSec + '</div>');
     root.querySelector('#fAddC')?.addEventListener('click', () => { ctx.setView('map'); ctx.addNote({}); });
@@ -204,7 +218,8 @@ export function initField(ctx) {
     root.querySelector('#fImp').onchange = e => { const f = e.target.files[0]; e.target.value = ''; importGeo(f); }; // (cleared, so the same file can be chosen again)
     ctx.team?.mount(root.querySelector('#fTeam'));
   }
-  ctx.onView('field', render);
+  // opening the page counts as seeing the changes: the badge clears, this visit's rows keep their flags
+  ctx.onView('field', () => { seenOnEntry = seenAt(); try { localStorage.setItem(SEEN, new Date().toISOString()); } catch (e) {} syncBadges(); render(); });
   // team sync (src/team.js) reads and replaces the store through this
   ctx.field = { get db() { return db; }, setWatch, isWatched: info => !!findWatch(info), replace(next) { db = next; save(true); }, getPhoto, localPhoto: id => localPhoto(id).then(b => b instanceof Blob ? b : null), putPhoto, delPhoto, TAGS, render: () => { if (ctx.view === 'field') render(); } };
 
