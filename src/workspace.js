@@ -98,7 +98,7 @@ export function workspace(env) {
   // ---------- 1 Intake ----------
   function intakeStep(p) {
     const f = fz(p), it = M0.intakeFromParcels(f.intake, p.parcels || []), parcels = p.parcels || [];
-    const field = (k, label, v, o = {}) => '<label class="ws-f' + (o.wide ? ' wide' : '') + '"><span>' + label + '</span><input data-in="' + k + '" ' + (o.type ? 'type="' + o.type + '" inputmode="decimal" ' : '') + 'value="' + esc(v ?? '') + '" autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '></label>';
+    const field = (k, label, v, o = {}) => '<label class="ws-f' + (o.wide ? ' wide' : '') + '"><span>' + label + '</span><input id="wsIn-' + k + '" data-in="' + k + '" ' + (o.type ? 'type="' + o.type + '" inputmode="decimal" ' : '') + 'value="' + esc(v ?? '') + '" autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '></label>';
     const basis = '<label class="ws-f"><span>Land basis</span><select data-in="landBasis">' + [['appraised-land', 'Appraised land value'], ['appraised-total', 'Appraised total value'], ['asking', 'Asking / contract price'], ['house', 'Platform $ an acre']].map(([v, l]) => '<option value="' + v + '"' + (f.intake.landBasis === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>';
     const rows = parcels.length ? '<table class="ws-t"><caption class="sr">Parcels</caption><thead><tr><th scope="col">Parcel</th><th scope="col">Owner</th><th scope="col" class="r">Acres</th><th scope="col" class="r">Land value</th><th scope="col" class="r">Total value</th><th scope="col">Source</th></tr></thead><tbody>' +
       parcels.map(x => '<tr><th scope="row">' + esc(x.label) + (x.zip ? '<small>' + esc([x.city, x.zip].filter(Boolean).join(' ')) + '</small>' : '') + '</th><td>' + esc(x.owner || '—') + '</td><td class="r m">' + num(x.acres, 2) + '</td><td class="r m">' + usd(x.landValue) + '</td><td class="r m">' + usd(x.marketValue) + '</td><td>' + esc(x.source?.label || (x.propId ? 'Appraisal district' : 'Map')) + '</td></tr>').join('') + '</tbody></table>'
@@ -236,7 +236,7 @@ export function workspace(env) {
   const mixOf = study => study.site.mix.map(t => ({ name: t.name, sf: t.sf, pct: Math.round(t.n / Math.max(1, study.site.units) * 100) }));
   function mixEditor(sc, study) {
     const mix = sc.mix?.length ? sc.mix : mixOf(study);
-    return '<fieldset class="ws-mix"><legend>Unit mix in this scenario (same buildings, units re-split)</legend>' + mix.map((t, i) => '<span class="ws-mixr"><b>' + esc(t.name) + '</b><label>sf <input class="ws-num" type="number" data-mix="' + i + ':sf" value="' + esc(+t.sf || 0) + '"></label><label>% <input class="ws-num" type="number" data-mix="' + i + ':pct" value="' + esc(+t.pct || 0) + '"></label></span>').join('') + '</fieldset>';
+    return '<fieldset class="ws-mix"><legend>Unit mix in this scenario (same buildings, units re-split)</legend>' + mix.map((t, i) => '<span class="ws-mixr"><b>' + esc(t.name) + '</b><label>sf <input id="wsMix-' + i + '-sf" class="ws-num" type="number" data-mix="' + i + ':sf" value="' + esc(+t.sf || 0) + '"></label><label>% <input id="wsMix-' + i + '-pct" class="ws-num" type="number" data-mix="' + i + ':pct" value="' + esc(+t.pct || 0) + '"></label></span>').join('') + '</fieldset>';
   }
 
 
@@ -262,7 +262,11 @@ export function workspace(env) {
     const opened = [...el.querySelectorAll('details[open]')].map(d => d.dataset.group || d.querySelector('summary span')?.textContent);
     el.innerHTML = inner(cur);
     for (const d of el.querySelectorAll('details')) if (opened.includes(d.dataset.group || d.querySelector('summary span')?.textContent)) d.open = true;
-    if (id) { const n = el.querySelector('#' + CSS.escape(id)); if (n) { n.focus({ preventScroll: true }); if (sel && n.setSelectionRange && n.type !== 'number') try { n.setSelectionRange(...sel); } catch (e) { /* not a text field */ } } }
+    // the field being typed in: the user's own element goes back in place of its fresh copy, so its value, caret and
+    // selection (number fields too, which have no selection to restore) are kept while the numbers around it update
+    if (id) { const n = el.querySelector('#' + CSS.escape(id)); if (n) {
+      if (/^(INPUT|TEXTAREA)$/.test(a.tagName) && n.tagName === a.tagName && n.type === a.type) { n.replaceWith(a); a.focus({ preventScroll: true }); if (sel && a.setSelectionRange && a.type !== 'number') try { a.setSelectionRange(...sel); } catch (e) { /* not a text field */ } }
+      else { n.focus({ preventScroll: true }); if (sel && n.setSelectionRange && n.type !== 'number') try { n.setSelectionRange(...sel); } catch (e) { /* not a text field */ } } } }
   }
   const go = (p, step) => { st(p).step = step; st(p).err = ''; paint(); root?.querySelector('#wsH')?.focus({ preventScroll: false }); };
   const headers = () => ({ 'Content-Type': 'application/json', 'x-field-code': env.code() || '' });

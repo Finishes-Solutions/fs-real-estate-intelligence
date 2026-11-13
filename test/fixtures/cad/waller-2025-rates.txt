@@ -1,0 +1,60 @@
+                                         2025 TAX RATES
+ENTITY CODE    TAXING ENTITY                        M&O        I&S          TOTAL     COLLECTOR
+CBR           City of Brookshire                      0.56514        0.00    0.56514 Waller Co
+CHD           City of Hempstead                      0.510341 0.048874      0.559215 Waller Co
+CKT           City of Katy                           0.374632 0.050368          0.425 Ft. Bend
+CPV           City of Prairie View                    0.54057 0.18992        0.73049 Waller ISD
+CWR           City of Waller                             0.328    0.1184       0.4464 Waller ISD
+DBK           Brookshire-Katy Drainage Dist          0.057850        0.00    0.05785 Waller Co
+EWCMD         East Waller Co. Mgmt District          1.500000        0.00         1.50 Waller Co
+ESD           Waller Harris ESD 200                  0.079984 0.020016            0.10 Waller Co
+GWA           Waller County                          0.439463 0.093133      0.532596
+RFM           Waller County RFM                      0.023591        0.00   0.023591        0.556187
+HWCM2         Harris Waller Co MUD #2                      0.16      0.49         0.65 B&A
+HWCM3         Harris Waller Co MUD #3                    0.115     0.765          0.88 Assessments
+HWCM4         Harris Waller Co MUD #4                      1.04      0.46         1.50 Bob Leared
+HWCM5         Harris Waller Co MUD #5                      0.37      1.13         1.50 Bob Leared
+HWCM7         Harris Waller Co MUD #7                      1.50                   1.50 Utility Tax
+HWCM10        Harris Waller Co MUD #10                     1.50                   1.50 Utility Tax
+M34A          Waller County MUD 34A                        0.65      0.25         0.90 B&A
+M34D          Waller County MUD 34D                        1.00         0         1.00 B&A
+M50           Willow Creek Farms MUD                       0.43      0.72         1.15 Utility Tax
+M52           Katy West MUD                                0.40      0.40         0.80 Tax Tech
+M54           FB-Waller Co MUD #3                          0.21      0.63         0.84 Assessments
+M55           Fulshear MUD 3A                              0.47      0.65         1.12 Utility Tax
+M55A          Waller County MUD 55A                        1.50         0         1.50 B&A
+M55B          Waller County MUD 55B                 NO LEVY IN 2025                  0 B&A
+M60A          Waller County MUD 60A                        1.50      0.00         1.50 B&A
+RO1           Waller County Road Impr #1                   0.28      0.67         0.95 Bob Leared
+SERMD         Southeast Regional Mgmt Dist                 0.68      0.55         1.23 Utility Tax
+SHD           Hempstead ISD                             0.7552    0.3208        1.076 Waller Co
+SKT           Katy ISD                                  0.7271       0.39      1.1171 Ft Bend
+SRL           Royal ISD                                 0.7111 0.358817     1.069917 Waller Co
+SWR           Waller ISD                                0.6226       0.44      1.0626 Waller ISD
+WBR           Brookshire Municipal Water Dist                 0   0.0139       0.0139 Waller County
+WCID2         Waller Co Improvement Dist #2                0.30      0.50         0.80 Assessments
+WCID3         Waller County Water Contrl Imp Dist          0.39      0.11         0.50 B&A
+WCM9B         Waller County MUD 9B                      0.1275    0.6125          0.74 Utility Tax
+WCM18         Waller County MUD 18                         0.44      0.46         0.90 B&A
+WCM19         Waller County MUD 19                       0.285     0.465          0.75 Assessments
+WCM20         Waller County MUD 20                  NO LEVY IN 2025                  0 Utility Tax
+WCM33         Waller County MUD 33                         0.24      0.76         1.00 Tax Tech
+WCM35         Waller County MUD 35                         0.48      1.02         1.50 Bob Leared
+WCM37         Waller County MUD 37                         0.40      1.10         1.50 Bob Leared
+WCM38         Waller County MUD 38                         0.90         0         0.90 B&A
+WCM41         Waller County MUD 41                         0.86      0.49         1.35 Utility Tax
+WCM42         Waller County MUD 42                  NO LEVY IN 2025                  0 Tax Tech
+WCM43         Waller County MUD 43                         1.50      0.00         1.50 Utility Tax
+WCM44         Waller County MUD 44                  NO LEVY IN 2025               0.00 Assessments
+WCM45         Waller County MUD 45                         1.50      0.00         1.50 B&A
+WCM46         Waller County MUD 46                  NO LEVY IN 2025                  0 Assessments     TBD Dec/Jan
+WCM47         Waller County MUD 47                         1.50      0.00         1.50 Utility Tax
+WCM52         Waller County MUD 52                         1.50                   1.50 Utility Tax
+WCM54         Waller County MUD 54                         1.50      0.00         1.50 Utility Tax
+WCM55         Waller County MUD 55                  WILL NOT EVER LEVY               0 B&A
+WCM56         Waller County MUD 56                  NO LEVY IN 2025                  0 Utility Tax
+WCM58         Waller County MUD 58                         1.50      0.00         1.50 Utility Tax
+WCM59         Waller County MUD 59                         1.50                   1.50 Utility Tax
+WCM60         Waller County MUD 60                  NO LEVY IN 2025                  0 B&A
+WPMUD         Willow Point MUD                             0.45      0.80         1.25 Utility Tax
+

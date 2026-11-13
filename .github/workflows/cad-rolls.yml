@@ -1,0 +1,77 @@
+name: CAD rolls and tax rates (Supabase)
+
+# Appraisal rolls and tax rates for the seven home counties into Supabase (build/cad-rolls.mjs; sources in
+# docs/data-sources/cad-and-tax-rates.md). A file already loaded is skipped by its checksum, so extra runs cost little.
+# Needs supabase/migrations/20261112000000_cad_rolls.sql applied once.
+#   monthly (3rd)          everything: supplements, HCAD's weekly files, parcel layers, rates
+#   Apr 25, May 20         preliminary rolls (Fort Bend, Washington, HCAD)
+#   Jul 28, Aug 6, Aug 20  certified rolls (most districts certify by July 25; Grimes posts in August or September)
+#   Sep 25, Oct 15, Oct 31, Nov 15, Jan 10   adopted rates (district tables Sep–Nov; the Comptroller's full list by Jan 1)
+# A failed source, or a load with far fewer rows than the last one, fails the job (GitHub emails the repository's watchers).
+on:
+  schedule:
+    - cron: "17 10 3 * *"
+    - cron: "23 10 25 4 *"
+    - cron: "23 10 20 5 *"
+    - cron: "41 10 28 7 *"
+    - cron: "41 10 6 8 *"
+    - cron: "41 10 20 8 *"
+    - cron: "11 11 25 9 *"
+    - cron: "11 11 15 10 *"
+    - cron: "11 11 31 10 *"
+    - cron: "11 11 15 11 *"
+    - cron: "11 11 10 1 *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Steps: comptroller,rates,hcad,fbcad,washington,grimes,layers (blank = all)"
+        required: false
+      years:
+        description: "Tax years, e.g. 2025,2026 (blank = the last three)"
+        required: false
+      force:
+        description: "Reload files already loaded (1 = yes)"
+        required: false
+      allow_shrink:
+        description: "Accept a load with under half the rows of the last one (1 = yes)"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC for the Supabase pipeline edge function when no secret key is stored
+
+concurrency:
+  group: cad-rolls
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: Production # the secrets live in this GitHub environment
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: PDF text tool (the Waller and Montgomery rate tables are PDFs)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - name: Which steps
+        id: steps
+        run: |
+          case "${{ github.event.schedule }}" in
+            "11 11 "*) echo "only=comptroller,rates" >> "$GITHUB_OUTPUT" ;;
+            *) echo "only=${{ inputs.only }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Load rolls and rates into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ytsxkipkobvcgysylfzc.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_KEY }}
+          ONLY: ${{ steps.steps.outputs.only }}
+          YEARS: ${{ inputs.years }}
+          FORCE: ${{ inputs.force }}
+          ALLOW_SHRINK: ${{ inputs.allow_shrink }}
+        run: node --max-old-space-size=6144 build/cad-rolls.mjs
