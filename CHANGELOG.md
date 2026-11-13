@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-13
 
+### 12:40 PM CT (Nov 13): UI/UX audit plan and coverage added to docs (`6b63dac`)
+- **The audit's plan is in the repository:** `docs/ui-ux-audit-2026-11/` holds the implementation plan and the coverage table from the November UI/UX audit, so the reason behind each `UX-xxx` fix can be looked up.
+
 ### 12:15 PM CT (Nov 13): EV charging in site layouts merged into experimental (`bb5bd30`…`739ec4a`)
 - **Planned EV charging is now on experimental:** the Plan EV charging option, the per-lot charger counts, the tinted stalls and the 3D chargers and canopy (see Nov 10 and Nov 11 below) are merged in with the UI/UX audit fixes. The site-layout skill bundle was rebuilt to include the EV engine file.
 
