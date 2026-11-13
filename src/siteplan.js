@@ -94,7 +94,12 @@ const clone = o => JSON.parse(JSON.stringify(o));
 export function initSitePlan(ctx) {
   const { map, esc, fmtN } = ctx, card = ctx.card, root = document.getElementById('view-projects');
   const store = projectStore(KEY, safeLS(), browserIdb()), boot = store.load();
-  let db = boot.db, loaded = !boot.later, ed = null, shared = null, syncT = 0, syncing = false, raf = 0;
+  let db = boot.db, loaded = !boot.later, ed = null, shared = null, shareWhy = '', syncT = 0, syncing = false, raf = 0;
+  // the one sharing state for projects, said the same way everywhere (the list's subtitle, its team chip, the delete
+  // confirm): what /api/projects last answered, not the field-notes setting (src/team.js), which is a different store
+  const shareSay = () => shared === true ? { chip: 'Shared with the team', sub: 'shared with the team', del: 'Projects are shared with the team, so this removes it for everyone.' }
+    : shared === false ? { chip: 'On this device only' + (shareWhy === 'passcode' ? ': passcode needed' : ''), sub: 'on this device only' + (shareWhy === 'passcode' ? ' (enter the team passcode in Settings to share)' : ' (team sharing isn’t set up on this site)'), del: 'Projects are on this device only, so this removes it from this device.' }
+    : { chip: 'Connecting to the team…', sub: 'on this device; connecting to the team…', del: 'This removes it from this device and, once it reconnects, for the team.' };
   const f0 = v => (Math.round(v) || 0).toLocaleString('en-US'), pct = v => (v * 100).toFixed(v < 0.1 ? 1 : 0) + '%';
   // the numbers and checks of a plan, under the Waller guardrails when they're on for it (lib/guardrails.mjs); exactly
   // lib/siteplan.mjs's for every other plan
@@ -120,7 +125,7 @@ export function initSitePlan(ctx) {
   window.addEventListener('pagehide', () => { if (persistT) persistNow(); });
   function save(p) {
     if (p) { p.updated = new Date().toISOString(); p.by = get(NAME_KEY) || p.by || ''; if (!db.dirty.includes(p.id)) db.dirty.push(p.id); }
-    persist(); badge(); if (ctx.view === 'projects') render();
+    persist(); badge(); if (ctx.view === 'projects') { render(); paintUpd(); }
     clearTimeout(syncT); syncT = setTimeout(sync, 1500);
   }
   // the team's copy is the real one (api/projects.js): changes go up in batches the server can take, and only projects
@@ -129,7 +134,7 @@ export function initSitePlan(ctx) {
   async function sync() {
     if (syncing || !loaded || !navigator.onLine) return; syncing = true;
     const h = { 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY) };
-    const notUp = r => { shared = r.status === 503 || r.status === 401 ? false : shared; syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); };
+    const notUp = r => { if (r.status === 503 || r.status === 401) { shared = false; shareWhy = r.status === 401 ? 'passcode' : 'setup'; } syncSaid([401, 404, 405, 503].includes(r.status) ? null : false); };
     try {
       if (db.dirty.length || db.gone.length) {
         const copies = db.projects.filter(p => db.dirty.includes(p.id)).map(p => { const c = RUN.syncCopy(p); return { id: p.id, u: p.updated, c, n: JSON.stringify(c).length }; });
@@ -147,10 +152,10 @@ export function initSitePlan(ctx) {
         }
       }
       const r = await fetch('api/projects?index=1', { headers: h }); if (!r.ok) { notUp(r); return; }
-      const d = await r.json(); shared = true; let changed = false;
+      const d = await r.json(); shared = true; shareWhy = ''; let changed = false;
       const ix = d.index || [], skip = id => ed?.pid === id || db.dirty.includes(id);
       for (const e of ix) if (e.deleted) { const i = db.projects.findIndex(p => p.id === e.id); if (i >= 0 && !skip(e.id)) { db.projects.splice(i, 1); changed = true; } }
-      let want = ix.filter(e => !e.deleted && seenAt.get(e.id) !== e.updated).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
+      let want = ix.filter(e => !e.deleted && !projDel.has(e.id) && seenAt.get(e.id) !== e.updated).filter(e => { const p = db.projects.find(x => x.id === e.id); return !p || t(e.updated) > t(p.updated); }).map(e => e.id);
       for (let k = 0; want.length && k < 40; k++) {
         const ask = want.slice(0, 20), q = await fetch('api/projects?ids=' + ask.map(encodeURIComponent).join(','), { headers: h }); if (!q.ok) { notUp(q); return; }
         const got = await q.json(), more = got.more || [];
@@ -162,7 +167,7 @@ export function initSitePlan(ctx) {
       if (tooBig.size) { const names = db.projects.filter(p => tooBig.has(p.id)).map(p => p.name); tooBig = new Set(); if (names.length) ctx.toast(names.join(', ') + ' is too big for the team’s copy, so it is kept on this device only. Delete some options or renderings to make it smaller.'); }
       if (changed) { persist(); badge(); if (ctx.view === 'projects') render(); }
     } catch (e) { syncSaid(false); /* offline: try again on the next change or when back online */ }
-    finally { syncing = false; if (ctx.view === 'projects') render(); }
+    finally { syncing = false; if (ctx.view === 'projects') { render(); paintUpd(); } }
   }
   // A project open here (or changed here and not sent yet) isn't replaced by the team's newer copy; only what server runs
   // added to it comes in: renderings and plan sets (not ones deleted here this visit), and a build that finished
@@ -302,7 +307,9 @@ export function initSitePlan(ctx) {
     if (list.length <= 1 && !list[0]?.geometry && rg && inGeom(center, rg)) list = [{ ...(list[0] || {}), geometry: rg, regrid: true }]; // Harris and Waller: Regrid's outline
     const recs = list.map(pc => parcelOf(pc, pc.center || center)); recs.forEach((r, i) => keyIn(r, recs.slice(0, i)));
     const b = siteOf(recs), many = recs.length > 1;
-    const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || info.title || 'Site';
+    const named = t => t && !/^(Loading parcel|Property details unavailable|Couldn’t load this parcel)/i.test(t); // the card's placeholders aren't names
+    const unnamed = !many && !recs[0]?.label && !named(info.title);
+    const label = many ? recs.length + ' parcels' + (recs[0].label ? ' · ' + recs[0].label : '') : recs[0]?.label || (named(info.title) ? info.title : '');
     const acres = b ? SP.ringArea(b.ring) / 43560 : null, noGeom = recs.filter(r => !r.geometry).length;
     // the projects these parcels are already in (newest first), and a project waiting for a parcel (Find a Parcel)
     const have = RUN.projectsWith(db.projects, recs.map(r => r.key)).slice(0, 3), want = pendingProject(), first = !db.projects.length;
@@ -311,19 +318,19 @@ export function initSitePlan(ctx) {
     for (const x of [pre, ...have.map(h => h.p)]) if (x && !recent.includes(x)) recent.unshift(x);
     if (ed) close();
     ctx.clearSelection?.();
-    const back = info.title && !/^Loading/.test(info.title) ? info.title : recs[0]?.label || 'Property';
+    const back = named(info.title) ? info.title : recs[0]?.label || 'Property';
     // started from a property card: that card waits behind the plan ("← address" in the header, and × goes back to it)
     const radio = (id, html, on) => '<label class="sp-radio"><input type="radio" name="spP" value="' + esc(id) + '"' + (on ? ' checked' : '') + '> ' + html + '</label>';
     const paint = () => { card.innerHTML = '<div class="top"><div><div class="kicker">Site Plan</div><h2>' + (want ? 'Add a parcel to ' + esc(want.name) : have.length ? 'Site plan' : 'Start a site plan') + '</h2><div class="bsub">' + esc(label) + (acres ? ' · ' + acres.toFixed(2) + ' acres' : '') + '</div></div>' + xBtn() + '</div>' +
       (have.length ? '<div class="bsec sp-haves">' + have.map(({ p, plan }) => '<div class="sp-have"><div class="sp-have-t"><b>Already in ' + esc(p.name) + '</b><span>' + (plan ? esc(plan.name) + ' · ' + holds(p, plan) : 'no options yet') + (p.plans.length > 1 ? ' · ' + plural(p.plans.length, 'option') : '') + '</span></div>' +
         '<span class="btnrow">' + (plan ? '<button type="button" class="btn sm primary" data-openplan="' + esc(p.id) + '|' + esc(plan.id) + '">Open Plan</button>' : '') + '<button type="button" class="btn sm" data-newin="' + esc(p.id) + '" title="Start a new option in ' + esc(p.name) + '">New Option</button></span></div>').join('') + '</div>' : '') +
       '<div class="bsec sp-start"><div class="lt sp-lt-proj">' + (have.length ? 'Or start another plan' : 'Project') + '</div>' +
-      radio('', 'New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name">', !pre) +
+      radio('', 'New project <input id="spName" class="sp-in" value="' + esc(recs[0]?.label || label) + '" aria-label="Project name"' + (unnamed ? ' placeholder="Name this project" aria-describedby="spNameErr"' : '') + '>', !pre) + (unnamed ? '<div class="rnote" id="spNameErr">No address came with this parcel, so name the project before you start.</div>' : '') +
       recent.map(p => radio(p.id, 'Add to <b>' + esc(p.name) + '</b> <span class="rnote">' + p.plans.length + ' plan' + (p.plans.length === 1 ? '' : 's') + (have.some(h => h.p === p) ? ' · has this parcel' : p === want ? ' · waiting for a parcel' : '') + '</span>', p === pre)).join('') +
       '<div class="lt sp-lt-site" style="margin-top:12px">Site</div><div class="rnote">' + (b ? (many ? recs.length + ' parcel outlines from the county appraisal district, merged into one site (small gaps and overlaps between them are closed up, and parcels apart are joined over the gap between them).' : 'The parcel outline from ' + (list[0]?.regrid ? 'Regrid' : 'the county appraisal district') + ', dashed on the map.') + ' You can add or remove parcels, or redraw the site, in the plan.' : 'There’s no parcel outline here (in Harris and Waller County, use “Get owner, value &amp; zoning from Regrid” on the property card first). You’ll draw the site on the map.') + '</div>' +
       gapNote(b) + (b?.pieces > 1 ? '<div class="rnote sp-warn">Some parcels are more than ' + SP.BRIDGE_FT + ' ft from the rest, so they’re left out of the site.</div>' : '') +
       (noGeom && b ? '<div class="rnote sp-warn">' + noGeom + ' of the parcels have no outline from the county and are left out.</div>' : '') +
-      '<div class="bacts" style="padding:12px 0 0"><button class="btn askai" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
+      '<div class="bacts" style="padding:12px 0 0"><button class="btn primary" id="spStart">Start Site Plan</button><button class="btn" id="spBack">Back</button></div></div>';
       card.classList.add('open'); card.scrollTop = 0; };
     if (ctx.cardPush && card.classList.contains('open') && !ed) ctx.cardPush(null, back, paint); else paint();
     fromCard = ctx.cardChild?.() === 'open' ? back : '';
@@ -342,12 +349,13 @@ export function initSitePlan(ctx) {
       p.plans.push(plan); save(p); open(p.id, plan.id, { draw: !b });
     };
     card.querySelector('#spStart').onclick = () => {
-      const pick = card.querySelector('input[name=spP]:checked').value;
-      begin(db.projects.find(x => x.id === pick) || newProject(card.querySelector('#spName').value.trim() || label));
+      const pick = card.querySelector('input[name=spP]:checked').value, nm = card.querySelector('#spName'), name = nm.value.trim() || label;
+      if (!pick && !name) { nm.setAttribute('aria-invalid', 'true'); const e = card.querySelector('#spNameErr'); if (e) { e.textContent = 'Enter a project name to start.'; e.classList.add('err'); } nm.focus(); return; }
+      begin(db.projects.find(x => x.id === pick) || newProject(name));
     };
     card.querySelectorAll('[data-openplan]').forEach(x => x.onclick = () => { const [pid, plid] = x.dataset.openplan.split('|'), o = planOf({ pid, plid }); if (o) open(pid, plid, { draw: o.pl.ring.length < 3 }); });
     card.querySelectorAll('[data-newin]').forEach(x => x.onclick = () => { const p = db.projects.find(y => y.id === x.dataset.newin); if (p) begin(p); });
-    if (first) card.querySelector('#spStart').click(); // no projects yet: nothing to choose, so the project (named after the address) is made and the plan opens
+    if (first && !unnamed) card.querySelector('#spStart').click(); // no projects yet: nothing to choose, so the project (named after the address) is made and the plan opens
     return true;
   }
   const inGeom = (pt, g) => (g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : []).some(p => SP.inRing(pt, p[0]));
@@ -1848,6 +1856,33 @@ export function initSitePlan(ctx) {
   // only once Undo can't happen any more (or the page is closed). From the editor the next option opens, or after the last
   // one the project page, where New Option starts again from the same site (p.keptSite).
   const delPending = new Map(); // option id → { t (the timer), keys (its pictures) }
+  // Delete Project: the app's own dialog (a modal <dialog>: focus stays in it, Esc cancels, Cancel has focus), then a soft
+  // delete: the project leaves the list at once but is only deleted for the team (db.gone) and its pictures dropped after
+  // 12 s, so Undo in the note brings it back whole
+  const projDel = new Map(); // project id → the timer that makes the delete final
+  function confirmDeleteProject(p) {
+    const nR = rendersOf(p).length, dlg = document.createElement('dialog');
+    dlg.className = 'pj-dlg'; dlg.setAttribute('aria-labelledby', 'pjDelT'); dlg.setAttribute('aria-describedby', 'pjDelD');
+    dlg.innerHTML = '<h3 id="pjDelT">Delete “' + esc(p.name) + '”?</h3><p id="pjDelD">Its ' + plural(p.plans.length, 'site plan option') + (nR ? ' and ' + plural(nR, 'rendering') : '') + (p.plans.length === 1 && !nR ? ' goes' : ' go') + ' with it. ' + esc(shareSay().del) + '</p><p class="pj-dlgn">You can undo this for 12 seconds.</p>' +
+      '<div class="btnrow"><button type="button" class="btn danger" data-ok>Delete project</button><button type="button" class="btn" data-x autofocus>Cancel</button></div>';
+    document.body.append(dlg);
+    dlg.addEventListener('close', () => { dlg.remove(); if (dlg.returnValue !== 'ok') root.querySelector('[data-delp]')?.focus(); });
+    dlg.querySelector('[data-x]').onclick = () => dlg.close('cancel');
+    dlg.querySelector('[data-ok]').onclick = () => { dlg.close('ok'); deleteProject(p); };
+    dlg.showModal();
+  }
+  function deleteProject(p) {
+    const wasDirty = db.dirty.includes(p.id);
+    db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); cur = null;
+    if (away?.pid === p.id) hideAway(); if (resume?.pid === p.id) clearResume();
+    projDel.set(p.id, setTimeout(() => { projDel.delete(p.id); db.gone.push(p.id);
+      for (const pl of p.plans) for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); } // its pictures on this device
+      save(); }, 12000));
+    persist(); badge(); render(true); ctx.scheduleHash?.();
+    ctx.toast('Deleted ' + p.name + (shared === true ? ' for the team' : '') + '.', { ms: 12000, action: { label: 'Undo', run: () => {
+      if (!projDel.has(p.id)) return; clearTimeout(projDel.get(p.id)); projDel.delete(p.id);
+      db.projects.push(p); if (wasDirty) db.dirty.push(p.id); persist(); badge(); show(p.id, 'overview'); ctx.toast('Restored ' + p.name + ' with its ' + plural(p.plans.length, 'option') + '.'); } } });
+  }
   const dropImages = (keys, pid = null) => { for (const k of keys) rdel(k); if (pid) cloudDel(pid, keys.map(mediaOf)); }; // pid: the team copies go too
   function flushDeletes() { for (const d of delPending.values()) { clearTimeout(d.t); dropImages(d.keys, d.pid); } delPending.clear(); }
   window.addEventListener('pagehide', flushDeletes);
@@ -2090,7 +2125,7 @@ export function initSitePlan(ctx) {
     card.innerHTML = '<div class="top sp-top"><div class="sp-head">' + back +
         '<nav class="sp-crumb" aria-label="Where you are"><button type="button" class="sp-cr" data-crumb="all">Projects</button><span aria-hidden="true">›</span><button type="button" class="sp-cr sp-crp" data-crumb="project" title="Open the project page: ' + esc(p.name) + '">' + esc(p.name) + '</button></nav>' +
         '<div class="sp-htools"><span class="sp-save" id="spSave"></span><button type="button" class="sp-ib" id="spUndo"' + (ed.undo.length ? '' : ' disabled') + ' aria-label="Undo" title="Undo (⌘Z / Ctrl+Z)">' + ICO.undo + '</button><button type="button" class="sp-ib" id="spRedo"' + (ed.redo.length ? '' : ' disabled') + ' aria-label="Redo" title="Redo (⇧⌘Z / Ctrl+Y)">' + ICO.redo + '</button>' + xBtn() + '</div>' +
-        '<div class="sp-ttl"><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Option name" title="' + esc(pl.name) + ' (click to rename)" maxlength="60" spellcheck="false"></h2>' + (sub ? '<div class="bsub" title="' + sub + '">' + sub + '</div>' : '') + '</div>' +
+        '<div class="sp-ttl"><button type="button" class="sp-ib sp-pback" data-crumb="project" aria-label="Back to the project: ' + esc(p.name) + '" title="Back to ' + esc(p.name) + '">' + ICO.back + '</button><h2><input id="spPlanName" class="sp-title" value="' + esc(pl.name) + '" aria-label="Option name" title="' + esc(pl.name) + ' (click to rename)" maxlength="60" spellcheck="false"></h2>' + (sub ? '<div class="bsub" title="' + sub + '">' + sub + '</div>' : '') + '</div>' +
         '<div class="sp-hact">' + editBtn + '<button type="button" class="btn sm primary sp-done" id="spDone" title="Close the plan (it’s saved as you go)">' + ICO.done + '<span>Done</span></button></div></div>' +
       plansHtml(p, pl) + stagesHtml(pl, stage) + (ed.run ? runHtml(ed.run) : '') +
       ctx.cardNav(secs.map(x => [x.id, x.label])) + '</div>' +
@@ -2171,7 +2206,7 @@ export function initSitePlan(ctx) {
     const act = stage === 'deliver' ? '' : c.state === 'done'
       ? '<button type="button" class="btn sm primary" id="spStageNext">Go to ' + esc(next.label) + ' ›</button><button type="button" class="btn sm ghost" id="spStageReopen" title="Take the confirmation back to change the ' + esc(S0.label.toLowerCase()) + '">Reopen</button>'
       : '<button type="button" class="btn sm primary" id="spStageOk"' + (why ? ' disabled title="' + esc(why) + '"' : ' title="Confirm the ' + esc(S0.label.toLowerCase()) + ' and go on to ' + esc(next.label.toLowerCase()) + '"') + '>' + esc(S0.confirm) + ' ›</button>';
-    return '<div class="sp-stagehd" id="spStageHd"><div class="sp-sth-t"><span class="sp-sth-n">Step ' + S0.n + ' of 4</span><b>' + esc(S0.label) + '</b>' + (say ? '<span class="sp-sth-s ' + c.state + '">' + say + '</span>' : '') + '</div>' +
+    return '<div class="sp-stagehd" id="spStageHd"><div class="sp-sth-t"><span class="sp-sth-n" title="The site plan’s stages are part of the project’s Feasibility steps">Step ' + S0.n + ' of 4 · Feasibility: ' + esc(S0.step) + '</span><b>' + esc(S0.label) + '</b>' + (say ? '<span class="sp-sth-s ' + c.state + '">' + say + '</span>' : '') + '</div>' +
       '<p class="rnote">' + esc(S0.about) + (why && c.state !== 'done' ? ' <b>' + esc(why) + '</b>' : '') + (stage === 'site' && pl.frontGuess && c.state !== 'done' ? ' <b>The street side is a guess: set it with Street Side before confirming.</b>' : '') + '</p>' +
       (act ? '<div class="sp-row">' + act + '</div>' : '') + '</div>';
   }
@@ -4812,7 +4847,7 @@ export function initSitePlan(ctx) {
   const PIN = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.8 4.5 7.8z"/><circle cx="8" cy="6.6" r="1.6"/></svg>';
   const ICON_CARDS = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>';
   const ICON_LIST = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5"/><circle cx="2.6" cy="4" r=".6"/><circle cx="2.6" cy="8" r=".6"/><circle cx="2.6" cy="12" r=".6"/></svg>';
-  let pq = '', psort = 'updated', mode = get(VIEW_KEY) === 'list' ? 'list' : 'cards', cur = null, adding = false, renaming = false, waiting = false;
+  let pq = '', psort = 'updated', mode = get(VIEW_KEY) === 'list' ? 'list' : 'cards', cur = null, adding = false, renaming = false, editingNext = false, waiting = false;
   const thumbs = new Map(), infos = new Map();
   const plural = (n, w) => f0(n) + ' ' + w + (n === 1 ? '' : 's');
   const money = v => '$' + f0(v);
@@ -4866,7 +4901,7 @@ export function initSitePlan(ctx) {
   // ----- all projects -----
   function shown() {
     const q = pq.trim().toLowerCase(), by = { updated: (a, b) => t(b.updated) - t(a.updated), name: (a, b) => a.name.localeCompare(b.name), acres: (a, b) => acresOf(b) - acresOf(a), options: (a, b) => b.plans.length - a.plans.length || t(b.updated) - t(a.updated), status: (a, b) => PJ.STATUSES.indexOf(PJ.statusOf(a)) - PJ.STATUSES.indexOf(PJ.statusOf(b)) || a.name.localeCompare(b.name) }[psort];
-    return db.projects.filter(p => !q || [p.name, p.notes, p.by, ...p.parcels.flatMap(x => [x.label, x.owner]), ...p.plans.map(x => x.name)].join(' ').toLowerCase().includes(q)).sort(by);
+    return db.projects.filter(p => !q || [p.name, p.notes, p.by, p.status ? PJ.statusOf(p).label : '', p.client, ...p.parcels.flatMap(x => [x.label, x.owner]), ...p.plans.map(x => x.name)].join(' ').toLowerCase().includes(q)).sort(by);
   }
   // the status as the small coloured pill from the project page's header (nothing for a project that has none set)
   const stPill = p => p.status ? '<span class="pj-st" data-st="' + PJ.statusOf(p).id + '"><span class="pj-stp">' + esc(PJ.statusOf(p).label) + '</span></span>' : '';
@@ -4895,12 +4930,12 @@ export function initSitePlan(ctx) {
   }
   function indexHtml() {
     const all = db.projects, nPlans = all.reduce((s, p) => s + p.plans.length, 0);
-    const share = shared === true ? 'shared with the team' : shared === false ? 'saved on this device only' : 'saved on this device';
-    return '<div class="vhead"><div><div class="kicker">Site plans</div><h2>Projects</h2><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
+    const share = shareSay().sub;
+    return '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('projects')) + '</div><h1>Projects</h1><div class="vsub">' + (all.length ? plural(all.length, 'project') + ' · ' + plural(nPlans, 'site plan option') + ' · ' : '') + share + '</div></div>' +
         '<div class="vctl">' + (adding ? '' : '<button type="button" class="btn primary" id="pjNew">+ New Project</button>') + '<div class="team-slot" id="pjTeam"></div></div></div>' +
-      (adding ? '<form class="pj-new" id="pjForm"><label class="sr" for="pjNm">New project name</label><input id="pjNm" maxlength="120" placeholder="Project name" autocomplete="off"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span>' +
+      (adding ? '<form class="pj-new" id="pjForm" novalidate><label class="pj-lbl" for="pjNm">Project name</label><input id="pjNm" maxlength="120" placeholder="e.g. Waller garden apartments" autocomplete="off" required aria-describedby="pjNmErr"><span class="btnrow"><button class="btn primary">Create Project</button><button type="button" class="btn" id="pjCancel">Cancel</button></span><small class="field-err" id="pjNmErr" role="alert" hidden>Give the project a name</small>' +
         '<div class="rnote">You can add parcels and site plans to it next. To start from a parcel instead, click it on the map and use <b>Site plan</b> at the top of its card.</div></form>' : '') +
-      (all.length ? '<div class="pj-bar"><label class="search sm pj-q"><input type="search" id="pjQ" placeholder="Search projects" value="' + esc(pq) + '" aria-label="Search projects, parcels, owners and notes"></label>' +
+      (all.length ? '<div class="pj-bar"><label class="search sm pj-q"><input type="search" id="pjQ" placeholder="Search projects, parcels, owners or status" value="' + esc(pq) + '" aria-label="Search projects, parcels, owners, notes and status"></label>' +
         '<div class="pj-ctl"><label class="pj-sort">Sort <select class="chip" id="pjSort">' + Object.entries(SORTS).map(([k, l]) => '<option value="' + k + '"' + (psort === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
         '<div class="seg seg2 pj-mode" role="group" aria-label="Show projects as">' + [['cards', 'Cards', ICON_CARDS], ['list', 'List', ICON_LIST]].map(([k, l, ic]) => '<button type="button" data-v="' + k + '" aria-pressed="' + (mode === k) + '">' + ic + l + '</button>').join('') + '</div></div></div>' : '') +
       '<div id="pjList">' + listHtml() + '</div>';
@@ -4935,11 +4970,37 @@ export function initSitePlan(ctx) {
   function headHtml(p) {
     const ac = acresOf(p), st = PJ.statusOf(p), addr = addrOf(p);
     return '<button type="button" class="lnk pj-back" data-back="1">‹ All projects</button><header class="pj-head"><div class="kicker">Project</div>' +
-      (renaming ? '<form class="pj-ren" id="pjRenForm"><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span></form>'
+      (renaming ? '<form class="pj-ren" id="pjRenForm" novalidate><label class="sr" for="pjRen">Project name</label><textarea id="pjRen" rows="1" maxlength="120" required aria-describedby="pjRenErr">' + esc(p.name) + '</textarea><span class="btnrow"><button class="btn primary">Save</button><button type="button" class="btn" id="pjRenX">Cancel</button></span><small class="field-err" id="pjRenErr" role="alert" hidden>Give the project a name</small></form>'
         : '<div class="pj-title"><h2>' + esc(p.name) + '</h2><button type="button" class="lnk" id="pjRename">Rename</button></div>') +
       '<div class="pj-hmeta"><span class="pj-st" data-st="' + st.id + '"><label class="sr" for="pjStatus">Status</label><select id="pjStatus" title="The project’s status (shared with the team)">' + PJ.STATUSES.map(x => '<option value="' + x.id + '"' + (x.id === st.id ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></span>' +
-        (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac"><b>' + ac.toFixed(2) + '</b> acres</span>' : '') +
-        '<span class="pj-upd">Updated ' + when(ver(p)) + (p.by ? ' by ' + esc(p.by) : '') + (p.created ? ' · started ' + when(p.created) : '') + '</span></div></header>';
+        (addr ? '<span class="pj-addr">' + PIN + '<span>' + addr + '</span></span>' : '') + (ac ? '<span class="pj-hac" title="The parcels’ recorded acreage (appraisal district), added up. The merged site outline, with overlaps between parcels closed up, can be slightly smaller: see Site on the Feasibility tab."><b>' + ac.toFixed(2) + '</b> acres in parcels</span>' : '') +
+        updHtml(p) + '</div>' + nextHtml(p) + '</header>';
+  }
+  // who acts next, on what, by when and what blocks it (p.next, synced with the team like the status); what the steps say
+  // is still to do is shown beside it and pre-fills the action. Nothing notifies anyone: an overdue date just turns red.
+  function nextHtml(p) {
+    const n = PJ.nextStepOf(p, WS.steps(p)), due = n.due ? new Date(n.due + 'T12:00') : null, late = PJ.overdue(n.due);
+    const left = '<span class="pj-nleft"><span class="pj-nk">Still to do</span> ' + (n.pending.length ? n.pending.map(esc).join(' · ') : 'Nothing: every step is done') + '</span>';
+    if (editingNext) {
+      const names = [...new Set([get(NAME_KEY), p.by, ...db.projects.map(x => x.by)].filter(Boolean))], risks = (WS.studyOf(p, { sensitivity: false })?.study?.risks || []).filter(r => r.level !== 'low').slice(0, 6);
+      const fld = (id, label, v, extra = '') => '<label class="pj-nf"><span>' + label + '</span><input id="' + id + '" value="' + esc(v) + '" autocomplete="off"' + extra + '></label>';
+      return '<form class="pj-next pj-nform" id="pjNextForm" aria-label="Next step">' + fld('pjNxOwner', 'Owner', n.owner, ' list="pjNxPeople" maxlength="80" placeholder="Who acts next"') + fld('pjNxAction', 'Next action', n.action || n.suggest, ' maxlength="160"') +
+        fld('pjNxDue', 'Due', n.due, ' type="date"') + fld('pjNxBlock', 'Blocked by (optional)', n.blocker, ' list="pjNxRisks" maxlength="160" placeholder="e.g. waiting on the GC’s cost check"') +
+        '<datalist id="pjNxPeople">' + names.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist><datalist id="pjNxRisks">' + risks.map(r => '<option value="' + esc(r.title) + '">').join('') + '</datalist>' +
+        '<span class="btnrow"><button class="btn primary sm">Save</button><button type="button" class="btn sm" id="pjNxX">Cancel</button>' + (n.set ? '<button type="button" class="lnk" id="pjNxClear">Clear</button>' : '') + '</span></form>';
+    }
+    return '<div class="pj-next" role="group" aria-label="Next step"><div class="pj-nmain"><span class="pj-nk">Next step</span> ' +
+      (n.set ? (n.owner ? '<b>' + esc(n.owner) + '</b>' : '<b>No owner</b>') + (n.action ? ' · ' + esc(n.action) : '') + (due ? ' · <span class="pj-due' + (late ? ' late' : '') + '">' + (late ? 'Overdue, was due ' : 'Due ') + due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</span>' : '')
+        : '<em>No next step set</em>') +
+      ' <button type="button" class="lnk" id="pjNxEdit">' + (n.set ? 'Edit' : 'Set next step') + '</button></div><div class="pj-nsub">' + (n.blocker ? '<span class="pj-blk"><span class="pj-nk">Blocked by</span> ' + esc(n.blocker) + '</span>' : '') + left + '</div></div>';
+  }
+  // "Updated … by …" and where the last save went (the editor's save mark, in words), repainted by paintUpd() after each
+  // save and sync even while someone is typing (render() waits for them to leave the field)
+  function updHtml(p) {
+    const s = Date.now() - t(ver(p)), k = db.dirty.includes(p.id) ? (shared === false ? 'local' : 'saving') : shared === true ? 'synced' : shared === false ? 'local' : '';
+    const say = { saving: 'Saving to the team…', synced: 'Synced with team', local: 'Saved on this device only' }[k];
+    return '<span class="pj-upd" aria-live="polite">Updated ' + (s >= 0 && s < 60e3 ? 'just now' : s < 3600e3 ? Math.max(1, Math.round(s / 60e3)) + ' min ago' : when(ver(p))) + (p.by ? ' by ' + esc(p.by) : '') + (p.created ? ' · started ' + when(p.created) : '') +
+      (say ? ' · <span class="pj-sync" data-k="' + k + '">' + say + '</span>' : '') + '</span>';
   }
   const rendersOf = p => p.plans.flatMap(pl => (pl.renders || []).map(r => ({ pl, r })));
   function tabsHtml(p, tab) {
@@ -4950,7 +5011,7 @@ export function initSitePlan(ctx) {
   }
   // the Feasibility tab: the step-by-step workspace (src/workspace.js), saving and opening options through this page
   const WS = workspace({ save, openOption: (pid, plid) => open(pid, plid), newPlan: (p, extra) => newPlan(p, extra), setTab: (p, t) => setTab(p, t, true), goMap: () => ctx.setView('map'),
-    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: m => ctx.toast?.(m), saveFile: (n, d, m) => ctx.saveFile(n, d, m) });
+    code: () => get(CODE_KEY), name: () => get(NAME_KEY), toast: (m, o) => ctx.toast?.(m, o), saveFile: (n, d, m) => ctx.saveFile(n, d, m) });
   function detailHtml(p) {
     const tab = tabFor(p), body = { workspace: WS.html, overview: overviewHtml, options: optionsHtml, renderings: rendersHtml, plans: setsHtml, files: SF.html, ask: pAskHtml }[tab](p);
     return headHtml(p) + tabsHtml(p, tab) + '<div class="pj-panel pj-p-' + tab + '" id="pjPanel" role="tabpanel" aria-labelledby="pjTab-' + tab + '">' + body + '</div>';
@@ -4963,7 +5024,7 @@ export function initSitePlan(ctx) {
     const fact = (k, v, sub) => '<div><dt>' + k + '</dt><dd>' + v + (sub ? '<small>' + sub + '</small>' : '') + '</dd></div>';
     const field = (id, label, input) => '<div class="pj-f"><label for="' + id + '">' + label + '</label>' + input + '</div>';
     return '<div class="pj-ov"><section class="pj-box pj-info" aria-labelledby="pjInfoH"><h3 class="pj-h3" id="pjInfoH">Project information</h3>' +
-        '<div class="pj-ib"><div class="pj-thumb">' + (c || '<i>No site yet</i>') + '</div><dl class="pj-dl">' + fact('Site area', ac ? ac.toFixed(2) + ' acres' : 'Not set', ac ? f0(ac * 43560) + ' sq ft' : '') + fact('Parcels', f0(p.parcels.length)) +
+        '<div class="pj-ib"><div class="pj-thumb">' + (c || '<i>No site yet</i>') + '</div><dl class="pj-dl">' + fact('Parcel area', ac ? ac.toFixed(2) + ' acres' : 'Not set', ac ? f0(ac * 43560) + ' sq ft, recorded acreage added up' : '') + fact('Parcels', f0(p.parcels.length)) +
           (owners.length ? fact(owners.length > 1 ? 'Owners' : 'Owner', esc(owners[0]), owners.length > 1 ? 'and ' + plural(owners.length - 1, 'other') : '') : '') +
           (value ? fact('Appraised value', money(value), land ? 'land ' + money(land) : '') : '') + fact('Site plan options', f0(p.plans.length)) +
           (big ? fact('Largest option', f0(big.m.gfa) + ' sq ft', esc(big.pl.name) + ' · ' + esc(SP.USES[SP.normalizeProgram(big.pl.program).use].label) + (big.m.units ? ' · ' + plural(big.m.units, 'unit') : '')) : '') + '</dl></div>' +
@@ -5188,7 +5249,7 @@ export function initSitePlan(ctx) {
     const sheets = PS.sheetList(pl, { sections: [...s.sections], renders: nR, types }), sup = types.filter(t => t.supported), later = types.filter(t => !t.supported);
     const discs = PS.pickSections([...s.sections]).filter(x => PS.SECTION_DISC[x] && sheets.some(q => q.section === x)).length, calls = 1 + discs + (s.sections.has('arch') ? sup.length * 1.4 : 0);
     const mins = Math.max(1, Math.round((calls * 90 / 2 + sheets.length * 8 / 3 + 20) / 60)), cost = 0.12 + discs * 0.12 + (s.sections.has('arch') ? sup.length * 0.55 : 0);
-    const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with Claude’s notes and designs if it answers.' : !I.configured ? 'Claude isn’t set up on this site (ANTHROPIC_API_KEY): the set uses rule-based building designs and standard notes.'
+    const ai = !I ? 'Checking Claude…' : I.error ? 'Couldn’t check Claude just now: the set is made with Claude’s notes and designs if it answers.' : !I.configured ? 'Claude isn’t set up on this site, so the set uses rule-based building designs and standard notes. An admin can turn it on in Settings › AI model.'
       : 'Claude: <b>' + esc(psModel()) + '</b> at ' + esc(psEffort()) + ' effort (Settings › AI model)' + (I.budget?.spent != null ? ' · this month ' + usd(I.budget.spent) + ' of ' + usd(I.budget.cap) : '') + '. About ' + usd(cost) + ' for this set.';
     const form = '<section class="pj-box ps-form" aria-labelledby="psH"><h3 class="pj-h3" id="psH">Make a plan set</h3>' +
       '<div class="ps-row"><label for="psOpt">Option</label><select id="psOpt"' + (busy ? ' disabled' : '') + '>' + ready.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pl.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' +
@@ -5450,13 +5511,14 @@ export function initSitePlan(ctx) {
     const key = a && root.contains(a) ? (a.id ? '#' + a.id : ['open', 'plan', 'v', 'parcel', 'rid', 'copy', 'rmore'].map(k => a.dataset[k] != null ? '[data-' + k + '="' + CSS.escape(a.dataset[k]) + '"]' : '').find(Boolean) || (a.classList[0] ? '.' + a.classList[0] : null)) : null;
     const p = cur && db.projects.find(x => x.id === cur); if (!p) { cur = null; renaming = false; }
     root.innerHTML = '<div class="pj-wrap">' + (p ? detailHtml(p) : indexHtml()) + '</div>'; ctx.scheduleHash?.(); // the open project (pj=) and its tab (pt=) go in the address, so a reload comes back to them
-    ctx.team?.chip?.(root.querySelector('#pjTeam')); // who you are and whether projects are shared; opens Settings
+    ctx.team?.chip?.(root.querySelector('#pjTeam'), () => shareSay().chip); // who you are and whether projects are shared (the projects' own state, as the subtitle); opens Settings
     wire(p);
     if (key) try { root.querySelector(key)?.focus(); } catch (e) { /* the control is gone */ }
   }
   // the project page is in the address (#pj=<id>): opening one adds a history entry, so Back returns to the list (src/app.js)
   const pjMoved = was => { if (was !== cur) ctx.scheduleHash?.(ctx.view === 'projects' ? { push: true } : undefined); };
-  function show(id, tab) { const was = cur; cur = id; renaming = false; adding = false; if (id && tab) ptab.set(id, PJ.tabOf(tab)); render(true); root.scrollTop = 0; pjMoved(was); }
+  function paintUpd() { const p = cur && db.projects.find(x => x.id === cur), u = p && root?.querySelector('.pj-head .pj-upd'); if (u) u.outerHTML = updHtml(p); }
+  function show(id, tab) { const was = cur; cur = id; renaming = false; editingNext = false; adding = false; if (id && tab) ptab.set(id, PJ.tabOf(tab)); render(true); root.scrollTop = 0; pjMoved(was); }
   ctx.currentProject = () => ctx.view === 'projects' ? cur : null;
   ctx.openProject = (id, tab) => { if (ctx.view !== 'projects') ctx.setView('projects'); if (!id || db.projects.some(x => x.id === id)) show(id || null, tab); };
   function setTab(p, id, focus) { ptab.set(p.id, PJ.tabOf(id)); render(true); if (focus) root.querySelector('#pjTab-' + PJ.tabOf(id))?.focus(); }
@@ -5481,7 +5543,8 @@ export function initSitePlan(ctx) {
       on('[data-clear]', () => { pq = ''; render(true); });
       const form = $('#pjForm');
       if (form) {
-        form.onsubmit = e => { e.preventDefault(); const name = $('#pjNm').value.trim(); if (!name) { $('#pjNm').focus(); return; }
+        const nm = $('#pjNm'), nmErr = $('#pjNmErr'); nm.oninput = () => { nm.removeAttribute('aria-invalid'); nmErr.hidden = true; };
+        form.onsubmit = e => { e.preventDefault(); const name = nm.value.trim(); if (!name) { nm.setAttribute('aria-invalid', 'true'); nmErr.hidden = false; nm.focus(); return; } // the Save search pattern: say what's missing, under the field
           const np = { id: uid(), name, notes: '', parcels: [], plans: [], created: new Date().toISOString(), by: get(NAME_KEY) };
           db.projects.push(np); adding = false; pq = ''; document.activeElement?.blur(); const was = cur; cur = np.id; save(np); root.scrollTop = 0; pjMoved(was); };
         $('#pjCancel').onclick = () => { adding = false; render(true); };
@@ -5500,11 +5563,22 @@ export function initSitePlan(ctx) {
     const rf = $('#pjRenForm');
     if (rf) {
       const r = $('#pjRen'); grow(r); r.oninput = () => grow(r);
-      rf.onsubmit = e => { e.preventDefault(); const v = r.value.replace(/\s+/g, ' ').trim(); renaming = false; document.activeElement?.blur(); if (v && v !== p.name) { p.name = v; save(p); } render(true); };
+      r.addEventListener('input', () => { r.removeAttribute('aria-invalid'); $('#pjRenErr').hidden = true; });
+      rf.onsubmit = e => { e.preventDefault(); const v = r.value.replace(/\s+/g, ' ').trim(); if (!v) { r.setAttribute('aria-invalid', 'true'); $('#pjRenErr').hidden = false; r.focus(); return; } renaming = false; document.activeElement?.blur(); if (v && v !== p.name) { p.name = v; save(p); } render(true); };
       r.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); rf.requestSubmit(); } else if (e.key === 'Escape') $('#pjRenX').click(); };
       $('#pjRenX').onclick = () => { renaming = false; render(true); };
     }
     const st = $('#pjStatus'); if (st) st.onchange = () => { p.status = st.value; st.parentElement.dataset.st = st.value; save(p); };
+    on('#pjNxEdit', () => { editingNext = true; render(true); $('#pjNxOwner')?.focus(); });
+    const nf = $('#pjNextForm');
+    if (nf) {
+      const done = () => { editingNext = false; render(true); $('#pjNxEdit')?.focus(); };
+      nf.onsubmit = e => { e.preventDefault(); const v = id => ($(id)?.value || '').replace(/\s+/g, ' ').trim();
+        const nx = { owner: v('#pjNxOwner'), action: v('#pjNxAction'), due: v('#pjNxDue'), blocker: v('#pjNxBlock') };
+        if (Object.values(nx).some(Boolean)) p.next = nx; else delete p.next; save(p); done(); };
+      $('#pjNxX').onclick = done; nf.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); done(); } };
+      on('#pjNxClear', () => { delete p.next; save(p); done(); });
+    }
     wireTabs(p);
     // the fields save when you leave them (Enter in a one-line field leaves it), like the notes always have
     const keep = (id, k, n) => { const el = $(id); if (!el) return; el.onchange = () => { const v = el.value.slice(0, n); if (v !== (p[k] || '')) { p[k] = v; save(p); } }; if (el.tagName === 'INPUT') el.onkeydown = e => { if (e.key === 'Enter') el.blur(); }; };
@@ -5524,9 +5598,7 @@ export function initSitePlan(ctx) {
     root.querySelectorAll('[data-rdelall]').forEach(b => b.onclick = () => { const id = b.dataset.rdelall, pl = id === '*' ? null : planOf2(id); if (id === '*' || pl) deleteAllRenders(p, pl); });
     on('[data-tabgo]', e => setTab(p, e.currentTarget.dataset.tabgo, true));
     on('[data-jref]', () => { siteFail.delete(p.id); gatherSite(p); render(true); });
-    on('[data-delp]', () => { if (!confirm('Delete the project ' + p.name + ' and its ' + plural(p.plans.length, 'plan') + '? ' + (shared === true ? 'This removes it for the team too.' : 'This removes it from this device.'))) return; db.projects = db.projects.filter(x => x.id !== p.id); db.dirty = db.dirty.filter(i => i !== p.id); db.gone.push(p.id); cur = null;
-      for (const pl of p.plans) for (const r of pl.renders || []) { rdel(r.id); rdel(r.id + ':m'); } // its pictures on this device
-      if (away?.pid === p.id) hideAway(); if (resume?.pid === p.id) clearResume(); save(); ctx.scheduleHash?.(); });
+    on('[data-delp]', () => confirmDeleteProject(p));
     if (tab === 'overview') { // Regrid fetched on one of the parcels' cards since: its city and zoning count now; the jurisdiction is looked up once
       let ch = false; for (const x of p.parcels) ch = regridOn(x) || ch; if (ch) { quietSave(p); setTimeout(() => render()); }
       if (needSite(p)) gatherSite(p); // (the card already says Checking…)

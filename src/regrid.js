@@ -9,7 +9,12 @@ const SRC = 'regrid', LAYER = 'regrid-lines';
 export function initRegrid(ctx) {
   const { map, esc, fmtN } = ctx, box = document.getElementById('lyRegrid');
   let on = false, usage = null;
-  const getUsage = async () => { try { const r = await fetch('api/regrid?usage=1', { cache: 'no-store' }); return usage = await readJSON(r); } catch (e) { return { error: e.message }; } };
+  const getUsage = async () => { try { const r = await fetch('api/regrid?usage=1', { cache: 'no-store' }); return usage = await readJSON(r); } catch (e) { const u = { error: e.message, code: e.body?.code }; if (u.code === 'not_configured') { usage = u; offRows(); } return u; } };
+  // Regrid not set up on this site: the card's Regrid rows say so instead of offering a button that can't work
+  const OFF = 'Not available on this site';
+  ctx.regridOff = () => usage?.code === 'not_configured';
+  function offRows() { document.querySelectorAll('#card [data-rg]').forEach(b => { const s = document.createElement('span'); s.className = 'rg-off'; s.textContent = OFF; b.replaceWith(s); }); }
+  getUsage(); // once at start, so the first card already knows
   const left = (u, k) => u?.[k] ? Math.max(0, u[k].cap - u[k].used) : null;
 
   function addLayer() {
@@ -39,8 +44,10 @@ export function initRegrid(ctx) {
     const paintLeft = u => { if (u?.records) document.querySelectorAll('#card [data-rg-left]').forEach(x => { x.textContent = ' (' + fmtN(left(u, 'records')) + ' left)'; }); };
     const btn = (u) => lt() + '<button class="btn" type="button" id="rgGo">Get Regrid Details</button><div class="rnote">Zoning, standardized land use and the full parcel record. Uses 1 of your Regrid records' +
       (u && !u.error ? ' (' + fmtN(left(u, 'records')) + ' of ' + fmtN(u.records.cap) + ' left this month)' : '') + '; a parcel looked up before is free.</div>';
+    const off = () => lt() + '<div class="rnote">Regrid’s zoning and parcel records aren’t available on this site.</div>';
+    if (ctx.regridOff()) { el.innerHTML = off(); return; }
     el.innerHTML = btn(usage);
-    getUsage().then(u => { if (el.isConnected && el.querySelector('#rgGo')) { el.innerHTML = btn(u); wire(); }
+    getUsage().then(u => { if (u.code === 'not_configured') { if (el.isConnected) el.innerHTML = off(); return; } if (el.isConnected && el.querySelector('#rgGo')) { el.innerHTML = btn(u); wire(); }
       paintLeft(u); }); // the property card's own "Get … from Regrid" buttons (src/building.js) show the same allowance
     function wire() {
       el.querySelector('#rgGo').onclick = () => look(false);

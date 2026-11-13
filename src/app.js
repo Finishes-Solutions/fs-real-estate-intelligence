@@ -356,13 +356,32 @@ const SEL_IC={view:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d
   shape:'<path d="M3 4.5 9 2l4.5 5-2.5 6.5-7.5-1.5z"/>',radius:'<circle cx="8" cy="8" r="5.8"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/>',
   county:'<path d="M3 2.5h6l1 3h3.5v8H3z"/>',place:'<path d="M8 14.5s5-4.3 5-8.2A5 5 0 0 0 3 6.3c0 3.9 5 8.2 5 8.2z"/><circle cx="8" cy="6.3" r="1.8"/>'};
 let selIcK='';
+// with nothing picked, the figures are the census tracts on screen, and tracts exist only for the counties the app covers
+// (DATA.counties). Name that, not the view's middle (which read as a town: "near Tomball" over 6.6M people): the covered
+// counties that reach into the view and how much of their land is on screen (each outline clipped to the view)
+function viewScope(){ try{ const b=map.getBounds(), w=b.getWest(), e=b.getEast(), s=b.getSouth(), n=b.getNorth(), lat=(s+n)/2*Math.PI/180;
+  const kx=69.17*Math.cos(lat), ky=69.17;
+  // Sutherland–Hodgman against the view rectangle, then the shoelace area in square miles
+  const clip=(ring,inside,cut)=>{ const out=[]; for(let i=0;i<ring.length;i++){ const p=ring[i], q=ring[(i+1)%ring.length], pi=inside(p), qi=inside(q); if(pi) out.push(p); if(pi!==qi) out.push(cut(p,q)); } return out; };
+  const at=(p,q,t)=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t];
+  const edges=[[p=>p[0]>=w,(p,q)=>at(p,q,(w-p[0])/(q[0]-p[0]))],[p=>p[0]<=e,(p,q)=>at(p,q,(e-p[0])/(q[0]-p[0]))],[p=>p[1]>=s,(p,q)=>at(p,q,(s-p[1])/(q[1]-p[1]))],[p=>p[1]<=n,(p,q)=>at(p,q,(n-p[1])/(q[1]-p[1]))]];
+  const area=r=>{ let a=0; for(let i=0,j=r.length-1;i<r.length;j=i++) a+=r[j][0]*kx*r[i][1]*ky-r[i][0]*kx*r[j][1]*ky; return Math.abs(a)/2; };
+  const inView=ring=>{ let r=ring.slice(0,-1); for(const [f,c] of edges){ if(!r.length) break; r=clip(r,f,c); } return r.length>2?area(r):0; };
+  let sqmi=0; const names=[];
+  for(const c of countyGeo){ const a=c.geom.coordinates.reduce((t,poly)=>t+inView(poly[0])-poly.slice(1).reduce((h,x)=>h+inView(x),0),0); if(a>1){ names.push(c.name); sqmi+=a; } }
+  return { names, sqmi, all:countyGeo.length, zoom:map.getZoom() }; }catch(e){ return null; } }
+// short: the area bar's one line ('7 covered counties, 6,400 sq mi'); long: the Glance sentence
+const scopeText=(v,short)=>{ if(!(v&&v.names.length&&v.zoom>=6.5)) return ''; const n=v.names.length, sq=fmtN(v.sqmi>=1000?Math.round(v.sqmi/100)*100:Math.round(v.sqmi))+' sq mi';
+  return short?(n===v.all?n:n+' of '+v.all)+' covered counties, '+sq:(n===v.all?'the '+n:n+' of the '+v.all)+' covered counties, about '+sq; };
 const viewPlaceSafe=()=>{ try{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }catch(e){ return null; } }; // farLabel (below) is filled after the first move
 // with nothing selected the header names the place in view (the far-away name arrives about 600 ms after a move)
 let selNameT=0; map.on('moveend',()=>{ if(sel.feature) return; clearTimeout(selNameT); selNameT=setTimeout(syncSelBar,800); });
 function syncSelBar(){
   const k=sel.feature?(SEL_IC[sel.kind]?sel.kind:'shape'):'view';
   document.getElementById('selKind').innerHTML=sel.feature?'<span class="sk-l">Selected area · </span>'+(SEL_KIND[sel.kind]||'Area'):'<span class="sk-l">No area picked</span>'; // phones show only the kind
-  const vp=sel.feature?null:viewPlaceSafe(); document.getElementById('selName').textContent=sel.feature?sel.label:vp?'Map view near '+vp:'Map view';
+  // zoomed in to a neighborhood the nearest place is a fair name; further out, the extent
+  const vs=sel.feature?null:viewScope(), vp=sel.feature||!vs||vs.zoom<11?null:viewPlaceSafe();
+  document.getElementById('selName').textContent=sel.feature?sel.label:vp?'Map view near '+vp:scopeText(vs)?'Map view · '+scopeText(vs,true):'Map view';
   if(selIcK!==k){ selIcK=k; document.getElementById('selIcon').innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+SEL_IC[k]+'</svg>'; }
   // with no area picked the count is for the whole region (and your filters), not what's in view: say so
   const stEl=document.getElementById('selStats'); stEl.textContent=fmtN(visible.length)+' filing'+(visible.length===1?'':'s')+(sel.feature?'':' region-wide')+' · '+fmtM(visible.reduce((s,f)=>s+f.cost,0));
@@ -371,7 +390,9 @@ function syncSelBar(){
   // Save search and alerts only mean something once there is a filter or an area; Copy link always works
   const custom=filterChips({area:true}).some(c=>!c.fixed);
   // (shown but off with nothing to save, so the menu doesn't change shape)
-  for(const id of ['saveSearch','rssLink']){ const b=document.getElementById(id); b.removeAttribute('hidden'); b.toggleAttribute('disabled',!custom&&id==='saveSearch'); b.setAttribute('aria-disabled',String(!custom)); b.classList.toggle('is-off',!custom); b.title=custom?'':'Pick an area or set a filter first'; }
+  for(const id of ['saveSearch','rssLink']){ const b=document.getElementById(id); b.removeAttribute('hidden'); b.toggleAttribute('disabled',!custom&&id==='saveSearch'); b.setAttribute('aria-disabled',String(!custom)); b.classList.toggle('is-off',!custom); b.title='';
+    // the reason is shown in the item itself (not only a hover tooltip), and read out with it
+    const em=b.querySelector('em'); if(em){ em.id||=id+'Why'; em.dataset.sub??=em.textContent; em.textContent=custom?em.dataset.sub:'Pick an area or set a filter first'; b.setAttribute('aria-describedby',em.id); } }
   if(!custom) document.getElementById('saveForm').hidden=true;
   syncFilingsHead();
 }
@@ -398,13 +419,19 @@ function applyFilters(){
 const cRow=document.getElementById('countyRow'), tRow=document.getElementById('typeRow'), pRow=document.getElementById('periodRow');
 PERIODS.forEach(([k,label])=>{ const b=document.createElement('button'); b.className='chip'; b.dataset.p=k; b.textContent=label; b.setAttribute('aria-pressed','false');
   b.onclick=()=>{ state.d=periodSpec(k); datePicked=false; applyFilters(); }; pRow.appendChild(b); });
+// County chips work like the Type chips: a click turns that county on or off (at least one stays on); "All" turns them all back on.
+// Each count is the filings that county would add under every other current filter (period, type, value, area…), so the
+// numbers add up to the result instead of showing all-time totals.
+{ const all=document.createElement('button'); all.className='chip c-all'; all.type='button'; all.textContent='All'; all.setAttribute('aria-pressed','true'); all.title='Every county';
+  all.onclick=()=>{ state.counties=new Set(COUNTIES); applyFilters(); }; cRow.appendChild(all); }
 COUNTIES.forEach(c=>{
-  const b=document.createElement('button'); b.className='chip'; b.setAttribute('aria-pressed','true');
-  b.innerHTML=c+' <span class="n">'+F.filter(f=>f.county===c).length+'</span>';
-  b.onclick=()=>{ const solo=state.counties.size===1&&state.counties.has(c); state.counties=solo?new Set(COUNTIES):new Set([c]);
-    [...cRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.counties.has(COUNTIES[i]))); applyFilters(); if(!solo) fitGeom(countyGeo.find(x=>x.name===c).geom); };
+  const b=document.createElement('button'); b.className='chip'; b.type='button'; b.dataset.c=c; b.setAttribute('aria-pressed','true');
+  b.innerHTML=c+' <span class="n">'+fmtN(F.filter(f=>f.county===c).length)+'</span>';
+  b.onclick=()=>{ state.counties.has(c)&&state.counties.size>1?state.counties.delete(c):state.counties.add(c); applyFilters(); };
   cRow.appendChild(b);
 });
+function countyCounts(){ const spec=curSpec(false); delete spec.c; const m=makeMatcher(spec,{changed:CHANGED}), n={}; COUNTIES.forEach(c=>n[c]=0);
+  for(const f of F) if(f.county in n&&m(f)&&inSel(f)&&monthOK(f)) n[f.county]++; return n; }
 TYPES.forEach(t=>{
   const b=document.createElement('button'); b.className='chip'; b.setAttribute('aria-pressed','true');
   const sw=t==='Addition'?'border:2px solid var(--c-add);background:transparent':'background:var(--c-'+(t==='New'?'new':'reno')+')';
@@ -459,7 +486,8 @@ const chgRow=document.getElementById('chgRow');
   b.onclick=()=>{ state.chg=state.chg===k?null:k; applyFilters(); }; chgRow.appendChild(b); });
 if(!LAST_RUN) chgRow.style.display='none';
 function syncFilterUI(){
-  [...cRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.counties.has(COUNTIES[i])));
+  const cn=countyCounts(); cRow.querySelectorAll('.chip[data-c]').forEach(x=>{ x.setAttribute('aria-pressed',state.counties.has(x.dataset.c)); const s=x.querySelector('.n'); if(s) s.textContent=fmtN(cn[x.dataset.c]); });
+  cRow.querySelector('.c-all')?.setAttribute('aria-pressed',state.counties.size===COUNTIES.length);
   [...tRow.querySelectorAll('.chip')].forEach((x,i)=>x.setAttribute('aria-pressed',state.types.has(TYPES[i])));
   [...chgRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',state.chg===x.dataset.chg));
   const pk=periodOf(state.d); [...pRow.querySelectorAll('.chip')].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===pk));
@@ -525,8 +553,9 @@ document.getElementById('resetAll').onclick=clearFilters;
     if(floating) document.getElementById('lfFilings').open=true;
     pop.hidden=!open; btn.setAttribute('aria-expanded',open&&!floating); btn.classList.toggle('open',open&&!floating);
     document.querySelectorAll('[data-edit-filters]').forEach(b=>b.setAttribute('aria-expanded',String(floating&&b===at))); place();
-    if(open) (floating?pop.querySelector('#filtersBody select,#filtersBody button.chip,#filtersBody input'):pop.querySelector('select,button.chip,input'))?.focus({preventScroll:true}); };
+    if(open) requestAnimationFrame(()=>[...pop.querySelectorAll(floating?'#filtersBody select,#filtersBody button.chip,#filtersBody input':'select,button.chip,input,summary,button')].find(x=>x.offsetParent!==null)?.focus({preventScroll:true})); }; // the first control that shows
   addEventListener('resize',place); listeners.push(()=>{ if(!pop.hidden&&anchor) requestAnimationFrame(place); });
+  pop.addEventListener('keydown',e=>trapTab(pop,e)); // a role=dialog: Tab stays inside until Esc, × or Done
   const dismiss=()=>{ const a=anchor; setOpen(false); (a&&a.isConnected?a:btn).focus(); };
   btn.onclick=()=>setOpen(pop.hidden);
   document.getElementById('filterClose').onclick=dismiss;
@@ -589,6 +618,12 @@ function exportMenu(items,{label='Export',cls=''}={}){
 }
 // close an open menu on a click elsewhere, after picking an item, or on Esc
 document.addEventListener('click',e=>{ document.querySelectorAll('details.vmenu[open]').forEach(d=>{ if(!d.contains(e.target)||e.target.closest('.vm-pop [role=menuitem]')) d.open=false; }); });
+// role=menu promises arrow keys: Down/Up move through the items (from the button too), Home/End jump to the ends
+document.addEventListener('keydown',e=>{ if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key)) return; const d=e.target.closest?.('details.vmenu'); if(!d) return;
+  const items=[...d.querySelectorAll('.vm-pop [role=menuitem]')].filter(x=>x.offsetParent!==null&&!x.disabled); if(!items.length) return;
+  if(!d.open){ if(e.key!=='ArrowDown') return; d.open=true; }
+  e.preventDefault(); const i=items.indexOf(document.activeElement), n=items.length;
+  (e.key==='Home'?items[0]:e.key==='End'?items[n-1]:e.key==='ArrowDown'?items[(i+1)%n]:items[(i-1+n)%n]).focus(); });
 document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; const d=document.querySelector('details.vmenu[open]'); if(d){ e.preventDefault(); d.open=false; d.querySelector('summary')?.focus(); } });
 // apply a whole filter spec (URL, saved search, AI answer)
 function fromSpec(spec,{fly=true}={}){
@@ -782,7 +817,36 @@ addEventListener('keydown',e=>{ if(e.key!=='Escape'||e.defaultPrevented||!card.c
   if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
   if(card.classList.contains('sp-mode')) return; // a site plan is never closed by Esc: it steps back itself (src/siteplan.js), and × or Done closes it
   e.preventDefault(); if(!cardBack()) closeCard(); });
+// Focus follows the card: opened from a page or the list (a Timeline row, a Changes item, a filing), focus goes to the
+// card's title; closed, it goes back to what opened it. Pages often redraw that row when it's picked, so the opener is
+// also remembered as a selector (its list's id and its data-i / data-k / data-id) and found again.
+const actKey=el=>{ const r=el?.closest?.('[data-i],[data-k],[data-id],[data-open]'), host=r?.parentElement?.closest('[id]'); if(!r||!host) return null;
+  const a=['data-i','data-k','data-id','data-open'].find(k=>r.hasAttribute(k)); return '#'+CSS.escape(host.id)+' ['+a+'="'+CSS.escape(r.getAttribute(a))+'"]'; };
+const findAct=k=>{ const r=k&&document.querySelector(k); return r&&(r.matches(FOCUSABLE)?r:r.querySelector(FOCUSABLE)); };
+let lastAct=null, cardFrom=null;
+const noteAct=e=>{ if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; const el=e.target.closest?.(FOCUSABLE+',tr[data-k]'); if(el&&!card.contains(el)) lastAct={el,key:actKey(el),page:!!el.closest('.view,#panel'),t:performance.now()}; };
+document.addEventListener('click',noteAct,true); document.addEventListener('keydown',noteAct,true);
+new MutationObserver(()=>{ const open=card.classList.contains('open'), a=document.activeElement;
+  // a new card from a page or the list (also while another card is open): remember the opener, focus the new title
+  const fresh=lastAct&&performance.now()-lastAct.t<1500&&lastAct.page&&(!a||a===document.body||!card.contains(a));
+  if(open&&fresh){ cardFrom=lastAct; lastAct=null; requestAnimationFrame(()=>{ const h=card.querySelector(':scope>.top h2'); if(!h||!card.classList.contains('open')) return; h.tabIndex=-1; h.focus({preventScroll:true}); }); }
+  else if(!open&&cardFrom){ const f=cardFrom; cardFrom=null; if(a&&a!==document.body&&!card.contains(a)) return;
+    // the page may redraw the list once more as the card goes (Timeline does): if focus falls to the page again, find the row again
+    const back=()=>{ const t=f.el.isConnected&&f.el.offsetParent!==null?f.el:findAct(f.key); t?.focus({preventScroll:true}); };
+    requestAnimationFrame(back); for(const ms of [150,400]) setTimeout(()=>{ const x=document.activeElement; if(!x||x===document.body) back(); },ms); }
+}).observe(card,{attributes:true,attributeFilter:['class'],childList:true});
 document.getElementById('sheetToggle').onclick=()=>panel.classList.toggle('up');
+// Offline (UX-609): one status chip for the whole app, in the top bar (desktop) or just above the tab bar (phone). Pages
+// keep showing what they loaded; notes are kept on the device and sync when the connection is back.
+{ const chip=document.createElement('div'); chip.className='netchip'; chip.setAttribute('role','status'); chip.hidden=true;
+  chip.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M1.5 5.5a10 10 0 0 1 13 0M4 8.3a6.5 6.5 0 0 1 8 0M6.4 11a3 3 0 0 1 3.2 0M2 2l12 12"/></svg><span><b>Offline</b> · showing saved data · changes will sync</span>';
+  const phone=matchMedia('(max-width:700px)'), place=()=>{ if(phone.matches) document.getElementById('mnav')?.before(chip); else document.querySelector('#appbar .ab-util, .ab-util')?.prepend(chip); };
+  const sync=()=>{ const off=navigator.onLine===false; chip.hidden=!off; document.querySelector('.app')?.classList.toggle('offline',off); };
+  place(); phone.addEventListener('change',place); addEventListener('online',sync); addEventListener('offline',sync); sync(); }
+// skip links: to the map's search (on the Map; opened first from any page), and to the current page's title (the map itself on the Map)
+document.getElementById('skipTools')?.addEventListener('click',e=>{ e.preventDefault(); if(view!=='map') setView('map'); requestAnimationFrame(()=>document.getElementById('msq')?.focus()); });
+document.getElementById('skipMain')?.addEventListener('click',e=>{ e.preventDefault(); const sec=document.getElementById('view-'+view), h=view==='map'?map.getCanvas():sec?.querySelector('h1,h2');
+  if(!h) return; if(view!=='map') h.setAttribute('tabindex','-1'); h.focus(); });
 
 // hover + click on markers
 const tip=document.getElementById('tip'), stage=document.getElementById('stage'), viewport=document.getElementById('viewport');
@@ -833,7 +897,7 @@ map.on('movestart',hideMenu);
 let mode='pan', draft=[], boxA=null, boxB=null;
 const hintEl=document.getElementById('hint'), radiusEl=document.getElementById('radius');
 const isTouch=window.matchMedia('(pointer: coarse)').matches;
-const HINTS={area:'Drag a box over the area you want.'+(isTouch?'':' Esc to cancel.'),poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes. Esc to cancel.',county:'Click counties to add or remove them from the selection.'+(isTouch?'':' Esc to cancel.')};
+const HINTS={area:'Drag a box over the area you want.'+(isTouch?'':' Esc to cancel.'),poly:isTouch?'Tap to drop points. Tap the first point to close the shape.':'Click to drop points. Click the first point or double-click to close. Backspace undoes. Esc to cancel.',county:(isTouch?'Tap':'Click')+' counties to add or remove them from the selection.'+(isTouch?'':' Esc to cancel.')};
 function setMode(m){
   mode=m; draft=[]; boxA=null; drawDraft();
   document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
@@ -851,7 +915,9 @@ document.querySelectorAll('.tools button[data-mode]').forEach(b=>b.onclick=()=>{
 const MODE_TXT={area:'Drawing a box',poly:'Drawing a shape',radius:'Radius search',county:'Picking counties'};
 const selPill=document.getElementById('selPill'), modeChip=document.getElementById('modeChip');
 function setSelSheet(on){ document.querySelector('.app').classList.toggle('sel-open',!!on); selPill?.setAttribute('aria-expanded',String(!!on)); }
-function syncModeUI(m){ if(modeChip){ modeChip.hidden=m==='pan'||!MODE_TXT[m]; document.getElementById('modeChipT').textContent=MODE_TXT[m]||''; }
+function syncModeUI(m){ if(modeChip){ modeChip.hidden=m==='pan'||!MODE_TXT[m]; document.getElementById('modeChipT').textContent=MODE_TXT[m]||'';
+    // once a radius or counties are applied, leaving the tool keeps them: the button says Done, not Cancel (the area chip's × removes it)
+    const kept=(m==='radius'||m==='county')&&!!sel.feature, mc=document.getElementById('modeCancel'); if(mc){ mc.textContent=kept?'Done':'Cancel'; mc.title=kept?'Close the tool and keep the area':'Stop without picking an area'; } }
   if(!selPill) return; const ic=(m==='pan'?selIc0:document.querySelector('.tools button[data-mode="'+m+'"] svg'))?.cloneNode(true);
   if(ic){ ic.setAttribute('class','sp-ic'); selPill.querySelector('.sp-ic').replaceWith(ic); } selPill.classList.toggle('on',m!=='pan'); }
 const selIc0=selPill?.querySelector('.sp-ic')?.cloneNode(true);
@@ -866,9 +932,9 @@ function ringFeature(ring){
 }
 function setSelection(kind,label,feature,counties){
   sel.kind=kind; sel.label=label; sel.feature=feature; sel.counties=counties||new Set(); if(kind!=='radius'){ sel.center=null; setPin(null); }
-  syncSel(); applyFilters();
+  syncSel(); applyFilters(); try{ syncModeUI(mode); }catch(e){} // (not yet defined while the URL state restores at boot)
 }
-function clearSelection(){ sel.kind=null; sel.label=''; sel.feature=null; sel.center=null; sel.counties=new Set(); setPin(null); syncSel(); applyFilters(); }
+function clearSelection(){ sel.kind=null; sel.label=''; sel.feature=null; sel.center=null; sel.counties=new Set(); setPin(null); syncSel(); applyFilters(); try{ syncModeUI(mode); }catch(e){} }
 function syncSel(){ const s=map.getSource&&map.getSource('sel'); if(s) s.setData(fc(sel.feature?[{type:'Feature',properties:{},geometry:sel.feature}]:[])); }
 function drawDraft(cursor){
   const s=map.getSource&&map.getSource('draft'), p=map.getSource&&map.getSource('draftpts'); if(!s||!p) return;
@@ -908,7 +974,7 @@ map.on('click',e=>{
     const set=new Set(sel.kind==='county'?sel.counties:[]); set.has(c.name)?set.delete(c.name):set.add(c.name);
     if(!set.size){ clearSelection(); return; }
     setCountySel(set);
-  } else if(mode==='radius'){ setRadiusCenter(ll,pinLabel(ll),false); }
+  } else if(mode==='radius'){ setRadiusCenter(ll,pinLabel(ll),false); radiusEl.classList.remove('on'); }
 });
 map.on('dblclick',e=>{ if(mode==='poly'&&draft.length>=3){ e.preventDefault(); finishPoly(); } });
 function setCountySel(set){ const names=COUNTIES.filter(n=>set.has(n));
@@ -978,7 +1044,7 @@ rq.addEventListener('keydown',e=>{
   if(e.key==='ArrowDown'&&sugs.length){e.preventDefault(); sugI=(sugI+1)%sugs.length; renderSugs();}
   else if(e.key==='ArrowUp'&&sugs.length){e.preventDefault(); sugI=(sugI-1+sugs.length)%sugs.length; renderSugs();}
   else if(e.key==='Enter'&&sugs.length){e.preventDefault(); pickSug(sugs[Math.max(0,sugI)]);} });
-function pickSug(o){ picked=true; rq.value=o.t; sugs=[]; renderSugs(); setRadiusCenter(o.c,o.t,true); }
+function pickSug(o){ picked=true; rq.value=o.t; sugs=[]; renderSugs(); setRadiusCenter(o.c,o.t,true); if(mode==='radius') radiusEl.classList.remove('on'); } // the panel folds to the chip: the circle is what you look at now (the Radius button reopens it)
 function setMiles(v,fromRange,silent){ v=Math.max(0.1,Math.min(MAX_MI,+v||0)); radiusMiles=v; if(!fromRange) rrange.value=v; rmi.value=v;
   document.querySelectorAll('.rpre button').forEach(b=>b.classList.toggle('on',+b.dataset.mi===v)); if(sel.kind==='radius'&&!silent) updateRadius(false); }
 rrange.addEventListener('input',()=>setMiles(rrange.value,true)); rmi.addEventListener('change',()=>setMiles(rmi.value));
@@ -1010,11 +1076,12 @@ function placeLayers(){ const a=layersOpen&&layersOpen.offsetParent?layersOpen:n
   // keep the panel inside the controls' column (#mapleft), so it doesn't spill over the camera rail or the assistant drawer
   const ml=document.getElementById('mapleft').getBoundingClientRect(), maxL=Math.max(ml.left,ml.right-(layersEl.offsetWidth||320))-host.left;
   layersEl.style.setProperty('--ly-top',Math.round(q.bottom-host.top+8)+'px'); layersEl.style.setProperty('--ly-left',Math.round(Math.max(16,Math.min(q.left-host.left,maxL,host.width-336)))+'px'); }
+const layersPop=popover(layersEl,{trigger:()=>layersOpen?.offsetParent?layersOpen:layersBtn,first:'#layersX'});
 function setLayersOpen(on){ const was=layersEl.classList.contains('on'); layersEl.classList.toggle('on',on); layersBtn.setAttribute('aria-expanded',on); layersOpen?.setAttribute('aria-expanded',on); layersOpen?.classList.toggle('open',on);
-  if(on&&!was){ try{ ctx.openLayerGroups?.(); }catch(e){} layersEl.scrollTop=0; } placeLayers(); }
+  if(on&&!was){ try{ ctx.openLayerGroups?.(); }catch(e){} layersEl.scrollTop=0; layersPop.opened(); } else if(!on&&was) layersPop.closed(); placeLayers(); }
 layersBtn.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); };
 layersOpen&&(layersOpen.onclick=e=>{ e.stopPropagation(); setLayersOpen(!layersEl.classList.contains('on')); });
-document.getElementById('layersX')?.addEventListener('click',()=>{ setLayersOpen(false); layersOpen?.offsetParent&&layersOpen.focus({preventScroll:true}); });
+document.getElementById('layersX')?.addEventListener('click',()=>setLayersOpen(false)); // focus goes back to the button that opened it (popover)
 document.getElementById('layersDone')?.addEventListener('click',()=>setLayersOpen(false));
 addEventListener('resize',placeLayers); if(layersOpen&&window.ResizeObserver) new ResizeObserver(placeLayers).observe(document.getElementById('mapleft'));
 let swallowClick=false;
@@ -1072,17 +1139,64 @@ document.getElementById('home').onclick=()=>{ if(!resetPop.hidden) setResetOpen(
 document.getElementById('orbit').onclick=()=>{ if(!resetPop.hidden) setResetOpen(false); stopAllOrbits(); map.flyTo({center:[-93,26],zoom:2.2,pitch:0,bearing:0,roll:0,duration:reduceMotion?0:1600}); };
 
 // ---------- toast ----------
-const toastEl=document.getElementById('toast'); let toastT=0;
-// toast(text) or toast(text, {action:{label, run}}): with an action the note carries a button and stays a little longer
-function toast(m,o={}){ toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a);
-  if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.onclick=()=>{ toastEl.classList.remove('on','act'); a.run(); }; toastEl.append(' ',b); }
-  toastEl.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('on','act'),o.ms||(a?6500:3400)); }
+const toastEl=document.getElementById('toast'); let toastT=0, toastMs=0, toastAct=null, toastJump=false, toastBack=null;
+// toast(text) or toast(text, {action:{label, run}}): with an action (Undo) the note carries the button and a ×, stays at
+// least 10 s, and ⌘Z / Ctrl+Z runs it. The first Tab after it shows goes to its Undo (the note sits at the end of the page,
+// so it would be many Tab stops away), and Tab out of it carries on from where focus was. Any note waits while the pointer is over it or focus is in it (WCAG 2.2.1).
+const MOD_Z=/Mac|iPhone|iPad|iPod/.test(navigator.platform||navigator.userAgent)?'⌘Z':'Ctrl+Z';
+const hideToast=()=>{ const back=toastEl.contains(document.activeElement)&&toastBack?.isConnected?toastBack:null; toastEl.classList.remove('on','act'); toastAct=null; toastJump=false; toastBack=null; back?.focus({preventScroll:true}); };
+const armToast=()=>{ clearTimeout(toastT); if(toastEl.matches(':hover')||toastEl.contains(document.activeElement)) return; toastT=setTimeout(hideToast,toastMs); };
+const toastHome0=toastEl.parentNode;
+function toast(m,o={}){ // on a page (Projects, Reports…) the note goes on the stage, over the page; on the Map it stays in the map's viewport
+  if(toastEl.parentNode!==document.body){ const st=document.getElementById('stage'), home=!st||(st.dataset.view||'map')==='map'?toastHome0:st; if(home&&toastEl.parentNode!==home) home.append(toastEl); }
+  toastEl.textContent=m; const a=o.action; toastEl.classList.toggle('act',!!a); toastAct=null;
+  if(a){ const b=document.createElement('button'); b.type='button'; b.textContent=a.label; b.title=a.label+' ('+MOD_Z+')'; b.setAttribute('aria-keyshortcuts',MOD_Z==='⌘Z'?'Meta+Z':'Control+Z');
+    const run=toastAct=()=>{ hideToast(); a.run(); }; b.onclick=run;
+    const x=document.createElement('button'); x.type='button'; x.className='tx'; x.setAttribute('aria-label','Dismiss'); x.textContent='×'; x.onclick=hideToast;
+    toastEl.append(' ',b,x); }
+  toastEl.classList.add('on'); toastJump=!!a; toastBack=null; toastMs=Math.max(o.ms||0,a?10000:3400); armToast(); }
+toastEl.addEventListener('mouseenter',()=>clearTimeout(toastT)); toastEl.addEventListener('focusin',()=>clearTimeout(toastT));
+toastEl.addEventListener('mouseleave',armToast); toastEl.addEventListener('focusout',()=>setTimeout(armToast,0));
+document.addEventListener('keydown',e=>{ if(e.key!=='Tab'||!toastAct||e.defaultPrevented) return; const a=document.activeElement, bs=[...toastEl.querySelectorAll('button')];
+  if(!toastEl.contains(a)){ if(e.shiftKey||!toastJump||appEl.classList.contains('planning')||a?.closest?.('[role=dialog],dialog')) return; toastJump=false; toastBack=a&&a!==document.body?a:null; e.preventDefault(); bs[0]?.focus(); return; }
+  const back=toastBack?.isConnected?toastBack:null; if(!back) return;
+  if(e.shiftKey&&a===bs[0]){ e.preventDefault(); back.focus(); } else if(!e.shiftKey&&a===bs[bs.length-1]) back.focus(); }); // no preventDefault: Tab moves on from `back`
+// ⌘Z / Ctrl+Z while an Undo note shows: undo (not while typing, and not on the site plan, which has its own undo)
+document.addEventListener('keydown',e=>{ if(!toastAct||e.key.toLowerCase()!=='z'||e.shiftKey||!(e.metaKey||e.ctrlKey)||e.defaultPrevented) return;
+  if(e.target.closest?.('input,textarea,select,[contenteditable="true"]')||appEl.classList.contains('planning')) return; e.preventDefault(); toastAct(); });
 // Tab and Shift+Tab stay inside an open dialog (Settings, Export): past the last control back to the first, and the reverse
+// inside a folded <details> (other than its own summary): rendered for layout, but not a Tab stop
+function inClosed(x){ for(let d=x.parentElement?.closest('details');d;d=d.parentElement?.closest('details')) if(!d.open&&!(x.tagName==='SUMMARY'&&x.parentElement===d)) return true; return false; }
 function trapTab(box,e){ if(e.key!=='Tab'||!box) return;
-  const f=[...box.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null); if(!f.length) return;
+  const f=[...box.querySelectorAll(FOCUSABLE)].filter(x=>x.offsetParent!==null&&getComputedStyle(x).visibility!=='hidden'&&!inClosed(x)); if(!f.length) return;
   const first=f[0], last=f[f.length-1], a=document.activeElement;
   if(e.shiftKey&&(a===first||a===box||!box.contains(a))){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&(a===last||!box.contains(a))){ e.preventDefault(); first.focus(); } }
-function clearToast(){ clearTimeout(toastT); toastEl.classList.remove('on','act'); } // a mode changed: its old instruction goes
+// One popover behaviour for every panel that opens over the page (Layers, Filters, Metrics, cards opened from a list):
+// popover(box, {trigger, first}) → {opened(), closed()}. opened() remembers what had focus and moves focus inside (the
+// `first` selector, else the first control); Tab stays inside while focus is there; closed() puts focus back on the
+// opener (or `trigger`) when focus was inside the box or had fallen to the page, never when the user clicked elsewhere.
+const FOCUSABLE='button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],summary,[tabindex]:not([tabindex="-1"])';
+function popover(box,{trigger=null,first=null}={}){ let opener=null;
+  box.addEventListener('keydown',e=>trapTab(box,e));
+  const lost=()=>{ const a=document.activeElement; return !a||a===document.body||box.contains(a); };
+  return { opened(){ const a=document.activeElement; opener=a&&a!==document.body&&!box.contains(a)?a:null;
+      requestAnimationFrame(()=>{ const b=document.activeElement; if(b&&b!==document.body&&b!==opener&&!box.contains(b)) return; const el=(first&&box.querySelector(first))||[...box.querySelectorAll(FOCUSABLE)].find(x=>x.offsetParent!==null); (el||box).focus({preventScroll:true}); }); },
+    closed(){ const o=opener; opener=null; if(!lost()) return; const t=o&&o.isConnected&&o.offsetParent!==null?o:(typeof trigger==='function'?trigger():trigger); t?.focus({preventScroll:true}); } }; }
+// Sortable data tables (UX-605): sortTable(table) turns each header (except those marked data-nosort) into a button that
+// sorts the body rows by that column (numbers by value: $1.2M, 5.9%, 1,234; else A–Z) and sets aria-sort. Tables drawn
+// from data that is cut to a top N (Companies) sort the data instead, with the same header markup (sortHead).
+const SORT_ICON={ascending:'▲',descending:'▼',none:'↕'};
+function sortHead(label,key,cur,dir,cls=''){ const s=cur===key?dir:'none';
+  return '<th'+(cls?' class="'+cls+'"':'')+' aria-sort="'+s+'"><button type="button" class="th-sort" data-sort="'+key+'">'+esc(label)+'<span class="th-ic" aria-hidden="true">'+SORT_ICON[s]+'</span></button></th>'; }
+const cellVal=td=>{ const t=(td?.dataset.v??td?.textContent??'').trim(), m=t.replace(/[,\s$]/g,'').match(/^([+−-]?\d*\.?\d+)([KMB%]?)/i);
+  return m?parseFloat(m[1].replace('−','-'))*({k:1e3,m:1e6,b:1e9}[m[2].toLowerCase()]||1):t.toLowerCase(); };
+function sortTable(table){ const head=table?.tHead?.rows[0], body=table?.tBodies[0]; if(!head||!body||head.dataset.sortable) return; head.dataset.sortable='1';
+  [...head.cells].forEach((th,i)=>{ if(th.dataset.nosort!=null) return; const b=document.createElement('button'); b.type='button'; b.className='th-sort';
+    b.append(...th.childNodes); const ic=document.createElement('span'); ic.className='th-ic'; ic.setAttribute('aria-hidden','true'); ic.textContent=SORT_ICON.none; b.append(ic); th.append(b); th.setAttribute('aria-sort','none');
+    b.onclick=()=>{ const num=[...body.rows].some(r=>typeof cellVal(r.cells[i])==='number'), dir=th.getAttribute('aria-sort')==='descending'?'ascending':th.getAttribute('aria-sort')==='ascending'||!num?(th.getAttribute('aria-sort')==='ascending'?'descending':'ascending'):'descending';
+      const rows=[...body.rows].sort((x,y)=>{ const a=cellVal(x.cells[i]),c=cellVal(y.cells[i]); const d=typeof a==='number'&&typeof c==='number'?a-c:String(a).localeCompare(String(c)); return dir==='ascending'?d:-d; });
+      body.append(...rows); [...head.cells].forEach(h=>{ if(h.hasAttribute('aria-sort')){ h.setAttribute('aria-sort',h===th?dir:'none'); const k=h.querySelector('.th-ic'); if(k) k.textContent=SORT_ICON[h===th?dir:'none']; } }); }; }); }
+function clearToast(){ clearTimeout(toastT); hideToast(); } // a mode changed: its old instruction goes
 
 // ---------- export ----------
 const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
@@ -1190,19 +1304,21 @@ document.getElementById('viewport').appendChild(backEl);
 function setBack(from){
   if(!from){ back=null; backEl.hidden=true; appEl.classList.remove('has-back'); return; }
   const sec=document.getElementById('view-'+from); // read the scroll positions now, before the page is hidden
-  back={from,top:sec?.scrollTop||0,inner:[...(sec?.querySelectorAll('.g-scroll')||[])].map(el=>el.scrollTop)};
+  back={from,top:sec?.scrollTop||0,inner:[...(sec?.querySelectorAll('.g-scroll')||[])].map(el=>el.scrollTop),key:lastAct&&lastAct.page&&performance.now()-lastAct.t<3000?lastAct.key:null};
   backEl.querySelector('span').textContent='Back to '+labelOf(from); backEl.hidden=false; appEl.classList.add('has-back');
 }
 backEl.querySelector('.bk-go').onclick=()=>{ const b=back; if(!b) return; setView(b.from);
   const put=()=>{ const sec=document.getElementById('view-'+b.from); if(!sec) return; sec.scrollTop=b.top; sec.querySelectorAll('.g-scroll').forEach((el,i)=>{ if(b.inner[i]!=null) el.scrollTop=b.inner[i]; }); };
-  put(); requestAnimationFrame(()=>{ put(); setTimeout(put,120); }); };
+  put(); requestAnimationFrame(()=>{ put(); setTimeout(()=>{ put(); // and focus where the user was: the row they followed, else the page title
+    const sec=document.getElementById('view-'+b.from); const h=sec?.querySelector('h1,h2'); h?.setAttribute('tabindex','-1'); (findAct(b.key)||h)?.focus({preventScroll:true}); },120); }); };
 backEl.querySelector('.bk-x').onclick=()=>setBack(null);
 // Changes badge: filings new or changed in nightly checks since you last opened Changes (all of this week's on a first visit)
 const CHG_SEEN='fs-chg-seen';
 function changesBadge(){
   let seen=null; try{ seen=localStorage.getItem(CHG_SEEN); }catch(e){}
   const ids=new Set(); for(const r of DATA.changes.runs||[]){ if(seen&&r.built<=seen) break; for(const x of r.items) if(CHANGED.has(x.id)) ids.add(x.id); }
-  ctx.setBadge('changes',ids.size,{alert:true,roll:false,title:'New and changed filings since your last visit'}); // on the Changes sub-tab only, not the Filings tab
+  // green only for what's new since you last opened Changes; before the first visit it's this week's count, in grey
+  ctx.setBadge('changes',ids.size,{alert:!!seen,roll:false,title:seen?'New and changed filings since your last visit':'Filings new or changed this week'}); // on the Changes sub-tab only, not the Filings tab
 }
 function changesSeen(){ const last=DATA.changes.runs?.[0]?.built; if(!last) return; try{ localStorage.setItem(CHG_SEEN,last); }catch(e){} changesBadge(); }
 
@@ -1286,7 +1402,7 @@ function showIntro(){ try{ localStorage.removeItem(INTRO); }catch(e){} introEl.h
 if(/[?&]debug\b/.test(location.search)) window.fsDebug=()=>ctx;
 const ctx={ DATA,F,BY_ID,CHANGED,COUNTIES,TYPES,TYPE_LABEL,state,sel,map,
   get visible(){ return visible; }, get visibleNoWho(){ return visibleNoWho; }, get view(){ return view; },
-  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,esc,fmtM,fmtN,C,geocode,hashStr,
+  applyFilters,fromSpec,curSpec,select,setView,setMonth,monthLabel,filterText,richText,wireCites,toast,clearToast,trapTab,popover,sortTable,sortHead,esc,fmtM,fmtN,C,geocode,hashStr,
   onChange:fn=>listeners.push(fn), onCardClose:fn=>cardCloseHooks.push(fn), onViewChange:fn=>viewChangeHooks.push(fn), onCardRender:fn=>cardRenderHooks.push(fn), cardRendered:info=>cardRenderHooks.forEach(fn=>fn(info)), onSave:fn=>saveHooks.push(fn), mapClickHandlers:[], clickLayers:[], setRadiusCenter, setMiles, fitGeom, fitBox, coverPad, saveFile, card, panel, closeCard, clearSelection:clearSel, get reduceMotion(){ return reduceMotion; }, onView:(v,fn)=>{ viewHooks[v]=fn; }, onOverlays:fn=>overlayHooks.push(fn), tip, viewport };
 // close in: steeper tilt and a slower spin so one building stays framed and doesn't whip past.
 // Each spin step is a jumpTo, which cancels any running easeTo/flyTo, so the spin gives way as soon as anything else moves the camera.
@@ -1366,7 +1482,7 @@ ctx.setLegend=(id,html)=>{ const box=document.querySelector('.legends'); if(!box
     ctx.foldLegend=v=>{ if(v==null){ if(held!=null){ min=held; held=null; sync(); } return; } if(held==null) held=min; min=!!v; sync(); }; // folded for now (the site plan on a phone), without changing the saved choice; null puts it back as it was
     sync(); } }
 syncQL=()=>ctx.syncQuickLayers?.();
-Object.assign(ctx,{ viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, baseLayers:()=>baseIds, imageryStyle:()=>ESRI_STYLE, streetStyle:()=>OFM+'/styles/liberty', mapTilerDown:()=>mtDown, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
+Object.assign(ctx,{ viewScope, viewScopeText:()=>scopeText(viewScope()), viewLabels, nearestPlace, viewPlace:()=>{ const c=map.getCenter(); return nearestPlace([c.lng,c.lat])||farLabel; }, basemap:()=>layers.style, baseLayers:()=>baseIds, imageryStyle:()=>ESRI_STYLE, streetStyle:()=>OFM+'/styles/liberty', mapTilerDown:()=>mtDown, mode:()=>mode, screenContext, vocab, orbitAt, stopOrbit, onOrbitStop:fn=>orbitStops.push(fn), flatView, periodSpec, matchWith:o=>{ const m=makeMatcher({...curSpec(false),...o},{changed:CHANGED}); return F.filter(f=>m(f)&&inSel(f)&&monthOK(f)); }, highlight, clearHighlight, highlighted, showFilings, filingsShown, setFilingsShown, cardNav, fitToVisible:()=>fitPoints(visible), setMapOptions, mapPadding,
   snapshot:()=>({spec:curSpec(),month:state.month}), restore:s=>{ fromSpec(s.spec,{fly:false}); setMonth(s.month||null); fitPoints(visible); },
   resetAll:()=>{ closeCard(); clearHighlight(); ctx.live?.clearRoute(); ctx.clearNearby?.(); ctx.clearPlace?.(); if(state.month) setMonth(null); fromSpec(DEFAULT_SPEC()); map.flyTo({...HOME,duration:reduceMotion?0:1000}); },
   filtered:()=>{ const m=makeMatcher(curSpec(false),{changed:CHANGED}); return F.filter(f=>m(f)&&monthOK(f)); },

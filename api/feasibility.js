@@ -76,10 +76,11 @@ export default async function handler(req, res) {
   let b; try { b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) { return res.status(400).json({ error: 'The request isn’t valid JSON.' }); }
   try {
     if (b.op === 'link') {
-      const db = conn(); if (!db) return res.status(503).json({ error: 'Report storage needs SUPABASE_SECRET_KEY on the site.', local: true });
+      const db = conn(); if (!db) { console.warn('feasibility: report storage needs SUPABASE_URL and SUPABASE_SECRET_KEY'); return res.status(503).json({ error: 'Team storage isn’t connected on this site, so saved report files can’t be opened here.', local: true, code: 'not_configured' }); }
       const p = String(b.path || ''); if (!/^projects\/[\w-]{3,60}\/reports\/[\w-]+\/[\w.-]+$/.test(p)) return res.status(400).json({ error: 'Not a report file.' });
       return res.json({ url: signedUrl(db, await storage(db, bucket()).signGet(p)) });
     }
+    if (b.op === 'ping') return res.json({ storage: !!conn() }); // what this site can do, asked once when the Reports step opens
     const project = b.project;
     if (!project || typeof project !== 'object' || !ID.test(String(project.id || ''))) return res.status(400).json({ error: 'Send the project.' });
     if (JSON.stringify(project).length > MAX_BODY) return res.status(413).json({ error: 'The project is too large to send.' });
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Unknown file kind.' });
     }
     if (b.op === 'save') {
-      const db = conn(); if (!db) return res.status(503).json({ error: 'Saving report sets needs SUPABASE_SECRET_KEY on the site; download the files instead.', local: true });
+      const db = conn(); if (!db) { console.warn('feasibility: saving report sets needs SUPABASE_URL and SUPABASE_SECRET_KEY'); return res.status(503).json({ error: 'Team storage isn’t connected on this site, so report sets can’t be saved for the team. Download the files above, or ask your admin to connect it.', local: true, code: 'not_configured' }); }
       const files = await reportFiles(project, study, { narrative: nar.text, scenarios }), id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), dir = 'projects/' + project.id + '/reports/' + id + '/';
       const st = storage(db, bucket()); await Promise.all(files.map(f => st.put(dir + f.name, f.buf, f.type)));
       const report = { id, kind: 'feasibility', created: new Date().toISOString(), by: clip(b.by, 80), scenario: study.scenario?.id || null, inputsHash: study.inputsHash,

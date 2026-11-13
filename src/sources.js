@@ -195,12 +195,13 @@ export function initSources(ctx) {
       offline ? '<span class="src-pill">' + st('stale', 'Offline') + ' showing the copy saved on this device</span>' : '',
       newer ? '<span class="src-pill">' + st('stale', 'Newer data') + ' refreshed ' + esc(fmtWhen(newer)) + ' · <button class="lnk" id="srcReload" type="button">Reload</button></span>' : '',
     ].join('');
-    root.innerHTML = '<div class="vhead"><div><div class="kicker">Data &amp; help</div><h2>Where the data comes from</h2><div class="vsub">What each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div><div class="vctl"><button type="button" class="btn md" id="srcIntro" title="Show the short getting-started tip at the top of the Map panel again">Getting started</button></div></div>' +
+    root.innerHTML = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('sources')) + '</div><h1>Data &amp; help</h1><div class="vsub">Where the data comes from: what each source feeds, how often it refreshes and when it last did. Nightly data is pulled once a night and built into the app; map layers and lookups are fetched live when you use them.</div></div><div class="vctl"><button type="button" class="btn md" id="srcIntro" title="Show the short getting-started tip at the top of the Map panel again">Getting started</button></div></div>' +
       '<div class="src-sum">' + pills + '</div>' +
       // the options themselves live in Settings; this line says how they're set and links there
       '<div class="src-opt muted">Show sources on cards: <b id="srcShowState">' + (ctx.showSources?.() ? 'On' : 'Off') + '</b> · <button class="lnk" id="srcSettings" type="button">Change in Settings</button> · <button class="lnk" id="srcVoiceLog" type="button" title="What the voice assistant heard and did in this visit, for troubleshooting">Save voice log</button></div>' +
       rows().map(([title, list]) => '<section class="src-grp"><h3>' + esc(title) + '</h3><table class="src-tbl"><thead><tr><th>Source</th><th>Status</th><th>Used for · freshness</th></tr></thead><tbody>' +
         list.map(r => '<tr><td><b>' + r.name + '</b></td><td>' + r.status + '</td><td>' + esc(r.what) + '<div class="s">' + esc(r.detail) + '</div></td></tr>').join('') + '</tbody></table></section>').join('');
+    root.querySelectorAll('table.src-tbl').forEach(t => ctx.sortTable?.(t)); // sortable headers (UX-605)
     root.querySelector('#srcReload')?.addEventListener('click', () => location.reload());
     root.querySelector('#srcSettings')?.addEventListener('click', () => ctx.openSettings?.('map'));
     root.querySelector('#srcVoiceLog')?.addEventListener('click', () => ctx.saveVoiceLog?.());

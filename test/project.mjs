@@ -5,9 +5,23 @@ const PJ = await import('../lib/project.mjs');
 const S = await import('../lib/siteplan.mjs'), L = await import('../lib/sitelayout.mjs'), PF = await import('../lib/proforma.mjs'), A = await import('../lib/planask.mjs');
 
 // ---- status and tabs ----
-assert.deepEqual(PJ.STATUSES.map(s => s.label), ['Prospect', 'Under review', 'Under contract', 'Owned', 'On hold', 'Dead']);
+assert.deepEqual(PJ.STATUSES.map(s => s.label), ['Prospect', 'Under review', 'Approved', 'Under contract', 'Owned', 'On hold', 'Dead']);
 assert.equal(PJ.statusOf({}).label, 'Prospect', 'no status yet: a prospect'); assert.equal(PJ.statusOf({ status: 'owned' }).label, 'Owned'); assert.equal(PJ.statusOf({ status: 'bogus' }).id, 'prospect');
 assert.deepEqual(PJ.TABS.map(t => t.id), ['workspace', 'overview', 'options', 'renderings', 'plans', 'files', 'ask']); assert.equal(PJ.TABS[0].label, 'Feasibility', 'the feasibility workspace first (src/workspace.js)'); assert.equal(PJ.tabOf('files'), 'files', 'reference files have a tab of their own'); assert.equal(PJ.TABS[2].label, 'Sites', 'Options is called Sites; its id stays for old links'); assert.equal(PJ.tabOf('plans'), 'plans'); assert.equal(PJ.tabOf('ask'), 'ask'); assert.equal(PJ.tabOf('<x>'), 'workspace'); assert.equal(PJ.tabOf(undefined), 'workspace'); assert.equal(PJ.tabOf('overview'), 'overview');
+
+// ---- next step (p.next): an older project without one loads as "no next step set"; what the steps leave pre-fills the action ----
+{ const P = await import('../lib/feasibility/pipeline.mjs');
+  const none = PJ.nextStepOf({ id: 'x', status: 'review' }); assert.equal(none.set, false); assert.deepEqual([none.owner, none.action, none.due, none.blocker, none.pending, none.suggest], ['', '', '', '', [], '']);
+  assert.equal(PJ.nextStepOf(null).set, false); assert.equal(PJ.nextStepOf({ next: 'junk' }).set, false, 'a malformed next is ignored');
+  const steps = { intake: { state: 'done' }, site: { state: 'done' }, plans: { state: 'ready' }, budget: { state: 'done' }, proforma: { state: 'ready' }, reports: { state: 'ready' } };
+  const n = PJ.nextStepOf({ next: { owner: '  Audit   Tester ', action: 'Make the plan set', due: '2026-11-18', blocker: 'Flood zone AE on part of the site' } }, steps);
+  assert.deepEqual([n.set, n.owner, n.action, n.due, n.blocker], [true, 'Audit Tester', 'Make the plan set', '2026-11-18', 'Flood zone AE on part of the site']);
+  assert.deepEqual(n.pending, ['Plan set not made', 'Report set not saved'], 'Budget and Pro Forma are never pending on their own'); assert.equal(n.suggest, 'Make the plan set and save the report set');
+  assert.equal(PJ.nextStepOf({ next: { due: '18/11/2026', owner: 'x'.repeat(200) } }).due, '', 'only YYYY-MM-DD dates'); assert.equal(PJ.nextStepOf({ next: { owner: 'x'.repeat(200) } }).owner.length, 80);
+  assert.equal(PJ.nextStepOf({ next: { blocker: 'only a blocker' } }).set, false, 'a next step needs an owner or an action');
+  const details = PJ.nextStepOf({}, P.stepStatus({ parcels: [{ key: 'a', acres: 2 }] }, null)); assert.equal(details.pending[0], 'Client and target use not set'); assert.match(details.suggest, /^Add the client and target use/);
+  assert.equal(PJ.nextStepOf({}, P.stepStatus({}, null)).pending[0], 'Parcels not added');
+  const now = new Date(2026, 10, 12, 9); assert.equal(PJ.overdue('2026-11-11', now), true); assert.equal(PJ.overdue('2026-11-12', now), false, 'due today is not overdue'); assert.equal(PJ.overdue('', now), false); }
 
 // ---- facts from /api/site's answer (shaped like test/site.mjs) ----
 const site = { flood: { zone: 'AE', subtype: null, risk: 'high', bfe: 51.2 }, traffic: { roads: [{ road: 'I-10', aadt: 250000 }, { road: 'City street', aadt: 11969 }] },

@@ -78,6 +78,10 @@ assert.equal(floodInfo([{ FLD_ZONE: 'X', ZONE_SUBTY: '0.2 PCT ANNUAL CHANCE FLOO
 assert.equal(floodInfo([{ FLD_ZONE: 'X', ZONE_SUBTY: 'AREA OF MINIMAL FLOOD HAZARD', SFHA_TF: 'F', STATIC_BFE: -9999 }]).bfe, null);
 assert.equal(floodInfo([]).zone, null);
 assert.equal(roadName({ RTE_PRFX: 'SL', RTE_NBR: '0610' }), 'Loop 610'); assert.equal(roadName({ RTE_PRFX: 'FM', RTE_NBR: '1093' }), 'FM 1093');
+// TxDOT toll codes: Beltway 8's roadbeds (TL0008-RG / -KG / -LG) by name, other toll codes and bare segment codes said in words
+for (const nm of ['TL0008-RG', 'TL0008-KG', 'TL0008-LG']) assert.equal(roadName({ RTE_PRFX: 'TL', RTE_NBR: '0008', RTE_NM: nm }), 'Sam Houston Tollway (Beltway 8)');
+assert.equal(roadName({ RTE_PRFX: 'TL', RTE_NBR: '0099', RTE_NM: 'TL0099-KG' }), 'Toll road (TxDOT TL0099)'); assert.equal(roadName({ RTE_PRFX: 'TL', RTE_NBR: '8' }), 'Sam Houston Tollway (Beltway 8)');
+assert.equal(roadName({ RTE_PRFX: 'XX', RTE_NM: 'XX0123-KG' }), 'Unnamed TxDOT segment (XX0123-KG)'); assert.equal(roadName({ RTE_PRFX: 'IH', RTE_NBR: '0010', RTE_NM: 'IH0010-KG' }), 'I-10');
 assert.equal(trafficInfo([]).roads.length, 0); assert.equal(waterDistricts([{ NAME: 'X', TYPE: 'MUD', STATUS: 'I' }]).length, 0, 'inactive dropped');
 assert.equal(echoInfo([]).count, 0); assert.deepEqual(barsInfo([], new Date('2026-10-01')), []);
 // handler: bad coordinates, cache header

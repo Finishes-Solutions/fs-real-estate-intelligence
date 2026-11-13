@@ -90,15 +90,25 @@ export async function disasters(counties, deadline) {
   return { since: '2000', count: list.length, major: list.filter(x => x.kind === 'Major disaster').length, by_type: byType, list: list.slice(0, 40) };
 }
 
-export async function femaReport(g, { label, deadline = Date.now() + BUDGET_MS } = {}) {
-  const sq = areaSqMi(g);
+// the report's four parts; `parts` asks for some of them only (the map card asks for each separately, so it can show each one
+// as it lands and retry one that failed without re-running the rest)
+export const PARTS = ['flood_zones', 'nfip_claims', 'disasters', 'risk_index'];
+export async function femaReport(g, { label, deadline = Date.now() + BUDGET_MS, parts = PARTS } = {}) {
+  const sq = areaSqMi(g), want = new Set(parts.filter(p => PARTS.includes(p))); if (!want.size) PARTS.forEach(p => want.add(p));
   if (sq > MAX_SQMI) { const e = new Error('That area is larger than ' + MAX_SQMI.toLocaleString('en-US') + ' square miles. Pick a smaller area.'); e.status = 400; throw e; }
   const part = async fn => { try { return await fn(); } catch (e) { return { error: e.message }; } };
-  const [zones, nriRows] = await Promise.all([part(() => floodZones(g, sq, deadline)), part(() => riskTracts(g, deadline))]);
+  const needTracts = want.has('nfip_claims') || want.has('disasters') || want.has('risk_index');
+  const [zones, nriRows] = await Promise.all([want.has('flood_zones') ? part(() => floodZones(g, sq, deadline)) : undefined, needTracts ? part(() => riskTracts(g, deadline)) : undefined]);
   const tracts = Array.isArray(nriRows) ? [...new Set(nriRows.map(r => String(r.TRACTFIPS)))] : [], counties = Array.isArray(nriRows) ? [...new Set(nriRows.map(r => String(r.STCOFIPS)))] : [];
-  const [nfip, dis] = await Promise.all([part(() => tracts.length ? claims(tracts, deadline) : { claims: 0, note: 'No census tracts found for this area.' }), part(() => counties.length ? disasters(counties, deadline) : { count: 0 })]);
-  return { label, area_sqmi: Math.round(sq * 1000) / 1000, flood_zones: zones, risk_labels: RISK_LABEL, nfip_claims: nfip, disasters: dis,
-    risk_index: Array.isArray(nriRows) ? nriSummary(nriRows) : nriRows, counties: Array.isArray(nriRows) ? [...new Set(nriRows.map(r => r.COUNTY))] : [], sources: SOURCES };
+  const [nfip, dis] = await Promise.all([want.has('nfip_claims') ? part(() => tracts.length ? claims(tracts, deadline) : { claims: 0, note: 'No census tracts found for this area.' }) : undefined,
+    want.has('disasters') ? part(() => counties.length ? disasters(counties, deadline) : { count: 0 }) : undefined]);
+  const out = { label, area_sqmi: Math.round(sq * 1000) / 1000, risk_labels: RISK_LABEL, sources: SOURCES };
+  if (want.has('flood_zones')) out.flood_zones = zones;
+  if (want.has('nfip_claims')) out.nfip_claims = nfip;
+  if (want.has('disasters')) out.disasters = dis;
+  if (want.has('risk_index')) out.risk_index = Array.isArray(nriRows) ? nriSummary(nriRows) : nriRows;
+  if (needTracts) out.counties = Array.isArray(nriRows) ? [...new Set(nriRows.map(r => r.COUNTY))] : [];
+  return out;
 }
 
 // ---------- legend ----------
@@ -142,13 +152,13 @@ export default async function handler(req, res) {
     } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(502).json({ error: e.message }); }
   }
   if (!rateLimit(req, res, { perMinute: 15, perDay: 300 })) return;
-  let g = null, label = '';
-  if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; g = cleanGeometry(b.geometry); label = String(b.label || '').slice(0, 120); }
+  let g = null, label = '', parts;
+  if (req.method === 'POST') { const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}; g = cleanGeometry(b.geometry); label = String(b.label || '').slice(0, 120); if (Array.isArray(b.parts)) parts = b.parts.slice(0, 8).map(String); }
   else { const lat = +q.lat, lon = +q.lon, mi = Math.min(10, Math.max(0.05, +q.mi || 0.25)); if (lat > 17 && lat < 50 && lon > -125 && lon < -65) g = circle(lon, lat, mi); }
   if (!g) return res.status(400).json({ error: 'Send a Polygon or MultiPolygon geometry (POST) or lat, lon and mi.' });
   try {
-    const d = await femaReport(g, { label });
-    const partial = ['flood_zones', 'nfip_claims', 'disasters', 'risk_index'].some(k => d[k]?.error); // never cache a report with a part that failed
+    const d = await femaReport(g, { label, ...(parts ? { parts } : {}) });
+    const partial = PARTS.some(k => d[k]?.error); // never cache a report with a part that failed
     res.setHeader('Cache-Control', req.method === 'POST' || partial ? 'no-store' : 'public, max-age=3600, s-maxage=604800');
     return res.json(d);
   } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(e.status || 502).json({ error: e.message }); }

@@ -233,6 +233,6 @@ export function initExport(ctx) {
       { landscape: n > 3, sources: SOURCES + ' Census numbers: US Census ACS 5-year and LEHD LODES.' });
   }
   const activityDoc = (groups, list, label) => doc('Activity report', label, kpis(list) + groups.filter(g => g.rows.length).map((g, i) => '<div' + (i ? ' class="full"' : '') + '><h2>' + esc(g.label) + '</h2>' +
-    tbl(['#', 'Name', 'Projects', 'Est. value', 'New', 'Mostly', 'Where', 'Latest'], g.rows.slice(0, 40).map((r, j) => ['<span class="m">' + (j + 1) + '</span>', '<b>' + esc(r.label) + '</b>', fmtN(r.n), money(r.v), fmtN(r.nw), esc(r.use), esc(r.cos), '<span class="m">' + esc(r.last) + '</span>']), [2, 3, 4]) + '</div>').join(''),
+    tbl(['#', 'Name', 'Filings', 'Est. value', 'New', 'Mostly', 'Where', 'Latest'], g.rows.slice(0, 40).map((r, j) => ['<span class="m">' + (j + 1) + '</span>', '<b>' + esc(r.label) + '</b>', fmtN(r.n), money(r.v), fmtN(r.nw), esc(r.use), esc(r.cos), '<span class="m">' + esc(r.last) + '</span>']), [2, 3, 4]) + '</div>').join(''),
     { sources: 'Grouped by name as filed (or the developer the AI identified), with LLC and Inc. variants merged. ' + SOURCES });
 }

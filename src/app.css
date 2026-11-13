@@ -231,7 +231,7 @@ select.chip{appearance:none;padding-right:22px;background-image:linear-gradient(
 .view.on{display:block}
 .stage:not([data-view="map"]) .mapleft,.stage:not([data-view="map"]) .ctrls{visibility:hidden}
 .vhead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px}
-.vhead h2{margin:6px 0 2px;font-size:22px;letter-spacing:-.02em;font-weight:800}
+.vhead h1,.vhead h2{margin:6px 0 2px;font-size:22px;letter-spacing:-.02em;font-weight:800}
 .vsub{color:var(--muted);font-size:12.5px;max-width:760px}
 .vctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .vctl label{display:inline-flex;gap:6px;align-items:center}
@@ -472,7 +472,7 @@ table.who .r,th.r{text-align:right}
   .maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left{bottom:60px}
 
   .view{--view-pt:calc(14px + var(--st));padding:var(--view-pt) 14px 28px}
-  .vhead h2{font-size:19px}
+  .vhead h1,.vhead h2{font-size:19px}
   .vctl{width:100%}
   .who th:nth-child(5),.who td:nth-child(5),.who th:nth-child(7),.who td:nth-child(7){display:none}
 
@@ -565,6 +565,8 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .ai-m.bot{align-self:flex-start;color:var(--text)}
 .ai-m.err{color:var(--danger)}
 .ai-m.err .lnk{color:var(--brand);font-weight:600;margin-left:4px}
+.ai-m.info{color:var(--text-2);background:var(--panel-2,#f4f5f4);border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:6px;padding:8px 12px}
+@media (pointer:coarse){.ai-m.err .ai-retry{display:inline-flex;align-items:center;min-height:44px;padding:12px 8px}}
 .ai-m.act{align-self:flex-start;display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:6px;padding:6px 10px;max-width:100%}
 .ai-m.act .ai-ai{flex:1;min-width:0}
 .ai-m.act .lnk{font-family:var(--font-display);font-size:11.5px;white-space:nowrap}
@@ -735,6 +737,7 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .ms-more{display:block;width:100%;border:0;background:transparent;padding:10px 14px;font-size:12px;color:var(--muted);cursor:var(--cur-pointer,pointer);text-align:center}
 .ms-more:hover{color:var(--brand)}
 .ms-none{padding:14px;font-size:12.5px;color:var(--muted)}
+.ms-none.ms-empty{color:var(--text-2);border-bottom:1px solid var(--line,#e5e7eb)}
 .placebar{position:relative;display:none;gap:3px;background:var(--panel);border:1px solid var(--line-2);border-left:3px solid #d48806;border-radius:6px;padding:12px 14px;box-shadow:0 6px 18px rgba(11,13,12,.14)}
 .placebar.on{display:grid}
 .placebar .x{position:absolute;top:6px;right:6px;width:28px;height:28px;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:18px;cursor:var(--cur-pointer,pointer)}
@@ -743,6 +746,8 @@ kbd{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line-2)
 .pb-s{font-family:var(--font-mono);font-size:11.5px;color:var(--text-2)}
 .pb-s span,.pb-n{color:var(--muted)}
 .pb-n{font-size:11.5px}
+.pb-n.warn{color:var(--text-2);font-size:12.5px;border-left:3px solid var(--amber);padding:4px 8px;margin-top:6px;background:color-mix(in srgb,var(--amber) 10%,transparent);border-radius:3px}
+.ms-it i.ms-warn{color:#8a5300;font-weight:600}
 .pb-a{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 
 /* headline metrics: 3–6 tiles, user-picked */
@@ -1814,8 +1819,8 @@ button.mprow:hover b{color:var(--brand)}
 .mk-mini text.on{fill:var(--brand-ink)}
 
 /* ================= Market tab (redesigned 2026-10-05; src/area.js + src/mkcharts.js) ================= */
-:root{--mk-c0:var(--green-700);--mk-c1:#2a78d6;--mk-c2:#c26a00;--mk-c3:#7c3aed;--mk-c4:#8a9396;--mk-c5:#0e7c86;--mk-c6:#b3261e;--mk-up:var(--green-600);--mk-dn:#b3261e}
-#view-market .mk-vhead h2{font-size:24px}
+:root{--mk-c0:var(--green-700);--mk-c1:#2a78d6;--mk-c2:#c26a00;--mk-c3:#7c3aed;--mk-c4:#8a9396;--mk-c5:#0e7c86;--mk-c6:#b3261e;--mk-up:var(--green-700);--mk-dn:#b3261e}
+#view-market .mk-vhead h1,#view-market .mk-vhead h2{font-size:24px}
 /* area picker: mini map + county chips */
 .mk-scope2{display:flex;align-items:center;gap:18px;margin:2px 0 12px;padding:10px 14px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel)}
 .mk-scope2 .mk-mini{width:150px;height:auto;flex:none}
@@ -2121,6 +2126,9 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-fact{font-size:11.5px;line-height:1.4;color:var(--text-2);border:1px solid var(--line);background:var(--panel-2);border-radius:999px;padding:2px 9px}
 .pj-fact b{font-family:var(--font-mono);font-weight:600;color:var(--text)}
 .pj-upd{font-size:11.5px;color:var(--muted)}
+.pj-sync[data-k="synced"]{color:var(--green-700);font-weight:600}
+.pj-sync[data-k="synced"]:before{content:"✓ "}
+.pj-sync[data-k="local"]{color:#8a5a00;font-weight:600}
 /* list */
 .pj-list{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
 .pj-lh,.pj-row{display:grid;grid-template-columns:84px minmax(0,1fr) 90px 82px 112px 120px 12px;gap:14px;align-items:center;padding:10px 14px}
@@ -2191,6 +2199,14 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-notes:focus{outline:none;border-color:var(--brand)}
 .pj-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px}
 .lnk.pj-del{color:var(--danger);font-weight:600}
+/* Delete Project's dialog */
+.pj-dlg{max-width:440px;border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--panel);color:var(--text);box-shadow:0 18px 50px rgba(0,0,0,.25)}
+.pj-dlg::backdrop{background:rgba(15,20,25,.45)}
+.pj-dlg h3{margin:0 0 8px;font-size:16px}
+.pj-dlg p{margin:0 0 8px;font-size:13px;line-height:1.5;color:var(--text-2)}
+.pj-dlg .pj-dlgn{color:var(--muted);font-size:12px}
+.pj-dlg .btnrow{display:flex;gap:8px;margin-top:14px}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
 @container (max-width:640px){
   .pj-title h2{font-size:19px}
   .pj-dl{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -2214,11 +2230,25 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-head{margin-bottom:12px}
 .pj-hmeta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;margin-top:6px;font-size:12.5px;color:var(--text-2)}
 .pj-hmeta .pj-addr{font-size:12.5px}
+.pj-nsub{display:flex;flex-wrap:wrap;gap:2px 22px}
+/* the Next step row under the status (owner · action · due · blocker, and what the steps say is left) */
+.pj-next{display:grid;gap:3px;justify-content:start;margin-top:8px;padding:7px 12px;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:6px;background:var(--panel);font-size:12.5px;color:var(--text-2);max-width:1180px}
+.pj-next .pj-nk{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-right:4px}
+.pj-next b{color:var(--text)}
+.pj-next em{font-style:normal;color:var(--muted)}
+.pj-due.late{color:var(--danger);font-weight:600}
+.pj-blk{color:var(--danger);font-weight:600}
+.pj-blk .pj-nk{color:var(--danger)}
+.pj-nform{display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px}
+.pj-nf{display:grid;gap:2px;font-size:11.5px;color:var(--muted)}
+.pj-nf input{font:inherit;font-size:13px;color:var(--text);padding:5px 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);min-width:150px}
+.pj-nf:nth-of-type(2) input{min-width:300px}
 .pj-hac b{font-family:var(--font-mono);font-weight:600;color:var(--text)}
 .pj-st{--sc:var(--text-2);--sb:var(--chip);display:inline-flex}
 .pj-st select{appearance:none;-webkit-appearance:none;border:1px solid color-mix(in srgb,var(--sc) 35%,transparent);background:var(--sb) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 9px center;color:var(--sc);border-radius:999px;padding:4px 26px 4px 11px;font:600 12px/1.3 var(--font-display);cursor:var(--cur-pointer,pointer)}
 .pj-st select:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pj-st[data-st="review"]{--sc:#8a5a00;--sb:color-mix(in srgb,var(--amber) 14%,var(--panel))}
+.pj-st[data-st="approved"]{--sc:var(--green-800);--sb:color-mix(in srgb,var(--green-600) 10%,var(--panel))}
 .pj-st[data-st="contract"]{--sc:var(--green-800);--sb:var(--green-100)}
 .pj-st[data-st="owned"]{--sc:#fff;--sb:var(--green-600)}
 .pj-st[data-st="owned"] select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-width='1.4'/%3E%3C/svg%3E")}
@@ -2731,6 +2761,13 @@ table.who tr.nomatch td{border:0}
 .ptip b{font:700 13.5px/1.3 var(--font-display);color:var(--text)}
 .ptip-t{margin:0;font-size:12.5px;line-height:1.5;color:var(--text-2)}
 .ptip .btn{flex:none;min-height:28px;padding:3px 10px}
+/* phones: the same tip floating over the map on the Map tab (src/mobile.js), above the legend and the tab bar; it steps
+   aside while a card is open */
+.ptip-m,.ptip.ptip-float .ptip-t:not(.ptip-m){display:none}
+.ptip.ptip-float .ptip-m{display:block}
+.ptip.ptip-float{position:absolute;left:10px;right:10px;bottom:68px;z-index:6;margin:0;box-shadow:var(--sh-2)}
+.app:has(#card.open) .ptip.ptip-float,.app.sel-open .ptip.ptip-float{display:none}
+@media (pointer:coarse){ .ptip .btn{min-height:var(--tap);padding:3px 14px} }
 
 /* scope header: pinned to the top of the panel while it scrolls (the grey strip above the card hides what scrolls past) */
 .scope{position:sticky;top:0;z-index:4;padding:var(--sp-3) var(--pg) 0;background:var(--panel-2)}
@@ -2996,6 +3033,11 @@ table.who tr.nomatch td{border:0}
   .mapleft{display:flex;flex-direction:column;align-items:flex-start;gap:8px;grid-template-columns:none}
   .maptop{flex-direction:row;grid-row:auto;align-self:auto}
   .mapleft .hint,.mapleft .radius,.mapleft .placebar{width:100%;grid-column:auto}
+  /* the place card keeps its own box (so its × sits inside it, at a full fingertip size) and steps aside while the
+     property card for the same pick is open: one card at a time, and the parcel stays visible above the sheet */
+  .mapleft .placebar{position:relative;padding-right:52px}
+  .mapleft .placebar .x{top:2px;right:2px;width:var(--tap);height:var(--tap)}
+  .app:has(#card.open) .mapleft .placebar{display:none}
   .lybtn{display:none}
   .selpill{display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 11px 0 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--panel);color:var(--text);font:600 13.5px var(--font-display);box-shadow:0 1px 3px rgba(11,13,12,.12);cursor:var(--cur-pointer,pointer)}
   .selpill.on,.app.sel-open .selpill{background:var(--text);border-color:var(--text);color:var(--panel)}
@@ -3009,7 +3051,11 @@ table.who tr.nomatch td{border:0}
   .app.sel-open .mapleft .tools button[data-mode] span{display:inline}
   .modechip:not([hidden]){display:inline-flex;align-items:center;gap:4px;height:38px;padding:0 4px 0 14px;border-radius:999px;background:var(--text);color:var(--panel);font:600 13px var(--font-display);box-shadow:0 2px 8px rgba(11,13,12,.2)}
   .modechip button{height:30px;padding:0 12px;border:0;border-radius:999px;background:color-mix(in srgb,var(--panel) 18%,transparent);color:var(--panel);font:700 13px var(--font-display);cursor:var(--cur-pointer,pointer)}
-  .fchips{display:none!important}
+  /* the filters in effect stay visible on phones: one sideways-scrolling line under the layer chips, each removable */
+  .fchips{flex-wrap:nowrap;overflow-x:auto;width:100%;max-width:none;padding:2px 2px 4px;scrollbar-width:none;overscroll-behavior-x:contain}
+  .fchips::-webkit-scrollbar{display:none}
+  .fchip,.fc-all{flex:none}
+  .app:has(#fchips:not([hidden])) .backchip{top:calc(var(--st) + 206px)}
   .ctrls #layersBtn{display:grid}
   .ctrls .rgrp:first-child{display:none}
   .backchip{top:calc(var(--st) + 162px)}
@@ -3157,6 +3203,7 @@ table.who tr.nomatch td{border:0}
 #card.sp-mode .top{padding:12px 16px 10px;row-gap:0}
 #card.sp-mode .top>.sp-head{flex:1 1 100%;width:100%}
 #card .sp-head{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"back back" "crumb tools" "ttl act";align-items:center;column-gap:12px}
+#card .sp-pback{display:none}
 #card .sp-head>.cback{grid-area:back;justify-self:start;margin:-2px 0 6px -6px}
 #card .sp-crumb{grid-area:crumb;display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden;white-space:nowrap;font:500 12px/1.2 var(--font-display);color:var(--muted)}
 #card .sp-cr{flex:none;max-width:100%;border:0;background:none;padding:3px 5px;border-radius:5px;color:var(--text-2);font:inherit;cursor:var(--cur-pointer,pointer);overflow:hidden;text-overflow:ellipsis}
@@ -3215,7 +3262,11 @@ body:has(.xdlg.on)>.toast{z-index:61} /* a note with Undo stays clickable above 
   #card.sp-mode .top{padding:4px 12px 8px}
   #card .sp-head{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"ttl act tools";column-gap:2px}
   #card .sp-crumb,#card .sp-ttl .bsub,#card .sp-head>.cback{display:none!important}
-  #card .sp-ttl{margin:0}
+  #card .sp-ttl{margin:0;display:flex;align-items:center;gap:8px;min-width:0}
+  #card .sp-ttl h2{min-width:0;flex:1}
+  /* the way back to the project lives in the sheet's header on phones, not as a chip over the plan */
+  #card .sp-pback{display:grid;place-items:center;flex:none;margin-left:-8px}
+  .app.planning .backchip{display:none}
   #card .sp-ttl h2{font-size:17px}
   #card .sp-hact{gap:2px}
   #card .sp-hact .btn{width:36px;min-height:36px;padding:0;justify-content:center}
@@ -4059,7 +4110,8 @@ table.cmp tr.sub th{text-align:left;font-family:var(--font-mono);font-size:11.5p
 .scope{padding-bottom:var(--sp-2);box-shadow:0 8px 10px -8px rgba(11,13,12,.22)}
 @media (max-width:700px){ .panel .scope{box-shadow:none;padding-bottom:0} }
 /* area menu: items that don't apply yet stay in place, dimmed */
-.vm-pop>.is-off,.vm-pop>button:disabled{opacity:.5;cursor:not-allowed}
+.vm-pop>.is-off,.vm-pop>button:disabled{color:var(--muted);cursor:not-allowed}
+.vm-pop>.is-off em{color:var(--text-2);opacity:1}
 .vm-pop>.is-off:hover,.vm-pop>button:disabled:hover{background:transparent}
 .sc-err{color:var(--danger);font-size:11.5px;font-weight:600}
 /* saved searches: a one-line summary under each */
@@ -4212,7 +4264,7 @@ html.sp-dragging,html.sp-dragging *{cursor:var(--cur-grabbing,grabbing)!importan
    pill buttons, sentence-case grey labels, green only as an accent. Same look as the communication intelligence console.
    It sits last so it wins over the older literal values above; the tokens at the top carry the colours. ---------- */
 body{font-variant-numeric:tabular-nums;letter-spacing:-.003em}
-h1,h2,h3,.vhead h2{letter-spacing:-.02em;font-weight:600}
+h1,h2,h3,.vhead h1,.vhead h2{letter-spacing:-.02em;font-weight:600}
 .btn{border-radius:var(--r-pill);border-color:var(--line-2);font-weight:500;font-size:13px;padding:6px 14px;transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast)}
 .btn:hover:not(:disabled){background:var(--ink-100);border-color:var(--line-2)}
 .btn.primary{background:var(--ink-950);border-color:var(--ink-950);color:#fff}
@@ -4236,3 +4288,153 @@ a{color:var(--text)}
 .sr-btn[aria-busy="true"] span{color:var(--green-700)}
 .rp-group .sr-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:900px){.rp-group .sr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Companies: other spellings merged into one row */
+.who .aka{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+/* watchlist: what changed on a watched filing, and when */
+.witem .chitem em{display:block}
+.witem .wchg{color:var(--text-2);margin-top:5px}
+/* ================= touch: the compact controls that were still under a fingertip (44px) ==========   Last in the file so it wins over the compact desktop and phone sizes above. Small buttons, chips, segmented toggles,
+   the site plan's tool strip, its header icons and stage chips get the full size. Rows that can't grow without
+   crowding (the card's section chips) and text links (Retry) keep their look and get an invisible 44px hit area,
+   as the card's × does. */
+@media (pointer:coarse){
+  .btn.sm,.chip,.seg button,.vt-row button,#card .sp-stg,#card .sp-hact .btn,#card .bacts .btn,#card .btnrow .btn,#card .bsec>.btn,#card .cact .btn,#card .cback,.lfrow select.chip,.vctl .btn,.team-chip,.vhead .tg2,.filters .chip,#card .sp-plans .chip,#card .sp-cr{min-height:var(--tap)}
+  #card .sp-ovb{height:var(--tap)}
+  #card .cact .cmore>summary{min-width:var(--tap)}
+  .vm-pop>button,.vm-pop>label,.vm-pop>a{min-height:var(--tap);box-sizing:border-box;padding-top:13px;padding-bottom:13px}
+  .sp-tb,#card .sp-ib,#card .sp-htools .sp-ib,#card .top .mn,#card .sp-htools .x,#card .sp-hact .btn{width:var(--tap);min-width:var(--tap);height:var(--tap);flex-shrink:0}
+  #card .sp-stg{min-width:var(--tap);justify-content:center}
+  #card .bnav{padding-top:8px;padding-bottom:8px;margin-top:0}
+  #card .bnav button,.rnote.eb .eb-retry,.bot.err .lnk,.lnk.retry,.card .raw summary,.vhead .lnk,#card .sp-link{position:relative}
+  #card .bnav button::before,.rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before,.card .raw summary::before,.vhead .lnk::before,#card .sp-link::before{content:"";position:absolute;left:0;right:0;top:50%;height:var(--tap);transform:translateY(-50%)}
+  .rnote.eb .eb-retry::before,.bot.err .lnk::before,.lnk.retry::before,.vhead .lnk::before{left:-8px;right:-8px}
+  /* the × on a filter chip (map chip row) and the plan's (i) buttons keep their look with a 44px hit area */
+  .fchip button,#card .sp-i{position:relative}
+  .fchip button::before,#card .sp-i::before{content:"";position:absolute;left:50%;top:50%;width:var(--tap);height:var(--tap);transform:translate(-50%,-50%)}
+}
+@media (pointer:coarse) and (max-width:700px){
+  /* the plan header takes two rows so the full-size buttons leave room for the option's name */
+  #card .sp-head{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ttl ttl" "act tools";row-gap:2px}
+  #card .sp-hact{justify-self:start}
+  /* full-size tools need the room: Fit plan and Layers (both also on the map's own buttons) move under More */
+  .sp-strip:not(.open) .sp-tb:is([data-tool=fit],[data-tool=layers]){display:none}
+  .sp-strip:not(.open) .sp-tgrp:not(:has(.sp-tb:not(.sp-tb-x):not([data-tool=fit]):not([data-tool=layers]))){display:none}
+}
+
+/* ================= one look per role (UX-601) ==========   The filled near-black pill meant five things. Now: (a) the main action is the one filled button, in the app's green;
+   (b) where you are (top bar, sub-tabs) is bold text with an underline or a tinted pill, never filled; (c) a toggle's
+   chosen value is a light grey fill with dark text; (d) jump links are underlined text; Ask AI is an outlined button. */
+:root{--btn-primary-bg:var(--green-700);--btn-primary-hover:var(--green-800);--btn-primary-ink:#fff;--sel-bg:var(--ink-100)}
+.btn.primary,#card .bacts .btn.primary{background:var(--btn-primary-bg);border-color:var(--btn-primary-bg);color:var(--btn-primary-ink)}
+.btn.primary:hover:not(:disabled),#card .bacts .btn.primary:hover:not(:disabled){background:var(--btn-primary-hover);border-color:var(--btn-primary-hover)}
+/* (b) current page: bold, dark, underlined */
+.viewbar button[aria-pressed="true"],.appbar .viewbar button[aria-pressed="true"]{background:transparent;color:var(--text);font-weight:700;box-shadow:inset 0 -2px 0 var(--ink-950);border-radius:0}
+.viewbar button[aria-pressed="true"]:hover{background:var(--chip)}
+.appbar .viewbar button[aria-pressed="true"]:focus-visible{outline-color:var(--focus)}
+.viewbar button[aria-pressed="true"] .badge.muted{color:var(--muted);opacity:1}
+/* (b) current sub-page: tinted pill with a dark edge */
+.vt-row button[aria-current="true"]{background:var(--sel-bg);border-color:var(--ink-950);color:var(--text)}
+.vt-row button[aria-current="true"] .badge.muted{color:var(--muted);opacity:1}
+/* (c) the chosen value of a toggle */
+.seg button[aria-pressed="true"],.mk-seg button[aria-pressed="true"],.fpop .lfmode button[aria-pressed="true"]{background:var(--sel-bg);color:var(--text);box-shadow:inset 0 0 0 1px var(--ink-400)}
+.seg button[aria-pressed="true"]:focus-visible{outline-color:var(--focus)}
+/* (d) the section you jumped to: an underlined link, not a filled pill */
+.mk-nav button[aria-current="true"]{background:transparent;border-color:transparent;color:var(--text);font-weight:700;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}
+/* Ask AI: always there, so it doesn't compete with the page's own main action */
+.ab-ask,#card .btn.askai{background:var(--panel);color:var(--text);box-shadow:inset 0 0 0 1px var(--ink-300);border-color:transparent}
+.ab-ask:hover,#card .btn.askai:hover:not(:disabled){background:var(--chip)}
+.app.ai-open .ab-ask{background:var(--sel-bg);color:var(--text);box-shadow:inset 0 0 0 1.5px var(--ink-950)}
+
+/* the map: Export is its one main action; the chosen tool (Move, Box…) is a toggle value */
+.exbtn{background:var(--btn-primary-bg);color:var(--btn-primary-ink)}
+.exbtn:hover{background:var(--btn-primary-hover)}
+.tools button[aria-pressed="true"],.mapleft .tools button[aria-pressed="true"]{background:var(--sel-bg);border-color:var(--ink-400);color:var(--text)}
+.tools button[aria-pressed="true"]:focus-visible{outline-color:var(--focus)}
+/* Market: the range switch in the jump bar and the county pickers are toggle values too */
+.mk-nav .mk-seg button[aria-pressed="true"]{background:var(--sel-bg);color:var(--text);box-shadow:inset 0 0 0 1px var(--ink-400)}
+.mk-cty[aria-pressed="true"],.mk-scope2 .mk-cty[aria-pressed="true"]{background:var(--sel-bg);border-color:var(--ink-950);color:var(--text)}
+
+/* skip links (UX-604): off screen until focused, then a small panel at the top left, above everything */
+.skip{position:absolute;left:8px;top:-60px;z-index:var(--z-modal);background:var(--panel);color:var(--text);padding:10px 14px;border-radius:var(--r-sm);box-shadow:var(--sh-2);font:600 13px var(--font-display);text-decoration:none}
+.skip:focus{top:58px;left:40px;outline:2px solid var(--focus);outline-offset:2px}
+.skip+.skip:focus{left:40px}
+
+/* ================= data tables (UX-605): one header style, a header that stays in view, sortable columns =================
+   table.who (Companies, Market lists), .mk-tbl, .src-tbl and table.cmp share it. The page scrolls the table, so on wider
+   screens the wrapper clips sideways instead of becoming its own scroller (which would stop the header sticking). */
+table.who th,.mk-tbl th,#view-market .mk-tbl th,.src-tbl th,table.cmp th,table.cmp th:first-child{font-family:var(--font-mono);font-size:var(--fs-xs);letter-spacing:0;text-transform:none;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+table.who thead th,.mk-tbl thead th,.src-tbl thead th,table.cmp thead th{position:sticky;top:calc(-1 * var(--view-pt, 20px));z-index:2;background:var(--panel)}
+@media (min-width:701px){ .view .tablewrap:has(> table > thead){overflow-x:clip} }
+.th-sort{all:unset;display:inline-flex;align-items:center;gap:4px;cursor:var(--cur-pointer,pointer);border-radius:4px;color:inherit;font:inherit}
+.th-sort:hover{color:var(--text)}
+.th-sort:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+th[aria-sort=ascending] .th-sort,th[aria-sort=descending] .th-sort{color:var(--text);font-weight:700}
+.th-ic{font-size:9px;opacity:.55}
+th[aria-sort=ascending] .th-ic,th[aria-sort=descending] .th-ic{opacity:1}
+th.r .th-sort{flex-direction:row-reverse}
+/* rows that open something: the row highlights and ends in a chevron */
+table.who tr[data-k] td:last-child{position:relative;padding-right:22px}
+table.who tr[data-k] td:last-child::after{content:"›";position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px}
+table.who tr[data-k]:hover td:last-child::after{color:var(--text)}
+
+/* the Undo note (UX-606): its × sits after the action */
+.toast .tx{text-decoration:none;margin-left:6px;width:24px;height:24px;border:0;border-radius:50%;background:transparent;color:inherit;opacity:.75;font-size:16px;line-height:1;cursor:var(--cur-pointer,pointer)}
+.toast .tx:hover,.toast .tx:focus-visible{opacity:1;background:color-mix(in srgb,var(--panel) 18%,transparent)}
+@media (pointer:coarse){ .toast .tx{width:var(--tap);height:var(--tap);margin:-10px -10px -10px 0} }
+
+/* required names (UX-607): a visible label above the field, and the Save search error style for every form */
+.field-err{flex:0 0 100%;color:var(--danger);font-size:11.5px;font-weight:600}
+.field-err[hidden]{display:none}
+.pj-lbl{flex:0 0 100%;font-size:var(--fs-xs);font-weight:600;color:var(--text-2)}
+.pj-new input[aria-invalid=true],.pj-ren textarea[aria-invalid=true]{border-color:var(--danger)}
+
+/* counts (UX-608): a grey count is a small pill with a gap from its label; on the phone tab bar it's the same pill as
+   More's, at the icon's top right instead of on its stroke */
+.badge.muted{background:var(--ink-150);color:var(--text-2);padding:1px 6px;border-radius:var(--r-pill);margin-left:4px;font-weight:600;font-size:10.5px;line-height:1.3}
+.viewbar button[aria-pressed="true"] .badge.muted,.vt-row button[aria-current="true"] .badge.muted{color:var(--text-2)}
+@media (max-width:700px){
+  .mnav .badge{min-width:16px;height:16px;padding:0 5px;border-radius:var(--r-pill);font-size:10px;line-height:16px;text-align:center;top:2px;left:calc(50% + 11px);box-shadow:0 0 0 2px var(--panel)}
+  .mnav .badge.muted{margin-left:0;background:var(--ink-150);color:var(--text)}
+}
+
+/* offline (UX-609) */
+.netchip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--warn) 14%,var(--panel));color:#7a4f0e;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);font-size:12px;white-space:nowrap}
+.netchip[hidden]{display:none}
+.netchip b{font-weight:700}
+@media (max-width:700px){
+  .netchip{position:fixed;left:10px;right:10px;bottom:calc(var(--navh,58px) + var(--sb,0px) + 8px);z-index:var(--z-nav);justify-content:center;height:34px;box-shadow:var(--sh-2)}
+}
+
+#view-market .mk-tbl thead th{top:calc(var(--mk-nav, 0px) - var(--view-pt, 20px))} /* Market: the header stops under the sticky section bar */
+
+/* a type floor (UX-611): no text on the Map panel under --fs-xs (11.5px), chart axes at 11px. Only the rules that went
+   below it; the rest of the scale is unchanged. */
+.kpi span,.sc-k,.sc-k .sk-l,.fs-t em,#filingsPeriod,.fsw.tg2{font-size:var(--fs-xs)}
+.tl-chart .yax text,.tl-chart .xax text,.g-ticks span{font-size:11px}
+/* drive times: where the bands start (an area's drive times start from its middle) */
+.dt-start{display:flex;align-items:center;gap:5px;pointer-events:none}
+.dt-start i{width:14px;height:14px;border-radius:50%;background:#16191a;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.dt-start b{font:700 12px/1 var(--font-display,Inter,sans-serif);color:#16191a;background:#fff;border-radius:4px;padding:3px 6px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+#card .dt-from{margin:0 0 10px;padding:8px 10px;border-radius:6px;background:var(--chip,#f3f4f4);color:var(--text-2,#3b4245)}
+/* Environmental report on a large area: three columns, each record type's nearest record on one clipped line */
+.card table.env-big{table-layout:fixed}.card table.env-big th:nth-child(n+2),.card table.env-big td:nth-child(n+2){width:64px;text-align:right}
+.card table.env-big .env-db{display:block}.card table.env-big .env-eg{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmp-in{align-self:center;font-size:12.5px;color:var(--green-700,#0b7a5f);font-weight:600;margin-right:4px}
+.glance .gl-scope{margin:-6px 0 10px;font-size:12px;color:var(--muted)}
+.kp-warn{margin:8px 6px 0;padding:7px 9px;border-radius:5px;background:var(--warn-bg,#fff4e5);color:var(--warn-ink,#7a4100);font-size:12.5px;line-height:1.35}
+.rg-off{color:var(--muted);font-size:12px}
+
+#card .b-fail{margin:0 0 10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--danger) 35%,transparent);border-left-width:3px;border-radius:6px;background:color-mix(in srgb,var(--danger) 6%,var(--panel));font-size:12.5px;line-height:1.45}
+#card .b-fail .btnrow{display:flex;margin-top:6px}
+#spName[aria-invalid="true"]{border-color:var(--danger)}
+/* FEMA report: each part's state while a big area loads (src/fema.js) */
+#card .fm-steps{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:6px;font-size:13px}
+#card .fm-steps li{display:flex;align-items:center;gap:8px}
+#card .fm-steps li span{margin-left:auto;font-size:12px;color:var(--muted)}
+#card .fm-steps li i{flex:none;width:12px;height:12px;box-sizing:border-box;border-radius:50%;border:1.6px solid var(--line-2);border-top-color:var(--brand);animation:sp-spin .8s linear infinite}
+#card .fm-steps li.ok i{animation:none;border:0;background:var(--green-700,#0b7a5f);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='6'/%3E%3C/svg%3E")}
+#card .fm-steps li.ok span{color:var(--green-700,#0b7a5f);font-weight:600}
+#card .fm-steps li.err i{animation:none;border:0;background:var(--danger,#b42318)}
+#card .fm-steps li.err span{color:var(--danger,#b42318)}
+@media (prefers-reduced-motion:reduce){#card .fm-steps li i{animation:none}}

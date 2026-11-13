@@ -104,7 +104,7 @@ export async function kindReport(kind, site, ext, { run = limiter(6), deadline, 
   const part = async fn => { try { return await fn(); } catch (e) { return null; } };
   if (kind === 'wells') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name], null, run, deadline)); if (t) out.by_type = t.map(x => ({ type: x.keys[0] || 'Unknown', n: x.n })).sort((a, b) => b.n - a.n); }
   if (kind === 'wetlands') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name.split('.').pop()], K.f.acres.split('.').pop(), run, deadline)); if (t) out.by_type = t.map(x => ({ type: x.keys[0] || 'Unknown', n: x.n, acres: Math.round(x.s || 0) })).sort((a, b) => b.n - a.n); }
-  if (kind === 'pipelines') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name, K.f.system, K.f.commodity, K.f.diameter], null, run, deadline)); if (t) { out.count = t.length; out.segments = total; } }
+  if (kind === 'pipelines') { const t = await part(() => statsBy(kind, site, K.mi, [K.f.name, K.f.system, K.f.commodity, K.f.diameter], null, run, deadline)); if (t) { out.count = t.length; out.segments = total; if (t.length >= 1000) out.capped = true; } } // the service answers at most 1,000 groups
   return out;
 }
 export async function soils(site, deadline) {

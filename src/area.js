@@ -174,7 +174,7 @@ export function initArea(ctx) {
       s.pop ? ({ label: 'Population', v: fmtN(s.pop.n), d: C.delta(s.pop.gr), sub: 'since ' + s.pop.baseYear }) : null,
       s.jobs ? ({ label: 'Jobs located here', v: fmtN(s.jobs.n), d: C.delta(s.jobs.gr), sub: s.jobs.gr != null ? 'since ' + s.jobs.baseYear : 'LODES ' + s.jobs.year }) : null,
       hs?.median_household_income_approx ? ({ label: 'Median household income', v: money(hs.median_household_income_approx), sub: 'census estimate' }) : null,
-      rn ? ({ label: 'Typical rent', v: '$' + fmtN(Math.round(rn.typical)) + '<small>/mo</small>', d: C.delta(rn.yoy), sub: 'ZIP median · a year earlier' }) : null,
+      rn ? ({ label: 'Typical rent (Zillow)', v: '$' + fmtN(Math.round(rn.typical)) + '<small>/mo</small>', d: C.delta(rn.yoy), sub: 'ZIP median · a year earlier' }) : null,
       lastP ? ({ label: 'Homes permitted ' + lastP.y, v: fmtN(lastP.sf + lastP.mf), d: prevP ? C.delta(chg(lastP.sf + lastP.mf, prevP.sf + prevP.mf)) : '', sub: prevP ? 'vs ' + prevP.y : '', sp: C.spark(s.permits.map(r => r.sf + r.mf), { ck: 'mk:overview:permits', tips: s.permits.map(r => r.y + ': ' + fmtN(r.sf + r.mf) + ' homes') }) }) : null,
       // no change badge: the permit list only keeps locations still open, so older months read low and a year-on-year gain is inflated
       bz.a.length ? ({ label: 'New businesses, 12 mo', v: fmtN(bzA), sub: 'still open · older months read low', sp: C.spark(bzDone.map(r => r.n), { ck: 'mk:overview:biz', tips: bzDone.map(r => monthLabel(r.m) + ': ' + fmtN(r.n)) }) }) : null,
@@ -212,7 +212,7 @@ export function initArea(ctx) {
   // ----- Construction pipeline (TDLR filings) -----
   const TYPE_KEYS = [{ k: 'New', label: 'New construction', c: 0 }, { k: 'Reno', label: 'Renovation', c: 4 }, { k: 'Addition', label: 'Addition', c: 5 }];
   const fRow = f => '<tr class="mk-fr" data-fid="' + esc(f.id) + '" tabindex="0"><td><b>' + esc(f.name) + '</b><span class="sc">' + esc([f.city || f.county, f.use, ctx.TYPE_LABEL?.[f.type] || f.type].filter(Boolean).join(' · ')) + '</span></td><td class="m r">' + money(f.cost) + '</td><td class="m">' + esc(String(f.ts).slice(0, 7)) + ' → ' + esc(String(f.te).slice(0, 7)) + '</td></tr>';
-  const fTable = list => '<div class="tablewrap"><table class="mk-tbl"><thead><tr><th>Project</th><th class="r">Est. value</th><th>Schedule</th></tr></thead><tbody>' + list.map(fRow).join('') + '</tbody></table></div>';
+  const fTable = list => '<div class="tablewrap" tabindex="0" role="region" aria-label="Construction filings table"><table class="mk-tbl"><thead><tr><th>Filing</th><th class="r">Est. value</th><th>Schedule</th></tr></thead><tbody>' + list.map(fRow).join('') + '</tbody></table></div>';
   function pipelineSec(p) {
     if (!p.active.n && !p.upcoming.n) return '';
     const now = p.months.findIndex(r => !r.future && p.months[p.months.indexOf(r) + 1]?.future);
@@ -282,8 +282,8 @@ export function initArea(ctx) {
       (h ? box('Households and incomes', kg + (h.income ? '<h4 class="mk-h4">Household income</h4>' + C.hbars(h.income.map(b => ({ label: b.label, v: b.pct, c: 1, tip: b.label + ': ' + fmtN(b.n) + ' households (' + b.pct.toFixed(1) + '%)' })), v => v.toFixed(0) + '%', null, 'mk:housing:income') : '') +
         note('Area medians are household-weighted averages of the tract medians (approximate).', 'US Census ACS 5-year ' + (market?.year || '') + '.')) : '') +
       (rn ? box('Rents by ZIP', '<div class="kgrid mk-kg4"><div><b>$' + fmtN(Math.round(rn.typical)) + '</b><span>Typical rent (ZIP median)</span></div><div><b>' + (rn.yoy != null ? pct(rn.yoy) : '—') + '</b><span>In a year</span></div><div><b>$' + fmtN(rn.low.rent) + (Math.round(rn.low.rent) === Math.round(rn.high.rent) ? '' : '–' + fmtN(rn.high.rent)) + '</b><span>' + (rn.rows.length === 1 ? 'Based on 1 ZIP' : 'Range across ' + rn.rows.length + ' ZIPs') + '</span></div></div>' +
-        '<div class="tablewrap mk-zips"><table class="mk-tbl"><thead><tr><th>ZIP</th><th>Town</th><th class="r">Rent</th><th class="r">Year</th></tr></thead><tbody>' + rn.rows.slice(0, 10).map(zipRow).join('') + '</tbody></table></div>' +
-        (rn.rows.length > 10 ? '<details class="mk-more"><summary>All ' + rn.rows.length + ' ZIPs</summary><div class="tablewrap"><table class="mk-tbl"><tbody>' + rn.rows.slice(10).map(zipRow).join('') + '</tbody></table></div></details>' : '') +
+        '<div class="tablewrap mk-zips" tabindex="0" role="region" aria-label="Rent by ZIP"><table class="mk-tbl"><thead><tr><th>ZIP</th><th>Town</th><th class="r">Rent</th><th class="r">Year</th></tr></thead><tbody>' + rn.rows.slice(0, 10).map(zipRow).join('') + '</tbody></table></div>' +
+        (rn.rows.length > 10 ? '<details class="mk-more"><summary>All ' + rn.rows.length + ' ZIPs</summary><div class="tablewrap" tabindex="0" role="region" aria-label="Rent, all ZIPs"><table class="mk-tbl"><tbody>' + rn.rows.slice(10).map(zipRow).join('') + '</tbody></table></div></details>' : '') +
         note('Typical asking rent for all home types, ' + esc(monthLabel(rn.month)) + '. ZIPs are placed in a county by their town, so border ZIPs are approximate.', 'Zillow Observed Rent Index.')) : '') +
       (homes ? box('Houston for-sale market' + tag('Houston metro'), homes + note('Houston-metro monthly figures, the same for every county here. “Seasonally adjusted” means the usual seasonal swings are smoothed out.', 'Realtor.com and US Census via FRED.'), 'mk-wide') : '') + '</div></section>';
   }
@@ -335,7 +335,7 @@ export function initArea(ctx) {
       (s.news ? box('Local development news', '<div class="mk-ctl"><select class="chip" id="mkPlace" aria-label="News place">' + placeOpts + '</select></div>' +
         (s.news.length ? s.news.map((a, i) => (i === 10 ? '<details class="raw mk-more"><summary>' + (s.news.length - 10) + ' more</summary>' : '') + '<a class="chitem" target="_blank" rel="noopener" href="' + esc(a.url) + '"><span><b>' + esc(a.title) + '</b><em>' + esc(a.domain) + (a.date ? ' · ' + esc(shortDate(a.date)) : '') + ' · ' + esc(a.place) + '</em></span></a>').join('') + (s.news.length > 10 ? '</details>' : '') : note('No articles found in the last few months.')) +
         note('Development, construction, rezoning and real estate stories naming each county and its busiest towns, kept 120 days.', 'Google News.'), 'mk-wide') : '') +
-      (s.latest?.length ? '<section class="mk-box mk-wide" id="mkLatest"><h3>Newest business locations</h3><div class="tablewrap"><table class="who mk-tbl"><thead><tr><th>Business</th><th>Address</th><th>Type</th><th>Permit issued</th></tr></thead><tbody>' +
+      (s.latest?.length ? '<section class="mk-box mk-wide" id="mkLatest"><h3>Newest business locations</h3><div class="tablewrap" tabindex="0" role="region" aria-label="Newest business locations"><table class="who mk-tbl"><thead><tr><th>Business</th><th>Address</th><th>Type</th><th>Permit issued</th></tr></thead><tbody>' +
         s.latest.map((b, i) => '<tr' + (i >= 10 ? ' hidden' : '') + '><td>' + esc(b.name) + (b.owner ? '<div class="sc">' + esc(b.owner) + '</div>' : '') + '</td><td>' + esc([b.addr, b.city].filter(Boolean).join(', ')) + '</td><td>' + esc(b.sec != null ? SECTORS[b.sec][1] : (b.naics || '')) + '</td><td class="m">' + esc(b.date) + '</td></tr>').join('') +
         '</tbody></table></div>' + (s.latest.length > 10 ? '<button class="btn mk-morebtn" type="button" id="mkLatestMore">Show ' + Math.min(10, s.latest.length - 10) + ' more (' + (s.latest.length - 10) + ' left)</button>' : '') +
         note('Active sales-tax permits, newest first (the latest ' + s.latest.length + '). A new permit can also mean a change of owner.', 'Texas Comptroller.') + '</section>' : '') + '</div></section>';
@@ -466,7 +466,9 @@ export function initArea(ctx) {
     try { await ctx.exportCsv(rows, fileBase('market', label)); } finally { ctx.exportMeta = null; }
   }
   // the area the Market page is showing, for the Reports page (and a way to change it)
-  ctx.marketAreaLabel = () => area ? areaLabel() : '';
+  // the same rule the export uses: follow the Map's selection first (adopt), so the Reports card names the area the PDF covers
+  // even before the Market page has been opened
+  ctx.marketAreaLabel = () => { if (!area) return ''; adopt(); return areaLabel() + (sel !== 'all' && sel === adopted ? ' (from the Map)' : ''); };
   ctx.marketChangeArea = () => { scopeOpen = true; ctx.setView('market'); setTimeout(() => { root.querySelector('.mk-scopebar summary')?.focus({ preventScroll: false }); }, 60); };
   ctx.exportMarket = async (format = 'html', county, { stay = false } = {}) => { await load(); if (county === 'all' || /^\d{5}(,\d{5})*$/.test(county || '')) { sel = county; adopted = mapCounties(); } else if (county) { const c = area?.counties.find(x => x.fips === county || x.name.toLowerCase() === String(county).toLowerCase()); if (c) { sel = c.fips; adopted = mapCounties(); } }
     if (format === 'csv') return exportData(); if (!stay) { ctx.setView('market'); await new Promise(r => setTimeout(r, 120)); } return exportReport(); };
@@ -565,14 +567,14 @@ export function initArea(ctx) {
   function draw() {
     if (!shown()) return;
     if (!area) {
-      root.innerHTML = '<div class="vhead"><div><div class="kicker">Market</div><h2>Growth signals by county</h2></div></div><div class="empty">' + (loadP ? 'Market data isn’t available yet. It’s added by the nightly data refresh.' : 'Loading…') + '</div>' +
+      root.innerHTML = '<div class="vhead"><div><div class="kicker">' + esc(ctx.navPath('market')) + '</div><h1><span class="vh-sr">Overview: </span>Growth signals by county</h1></div></div><div class="empty">' + (loadP ? 'Market data isn’t available yet. It’s added by the nightly data refresh.' : 'Loading…') + '</div>' +
         (loadP ? '' : '<div class="mk-skels">' + skel(110) + '<div class="mk-grid">' + skel(220) + skel(220) + '</div></div>');
       load().then(() => { if (area) render(); else if (shown()) { root.querySelector('.empty').textContent = 'Market data isn’t available yet. It’s added by the nightly data refresh.'; root.querySelector('.mk-skels')?.remove(); } });
       return;
     }
     adopt(); measure(); curStats = stats();
     const y0 = root.scrollTop, body = Object.keys(SECTIONS).map(build).join('');
-    root.innerHTML = '<div class="vhead mk-vhead"><div><div class="kicker">Market</div><h2>' + esc(areaLabel()) + '</h2>' +
+    root.innerHTML = '<div class="vhead mk-vhead"><div><div class="kicker">' + esc(ctx.navPath('market')) + '</div><h1><span class="vh-sr">Overview: </span>' + esc(areaLabel()) + '</h1>' +
       '<div class="vsub">Growth, housing, costs, markets and construction from free public sources, refreshed nightly' + (area.built ? ' (last ' + new Date(area.built).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : '') + '. No sale prices: Texas doesn’t disclose them.</div></div>' +
       '<div class="vctl">' + (ctx.exportMenu ? ctx.exportMenu([{ label: 'Market report · PDF', attrs: ' id="mkExport"' }, { label: 'Market data · CSV', attrs: ' id="mkCsv"' }])
         : '<button class="btn" type="button" id="mkCsv">Export Data</button><button class="btn primary" type="button" id="mkExport">Export PDF</button>') + '</div></div>' +
@@ -581,9 +583,10 @@ export function initArea(ctx) {
       '<nav class="mk-nav" aria-label="Market sections"><button type="button" class="mk-here" id="mkHere" title="Change the area"><span>' + esc(areaLabel()) + '</span><em>Change</em></button><i class="mk-div" aria-hidden="true"></i>' +
       NAV.map(([k, l]) => '<button type="button" data-sec="' + k + '">' + l + '</button>').join('') +
       '<span class="mk-rng"><span>Monthly charts:</span><span class="mk-seg" role="group" aria-label="Months shown in monthly charts">' + [[12, '12 mo'], [24, '24 mo'], [0, 'All']].map(([v, l]) => '<button type="button" data-range="' + v + '" aria-pressed="' + (range === v) + '">' + l + '</button>').join('') + '</span></span></nav>' +
-      '<div class="mk-tip" id="mkTip" role="tooltip"></div><div class="mk-body">' + body + '</div>';
+      '<div class="mk-tip" id="mkTip" aria-hidden="true"></div><div class="mk-body">' + body + '</div>';
     root.scrollTop = y0;
     fit(root.querySelectorAll('.mk-body > .mk-sec'));
+    root.querySelectorAll('table.mk-tbl').forEach(t => ctx.sortTable?.(t)); // sortable headers (UX-605)
     root.querySelectorAll('.mk-nav [data-sec]').forEach(b => { b.hidden = !root.querySelector('#mk-' + b.dataset.sec); });
     root.style.setProperty('--mk-nav', nav().offsetHeight + 'px'); // jump targets (sections, the correlation box) stop below the sticky bar
     mark(); loadExtras();

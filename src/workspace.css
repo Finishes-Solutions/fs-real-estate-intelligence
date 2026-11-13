@@ -171,7 +171,7 @@
 @media (max-width:1480px){.ws-two.wide{grid-template-columns:1fr}.ws-two.wide>.ws-card+.ws-card{margin-top:var(--sp-4)}}
 @media (max-width:1100px){.ws-kpis.big{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:900px){.ws-grid{grid-template-columns:1fr}.ws-rail{position:static;order:-1}.ws-rail .ws-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ws-two{grid-template-columns:1fr}}
-@media (max-width:560px){.ws-steps li{min-width:56px}.ws-sl{display:none}.ws-step[aria-current="step"] .ws-sl{display:inline}.ws-step[aria-current="step"]{flex:2 1 auto;min-width:150px}.ws-step[aria-current="step"] .ws-sl{overflow:hidden;text-overflow:ellipsis}
+@media (max-width:560px){.ws-steps li{min-width:56px}.ws-sl{display:none}.ws-step[aria-current="step"] .ws-sl{display:inline}.ws-steps li:has(> .ws-step[aria-current="step"]){flex:2 1 auto;min-width:150px}.ws-step[aria-current="step"] .ws-sl{overflow:hidden;text-overflow:ellipsis}
   .ws-rail .ws-kpis{grid-template-columns:1fr 1fr}.ws-a{grid-template-columns:1fr auto}.ws-a .ws-src{grid-column:1}.ws-dl>div{grid-template-columns:1fr}.ws-files .btn{min-width:0;width:100%}.ws-t{font-size:11px}}
 .ws-scroll:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 
@@ -184,3 +184,19 @@
 .ws-galc small.ws-warn{color:#8a5a00}.ws-galc small.ws-bad{color:#b3261e}.ws-galc[data-state="bad"]{border-color:#e4b7b4}
 .ws-galc .btn{margin-top:auto;align-self:flex-start}
 .ws-per{display:flex;gap:6px;align-items:center;font-size:var(--fs-xs)}.ws-per small{color:var(--text-2)}
+
+
+.ws-vs{margin:0 0 var(--sp-2);padding:6px 10px;border-radius:var(--r-sm);background:color-mix(in srgb,var(--green-600) 9%,var(--panel));color:var(--green-800);font-size:12.5px}
+.ws-railnote{margin:6px 0 0;font-size:12px;color:var(--text-2)}
+
+.ws-off{margin-top:var(--sp-2);padding:8px 10px;border-left:3px solid var(--line-2);background:var(--panel-2);border-radius:var(--r-sm)}
+
+.ws-f.need input{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.ws-req{font-style:normal;font-size:10.5px;font-weight:700;color:var(--ws-warn);background:var(--ws-warn-bg);border-radius:999px;padding:0 6px;margin-left:4px}
+
+/* step state in words beside each Feasibility step (To do, Needs details, Waiting on …) */
+.ws-ss{margin-left:auto;flex:none;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;line-height:1.5;color:var(--ws-warn);background:var(--ws-warn-bg)}
+.ws-ss[data-state="blocked"]{color:var(--muted);background:var(--panel-2)}
+
+/* the risk picked as the project's Next step blocker (src/siteplan.js nextHtml) */
+.ws-risks .ws-blocks{display:inline-block;margin-left:4px;padding:0 6px;border-radius:999px;font-size:10.5px;font-weight:700;color:var(--danger);background:color-mix(in srgb,var(--danger) 9%,var(--panel))}

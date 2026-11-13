@@ -77,15 +77,15 @@ export function initTeam(ctx) {
   // ---------- UI ----------
   // Two kinds of slot share one paint(): the full form in Settings › You & your team, and a one-line chip in the
   // Notes & watchlist and Projects headers that opens it. Slots that have left the page are dropped; painting never syncs.
-  const slots = new Map(); // element -> 'form' | 'chip'
+  const slots = new Map(), chipSay = new WeakMap(); // element -> 'form' | 'chip'; a chip's own sharing state (chip(el, say))
   let editCode = false;
   const ago = d => { const s = Math.round((Date.now() - d) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
   const OFF = 'Team sharing isn’t set up on this site yet, so notes stay on this device.', OFF_TIP = 'Turned on by whoever runs this site, in its server settings.';
   const waiting = () => queue.length + (configured ? (ctx.field?.db?.notes || []).filter(n => !n.synced || t(n.updated) > t(n.synced)).length : 0);
   const PEOPLE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="5.5" r="2.3"/><path d="M1.8 13.5c.5-2.4 2.2-3.7 4.2-3.7s3.7 1.3 4.2 3.7"/><path d="M10.6 3.4a2.2 2.2 0 0 1 0 4.3M12.2 9.9c1 .5 1.7 1.7 2 3.6"/></svg>';
-  function chipHtml() {
-    const who = name(), state = configured === false ? 'On this device only' : needCode ? 'Team passcode needed' : configured ? 'Shared with the team' : 'Connecting…';
-    return '<button type="button" class="team-chip' + (needCode ? ' warn' : '') + '" data-open-team title="Your name, team sharing and sync: Settings">' + PEOPLE + '<span>' + esc(state) + (who ? ' · ' + esc(who) : '') + '</span></button>';
+  function chipHtml(say) { // say: the sharing state of the page's own store, when it has one (Projects: /api/projects)
+    const who = name(), state = say ? say() : configured === false ? 'On this device only' : needCode ? 'Team passcode needed' : configured ? 'Shared with the team' : 'Connecting…';
+    return '<button type="button" class="team-chip' + ((say ? /passcode/.test(state) : needCode) ? ' warn' : '') + '" data-open-team title="Your name, team sharing and sync: Settings">' + PEOPLE + '<span>' + esc(state) + (who ? ' · ' + esc(who) : '') + '</span></button>';
   }
   function formHtml() {
     const code = get(CODE_KEY), n = waiting();
@@ -106,7 +106,7 @@ export function initTeam(ctx) {
     for (const [el, kind] of slots) {
       if (!el.isConnected) { slots.delete(el); continue; }
       if (kind !== 'chip' && chipsOnly) continue;
-      if (kind === 'chip') { el.innerHTML = chipHtml(); el.querySelector('[data-open-team]').onclick = () => ctx.openSettings?.('team'); continue; }
+      if (kind === 'chip') { el.innerHTML = chipHtml(chipSay.get(el)); el.querySelector('[data-open-team]').onclick = () => ctx.openSettings?.('team'); continue; }
       // the form: never redraw under someone typing in it
       if (el.contains(document.activeElement) && /^(INPUT)$/.test(document.activeElement.tagName)) { const s = el.querySelector('.team-on span'); if (s) { const tmp = document.createElement('div'); tmp.innerHTML = formHtml(); const ns = tmp.querySelector('.team-on span'); if (ns) s.innerHTML = ns.innerHTML; } continue; }
       el.innerHTML = '<div class="team">' + formHtml() + '</div>';
@@ -123,7 +123,7 @@ export function initTeam(ctx) {
   ctx.team = {
     // the Notes & watchlist header: a one-line chip that opens Settings › You & your team
     mount(el) { if (!el) return; slots.set(el, 'chip'); paint(); },
-    chip(el) { if (!el) return; slots.set(el, 'chip'); paint(); },
+    chip(el, say) { if (!el) return; slots.set(el, 'chip'); if (say) chipSay.set(el, say); else chipSay.delete(el); paint(); },
     mountSettings(el) { if (!el) return; slots.set(el, 'form'); paint(); },
     name, refresh: () => paint(),
     summary: () => configured ? 'shared with the team' : null,

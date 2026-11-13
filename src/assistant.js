@@ -6,7 +6,7 @@ import { SECTORS } from './lib/sectors.mjs';
 import { systemPrompt, VOICE_STYLE } from './lib/agent-tools.mjs';
 import { tractsFor, summarizeTracts, inGeom } from './lib/demographics.mjs';
 import { plausibleHeight } from './lib/height.mjs';
-import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, aiErrorMessage, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
+import { cleanFilterArgs, pickPlace, placeCandidates, districtFor, isPromptEcho, stripEcho, fromNominatim, withTellMore, suggestQuestions, aiErrorMessage, aiNotSetUp, frame, ZOOM, splitFollowups, cameraMove, aircraftName, pickAircraft, applyPlaceAlias, splitWithin, mentions, extentMeters, zoomForBox, BIG_PLACE_M } from './lib/assist-logic.mjs';
 import { createTurns, withTimeout, createVoiceLog } from './lib/voice-state.mjs';
 
 const SPARK = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg>';
@@ -84,7 +84,8 @@ export function initAssistant(ctx) {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '/' || e.code === 'Slash')) {
       e.preventDefault(); if (app.classList.contains('ai-open') && document.activeElement === q) close(); else open();
     }
-    if (e.key === 'Escape' && app.classList.contains('ai-open') && document.activeElement === q) close();
+    // Esc closes it from anywhere inside the panel (the message box, New chat, an answer's buttons), like Settings and Export
+    if (e.key === 'Escape' && !e.defaultPrevented && app.classList.contains('ai-open') && el.contains(document.activeElement)) { e.preventDefault(); close(); }
   });
 
   // ---------- width: drag the drawer's left edge to widen it (never narrower than the default). Saved per browser. ----------
@@ -98,7 +99,10 @@ export function initAssistant(ctx) {
     let want = null; try { want = +localStorage.getItem(KEY) || null; } catch (e) {}
     let raf = 0; const pad = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; ctx.mapPadding(); }); };
     const apply = () => { const w = want && innerWidth > 700 ? Math.min(maxW(), want) : 0;
-      if (w > base() + 1) app.style.setProperty('--aiw', Math.round(w) + 'px'); else app.style.removeProperty('--aiw'); pad(); };
+      if (w > base() + 1) app.style.setProperty('--aiw', Math.round(w) + 'px'); else app.style.removeProperty('--aiw'); pad();
+      // the separator's value is the drawer width in px, so a screen reader can tell how wide it is and that the arrows change it
+      grip.setAttribute('aria-valuemin', String(Math.round(base()))); grip.setAttribute('aria-valuemax', String(Math.round(Math.max(base(), maxW()))));
+      grip.setAttribute('aria-valuenow', String(Math.round(w > base() + 1 ? w : base()))); grip.setAttribute('aria-valuetext', Math.round(w > base() + 1 ? w : base()) + ' pixels wide'); };
     const save = () => { try { want ? localStorage.setItem(KEY, String(Math.round(want))) : localStorage.removeItem(KEY); } catch (e) {} };
     apply(); addEventListener('resize', apply); reclamp = apply;
     new MutationObserver(apply).observe(cardEl, { attributes: true, attributeFilter: ['class'] }); // a card opened, closed or widened (site plan) re-fits the drawer
@@ -221,7 +225,7 @@ export function initAssistant(ctx) {
   // api/chat sent it back; Claude keeps no thread). Switching provider mid-conversation starts a new one on the server.
   let thread = null;
   // a failed call is a sentence (never "Error 501" or "Failed to fetch"); the details go to the console
-  const aiErr = o => Object.assign(new Error(aiErrorMessage(o)), { friendly: true, status: o.status || 0 });
+  const aiErr = o => Object.assign(new Error(aiErrorMessage(o)), { friendly: true, status: o.status || 0, notSetUp: aiNotSetUp(o) });
   async function post(input) {
     const ai = ctx.aiFor?.('chat') || {}, th = Array.isArray(thread) ? { history: thread } : { previous_response_id: thread }; // (the server uses the one its provider keeps)
     let r; try { r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, ...th, context: context(), ...ai }) }); ctx.noteModel?.(r); }
@@ -234,7 +238,9 @@ export function initAssistant(ctx) {
   // the error bubble offers Retry, which asks the same question again (without repeating it in the chat)
   function errorBubble(e, text, mine) {
     const msg = e?.friendly ? e.message : aiErrorMessage({ status: 500 }); if (!e?.friendly) console.error(e);
-    const d = bubble('bot err', '<span>' + esc(msg) + '</span> <button class="lnk" type="button">Retry</button>');
+    // AI not set up on this site: a plain note, no Retry (asking again can never work)
+    if (e?.notSetUp) { bubble('bot info', '<span>' + esc(msg) + '</span>'); return; }
+    const d = bubble('bot err', '<span>' + esc(msg) + '</span> <button class="lnk ai-retry" type="button">Retry</button>');
     d.querySelector('button').onclick = () => { if (stillBusy()) return; d.remove(); ask(text, { retry: mine }); };
   }
   async function ask(text, opt = {}) {

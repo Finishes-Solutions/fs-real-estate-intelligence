@@ -143,6 +143,8 @@ export function initBuildings(ctx) {
       const act = groundClick({ adding, zoom: map.getZoom(), cardOpen: card.classList.contains('open'), point: c, shapes: shown });
       if (act === 'add') { add({ footprint: null, height: null, base: 0, center: c, tile: tileParcel(c) }); return true; }
       if (act === 'open') { open({ footprint: null, height: null, base: 0, center: c, tile: tileParcel(c) }); return true; }
+      // too far out for parcels: say so (and offer to go there) instead of doing nothing
+      if (!adding && !card.classList.contains('open') && map.getZoom() < 16) ctx.toast('Zoom in to street level to open a property.', { action: { label: 'Zoom in here', run: () => map.flyTo({ center: c, zoom: 17, duration: ctx.reduceMotion ? 0 : 900 }) } });
       return false;
     }
     const b = { footprint: wholeFootprint(hit, c), piece: partAt(hit.geometry, c), height: +hit.properties.render_height || +hit.properties.height || null, base: +hit.properties.render_min_height || 0, center: c };
@@ -243,6 +245,19 @@ export function initBuildings(ctx) {
     const k = card.querySelector('#bKick'), co = p?.county ? title(p.county) : countyAt(b.center);
     if (k) k.textContent = kindOf(b) + (co ? ' · ' + co.replace(/\s+county$/i, '') + ' County' : '');
   }
+  // the card sits over the right of the map: when the property is under it, slide the map so it shows left of the card
+  function clearOfCard(b) {
+    if (cur !== b || !card.classList.contains('open') || innerWidth <= 700) return;
+    const g = b.footprint || b.parcel?.geometry || b.d?.parcel?.geometry || b.tile?.geometry, pts = [];
+    const walk = a => { if (typeof a[0] === 'number') pts.push(map.project(a)); else a.forEach(walk); }; if (g) walk(g.coordinates); else pts.push(map.project(b.center));
+    const mr = map.getContainer().getBoundingClientRect(), cr = card.getBoundingClientRect(), left = cr.left - mr.left;
+    if (left <= 0 || cr.right < mr.left) return;
+    const x0 = Math.min(...pts.map(p => p.x)), x1 = Math.max(...pts.map(p => p.x)), y0 = Math.min(...pts.map(p => p.y)), y1 = Math.max(...pts.map(p => p.y));
+    if (x1 <= left - 24) return; // already clear of the card
+    // centre the property in the visible strip left of the card (and inside the map vertically)
+    const dx = (x0 + x1) / 2 - left / 2, dy = y0 < 140 ? y0 - 140 : y1 > mr.height - 24 ? Math.min(y1 - (mr.height - 24), y0 - 140) : 0;
+    map.panBy([dx, dy], { duration: ctx.reduceMotion ? 0 : 500 });
+  }
   async function open(b) {
     ctx.clearSelection?.(); stopOrbit(); cur = b; b.rg = null; b.rgDone = false; highlight(); // (the Regrid record is gone from a re-opened card, so is what it filled in)
     const gsv = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + b.center[1].toFixed(6) + ',' + b.center[0].toFixed(6);
@@ -251,7 +266,7 @@ export function initBuildings(ctx) {
     card.innerHTML = '<div class="top"><div><div class="kicker" id="bKick">' + kindOf(b) + '</div><h2 id="bTitle">Loading parcel…</h2><div class="bsub" id="bSub">' + b.center[1].toFixed(5) + ', ' + b.center[0].toFixed(5) + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
       ctx.cardActs('<button class="btn sm askai" type="button" id="bAsk" disabled aria-busy="true" title="Ready once the parcel record loads">' + ctx.SPARK + 'Ask AI</button>' +
-        '<button class="btn sm" type="button" id="bPlan" title="Start a project and lay out a site plan on this parcel, by hand or with AI">Site plan</button>',
+        '<button class="btn sm" type="button" id="bPlan" disabled aria-busy="true" title="Ready once the parcel record loads">Site plan</button>',
         [{ href: gsv, label: 'Street View ↗', sub: 'Google Street View at this spot' }, { label: 'Add site note', attrs: ' id="bNote" data-push' },
           ...(ctx.reduceMotion ? [] : [{ label: 'Orbit view', attrs: ' id="bOrbit"' }]),
           { label: 'Select more', attrs: ' id="bMulti" title="Then ' + (coarse ? 'tap' : 'click (or Shift-click)') + ' more buildings or parcels, up to 20"', sub: (coarse ? 'Tap' : 'Click or Shift-click') + ' more buildings or parcels' },
@@ -264,7 +279,7 @@ export function initBuildings(ctx) {
         ss('Footprint: OpenStreetMap. Height: USGS 3DEP lidar where it is newer than the building, otherwise OpenStreetMap. Floors: OpenStreetMap or the appraisal record, otherwise estimated from height.') + '</div>' +
       '<div class="bsec" id="bSite"></div><div class="bsec" id="bDev"></div><div class="bsec" id="bCrime"></div><div class="bsec" id="bCrimeUS"></div><div class="bsec" id="bArea"></div><div class="bsec" id="bPlaces"><div class="lt">Businesses on the Block</div><div class="rnote loading">Looking up…</div></div><div class="bsec" id="bTenants"></div>' +
       '<div class="bsec" id="bFilings"></div><div class="bsrc"></div>';
-    card.classList.add('open'); card.scrollTop = 0; setHead(b, null);
+    card.classList.add('open'); card.scrollTop = 0; setHead(b, null); requestAnimationFrame(() => clearOfCard(b));
     const mark = card.querySelector('#bParcel'), alive = () => cur === b && mark.isConnected; // still this card (not a report opened from it)
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#bOrbit')?.addEventListener('click', orbit);
@@ -273,6 +288,8 @@ export function initBuildings(ctx) {
     card.querySelector('#bCsv').onclick = () => { const s = stats(b), p = b.parcel || b.rg; ctx.exportCsv([{ Address: p?.situs || '', Owner: p?.owner || '', 'Property ID': p?.propId || '', County: p?.county || countyAt(b.center), 'Land use': p?.landUse || '', 'Market value': appraised(p) || '', 'Land value': p?.landValue || '', 'Improvement value': p?.improvementValue || '', 'Tax year': p?.taxYear || '', 'Land area': p?.area || '', 'Year built': p?.yearBuilt || '',
       'Footprint sq ft': s.fp || '', 'Est. floor area sq ft': s.gfa || '', 'Height ft': s.h ? Math.round(s.h * 3.281) : '', 'Height source': s.hSrc, Floors: s.fl || '', 'Floors source': s.fSrc, Latitude: b.center[1].toFixed(6), Longitude: b.center[0].toFixed(6) }], 'property-' + String(p?.situs || 'parcel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)); };
     const ready = () => { const a = card.querySelector('#bAsk'); if (a && alive()) { a.disabled = false; a.removeAttribute('aria-busy'); a.title = 'Ask the assistant about this property'; } };
+    // Site plan only once the parcel record (its address and outline) is in, so a project is never named "Loading parcel…"
+    const planReady = () => { const a = card.querySelector('#bPlan'); if (a && alive()) { a.disabled = false; a.removeAttribute('aria-busy'); if (a.textContent === 'Site plan') a.title = 'Start a project and lay out a site plan on this parcel, by hand or with AI'; } };
     ctx.tabs?.track({ id: bid(b), kind: 'building', label: b.parcel?.situs || (b.footprint ? 'Building' : 'Parcel'), ref: b, reopen: () => open(b), leave: stopOrbit });
     card.querySelector('#bNote').onclick = () => ctx.addNote?.({ at: b.center, label: b.parcel?.situs || b.rg?.situs || '' });
     card.querySelector('#bPlan').onclick = () => ctx.sitePlan?.start(ctx.currentBuilding());
@@ -284,18 +301,23 @@ export function initBuildings(ctx) {
     let d = null, early = false;
     // the appraisal record first: owner, value, title, the parcel outline and everything keyed on it
     const onParcel = pd => {
-      if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
-      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready(); planBtn(b);
+      if (!alive() || dropIfDuplicate(b)) return; early = true; highlight(); clearOfCard(b); ctx.tabs?.label(bid(b), pd.parcel?.situs || pd.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
+      renderParcel(pd.parcel, pd.parcelError); renderFilings(pd.parcel?.geometry || null); renderOverview(b, { ...pd, ...(b.d || {}) }); renderTenants(pd.parcel); ready(); planReady(); planBtn(b);
       ctx.cardStatus?.(pd.parcel ? 'Owner and value loaded for ' + (pd.parcel.situs || 'this parcel') + '.' : 'No appraisal record here; Regrid can look it up.');
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, pd.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, pd.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, pd.parcel);
     };
     try { d = await details(b, onParcel); }
-    catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Property details unavailable'; card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
+    catch (err) { if (!alive()) return; renderParcel(null, err.message); card.querySelector('#bTitle').textContent = 'Couldn’t load this parcel';
+      // the failure, plainly, with Retry; Site plan becomes "Draw the site instead" (it asks for a project name: there's no address to name it after)
+      const fail = document.createElement('div'); fail.className = 'b-fail'; fail.setAttribute('role', 'alert');
+      fail.innerHTML = '<b>The parcel record didn’t load.</b> ' + esc(/too many|429/i.test(err.message) ? 'The lookup service is busy right now.' : err.message) + ' Nothing has been saved. <span class="btnrow"><button type="button" class="btn sm primary" id="bRetry">Retry</button></span>';
+      card.querySelector('#bParcel')?.prepend(fail); card.querySelector('#bRetry').onclick = () => open(b);
+      const pb = card.querySelector('#bPlan'); if (pb) { pb.disabled = false; pb.removeAttribute('aria-busy'); pb.textContent = 'Draw the site instead'; pb.title = 'Start a project by drawing the site by hand; you name the project first'; } card.querySelector('#bPlaces').innerHTML = ''; card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
       // (the Regrid section still comes: its button is how a parcel without a free record gets one)
       ctx.renderSite?.(card.querySelector('#bSite'), b.center, null); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, null); ready(); return; }
     if (!alive()) return;
     if (dropIfDuplicate(b)) return;
-    ready();
+    ready(); planReady();
     highlight(); ctx.tabs?.label(bid(b), d.parcel?.situs || d.parcel?.owner || (b.footprint ? 'Building' : 'Parcel'));
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
     // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
@@ -385,6 +407,14 @@ export function initBuildings(ctx) {
   const landArea = p => { if (p.area) return fld('Land area', esc(p.area), p.areaSource === 'outline' || p.legalArea ? { sub: [p.areaSource === 'outline' ? 'From the parcel outline' : '', p.legalArea ? 'Legal acreage on the roll: ' + esc(p.legalArea) : ''].filter(Boolean).join(' · ') } : undefined); const ac = outlineAcres(p.geometry);
     return ac ? fld('Land area', '≈ ' + (ac < 10 ? ac.toFixed(2) : ac.toFixed(1)) + ' acres', { sub: 'From the parcel outline' }) : fld('Land area', '—'); };
   const appraised = p => p?.marketValue || ((p?.landValue || 0) + (p?.improvementValue || 0)) || null;
+  // no value on the roll: say why from the record itself rather than a bare dash
+  const GOV = /^(city|town|village) of\b|\bcounty\b|\b(c?isd|independent school district|school district)\b|\bstate of texas\b|\bunited states\b|\bmunicipal utility\b|\bm\.?u\.?d\.?\b|\b(water|drainage|hospital|navigation|port|flood control) (district|authority)\b|\bhousing authority\b/i;
+  function noValueReason(p) {
+    if (GOV.test(p.owner || '')) return { v: 'Exempt (government owner)', sub: 'Public property carries no taxable value on the roll' };
+    const yr = +p.taxYear || 0, now = new Date().getFullYear();
+    if (yr >= now) return { v: 'Not yet certified for ' + yr, sub: 'The appraisal district hasn’t published ' + yr + ' values for this account' };
+    return { v: 'Not in the appraisal record', sub: 'The ' + (p.taxYear ? p.taxYear + ' ' : '') + 'roll has no value for this account' };
+  }
   // a building that spans several parcels (a shopping center, a warehouse built over lot lines): list them all, with totals.
   // Each row opens that parcel in a card tab of its own (the grid above shows parcel 1; the Overview adds them all up).
   function parcelsHtml(list) {
@@ -406,6 +436,7 @@ export function initBuildings(ctx) {
   // the button here runs the Regrid section's own lookup, which shows its record right under this one
   const rgLeft = () => { const u = ctx.regridUsage?.(); return u?.records ? ' (' + fmtN(Math.max(0, u.records.cap - u.records.used)) + ' left)' : ''; };
   const rgFor = () => cur?.rgFor ? ' for parcel ' + esc(cur.rgFor) : '';
+  const rgOff = () => !!ctx.regridOff?.(), RG_OFF = '<span class="rg-off">Not available on this site</span>'; // Regrid not set up here (src/regrid.js)
   const toRegrid = () => { const r = card.querySelector('#bRegrid'); if (r) requestAnimationFrame(() => card.scrollTo({ top: Math.max(0, r.offsetTop - (card.querySelector(':scope>.top')?.offsetHeight || 0) - 80), behavior: ctx.reduceMotion ? 'auto' : 'smooth' })); };
   function wireRegrid(el) {
     el.querySelectorAll('[data-rg]').forEach(x => x.onclick = () => { const go = card.querySelector('#rgGo'); if (!go) { ctx.toast?.('Regrid isn’t ready yet. Try again in a moment.'); return; }
@@ -437,8 +468,8 @@ export function initBuildings(ctx) {
     setHead(cur, p);
     if (!p) {
       // nothing from the statewide parcel layer nor the county appraisal district's own (Harris, Waller, …): Regrid may have it
-      el.innerHTML = head + '<button class="btn md primary rg-cta" type="button" data-rg>Get owner, value &amp; zoning from Regrid<span data-rg-left>' + rgLeft() + '</span></button>' +
-        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : 'No appraisal record found at this point (often a street, a lake or a lot line).') + ' Regrid has the parcel record; one already looked up is free.</div>';
+      el.innerHTML = head + (rgOff() ? '' : '<button class="btn md primary rg-cta" type="button" data-rg>Get owner, value &amp; zoning from Regrid<span data-rg-left>' + rgLeft() + '</span></button>') +
+        '<div class="rnote">' + (err ? 'The appraisal lookup failed (' + esc(err) + ').' : 'No appraisal record found at this point (often a street, a lake or a lot line).') + (rgOff() ? '' : ' Regrid has the parcel record; one already looked up is free.') + '</div>';
       wireRegrid(el);
       if (t && !err) t.textContent = 'Unaddressed ' + kindOf(cur).toLowerCase();
       const near = ctx.nearestPlace?.(cur.center); if (sub) sub.textContent = 'No owner on file · ' + (near ? 'near ' + near : cur.center[1].toFixed(5) + ', ' + cur.center[0].toFixed(5));
@@ -451,10 +482,11 @@ export function initBuildings(ctx) {
     const many = all?.length > 1 ? all : null;
     cur.rgFor = many ? p.propId || '' : '';
     const rgRow = cur.rgDone || rgp ? '<a class="lnk" href="#bRegrid" data-rg-jump>Regrid record below</a>'
-      : '<button class="lnk" type="button" data-rg title="Zoning and last sale from Regrid. Uses 1 of your monthly records; a parcel looked up before is free.">Get from Regrid' + rgFor() + '<span data-rg-left>' + rgLeft() + '</span></button>';
+      : rgOff() ? RG_OFF : '<button class="lnk" type="button" data-rg title="Zoning and last sale from Regrid. Uses 1 of your monthly records; a parcel looked up before is free.">Get from Regrid' + rgFor() + '<span data-rg-left>' + rgLeft() + '</span></button>';
     el.innerHTML = head + (many ? '<div class="fl pgrid-h">Parcel 1 of ' + many.length + (p.owner ? ' · ' + esc(p.owner) : '') + '</div>' : '') + '<div class="fgrid">' +
       fld('Owner', esc(p.owner || '—'), { w: true }) +
-      fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' }) +
+      (val ? fld(p.marketValue ? 'Market value' : 'Appraised value', '<span class="mono">' + money(val) + '</span>', { sub: p.marketValue ? '' : 'Land + improvements' })
+        : (r => fld('Appraised value', esc(r.v), { dim: true, sub: esc(r.sub) }))(noValueReason(p))) +
       fld('Tax year', esc(p.taxYear || '—')) +
       fld('Land', '<span class="mono">' + money(p.landValue) + '</span>') + fld('Improvements', '<span class="mono">' + money(p.improvementValue) + '</span>') +
       landArea(p) + fld('Year built', esc(p.yearBuilt || 'Not reported'), { dim: !p.yearBuilt }) +
