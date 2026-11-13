@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-12
 
+### 3:03 PM CT: Quick layouts: Self storage, with the Jones Road plan as drawn (`d9b5cec`)
+- **New Self storage button under Quick layouts.** On 10514 Woodedge Dr, **Official site plan (as drawn)** lays down the Jones Road Self Storage site plan exactly as the engineer drew it: Bldgs 1–6 (drive-up), Bldg 7 (the 235 × 65 ft interior building), the 750 sf leasing office, the 17,600 sf walled pond, 29 parking spaces, the drives, the walk, the fence and the keypad gate. The numbers match the plan's unit table and the owner's rent roll: 221 units, 24,275 rentable sf, $302,820 a year of rent.
+- **On any other lot of about 1.2 acres or more:** the same arrangement (drive-up rows round an interior building, the office and gate at the street, the pond at the back), with the number of buildings you type in **Buildings**, plus climate-controlled, drive-up only and RV / boat storage layouts. Self storage is no longer under Industrial.
+- **If the site outline is the county's** (a few feet off the survey on this parcel), the plan is placed by the best fit and says so; drawing the boundary to the survey makes it exact.
+- Walled ponds are drawn with their wall on the site plan sheet instead of a 10 ft sloped bank.
+
 ### 1:18 PM CT: Typing in the Feasibility forms no longer drops out of the field (`matthew/more-data-sources`)
 - **Intake fields keep the cursor:** typing in Client, Target use, Address, City, County, ZIP or Asking price used to stop after the first letter or two, because the page redrew the form and lost the field. Now you can type straight through.
 - **The same fix covers every number box in the workspace:** the scenario unit mix, the Pro Forma assumptions and the Budget rates. Before, a redraw could also move the cursor to the start of a number box, so a typed price came out jumbled.

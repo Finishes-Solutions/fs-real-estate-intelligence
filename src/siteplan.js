@@ -14,6 +14,7 @@ import * as ER from './lib/editread.mjs';
 import { freeRect as openArea, fitPadding, planSections } from './lib/planview.mjs';
 import * as RUN from './lib/planruns.mjs';
 import * as QL from './lib/quicklayouts.mjs';
+import { storageQuick } from './lib/storagesite.mjs';
 import polyclip from './lib/vendor/polyclip.mjs';
 import * as ASK from './lib/planask.mjs';
 import * as K from './lib/planpick.mjs';
@@ -3545,6 +3546,11 @@ export function initSitePlan(ctx) {
     if (!terrainNow(pl)) { await Promise.race([terrainOf(pl), new Promise(res => setTimeout(res, 6000))]); if (!live(run)) return; }
     let done = 0; const tick = () => runStep(run, 1, 'Laying out ' + T.label + ' layouts' + big + ' · ' + done + ' of ' + want + ' done');
     const one = async q => {
+      if (q.template) { // a storage template (lib/storagesite.mjs): drawn from the Jones Road plan, not read from words; the official plan only on its own parcel
+        const o = storageQuick(pl.ring, pl.front ?? SP.longestEdge(pl.ring), q); done = Math.min(want, done + 1); tick(); if (!o || !live(run)) return null;
+        const v = named([o], { ...pl, program: o.program, setbacks: o.setbacks }, { params: pl.params })[0];
+        return { ...v, program: o.program, params: pl.params, arr: QL.quickArr(q.label, ''), quick: { key: q.key, label: q.label, ask: q.ask, template: q.template, buildings: q.buildings || 0 } };
+      }
       const hp = q.hotel ? hotelParts(pl, q.hotel) : null; if (q.hotel && !hp) { done = Math.min(want, done + 1); tick(); return null; } // (no room for a hotel beside the retail on this lot)
       const rp = SP.guessProgram(q.ask), prog = hp ? { use: 'retail', parcels: [{ parcel: 'hotel', program: SP.guessProgram(q.hotel.words) }, { parcel: 'retail', program: rp }] } : SP.keepNames(rp, pl.program);
       const np = SP.normalizeProgram(rp), wb = hp ? null : BR.wordsBrief(q.ask), ask = hp ? q.hotel.words + '; ' + q.ask : q.ask;
@@ -4285,6 +4291,11 @@ export function initSitePlan(ctx) {
     const v = ed.variants[i], pl = PL(); if (!v || !pl) return null;
     ctx.toast(stale ? 'Fitting ' + numOf(v) + ' to the new site…' : 'Laying out ' + numOf(v) + ' again…');
     const base = { ...pl, setbacks: v.setbacks || pl.setbacks, params: v.params || pl.params };
+    if (v.quick?.template) { // a storage template: drawn again from the Jones Road plan on this boundary
+      const o = storageQuick(pl.ring, pl.front ?? SP.longestEdge(pl.ring), v.quick); if (!o) { ctx.toast(numOf(v) + ' doesn’t fit this site any more.'); return null; }
+      const nv = { ...named([o], { ...base, program: o.program, setbacks: o.setbacks })[0], program: o.program, params: base.params, arr: v.arr, quick: v.quick, key: v.key, name: v.name, rank: v.rank };
+      ed.variants[i] = nv; return nv;
+    }
     let out = []; try { out = await laid('options', base, v.program || pl.program, { count: v.aiBrief ? 2 : 12, ...koOpts(pl), ...(v.aiBrief?.brief ? { brief: v.aiBrief.brief } : {}), ...(v.quick?.parts ? { parcels: v.quick.parts, perParcel: true } : {}) }); } catch (e) { console.warn('layout', e); } // (a hotel quick layout: its two parcels again)
     if (PL() !== pl || ed.variants?.[i] !== v) return null;
     const a2 = v.aiBrief ? aiLayout(out, base, v.program || pl.program, { ...v.aiBrief }).v || null : null; // the AI's plan: its brief laid out again, still the AI's (none when it no longer fits: then it says so below)

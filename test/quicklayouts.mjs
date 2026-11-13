@@ -10,11 +10,11 @@ import { LOTS } from '../scripts/layout-review.mjs';
 import * as PARC from '../lib/siteparcels.mjs';
 import polyclip from '../lib/vendor/polyclip.mjs';
 
-const USE = { multifamily: ['multifamily'], townhomes: ['townhomes', 'duplex', 'sfr'], sfr: ['sfr'], retail: ['retail', 'restaurant', 'fuel'], office: ['office', 'medical'], hotel: ['retail', 'restaurant'], industrial: ['industrial', 'storage'] };
+const USE = { multifamily: ['multifamily'], townhomes: ['townhomes', 'duplex', 'sfr'], sfr: ['sfr'], retail: ['retail', 'restaurant', 'fuel'], office: ['office', 'medical'], hotel: ['retail', 'restaurant'], industrial: ['industrial'], storage: ['storage'] };
 const usesOf = p => (p.zones?.length > 1 ? p.zones.map(z => z.use) : [p.use]).filter(u => u !== 'amenity'); // (a commons rides along with homes)
 for (const acres of [1, 2.5, 5.5, 11, 20, 40, 60]) for (const fr of [150, 400, 900]) {
   const types = Q.quickTypes(acres, fr);
-  assert.equal(types.length, 8);
+  assert.equal(types.length, 9);
   for (const t of types) {
     const set = Q.quickSet(t.id, acres, fr), all = Q.quickSet(t.id, acres, fr, { all: true });
     assert.equal(t.count, set.length); assert.ok(set.length <= Q.QUICK_MAX); assert.deepEqual(all.slice(0, set.length), set, 'the first five, then spares');
