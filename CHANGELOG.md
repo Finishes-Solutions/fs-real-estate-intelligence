@@ -5,6 +5,9 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-13
 
+### 12:15 PM CT (Nov 13): EV charging in site layouts merged into experimental (`bb5bd30`…`739ec4a`)
+- **Planned EV charging is now on experimental:** the Plan EV charging option, the per-lot charger counts, the tinted stalls and the 3D chargers and canopy (see Nov 10 and Nov 11 below) are merged in with the UI/UX audit fixes. The site-layout skill bundle was rebuilt to include the EV engine file.
+
 ### 11:30 AM CT (Nov 13): UI/UX audit fixes merged into experimental, after a verification pass (`73185a3`…`48e4c28`, merge `ce9d224`)
 - **Every audit fix re-checked in the app:** each of the 58 fixes was run again on the merged code and compared with the audit report's pictures. Ten small gaps were closed:
   - Phone tap targets: every button on the card, plan sheet, filters and page headers is now at least 44px.
@@ -35,6 +38,22 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 - **Projects say what they're doing:** one sharing state everywhere, "Saved" / "Synced" after edits with ⌘Z undo, steps say "To do", "Needs details" or "Waiting on …", and results follow the scenario you're editing.
 - **Tables sort by any column** with a header that stays in view; each page has one name; main buttons are green; an **Offline** chip shows when the connection drops.
 - **Phones:** active filters show as chips, one card opens at a time, the card swipes to half and full height, the project stepper no longer overlaps, controls are full-size (44px) and Getting started shows on the first visit.
+
+## 2026-11-11
+
+### 5:25 PM CT: EV charging stalls tinted on the map and chargers shown in 3D (`f5a5ce5`, on the `test/ev-stations` preview branch)
+- **See which stalls are for EV cars:** stalls with a charger are shaded green (blue for DC fast charging) on the map and the site plan sheet.
+- **In 3D on the tilted map:** chargers stand as posts about 5.5 ft tall, and a canopy shows as a roof 12 ft up on columns along the chargers' side.
+
+### 2:03 PM CT: EV chargers counted on each parking lot (`92151c4`, on the `test/ev-stations` preview branch)
+- **Each lot says how many of its stalls have chargers:** a parking lot with EV chargers is now labelled like "7 spaces · 6 EV" on the map, the site plan sheet and the editor's Items list, and "7 SPACES, 6 EV" in the CAD (DXF) export. Lots without chargers are labelled as before.
+
+## 2026-11-10
+
+### 5:29 PM CT: Planned EV charging in site layouts (`bb5bd30`, on the `test/ev-stations` preview branch)
+- **EV chargers on existing parking:** turn on **Plan EV charging** under Program and choose a number of chargers or a share of the parking, Level 2 or DC fast charging, and optionally the size of the power equipment and a canopy. Chargers reserve stalls the plan already has (straight or angled), so parking counts and the layout around them stay the same.
+- **Kept clear and said when it doesn't fit:** accessible stalls and aisles, drives and the walks round buildings stay clear. When the chargers, power equipment or canopy don't fit, the plan's notes and check say so instead of squeezing them in; a canopy shorter than the row of chargers covers as many as it can and says how many.
+- **Everywhere the plan goes:** Build, Quick layouts, Change With AI edits and hand-drawn plans place the chargers; Numbers, the map, the site and electrical sheets and the CAD (DXF) export show them.
 
 ## 2026-11-09
 

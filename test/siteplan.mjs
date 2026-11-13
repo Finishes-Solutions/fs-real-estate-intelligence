@@ -150,6 +150,10 @@ assert.deepEqual(S.guessProgram('150k sq ft warehouse, no detention'), { use: 'i
 assert.deepEqual(S.guessProgram('28000 sf of retail across 4 buildings with a retention pond'), { use: 'retail', gfa: 28000, buildings: 4, storm: 'retention' });
 assert.deepEqual(S.guessProgram('4 buildings of 7,000 sf each, retail, underground detention'), { use: 'retail', gfa: 28000, buildings: 4, storm: 'underground' });
 assert.equal(S.guessProgram('as big a medical office as fits').use, 'medical');
+{
+  const ev = { enabled: true, mode: 'count', value: 2, type: 'level2', power: { w: 20, d: 20 }, canopy: { w: 40, d: 18 } };
+  assert.deepEqual(S.keepNames(S.guessProgram('12,000 sf retail strip'), { use: 'retail', ev }).ev, ev, 'request-based builds keep the plan EV settings');
+}
 assert.equal(S.normalizeProgram({ use: 'multifamily', units: 100 }).gfa, Math.round(100 * 900 / 0.85), 'units become floor area');
 assert.equal(S.normalizeProgram({ use: 'nope', floors: 99 }).use, 'other'); assert.equal(S.normalizeProgram({ floors: 99 }).floors, 40);
 
@@ -629,4 +633,5 @@ for (const v of [0, 1, 2]) {
   // a numbered highway is that road, not "the highway" (the front)
   assert.equal(at(P('200 apartments along Highway 6 and 300 homes'), 'multifamily').road, 'highway 6'); assert.equal(at(P('retail along the highway and 300 homes'), 'retail').road, 'highway'); }
 
+await import('./siteev.mjs');
 console.log('site plans ok');

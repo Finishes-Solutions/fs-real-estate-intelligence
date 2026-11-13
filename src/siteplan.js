@@ -5,6 +5,7 @@
 // Projects are kept on this device and shared with the team through /api/projects once it's set up. Exports DXF
 // (AutoCAD, CADCraft and other CAD programs) and GeoJSON.
 import * as SP from './lib/siteplan.mjs';
+import * as EVP from './lib/siteev.mjs';
 import { layoutOptions, refit, relayPods, netEdit, wantPods, PARAMS } from './lib/sitelayout.mjs';
 import * as PF from './lib/proforma.mjs';
 import { sheetHTML, planSVG } from './lib/sitesheet.mjs';
@@ -728,6 +729,13 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-fill', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['parking', 'drive', 'truck', 'field', 'pond', 'plaza', 'court', 'pool', 'play', 'trail', 'trash', 'patio', 'foodtruck']]],
       paint: { 'fill-color': ['case', ['==', ['get', 'em'], 1], '#cfdcae', ['match', ['get', 'k'], 'foodtruck', C.foodtruck, 'trail', C.trail, 'trash', C.trash, 'patio', C.patio, 'parking', C.parking, 'drive', C.drive, 'truck', C.truck, 'field', C.drive, 'pond', C.pond, 'plaza', C.plaza, 'court', ['coalesce', ['get', 'c'], C.court], 'pool', C.pool, 'play', C.play, C.green]],
         'fill-opacity': ['case', sel1, .5, ['==', ['get', 'em'], 1], .9, ['in', ['get', 'k'], ['literal', PAVED]], 0.01, .75] } }); // (an emergency access lane: grass pavers, not asphalt)
+    add({ id: 'fs-sp-evstall', type: 'fill', source: SRC, filter: kind('evstall'), paint: { 'fill-color': ['case', ['==', ['get', 'dcfc'], 1], '#1769aa', C.evcharger], 'fill-opacity': .38 } }); // the stalls the EV chargers reserve, tinted under their stripes (lib/siteplan.mjs evStalls)
+    add({ id: 'fs-sp-evshape', type: 'fill', source: SRC, filter: ['in', ['get', 'k'], ['literal', ['evpower', 'evcanopy']]],
+      paint: { 'fill-color': ['match', ['get', 'k'], 'evpower', C.evpower, C.evcanopy], 'fill-opacity': ['case', sel1, .85, .68] } });
+    add({ id: 'fs-sp-evpoint', type: 'circle', source: SRC, filter: kind('evcharger'), paint: {
+      'circle-color': ['case', sel1, P.sel(C.evcharger), ['==', ['get', 'charger'], 'dcfc'], '#1769aa', C.evcharger],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 17, 4, 20, 7], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.4
+    } });
     add({ id: 'fs-sp-courtarea', type: 'fill', source: SRC, filter: kind('courtarea'), paint: { 'fill-color': ['get', 'c'], 'fill-opacity': .95 } }); // a court's playing surface (its lines and net are marks)
     add({ id: 'fs-sp-lots', type: 'line', source: SRC, filter: ['all', kind('lot'), ['!=', ['get', 'site'], 1]], minzoom: 17, layout: { 'line-cap': 'round' }, paint: { 'line-color': Ln.lots, 'line-width': 1, 'line-dasharray': [0.1, 2.4] } }); // house lots, dotted, close in
     add({ id: 'fs-sp-walk', type: 'fill', source: SRC, filter: kind('walk'), paint: { 'fill-color': Ln.walk, 'fill-opacity': .85 } });
@@ -770,8 +778,8 @@ export function initSitePlan(ctx) {
     add({ id: 'fs-sp-b3s', type: 'fill-extrusion', source: SRC, filter: ['all', kind('b3'), sel1], paint: b3(lit) });
     add({ id: 'fs-sp-fac', type: 'fill-extrusion', source: SRC, filter: kind('fac'), paint: { 'fill-extrusion-color': ['get', 'c'], 'fill-extrusion-base': ['get', 'b'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 1 }, layout: { visibility: mp === map ? facWanted() : 'visible' } }); // the facades: finishes, windows, doors, roofs (lib/massing.mjs)
     if (mp === map && !facHooked) { facHooked = true; map.on('pitchend', syncFac); }
-    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'field', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
-      paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, 'rgba(11,13,12,.45)'], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
+    add({ id: 'fs-sp-edge', type: 'line', source: SRC, filter: ['all', ['in', ['get', 'k'], ['literal', ['building', 'garage', 'patio', 'parking', 'drive', 'truck', 'field', 'pond', 'green', 'plaza', 'court', 'pool', 'play', 'trash', 'foodtruck', 'sign', 'evpower', 'evcanopy']]], ['any', ['!', ['in', ['get', 'k'], ['literal', [...PAVED, 'green']]]], ['==', ['get', 'nm'], 1], sel1, ['==', ['get', 'bad'], 1]]], // paving: outlined only when picked or wrong
+      paint: { 'line-color': ['case', ['==', ['get', 'bad'], 1], Ln.bad, ['match', ['get', 'k'], 'evpower', C.evpower, 'evcanopy', C.evcanopy, 'rgba(11,13,12,.45)']], 'line-width': ['case', ['==', ['get', 'bad'], 1], 2.5, 1] } });
     add({ id: 'fs-sp-p2', type: 'line', source: SRC, filter: ['all', kind('building'), ph2, ['!', sel1], ['!=', ['get', 'bad'], 1]], paint: { 'line-color': Ln.p2, 'line-width': 1.3, 'line-dasharray': [2, 1.6] } }); // Phase 2: dashed
     // the selection: green on a white casing (a red casing when it's also a problem)
     const pieces = ['all', ['has', 'id'], ['!', ['in', ['get', 'k'], ['literal', ['label', 'b3']]]]];
@@ -2436,6 +2444,17 @@ export function initSitePlan(ctx) {
     const parts = SP.partsOf({ ...pl, program: prog }, false), nmIn = (k, label, v, ph) => fld(label, '<input type="text" maxlength="60" data-nm="' + k + '" value="' + esc(v || '') + '" placeholder="' + esc(ph) + '">', { wide: true });
     const names = grp('Names', nmIn('community', 'Community name', prog.community, 'e.g. Beacon Hill') + parts.map(q => nmIn(q.i, q.word + ' name', q.name, parts.length > 1 ? q.word : 'e.g. The Reserve at Beacon Hill')).join(''), infoBtn('The community’s name goes on the map, the monument sign and the PDF sheet; each part’s name over its zone and in Numbers. Suggest Names asks the AI for names that fit the place.', 'About names')) +
       '<div class="sp-prm-a"><button type="button" class="btn sm" id="spNameAsk">Suggest Names</button></div>' + (ed.nameChoices?.length ? '<div class="sp-names" role="group" aria-label="Suggested names">' + ed.nameChoices.map((c, i) => '<button type="button" class="btn sm ghost" data-nmc="' + i + '" title="' + esc(c.why || '') + '">' + esc([c.community, ...c.parts.map(x => x.name)].filter((v, j, a) => a.indexOf(v) === j).join(' · ')) + '</button>').join('') + (ed.nameNote ? '<div class="rnote">' + esc(ed.nameNote) + '</div>' : '') + '</div>' : '');
+    const evFields = () => {
+      const ev = prog.ev, toggle = tog('data-ev="enabled"', 'Plan EV charging', !!ev, { tip: 'Reserve existing parking stalls for chargers; this does not add parking spaces or a new land use.' });
+      if (!ev) return toggle;
+      const field = (key, label, value, unit = 'ft') => fld(label, numCtl('min="1" max="500" step="1" data-ev="' + key + '"', value, 1, unit));
+      return toggle + fld('Charger count or share', selCtl('data-ev="mode"', [['count', 'Number of stalls'], ['share', 'Share of parking']], ev.mode)) +
+        fld(ev.mode === 'share' ? 'Share of stalls' : 'Number of chargers', numCtl('min="1" max="' + (ev.mode === 'share' ? '100' : '5000') + '" step="1" data-ev="value"', ev.value, 1, ev.mode === 'share' ? '%' : 'stalls')) +
+        fld('Charger type', selCtl('data-ev="type"', [['level2', 'Level 2'], ['dcfc', 'DC fast charging']], ev.type)) +
+        '<div class="sp-sub">Optional equipment footprints</div>' +
+        field('power.w', 'Power equipment width', ev.power?.w) + field('power.d', 'Power equipment depth', ev.power?.d) +
+        field('canopy.w', 'Canopy width', ev.canopy?.w) + field('canopy.d', 'Canopy depth', ev.canopy?.d);
+    };
     // the way in: a boulevard (two lanes and a planted median) for homes, apartments and mixed plans, its monument sign, and where entrances may go
     const er = SP.entryRules({ params: pp }), entry = has(['multifamily', 'townhomes', 'duplex', 'sfr']) || prog.zones ? grp('Entrance', fld('Entry', selCtl('data-ps="entry.style"', [['auto', 'Boulevard where it fits'], ['boulevard', 'Always a boulevard'], ['narrow', 'Driveway with a small median'], ['driveway', 'Plain driveway']], er.style)) +
       num('ps-entry.lane', 'Lane width', er.lane, 1, 'ft', { hint: 'each way' }) + num('ps-entry.median', 'Median', er.median, 1, 'ft') + fld('Monument sign', selCtl('data-ps="entry.sign"', [['median', 'In the median'], ['both', 'Both corners'], ['one', 'One corner'], ['none', 'None']], er.sign)) +
@@ -2454,6 +2473,7 @@ export function initSitePlan(ctx) {
       grp('Program', fld('Use', '<select id="spUse">' + Object.entries(SP.USES).map(([k, x]) => '<option value="' + k + '"' + (k === u ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select>') +
         (u === 'storage' ? storageFields(prog) : u === 'foodtrucks' ? foodTruckFields(prog) : u === 'fuel' ? fuelFields(prog) : u === 'multifamily' ? num('perUnit', 'Parking', prog.perUnit, 0.05, '/ unit') + num('floors', 'Floors', prog.floors, 1) + num('eff', 'Efficiency', prog.eff, 0.01, '', { hint: 'net ÷ gross' })
           : SP.USES[u]?.garage ? num('perUnit', 'Parking', prog.perUnit, 0.25, '/ home') : num('ratio', 'Parking', prog.ratio, 0.1, '/ 1k sf') + num('floors', 'Floors', prog.floors, 1) + num('depth', 'Building depth', prog.depth, 5, 'ft')) +
+        evFields() +
         (u === 'foodtrucks' || u === 'fuel' ? '' : fld('Leftover land', selCtl('data-lo="1" title="The land what you asked for doesn’t need: filled with more of the program (more homes, longer shop rows, more buildings) as one plan, the default; the same marked Phase 2; or held for later as Future development"', RUN.LEFTOVER, RUN.leftoverOf(RUN.fillParams(pl.params, { ask: ed.runMeta?.ask || pl.lastRun?.ask || '' }))))), // (a food truck park is sized by its trucks; what applies: what you set, else what your words asked, else filled)
         infoBtn('Typical suburban numbers to start with. Check the city’s or county’s rules (Houston has no zoning but has building lines and parking rules).', 'About these numbers')) +
       (u !== 'fuel' && fuelZ ? grp('Gas station', fuelFields(prog, fuelZ), infoBtn('The gas station goes on its own outparcel at the front corner (one end of the frontage on an inside lot), sized for its pumps, store and car wash; the rest of the plan is laid out behind and beside it, with a cross-access drive between them where one fits.', 'About the gas station')) : '') +
@@ -2632,6 +2652,24 @@ export function initSitePlan(ctx) {
     card.querySelectorAll('.sp-prog [data-lo]').forEach(i => i.onchange = () => { change(x => { x.params = { ...(x.params || {}), fill: RUN.leftoverParam(i.value), fillBy: 'you' }; }); after(i); }); // Leftover land: what you set stands over the words and the AI
     card.querySelectorAll('.sp-prog [data-pr]').forEach(i => i.onchange = () => { change(x => { x.program = { ...x.program, [i.dataset.pr]: i.value || null }; }); after(i); });
     card.querySelectorAll('.sp-prog [data-ps]').forEach(i => i.onchange = () => { const [g, f] = i.dataset.ps.split('.'); change(x => { x.params = { ...(x.params || {}), [g]: { ...(x.params?.[g] || {}), [f]: i.value } }; }); after(i); });
+    card.querySelectorAll('.sp-prog [data-ev]').forEach(i => i.onchange = () => {
+      const k = i.dataset.ev, v = i.value === '' ? null : i.tagName === 'SELECT' ? i.value : +i.value;
+      const relaid = ed.autoSolve !== false && (pl.recipe || ed.variants) && !dirty(pl); // (laid out again after this, as any program change is; else the equipment is placed on the plan as it is)
+      change(x => {
+        const old = x.program.ev || {};
+        if (k === 'enabled') {
+          x.program = { ...x.program, ev: i.checked ? { enabled: true, mode: 'count', value: 1, type: 'level2' } : null };
+          if (!i.checked) x.elements = (x.elements || []).filter(e => !['evcharger', 'evpower', 'evcanopy'].includes(e.kind));
+        } else {
+          const next = { ...old, enabled: true };
+          if (k === 'mode' || k === 'type' || k === 'value') next[k] = v;
+          else { const [group, field] = k.split('.'); next[group] = { ...(old[group] || {}), [field]: v }; }
+          x.program = { ...x.program, ev: next };
+        }
+        if (!relaid && x.program.ev) x.elements = EVP.withEV(x, { program: x.program, elements: x.elements || [] }).elements; // (a hand-drawn or hand-edited plan: chargers on its own stalls now, lib/siteev.mjs)
+      });
+      after(i);
+    });
     card.querySelectorAll('.sp-prog [data-st]').forEach(i => i.onchange = () => { change(x => { x.params = ['form', 'streets', 'mixStyle'].includes(i.dataset.st) ? { ...(x.params || {}), [i.dataset.st]: i.value } : { ...(x.params || {}), style: { ...(x.params?.style || {}), [i.dataset.st]: i.value } }; }); after(i); });
     const mixOf = x => clone(SP.normalizeProgram(x.program).mix || SP.UNIT_MIX);
     card.querySelectorAll('[data-mix]').forEach(i => i.onchange = () => { const [n, f] = i.dataset.mix.split(':'); change(x => { const m = mixOf(x); m[+n][f] = f === 'name' ? i.value : +i.value; x.program = { ...x.program, mix: m }; }); after(i); });
@@ -3112,6 +3150,7 @@ export function initSitePlan(ctx) {
       (cs ? customTile(cs, tile) : '') + (m.storage && !cs ? two('Storage', x => x.storage ? f0(x.storage.nrsf) + ' sf' : '—', 'rentable · ~' + f0(m.storage.units) + ' units (' + f0(m.storage.climateUnits) + ' climate, ' + f0(m.storage.driveUnits) + ' drive-up)' + (m.storage.rv ? ' · ' + m.storage.rv + ' RV / boat' : '')) : '') +
       (m.foodtrucks ? tile('Food trucks', f0(m.foodtrucks.trucks), '~' + f0(m.foodtrucks.seats) + ' seats (covered and patio)') + tile('Park buildings', f0(m.foodtrucks.pavilionSf) + ' sf pavilion', f0(m.foodtrucks.restroomSf) + ' sf restrooms · ' + (m.foodtrucks.barSf ? f0(m.foodtrucks.barSf) + ' sf bar' + (m.foodtrucks.patioSf ? ' + ' + f0(m.foodtrucks.patioSf) + ' sf patio' : '') : 'no bar')) : '') +
       (whole ? pair('Parking (spaces / needed)' + TG('parking'), f0(pk.stalls) + ' / ' + f0(pk.need), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad) : tile('Parking' + TG('parking'), f0(m.spaces) + ' / ' + f0(m.required), pSub, pBad)) +
+      (m.ev ? tile('EV chargers', f0(m.ev.placed) + (m.ev.requested ? ' / ' + f0(m.ev.requested) : ''), (m.ev.type === 'dcfc' ? 'DC fast charging' : 'Level 2') + (m.ev.powerSf ? ' · ' + f0(m.ev.powerSf) + ' sf power equipment' : '') + (m.ev.canopySf ? ' · ' + f0(m.ev.canopySf) + ' sf canopy' : ''), m.ev.short ? ' bad' : '') : '') +
       two('Coverage' + TG('coverage'), x => pct(x.coverage) + (x === m ? max(m.coverage * 100, z.max_coverage_pct, v => v + '%') : ''), '', +z.max_coverage_pct && m.coverage * 100 > +z.max_coverage_pct ? ' bad' : '') +
       two('FAR' + TG('far'), x => x.far.toFixed(2) + (x === m ? max(m.far, z.max_far, v => String(v)) : ''), '', +z.max_far && m.far > +z.max_far ? ' bad' : '') +
       tile('Detention' + TG('detention'), m.pond ? (m.pond / 43560).toFixed(2) + ' ac' : '—', m.pond ? pct(m.pond / m.siteSf) + ' of the site' + pondDepthNote(pl) : '') +
@@ -3581,7 +3620,7 @@ export function initSitePlan(ctx) {
     let done = 0; const tick = () => runStep(run, 1, 'Laying out ' + T.label + ' layouts' + big + ' · ' + done + ' of ' + want + ' done');
     const one = async q => {
       const hp = q.hotel ? hotelParts(pl, q.hotel) : null; if (q.hotel && !hp) { done = Math.min(want, done + 1); tick(); return null; } // (no room for a hotel beside the retail on this lot)
-      const rp = SP.guessProgram(q.ask), prog = hp ? { use: 'retail', parcels: [{ parcel: 'hotel', program: SP.guessProgram(q.hotel.words) }, { parcel: 'retail', program: rp }] } : SP.keepNames(rp, pl.program);
+      const rp = SP.guessProgram(q.ask), prog = hp ? { use: 'retail', parcels: [{ parcel: 'hotel', program: SP.guessProgram(q.hotel.words) }, { parcel: 'retail', program: rp }], ...(pl.program?.ev ? { ev: pl.program.ev } : {}) /* (the plan's EV charging settings, as keepNames keeps them) */ } : SP.keepNames(rp, pl.program);
       const np = SP.normalizeProgram(rp), wb = hp ? null : BR.wordsBrief(q.ask), ask = hp ? q.hotel.words + '; ' + q.ask : q.ask;
       let params = RUN.fillParams(pl.params, { ask: q.ask }); if (np.form && !hp) params = { ...(params || {}), form: np.form };
       const plan = { ...pl, params }; let out = [];
@@ -3707,7 +3746,7 @@ export function initSitePlan(ctx) {
         const first = rv; let add = [], progR = prog;
         if (rv.revise && rv.program) {
           runStep(run, 4 + o0, (revised.length ? 'Revising again: ' : 'Revising: ') + (rv.why || 'a better program').replace(/\.$/, ''));
-          const params2 = RUN.fillParams({ ...params1, ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, { ask }), prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}) }; // (its "fill" never holds land the words didn't ask to hold)
+          const params2 = RUN.fillParams({ ...params1, ...(rv.params?.streets ? { streets: rv.params.streets } : {}), ...(rv.params?.form ? { form: rv.params.form } : {}) }, { ask }), prog2 = { ...rv.program, ...(rv.params?.storm ? { storm: rv.params.storm } : {}), ...(prog?.ev ? { ev: prog.ev } : {}) /* (the plan's EV charging settings, as keepNames keeps them) */ }; // (its "fill" never holds land the words didn't ask to hold)
           let out2 = []; try { out2 = await laidRun({ ...pl, setbacks, params: params2 }, prog2, { ...(L.revise || { count: 3, depth: 6, budgetMs: 6000 }), ...koOpts(pl), ...(wb ? { brief: wb } : {}) }, ask); } catch (e) { console.warn('layout', e); }
           if (!live(run)) return;
           const v2 = named(out2, { ...plan, params: params2, program: prog2 }, { params: params2, revisedBy: rv.why || 'the AI review' }).filter(v => v.elements.length);
