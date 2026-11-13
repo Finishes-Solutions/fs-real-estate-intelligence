@@ -51,7 +51,7 @@ Construction filings (the state's register of commercial building projects) are 
 
 **The browser's Back and Forward buttons work between pages.** Each page you open is a step in the browser's history, so after Reports then Market, Back returns to Reports and Back again to the Map, and the tab's title names the page (for example "Reports · Real Estate Intelligence Platform"). Changing a filter or opening a card doesn't add a step.
 
-**A reload keeps your place.** Reloading the page, or opening the installed app again, comes back to where you were: the same map view (including tilt and turn), the property card you had open, the site plan you were working on, or the project you were looking at on Projects. Only a first visit flies in to the region. Links you copy and saved searches work as before.
+**A refresh keeps your place; a new visit starts fresh.** Refreshing the page comes back to where you were: the same map view (including tilt and turn), the property card you had open, the site plan you were working on, or the project you were looking at on Projects. Opening the app anew (a new tab or window, or launching the installed app) starts on the default screen instead of the last site you had open. Links you copy and saved searches work as before.
 
 Three of the six hold more than one page. A row of buttons at the top of the page switches between them, and the place remembers the page you used last:
 - **Market:** Overview and Compare areas.
@@ -1171,6 +1171,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **New visits start on the default screen (Nov 13):** opening the app in a new tab or window, or launching the installed app, no longer drops you back on the last site you had open. Refreshing the page still keeps your place.
 - **Quick layouts (Nov 9):** in a site plan's **Build** section, pick Multifamily, Townhomes, Single-family, Retail, Office, Hotel + retail, Industrial or Mixed use and get up to five layouts of that kind that fill the site, in seconds and without typing a request or using the AI; optionally set the number of buildings and square feet.
 - **Permits on the quick layer buttons (Nov 9):** building permits now have their own one-tap button on the map, next to Filings. The site plan's Add panel no longer scrolls sideways or cuts off its left edge, and the "Add a building by type" list lines up with the rest of the panel.
 - **Agents review and revise their site plans (Nov 8):** connected agents now lay out at high effort by default, see a picture of each plan, and send it back for changes until it passes its checks and does what was asked.

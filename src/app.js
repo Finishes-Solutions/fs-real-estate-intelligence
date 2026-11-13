@@ -1243,11 +1243,12 @@ function hashStr({map:withMap=false,live=false}={}){ const p=new URLSearchParams
     if(camReady) p.set('ml',camStr()); } // on every page, so coming back to the map after a reload finds it where it was
   return p.toString(); }
 // a new page is a new history entry (so the browser's Back button steps back through pages and then leaves the app);
-// filter, card and map moves only rewrite the current entry. The last address is also kept on this device, so the bare
-// page (the installed app opening, a bookmark) comes back to it.
+// filter, card and map moves only rewrite the current entry. The last address is also kept for this tab only
+// (sessionStorage), so a refresh comes back to it but a new visit (new tab, new window, the installed app opening)
+// starts on the default screen.
 function commitHash(push){ const h=hashStr({live:true}), url=h?'#'+h:location.pathname+location.search;
   try{ push?history.pushState(null,'',url):history.replaceState(null,'',url); }catch(e){}
-  try{ localStorage.setItem(LAST_KEY,h); }catch(e){}
+  try{ sessionStorage.setItem(LAST_KEY,h); }catch(e){}
   document.getElementById('rssLink').href='api/feed?'+encode(curSpec()); }
 function scheduleHash(o=false){ if(booting) return; const push=typeof o==='object'?!!o?.push&&!popping:!!o; clearTimeout(hashT); if(push){ commitHash(true); return; } hashT=setTimeout(()=>commitHash(false),250); } // push: a boolean, or {push} (src/siteplan.js)
 // Back / Forward: show the page (and the project on the Projects page) the address names, without adding history
@@ -1388,9 +1389,10 @@ new MutationObserver(()=>{ if(!card.classList.contains('open')&&card.classList.c
   document.getElementById('filingsPeriod').textContent='TDLR · '+m(s)+' – '+m(e);
   document.getElementById('periodTxt').textContent=PERIOD; const miss=DATA.unmapped||0; document.getElementById('missTxt').textContent=miss>0?fmtN(miss)+' filing'+(miss>1?'s':'')+' with no mappable address '+(miss>1?'are':'is')+' left off the map. ':''; }
 { let h=location.hash.slice(1);
-  // the bare page (a reload of it, the installed app opening, a bookmark): come back to where you were. A link with
-  // anything in it wins; a first visit has nothing kept and flies in to the region.
-  if(!h){ let kept=''; try{ kept=localStorage.getItem(LAST_KEY)||''; }catch(e){} h=startHash(h,kept); if(h) try{ history.replaceState(null,'','#'+h); }catch(e){} }
+  // the bare page reloaded in the same tab: come back to where you were. A link with anything in it wins; a new visit
+  // (new tab or window, the installed app opening) has nothing kept and opens on the default screen.
+  try{ localStorage.removeItem(LAST_KEY); }catch(e){} // older builds kept it on the device, which reopened the last site on every visit
+  if(!h){ let kept=''; try{ kept=sessionStorage.getItem(LAST_KEY)||''; }catch(e){} h=startHash(h,kept); if(h) try{ history.replaceState(null,'','#'+h); }catch(e){} }
   const p=new URLSearchParams(h), keys=[...p.keys()];
   // a link with filters puts the filing dots on; the date range alone (which the app writes into the address itself) doesn't,
   // so a reload opens like a fresh start: no filings until you turn them on

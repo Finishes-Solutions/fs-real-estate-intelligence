@@ -3,6 +3,13 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-13
+
+### 4:47 PM CT: New visits start on the default screen; a refresh still keeps your place (`HASH`)
+- **Opening REI fresh no longer drops you on the last site:** a new tab or window, or launching the installed app, now opens on the default map screen.
+- **Refreshing keeps your place:** reloading the page in the same tab still comes back to the same map view, property card, site plan or project.
+- The last-visited screen that older versions saved on your computer is cleared the first time you open this version.
+
 ## 2026-11-09
 
 ### 3:15 PM CT: Quick layouts: one hotel building with retail around it; set buildings and square feet (`924056e`)
