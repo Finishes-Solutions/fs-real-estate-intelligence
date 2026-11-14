@@ -3,6 +3,15 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-13
+
+### 7:10 PM CT: Agents can trace an existing drawing onto a parcel: exact ponds, drives and parking (`matthew/wonderful-allen-iy00ka`)
+- **Ponds, lawns and paving by their outline:** an agent changing a site plan can now add a detention pond, a lawn, a plaza or the paved area as the exact outline drawn, whatever its shape. Before, a pond could only be added as a box, so a triangular pond had to be faked with stepped rectangles.
+- **Drives and parking as drawn:** a drive can be added along its centre line at a width, and a parking row with exactly the number of stalls drawn. Before, drives and parking could only come from the app's own layout, which drew its own pattern, and on a large hand-placed plan timed out.
+- **Left where they are put:** pieces placed this way, and buildings added with the new "exact" choice, are never stepped aside to a clear spot, and nothing under them is removed. A building can also carry the floor area the drawing states.
+- **Bigger batches:** an agent can send up to 400 changes at once, up from 30.
+- Checked on the 43.8-acre FM 2004 tract in Texas City: its two detention ponds and two frontage swales to the vertex, the paved area with its 16 islands, and 95 parking rows with 893 stalls, with none of the 36 buildings moved.
+
 ## 2026-11-12
 
 ### 1:18 PM CT: Typing in the Feasibility forms no longer drops out of the field (`matthew/more-data-sources`)
