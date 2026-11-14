@@ -63,6 +63,25 @@ const svg = G.planSVG(r.plan, { turn: 0 }).svg; assert.ok(svg.length > 100000 &&
   assert.ok(count(svg4, lawnRe) > count(svg0, lawnRe), 'and is drawn again on top of it');
   const tr = o => S.details(o).trees.length; assert.equal(tr(r4.plan), tr(r.plan), 'no trees the drawing does not show'); }
 
+// buildings as drawn: the nine apartment buildings by their footprint (three unit wings round a T-shaped breezeway, some
+// mirrored), each with the 36 homes and 24,960 sf the drawing's table states; the townhome clusters' and clubhouse's
+// floor areas; and the apartments' unit mix from the table, so the tabulation reads as the drawing does
+{ const MIX = [{ name: '1 BR Junior', sf: 480, units: 12 }, { name: '1 BR', sf: 640, units: 9 }, { name: '2 BR Junior', sf: 720, units: 6 }, { name: '2 BR', sf: 920, units: 6 }, { name: '3 BR', sf: 1200, units: 3 }];
+  const ed = [...fx.apartments.map(b => ({ action: 'remove', target: b.name })), ...fx.apartments.map(b => ({ action: 'add', kind: 'building', use: 'multifamily', name: b.name, floors: 3, units: 36, sf: 24960, outline: b.outline })),
+    ...[1, 2, 3, 4, 5, 6].map(i => ({ action: 'change', target: 'Townhomes ' + i, sf: 9920 })), { action: 'change', target: 'Clubhouse', sf: 3000 }, { action: 'change', target: 'Storage Office', sf: 3000 }, { action: 'change', mix: MIX }];
+  const r5 = ED.applyEdits(r.plan, opsOf(r.plan, ed), {}), p5 = { ...r.plan, elements: r5.elements, program: r5.program }, m5 = S.metrics(p5), B = p5.elements.filter(e => e.kind === 'building');
+  assert.deepEqual(r5.skipped, []); assert.ok(r5.program?.mfMix?.length === 5, 'the mix rides on the plan’s program');
+  const apts = B.filter(e => e.use === 'multifamily'); assert.equal(apts.length, 9);
+  for (const e of apts) { const a = fx.apartments.find(b => b.name === e.name); assert.equal(e.poly.length, 34, e.name + ' has its 34 corners'); e.poly.forEach((q, i) => { const sxy = f.to(q); assert.ok(near(sxy[0], a.outline[i][0], 0.03) && near(sxy[1], a.outline[i][1], 0.03)); });
+    assert.ok(near(S.footArea(e), 9775, 15), e.name + ' footprint ' + Math.round(S.footArea(e))); assert.equal(S.gfaOf(e), 24960); assert.equal(e.units, 36); assert.equal(e.floors, 3); assert.ok(near(e.w, 143.4, 0.3) && near(e.d, 85.6, 0.3), e.name + ' box ' + e.w + ' x ' + e.d);
+    for (const o of B) if (o !== e) assert.ok(!S.rectsOverlap(e, o), e.name + ' clear of ' + o.name); }
+  const sum = u => B.filter(e => e.use === u).reduce((t, e) => t + S.gfaOf(e), 0);
+  assert.equal(sum('multifamily'), 224640); assert.equal(sum('townhomes'), 59520); assert.equal(sum('retail'), 61200); assert.equal(sum('storage'), 69400); assert.equal(sum('amenity'), 3000);
+  assert.equal(m5.units, 372); assert.deepEqual(m5.mix.map(t => [t.name, t.sf, t.n]), [['1 BR Junior', 480, 108], ['1 BR', 640, 81], ['2 BR Junior', 720, 54], ['2 BR', 920, 54], ['3 BR', 1200, 27]]);
+  assert.equal(m5.mix.reduce((t, x) => t + x.sf * x.n, 0), 224640, 'the units add up to the leasable area');
+  assert.equal(m5.spaces, m.spaces, 'no parking row gave way'); const svg5 = G.planSVG(p5, { turn: 0 }).svg; assert.ok(!/NaN/.test(svg5));
+  const bad = ED.applyEdits(r.plan, [{ action: 'change', mix: [{ name: 'x', sf: 10, units: 1 }] }], {}); assert.equal(bad.skipped.length, 1); assert.ok(!bad.program); }
+
 // a drive by its centre line, and a building left exactly where the feet put it with its own floor area
 { const r2 = run(r.plan, [{ action: 'add', path: [[440, 0], [440, 120], [520, 200]], width: 30, name: 'Stub drive' }, { action: 'add', kind: 'building', use: 'amenity', name: 'Kiosk', x: 592.8, y: 779.1, w: 20, d: 20, turn: 0, exact: true, sf: 350 }]);
   const d = r2.plan.elements.find(e => e.name === 'Stub drive'), k = r2.plan.elements.find(e => e.name === 'Kiosk');
@@ -70,10 +89,10 @@ const svg = G.planSVG(r.plan, { turn: 0 }).svg; assert.ok(svg.length > 100000 &&
   const s = f.to([k.x, k.y]); assert.ok(near(s[0], 592.8, 0.02) && near(s[1], 779.1, 0.02), 'on top of the clubhouse, as asked: not stepped aside'); assert.equal(S.gfaOf(k), 350); }
 
 // what can't be read is said, not drawn
-{ const r3 = ED.applyEdits(r.plan, [{ action: 'add', kind: 'pond', outline: [[0, 0], [10, 10]] }, { action: 'add', kind: 'building', outline: [[0, 0], [10, 0], [10, 10]] }, { action: 'add', kind: 'pond', outline: [[0, 0], [10, 0], [20, 0]] }, { action: 'add', kind: 'pond', outline: [[0, 0], ['a', 1], [5, 5]] }], {});
+{ const r3 = ED.applyEdits(r.plan, [{ action: 'add', kind: 'pond', outline: [[0, 0], [10, 10]] }, { action: 'add', kind: 'pool', outline: [[0, 0], [10, 0], [10, 10]] }, { action: 'add', kind: 'pond', outline: [[0, 0], [10, 0], [20, 0]] }, { action: 'add', kind: 'pond', outline: [[0, 0], ['a', 1], [5, 5]] }], {});
   assert.equal(r3.skipped.length, 4); assert.equal(r3.elements.length, r.plan.elements.length); }
 
 // the MCP tool takes them
 { const t = SV.TOOLS?.find?.(x => x.name === 'plan_edit') ?? null;
-  if (t) { const P = t.inputSchema.properties.edits.items.properties; for (const k of ['outline', 'path', 'width', 'exact', 'stalls', 'sf', 'island']) assert.ok(P[k], 'plan_edit edits take ' + k); assert.ok(t.inputSchema.properties.edits.maxItems >= 150); } }
+  if (t) { const P = t.inputSchema.properties.edits.items.properties; for (const k of ['outline', 'path', 'width', 'exact', 'stalls', 'sf', 'island', 'mix']) assert.ok(P[k], 'plan_edit edits take ' + k); assert.ok(t.inputSchema.properties.edits.maxItems >= 150); } }
 console.log('edittrace: ok (4 ponds to the vertex, paving with 16 islands drawn as islands, 95 rows / 893 stalls, nothing else moved)');
