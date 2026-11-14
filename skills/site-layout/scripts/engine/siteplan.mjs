@@ -2525,7 +2525,7 @@ export function metrics(plan) {
   }
   const heightFt = Math.max(0, ...B.map(e => (e.floors || 1) * USES[useOf(e)].floorH));
   // tabulation: apartments by the unit mix, beds, rentable area
-  const mfB = B.filter(e => useOf(e) === 'multifamily'), mfProg = prog.use === 'multifamily' ? prog : normalizeProgram({ use: 'multifamily' });
+  const mfB = B.filter(e => useOf(e) === 'multifamily'), mfProg = prog.use === 'multifamily' ? prog : normalizeProgram({ use: 'multifamily', ...(Array.isArray(plan.program?.mfMix) && plan.program.mfMix.length ? { mix: plan.program.mfMix } : {}) }); // (mfMix: the apartments' own unit mix on a plan of several uses, as a drawing's unit table gives it)
   const mfUnits = single && prog.use === 'multifamily' && !mfB.some(e => e.units != null) ? units : mfB.reduce((s, e) => s + (e.units ?? Math.floor((gfaOf(e) - (groundOf(e)?.gfa || 0)) * mfProg.eff / mfProg.unitSf)), 0);
   const mix = mfUnits ? splitMix(mfUnits, mfProg.mix) : [], HB = { townhomes: 3, duplex: 2 };
   const homeBeds = B.reduce((s, e) => { const u = useOf(e); return s + (u === 'sfr' ? (e.floors >= 2 ? 4 : 3) * (e.units ?? 1) : HB[u] ? HB[u] * (e.units ?? 1) : 0); }, 0);

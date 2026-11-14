@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-13
 
+### 11:40 PM CT: Buildings in a traced site plan take their real footprint, floor area and unit mix (`matthew/wonderful-allen-iy00ka`)
+- **Buildings by their footprint:** when an agent traces a drawing, a building can now be added as its exact outline (wings round a breezeway, a stepped front), with its use, stories, homes and the floor area the drawing states. Before, a building could only be a box.
+- **Stated floor areas:** an agent can set an existing building's floor area to the figure on the drawing, for example a townhome cluster's living area without its garages.
+- **The apartments' own unit mix:** an agent can give the unit table from the drawing (each type's name, size and count), and the plan's unit tabulation follows it. Before, a plan with several uses always showed the app's standard mix.
+- Checked on the FM 2004 tract in Texas City: nine apartment buildings to the corner (9,775 sf a floor, 36 homes and 24,960 sf each), 224,640 sf and 324 apartments in the drawing's mix (108, 81, 54, 54 and 27), 59,520 sf of townhomes, 61,200 sf of retail and a 3,000 sf clubhouse.
+
 ### 9:36 PM CT: Landscape islands in a traced site plan are real islands (`matthew/wonderful-allen-iy00ka`, ff11fe3)
 - **Islands, not gaps:** when an agent traces a drawing, the landscape islands in the paving (a parking row's end cap, a peninsula, an entry median, a roundabout's centre, a building's block) can now be added as islands. They are drawn curbed and planted on top of the paving. Before, they could only be left out of the paved outline, so they showed as blank ground.
 - **A lawn on a block still shows:** a named lawn or amenity space that sits on one of these blocks is drawn on top of it in a lighter green, so it is not lost.
