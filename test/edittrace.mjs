@@ -48,6 +48,21 @@ assert.equal(m.units, 372); assert.equal(by('building').length, 36);
 // it draws: the ponds and paving as paths, and the sheet doesn't choke on a 1,161-point outline
 const svg = G.planSVG(r.plan, { turn: 0 }).svg; assert.ok(svg.length > 100000 && !/NaN/.test(svg));
 
+// landscape islands: the 16 islands and blocks inside the paving edge, each a curbed island drawn over the paving, not a
+// gap in it; nothing is planted that the drawing doesn't show, and a named lawn on a block still shows on it
+{ const r4 = run(r.plan, fx.islands.map(o => ({ action: 'add', kind: 'green', island: true, outline: o }))), isl = r4.plan.elements.filter(e => e.island);
+  assert.deepEqual(r4.skipped, []); assert.equal(isl.length, 16);
+  for (const e of isl) { assert.equal(e.kind, 'green'); assert.equal(e.trees, false); assert.ok(e.poly.length >= 3); assert.ok(S.isMedian(e) && !S.isPark(e), 'an island, not a park'); assert.ok(!e.name); }
+  assert.ok(near(isl.reduce((t, e) => t + S.ringArea(e.poly), 0), 521800, 1500), 'islands ' + Math.round(isl.reduce((t, e) => t + S.ringArea(e.poly), 0)) + ' sf: what the paving outline leaves out');
+  const m4 = S.metrics(r4.plan); assert.equal(m4.spaces, m.spaces); assert.equal(m4.units, m.units);
+  const count = (svg, re) => (svg.match(re) || []).length, svg0 = G.planSVG(r.plan, { turn: 0 }).svg, svg4 = G.planSVG(r4.plan, { turn: 0 }).svg;
+  const islRe = new RegExp('fill="' + G.PALETTE.green + '" stroke="#a9c79a" stroke-width="[\\d.]+"/>', 'g');
+  assert.ok(count(svg4, islRe) - count(svg0, islRe) === 16, 'each island drawn');
+  const lawnRe = /stroke="#8fae7f" stroke-width="[\d.]+"\/>/g, park = r4.plan.elements.find(e => e.name === 'Amenity green (21,000 sf)');
+  assert.ok(isl.some(e => S.inRing([park.x, park.y], e.poly)), 'the central amenity green stands on a block');
+  assert.ok(count(svg4, lawnRe) > count(svg0, lawnRe), 'and is drawn again on top of it');
+  const tr = o => S.details(o).trees.length; assert.equal(tr(r4.plan), tr(r.plan), 'no trees the drawing does not show'); }
+
 // a drive by its centre line, and a building left exactly where the feet put it with its own floor area
 { const r2 = run(r.plan, [{ action: 'add', path: [[440, 0], [440, 120], [520, 200]], width: 30, name: 'Stub drive' }, { action: 'add', kind: 'building', use: 'amenity', name: 'Kiosk', x: 592.8, y: 779.1, w: 20, d: 20, turn: 0, exact: true, sf: 350 }]);
   const d = r2.plan.elements.find(e => e.name === 'Stub drive'), k = r2.plan.elements.find(e => e.name === 'Kiosk');
@@ -60,5 +75,5 @@ const svg = G.planSVG(r.plan, { turn: 0 }).svg; assert.ok(svg.length > 100000 &&
 
 // the MCP tool takes them
 { const t = SV.TOOLS?.find?.(x => x.name === 'plan_edit') ?? null;
-  if (t) { const P = t.inputSchema.properties.edits.items.properties; for (const k of ['outline', 'path', 'width', 'exact', 'stalls', 'sf']) assert.ok(P[k], 'plan_edit edits take ' + k); assert.ok(t.inputSchema.properties.edits.maxItems >= 150); } }
-console.log('edittrace: ok (4 ponds to the vertex, paving with 16 islands, 95 rows / 893 stalls, nothing else moved)');
+  if (t) { const P = t.inputSchema.properties.edits.items.properties; for (const k of ['outline', 'path', 'width', 'exact', 'stalls', 'sf', 'island']) assert.ok(P[k], 'plan_edit edits take ' + k); assert.ok(t.inputSchema.properties.edits.maxItems >= 150); } }
+console.log('edittrace: ok (4 ponds to the vertex, paving with 16 islands drawn as islands, 95 rows / 893 stalls, nothing else moved)');

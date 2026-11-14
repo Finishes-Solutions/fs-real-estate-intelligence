@@ -5,6 +5,12 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-13
 
+### 9:36 PM CT: Landscape islands in a traced site plan are real islands (`matthew/wonderful-allen-iy00ka`, HASH)
+- **Islands, not gaps:** when an agent traces a drawing, the landscape islands in the paving (a parking row's end cap, a peninsula, an entry median, a roundabout's centre, a building's block) can now be added as islands. They are drawn curbed and planted on top of the paving. Before, they could only be left out of the paved outline, so they showed as blank ground.
+- **A lawn on a block still shows:** a named lawn or amenity space that sits on one of these blocks is drawn on top of it in a lighter green, so it is not lost.
+- **Nothing invented:** an island is planted with grass only; no trees are added that the drawing does not show.
+- Checked on the FM 2004 tract in Texas City against the detailed site plan: 16 islands, and the stall count of each parking row set to the number labelled on the drawing (86 of 90 labelled rows already matched; 4 corrected).
+
 ### 8:21 PM CT: Agents can trace an existing drawing onto a parcel: exact ponds, drives and parking (`matthew/wonderful-allen-iy00ka`, 989c24e)
 - **Ponds, lawns and paving by their outline:** an agent changing a site plan can now add a detention pond, a lawn, a plaza or the paved area as the exact outline drawn, whatever its shape. Before, a pond could only be added as a box, so a triangular pond had to be faked with stepped rectangles.
 - **Drives and parking as drawn:** a drive can be added along its centre line at a width, and a parking row with exactly the number of stalls drawn. Before, drives and parking could only come from the app's own layout, which drew its own pattern, and on a large hand-placed plan timed out.
