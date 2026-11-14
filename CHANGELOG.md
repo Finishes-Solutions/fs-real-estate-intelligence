@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-13
 
-### 9:36 PM CT: Landscape islands in a traced site plan are real islands (`matthew/wonderful-allen-iy00ka`, HASH)
+### 9:36 PM CT: Landscape islands in a traced site plan are real islands (`matthew/wonderful-allen-iy00ka`, ff11fe3)
 - **Islands, not gaps:** when an agent traces a drawing, the landscape islands in the paving (a parking row's end cap, a peninsula, an entry median, a roundabout's centre, a building's block) can now be added as islands. They are drawn curbed and planted on top of the paving. Before, they could only be left out of the paved outline, so they showed as blank ground.
 - **A lawn on a block still shows:** a named lawn or amenity space that sits on one of these blocks is drawn on top of it in a lighter green, so it is not lost.
 - **Nothing invented:** an island is planted with grass only; no trees are added that the drawing does not show.
