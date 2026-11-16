@@ -63,6 +63,9 @@ export function projectOf(rec, { option = 1, name = '', address = '', county = '
   site.stated = { acres: +acres.toFixed(3), building_sf: Math.round(q.totals?.gfa || 0), ...(q.totals?.units ? { units: q.totals.units } : {}), stalls: pk.provided };
   // the facts: every check that failed or couldn't be decided, and every rule the layout rests on that isn't verified
   const facts = [];
+  if (rec.brief.site?.geometry_confidence) facts.push('BOUNDARY CONFIDENCE: ' + rec.brief.site.geometry_confidence + (rec.brief.site.scale_basis ? ' (' + rec.brief.site.scale_basis + ')' : ''));
+  if (rec.brief.site?.extraction?.file) facts.push('BOUNDARY SOURCE FILE: ' + rec.brief.site.extraction.file + (rec.brief.site.extraction.layer ? ', selected ' + rec.brief.site.extraction.layer + '#' + rec.brief.site.extraction.index : ''));
+  else if (rec.brief.site?.source) facts.push('BOUNDARY SOURCE: ' + rec.brief.site.source);
   for (const c of v.checks || []) if (c.status === 'fail' || c.status === 'unknown') facts.push((c.status === 'fail' ? (c.hard ? 'FAILS: ' : 'WARNING: ') : 'UNVERIFIED: ') + c.title + (c.note ? ' (' + c.note + ')' : '') + (c.rule ? ' [' + c.rule + ']' : ''));
   for (const [k, r] of Object.entries(rec.brief.rules?.values || {})) if (r && r.cls !== 'verified') facts.push('ENGINEERING ASSUMPTION: ' + k + ' ' + JSON.stringify(r.v) + (r.source ? ' (' + r.source + ')' : ''));
   const today = date || new Date(rec.created || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

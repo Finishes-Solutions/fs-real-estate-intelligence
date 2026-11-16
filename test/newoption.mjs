@@ -9,7 +9,8 @@ const clone = o => JSON.parse(JSON.stringify(o));
 
 const easement = { id: 'ko1', kind: 'keepout', poly: [[0, 395], [600, 395], [600, 420], [0, 420]], x: 300, y: 407.5, w: 600, d: 25, rot: 0, name: 'Easement 1', note: 'Drawn, not surveyed', pinned: true };
 const site = { origin: [-95.8245, 29.7855], ring: [[0, 0], [600, 0], [600, 420], [0, 420]], src: 'parcels', front: 0, frontGuess: false, streets: [1], streetsSet: true, streetsBy: 2,
-  setbacks: { ...S.SETBACKS, paveFront: 10, paveSide: 5, paveRear: 5, buildOn: true, paveOn: true }, parcel: 'pid:1234567', parcels: ['pid:1234567', 'pid:1234568'], zoning: { zoning: 'C-2', zoning_description: 'General commercial', max_far: 1.5 } };
+  setbacks: { ...S.SETBACKS, paveFront: 10, paveSide: 5, paveRear: 5, buildOn: true, paveOn: true }, parcel: 'pid:1234567', parcels: ['pid:1234567', 'pid:1234568'], zoning: { zoning: 'C-2', zoning_description: 'General commercial', max_far: 1.5 },
+  boundarySource: { fileName: 'Survey.pdf', confirmedAcres: 5.8, tracedAcres: 5.76, differencePct: 0.7, confidence: 'low; manually traced on map' } };
 const program = { use: 'retail', gfa: 25000, ratio: 4.5 };
 const layouts = L.layoutOptions({ ...site, program, elements: [easement] }, program, { count: 4, keepout: [clone(easement)] });
 assert.ok(layouts.length >= 2, 'the engine lays out more than one layout: ' + layouts.length);

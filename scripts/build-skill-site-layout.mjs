@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILL = path.join(ROOT, 'skills/site-layout'), ENGINE = path.join(SKILL, 'scripts/engine'), LIB = path.join(ROOT, 'lib');
+const INTAKE = path.join(SKILL, 'scripts/intake');
 const ENTRIES = ['layoutbrief.mjs', 'layoutrun.mjs', 'layoutcheck.mjs', 'layoutedit.mjs', 'layoutcaps.mjs', 'sitesheet.mjs', 'siteplan.mjs'];
 
 // the import closure, relative to lib/
@@ -43,6 +44,11 @@ export async function build({ zip = true } = {}) {
   let commit = null; try { commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { /* not a checkout */ }
   const stamp = { engine: ver(/ENGINE_VERSION = '([^']+)'/), files: files.length, sha256: h.digest('hex'), from: 'fs-real-estate-intelligence lib/ at ' + (commit || 'unknown commit') };
   fs.writeFileSync(path.join(ENGINE, 'VERSION.json'), JSON.stringify(stamp, null, 1) + '\n');
+  fs.mkdirSync(INTAKE, { recursive: true });
+  for (const file of ['extract_geometry.py']) {
+    fs.copyFileSync(path.join(SKILL, '../fs-site-plan/scripts', file), path.join(INTAKE, file));
+  }
+  fs.copyFileSync(path.join(SKILL, '../fs-site-plan/scripts/intake-requirements.txt'), path.join(INTAKE, 'requirements.txt'));
   await writeForms();
   await writeAssets();
   if (zip) {

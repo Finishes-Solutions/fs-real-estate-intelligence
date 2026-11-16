@@ -2287,6 +2287,7 @@ dl.sp-nums dt{color:var(--muted)}dl.sp-nums dd{margin:0;font-weight:600}dl.sp-nu
 .pj-conf{font-style:normal;font-size:10.5px;padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--warn) 18%,var(--panel));color:var(--text)}.pj-conf.ed{background:var(--chip)}
 .pj-fx{margin:3px 0 2px;overflow-wrap:anywhere}.pj-fsrc{color:var(--muted);font-size:11px}
 .pj-fact-a{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+.pj-trace{display:grid;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}.pj-trace label{font-size:12px;font-weight:600}.pj-trace label span,.pj-trace small{color:var(--text-2);font-weight:400}.pj-trace .btnrow{align-items:center}.pj-trace input{width:125px;max-width:40%;box-sizing:border-box;font:inherit;font-size:13px}
 .pj-fst{font-size:11.5px;color:var(--muted)}.pj-fst.ok{color:var(--brand);font-weight:600}
 .pj-fplace{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}.pj-fplace select{max-width:180px}
 .pj-fedit .pj-fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:8px}

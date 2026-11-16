@@ -2,6 +2,10 @@
 
 They run the same engine on the app's server. No AI and no network inside the layout tools.
 
+When the user supplies a drawing instead of GeoJSON, use the drawing-intake workflow in `references/drawing-intake.md`
+to extract and confirm a local-feet boundary before calling `layout_run`. The connector's reference-file reader extracts
+candidate facts; that alone does not establish survey geometry.
+
 ## `layout_run`
 
 Give either `brief` (a full `rei.brief/1`) or `request` with the site:

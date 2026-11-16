@@ -43,12 +43,19 @@ function briefOf() {
   const req = arg('request'); if (!req) die('give --brief brief.json, or --request "..." with --site site.json');
   const site = readJSON(arg('site') || die('give --site site.json'));
   const b = B.briefFromRequest(req, siteFrom(site), { seed: arg('seed') || 'rei-1', options: num('options', 3) });
+  if (site.boundary_source) b.site.source = site.boundary_source;
+  if (site.scale_basis) b.site.scale_basis = site.scale_basis;
+  if (site.geometry_confidence) b.site.geometry_confidence = site.geometry_confidence;
+  if (site.extraction) b.site.extraction = site.extraction;
   if (site.exclusions) b.site.exclusions = site.exclusions.map((x, i) => ({ id: x.id || 'ex' + (i + 1), kind: x.kind || 'easement', ring: x.ring || x.poly, source: x.source || 'given with the site' }));
   if (site.setbacks) b.rules.values.setbacks = { v: { ...S.SETBACKS, ...site.setbacks }, cls: site.setbacks_source ? 'verified' : 'assumption', source: site.setbacks_source || 'Given with the site; not verified' };
   return b;
 }
 function report(rec) {
   const sm = RUN.summary(rec), L = ['Outcome: ' + rec.outcome + (rec.optimality && rec.outcome === 'feasible' ? ' (' + rec.optimality + ')' : ''), 'Engine ' + rec.versions?.engine + ' · validator ' + rec.versions?.validator + ' · input ' + (rec.inputHash || '').slice(0, 16)];
+  if (rec.brief.site?.source) L.push('Boundary source: ' + rec.brief.site.source);
+  if (rec.brief.site?.scale_basis) L.push('Scale basis: ' + rec.brief.site.scale_basis);
+  if (rec.brief.site?.geometry_confidence) L.push('Geometry confidence: ' + rec.brief.site.geometry_confidence);
   for (const p of rec.problems || []) L.push('Problem: ' + p.msg);
   for (const p of rec.partial || []) L.push('Partial: ' + p);
   for (const m of rec.engineMapping || []) L.push('Note: ' + m);

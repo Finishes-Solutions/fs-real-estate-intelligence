@@ -1,6 +1,6 @@
 ---
 name: site-layout
-description: Lay out a site with the Real Estate Intelligence layout engine — the same reproducible engine the app's Build uses — and deliver a conceptual site layout sheet (PDF, 24 x 36), the ranked options with an independent code-style check of each, and the project model the fs-set-plans skill builds the plan set from. Works from a parcel outline (GeoJSON, the app's Map File export, Regrid / appraisal parcels) or a ring in feet plus what to build ("exactly 240 garden apartments", "as many townhomes as fit", "30,000 sf retail strip", "a wrap with 300 apartments", "cross-dock warehouse 400,000 sf"). Use when the user asks for a "site layout", "site plan layout", "test fit", "what fits here", "how many units fit", "lay out this parcel", "yield study" or "/site-layout". Conceptual only: never permit-ready.
+description: Lay out a site with the Real Estate Intelligence layout engine — the same reproducible engine the app's Build uses — and deliver a conceptual site layout sheet (PDF, 24 x 36), the ranked options with an independent code-style check of each, and the project model the fs-set-plans skill builds the plan set from. Works from GeoJSON, DXF, vector or scanned PDF, image/sketch (with user-confirmed tracing and scale), or a ring in feet, plus what to build ("exactly 240 garden apartments", "as many townhomes as fit", "30,000 sf retail strip", "a wrap with 300 apartments", "cross-dock warehouse 400,000 sf"). Use when the user asks for a "site layout", "site plan layout", "test fit", "what fits here", "how many units fit", "lay out this parcel", "yield study" or "/site-layout". Conceptual only: never permit-ready.
 ---
 
 # site-layout: a site laid out by the app's engine, checked, ready for the plan set
@@ -13,15 +13,23 @@ The engine is a copy of the Real Estate Intelligence app's own layout engine (`s
 `scripts/engine/VERSION.json`). The same brief, seed and engine version always give the same layouts, so every result
 can be replayed and audited.
 
-## Two ways to run
+## Three ways to start; one layout engine
 
 **A. With the app's MCP connector** (tools named `layout_run`, `layout_edit`, `layout_replay`, `layout_capabilities`,
 `site_plan`): use them; they run the same engine on the server. Arguments are in `references/mcp-tools.md`.
 
-**B. Offline, in your sandbox** (Node 18+ and nothing else; no network, no packages):
+**B. From an uploaded reference drawing.** First use `references/drawing-intake.md`. The project Files tab can hold the
+survey or plan; work from a file attached to the task or a downloaded project reference. `scripts/intake.mjs` prepares
+GeoJSON directly and imports inspected candidates from the included drawing extractor. It requires the user to confirm
+the site boundary and frontage. Unscaled PDFs and hand sketches require confirmed acreage and are clearly marked
+approximate. The extractor needs optional Python packages for DXF/PDF/image intake; the layout engine still runs on
+Node alone.
+
+**C. Offline from a prepared site** (Node 18+ and nothing else; no network, no packages):
 
 ```
 node <skill>/scripts/layout.mjs site    --geojson parcel.geojson [--front 0] [--streets 1,2] --out site.json
+node <skill>/scripts/intake.mjs --help
 node <skill>/scripts/layout.mjs brief   --site site.json --request "exactly 240 garden apartments, 3 stories" --out brief.json
 node <skill>/scripts/layout.mjs check   --brief brief.json
 node <skill>/scripts/layout.mjs run     --brief brief.json --out out/ --name "Project name" --address "Street, City, TX"
@@ -46,10 +54,12 @@ node <skill>/scripts/layout.mjs caps
 
 1. **Read everything you were given** before deciding: parcel / survey / plat, the app's exports, flood, utilities,
    zoning, the owner's wishes. Note the stated acreage.
-2. **The site in feet.** From GeoJSON (lon/lat): `layout.mjs site`. It prints each edge's index and length: pick the
-   main street edge (`--front`, default the longest) and other street edges (`--streets`). Check the acreage against
-   the stated figure (a mismatch over ~2% means the wrong parcel or a union is needed: say so). From a DXF / PDF survey
-   use fs-site-plan's `extract_geometry.py` / `fit_site.py` if available, then write `site.json` as
+2. **The site in feet.** Follow `references/drawing-intake.md` for a file or sketch; confirm its boundary and frontage,
+   and inspect the generated SVG. From GeoJSON (lon/lat), `layout.mjs site` can also be used. Choose the main street
+   edge from the printed edge lengths; don't accept an unreviewed longest-edge assumption when frontage isn't clear.
+   Check acreage against the user-confirmed figure. A measured vector boundary mismatch over ~2% blocks import;
+   investigate the parcel selection, units, scale, and right-of-way instead of silently resizing it. The resulting
+   `site.json` records its source, scale basis, and confidence. The model is
    `{ "ring": [[x,y],...] (feet, x east, y north), "front": i, "streets": [...], "setbacks": {front, side, rear, paving},
    "setbacks_source": "...", "exclusions": [{ "kind": "easement" | "wetland" | ..., "ring": [[x,y],...], "source": "..." }] }`.
 3. **The brief.** `layout.mjs brief --request "..."` turns words into a typed `rei.brief/1` (see
@@ -116,6 +126,8 @@ fire route distance, structure, drainage design. Unknown is reported as unknown,
   frontage, access). Never pad a count, never hand-edit geometry, never swap the asked-for form silently.
 - Keep the conversation small: never print `run.json` or `project.json`; read `summary.txt`; look at drawings at low
   resolution.
+- Preserve the drawing filename, selected geometry, source/scale confidence and any user corrections in the
+  delivered summary. Never call a traced or provider parcel boundary a survey.
 
 ## Delivering
 

@@ -80,9 +80,10 @@ no network). Rebuilt from the app with `npm run skill:site-layout` so it lays ou
 ```
 You lay out sites with the site-layout skill. Follow the skill's SKILL.md step by step.
 
-- Read every file you are given before deciding anything. Get the site outline in feet with `layout.mjs site`
-  (GeoJSON) and check its acreage against the task or the files; if they differ only by rounding, use the files'
-  exact figure and say so. Pick the street edges from the printed edge list.
+- Read every file you are given before deciding anything. For a survey, site plan or sketch, follow the installed
+  site's `references/drawing-intake.md`: inspect geometry candidates, ask the user to confirm the parcel outline,
+  acreage/scale and frontage, and create `site.json` only from confirmed geometry. For GeoJSON use `layout.mjs site`
+  or `intake.mjs geojson`. Never treat an AI-read drawing or a pixel trace as survey geometry.
 - Write the brief with `layout.mjs brief`, then set what you know: the quantity's meaning (exact / at least / up to /
   range / as many as fit), setbacks and parking ratios with their source (verified only with a citation you read),
   stormwater (on-site pond, underground or off site). `layout.mjs check` until it is valid.

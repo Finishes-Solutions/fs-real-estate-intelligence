@@ -10,21 +10,102 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SKILL = path.join(ROOT, 'skills/site-layout'), CLI = path.join(SKILL, 'scripts/layout.mjs');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SKILL = path.join(ROOT, 'skills/site-layout'), CLI = path.join(SKILL, 'scripts/layout.mjs'), INTAKE = path.join(SKILL, 'scripts/intake.mjs');
 const { closure } = await import(pathToFileURL(path.join(ROOT, 'scripts/build-skill-site-layout.mjs')).href);
 
 // 1. the engine copy is current (run `npm run skill:site-layout` after changing the engine)
 for (const rel of closure()) assert.ok(fs.existsSync(path.join(SKILL, 'scripts/engine', rel)) && fs.readFileSync(path.join(SKILL, 'scripts/engine', rel)).equals(fs.readFileSync(path.join(ROOT, 'lib', rel))), 'skills/site-layout/scripts/engine/' + rel + ' is out of date with lib/: run npm run skill:site-layout');
 assert.ok(fs.existsSync(path.join(ROOT, 'skills/site-layout.zip')), 'the skill zip is built');
+for (const name of ['extract_geometry.py', 'requirements.txt']) {
+  assert.ok(fs.readFileSync(path.join(SKILL, 'scripts/intake', name)).equals(fs.readFileSync(path.join(ROOT, 'skills/fs-site-plan/scripts', name === 'requirements.txt' ? 'intake-requirements.txt' : name))), 'packaged drawing intake ' + name + ' is out of date: run npm run skill:site-layout');
+}
+assert.ok(fs.existsSync(path.join(SKILL, 'references/drawing-intake.md')), 'the drawing intake workflow is packaged');
 console.log('skill engine in sync: ' + closure().length + ' files');
 
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-site-layout-'));
 const cli = (...a) => { const r = spawnSync(process.execPath, [CLI, ...a], { encoding: 'utf8', cwd: T, timeout: 240000 }); return { code: r.status, out: (r.stdout || '') + (r.stderr || '') }; };
+const intakeCli = (...a) => { const r = spawnSync(process.execPath, [INTAKE, ...a], { encoding: 'utf8', cwd: T, timeout: 240000 }); return { code: r.status, out: (r.stdout || '') + (r.stderr || '') }; };
 const json = f => JSON.parse(fs.readFileSync(path.join(T, f), 'utf8'));
+let r;
+
+// 1a. vector drawing candidates and pixel traces require explicit confirmation and retain provenance
+const geometry = {
+  source: 'dxf', units: 'unitless (assumed feet)', feet_per_unit: 1, unitless: true,
+  layers: {
+    PROPERTY: { closed: [[[1000, 2000], [1900, 2000], [1900, 2500], [1000, 2500]]] },
+    EASEMENT: { closed: [[[1100, 2100], [1120, 2100], [1120, 2120], [1100, 2120]]] }
+  },
+  boundary_candidates: [
+    { layer: 'PROPERTY', index: 0, boundary_layer: true },
+    { layer: 'EASEMENT', index: 0, boundary_layer: false }
+  ]
+};
+fs.writeFileSync(path.join(T, 'geometry.json'), JSON.stringify(geometry));
+r = intakeCli('candidate', '--file', 'geometry.json', '--layer', 'PROPERTY', '--index', '0', '--confirmed-acres', '10.331', '--front', '0', '--out', 'candidate-site.json');
+assert.equal(r.code, 2, 'drawing geometry is blocked until the user confirms the boundary');
+assert.match(r.out, /--confirm-boundary/);
+r = intakeCli('candidate', '--file', 'geometry.json', '--layer', 'PROPERTY', '--index', '0', '--confirmed-acres', '10.331', '--confirm-boundary', '--front', '0', '--exclude', 'EASEMENT#0', '--out', 'candidate-site.json');
+assert.equal(r.code, 2, 'unitless DXF candidates require explicit units confirmation');
+assert.match(r.out, /--confirm-units feet/);
+r = intakeCli('candidate', '--file', 'geometry.json', '--layer', 'PROPERTY', '--index', '0', '--confirmed-acres', '9.5', '--confirm-boundary', '--confirm-units', 'feet', '--front', '0', '--out', 'mismatch-site.json');
+assert.equal(r.code, 2, 'measured geometry is never auto-fitted to acreage');
+assert.match(r.out, /do not auto-fit a measured survey/);
+r = intakeCli('candidate', '--file', 'geometry.json', '--layer', 'PROPERTY', '--index', '0', '--confirmed-acres', '10.331', '--confirm-boundary', '--confirm-units', 'feet', '--front', '0', '--exclude', 'EASEMENT#0', '--out', 'candidate-site.json');
+assert.equal(r.code, 0, r.out);
+const importedSite = json('candidate-site.json');
+assert.equal(importedSite.ring.length, 4);
+assert.ok(Math.abs(importedSite.acres - 10.331) < .001);
+assert.deepEqual(importedSite.exclusions[0].ring[0], [100, 100], 'exclusions use the site boundary coordinate frame');
+assert.match(importedSite.boundary_source, /PROPERTY#0/);
+assert.match(importedSite.scale_basis, /difference/);
+r = intakeCli('candidate', '--file', 'geometry.json', '--layer', 'PROPERTY', '--index', '0', '--confirmed-acres', '10.331', '--confirm-boundary', '--confirm-units', 'feet', '--front', '4', '--out', 'bad-front-site.json');
+assert.equal(r.code, 2, 'frontage must point to a real boundary edge');
+r = intakeCli('candidate', '--file', 'geometry.json', '--layer', 'PROPERTY', '--index', '0', '--confirmed-acres', '10.331', '--confirm-boundary', '--confirm-units', 'feet', '--front', '0', '--streets', '8', '--out', 'bad-street-site.json');
+assert.equal(r.code, 2, 'street edges must point to real boundary edges');
+
+fs.writeFileSync(path.join(T, 'parcel.geojson'), JSON.stringify({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[-95.4, 29.7], [-95.398, 29.7], [-95.398, 29.701], [-95.4, 29.701], [-95.4, 29.7]]] } }));
+r = intakeCli('geojson', '--file', 'parcel.geojson', '--front', '0', '--out', 'geojson-site.json');
+assert.equal(r.code, 0, r.out);
+assert.ok(json('geojson-site.json').ring.length >= 4);
+assert.match(json('geojson-site.json').boundary_source, /not a boundary survey/);
+
+fs.writeFileSync(path.join(T, 'trace.json'), JSON.stringify({ ring: [[0, 0], [660, 0], [660, 660], [0, 660]] }));
+r = intakeCli('trace', '--ring', 'trace.json', '--confirmed-acres', '10', '--confirm-boundary', '--front', '0', '--out', 'trace-site.json');
+assert.equal(r.code, 0, r.out);
+const tracedSite = json('trace-site.json');
+assert.ok(Math.abs(tracedSite.ring[1][0] - 660) < .02);
+assert.ok(Math.abs(tracedSite.ring[0][1] - 660) < .02, 'pixel y coordinates are flipped into north-up local feet');
+assert.match(tracedSite.geometry_confidence, /low/);
+fs.writeFileSync(path.join(T, 'crossed-trace.json'), JSON.stringify({ ring: [[0, 0], [10, 10], [0, 10], [6, 0]] }));
+r = intakeCli('trace', '--ring', 'crossed-trace.json', '--confirmed-acres', '10', '--confirm-boundary', '--front', '0', '--out', 'crossed-site.json');
+assert.equal(r.code, 2, 'self-intersecting hand traces are rejected');
+assert.match(r.out, /crosses itself/);
+
+const unscaledPdf = {
+  source: 'pdf', units: 'PDF points', scale_ft_per_in: null,
+  layers: { boundary: { closed: [[[0, 0], [720, 0], [720, 360], [0, 360]]] } },
+  boundary_candidates: [{ layer: 'boundary', index: 0, boundary_layer: true }]
+};
+fs.writeFileSync(path.join(T, 'unscaled-pdf.json'), JSON.stringify(unscaledPdf));
+r = intakeCli('candidate', '--file', 'unscaled-pdf.json', '--layer', 'boundary', '--index', '0', '--confirmed-acres', '8', '--confirm-boundary', '--front', '0', '--out', 'blocked-pdf.json');
+assert.equal(r.code, 2, 'an unscaled vector PDF cannot be fitted without an explicit user-confirmed acreage fit');
+assert.match(r.out, /--fit-to-confirmed-acres/);
+r = intakeCli('candidate', '--file', 'unscaled-pdf.json', '--layer', 'boundary', '--index', '0', '--confirmed-acres', '8', '--confirm-boundary', '--fit-to-confirmed-acres', '--front', '0', '--out', 'fitted-pdf-site.json');
+assert.equal(r.code, 0, r.out);
+assert.match(json('fitted-pdf-site.json').geometry_confidence, /low/);
+assert.ok(Math.abs(json('fitted-pdf-site.json').acres - 8) < .001);
+
+// 1b. the imported site drives the same deterministic engine and provenance reaches its handoff
+r = cli('run', '--site', 'candidate-site.json', '--request', 'exactly 120 garden apartments, 3 stories', '--out', 'candidate-run');
+assert.equal(r.code, 0, r.out);
+const candidateRun = json('candidate-run/run.json');
+assert.equal(candidateRun.brief.site.source, importedSite.boundary_source);
+assert.equal(candidateRun.brief.site.geometry_confidence, importedSite.geometry_confidence);
+assert.ok(json('candidate-run/project.json').facts.some(f => f.includes('BOUNDARY SOURCE FILE: geometry.json, selected PROPERTY#0')));
 
 // 2. a rectangle, exactly 120 garden apartments
 fs.writeFileSync(path.join(T, 'rect.json'), JSON.stringify({ ring: [[0, 0], [900, 0], [900, 500], [0, 500]], front: 0, streets: [] }));
-let r = cli('run', '--site', 'rect.json', '--request', 'exactly 120 garden apartments, 3 stories', '--out', 'r1', '--name', 'Test Garden', '--address', '1 Test Rd');
+r = cli('run', '--site', 'rect.json', '--request', 'exactly 120 garden apartments, 3 stories', '--out', 'r1', '--name', 'Test Garden', '--address', '1 Test Rd');
 assert.equal(r.code, 0, r.out); assert.match(r.out, /^Outcome: feasible/m);
 const rec = json('r1/run.json'); assert.equal(rec.schema, 'rei.run/1'); assert.equal(rec.options[0].validation.status, 'pass'); assert.equal(rec.options[0].quantities.totals.units, 120);
 for (const f of ['summary.txt', 'option-1.svg', 'sheet.pdf', 'project.json', 'project-model.txt']) assert.ok(fs.statSync(path.join(T, 'r1', f)).size > 200, f);

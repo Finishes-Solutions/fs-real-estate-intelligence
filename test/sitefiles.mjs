@@ -185,6 +185,21 @@ res = await call('POST', { body: { pid: 'p-abc1', unmedia: ['render/pl1_mx9-corn
 assert.equal(res.body.removed, 2); assert.equal(media.size, 1, 'another project\'s picture stays');
 console.log('sitefiles api ok: not set up (key, bucket), signed upload, types and size, list, open, read PDF / PNG / DXF with the strict schema, unreadable, delete, team copies of renderings and plan sets');
 
+// ---- a supported reference drawing can start a confirmed-acreage trace from the project Files tab ----
+{
+  const { siteFiles } = await import('../public/sitefiles.js'), p = { id: 'p-abc1', files: [
+    { id: 'draw1', path: 'projects/p-abc1/k3x9a7b2c__Survey.pdf', name: 'Survey.pdf', size: 1024, type: 'application/pdf', facts: [] },
+    { id: 'text1', path: 'projects/p-abc1/k3x9a7b3c__Notes.txt', name: 'Notes.txt', size: 1024, type: 'text/plain', facts: [] }
+  ] };
+  const ui = siteFiles({ ctx: { toast() {} }, esc: s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]), project: () => p,
+    save() {}, render() {}, library: { get() {}, save() {} }, optionsOf: () => [], addEasement() {}, traceDrawing() {}, when: () => '' });
+  const timer = globalThis.setTimeout; let html;
+  try { globalThis.setTimeout = () => 0; html = ui.html(p); } finally { globalThis.setTimeout = timer; }
+  assert.match(html, /data-trace-acres="draw1"/);
+  assert.match(html, /data-ftrace="draw1"/);
+  assert.doesNotMatch(html, /data-ftrace="text1"/, 'plain text files cannot be traced as drawings');
+}
+
 // ---- the confirmed facts reach the site-plan AI: the program, the plan, the review, a change, a question ----
 { const { default: sp } = await import('../api/siteplan.js'); const got = [];
   globalThis.fetch = async (url, opts = {}) => { const u = String(url); if (u.includes('/models')) return json({ id: 'gpt-test', data: [{ id: 'gpt-test' }] }); const b = JSON.parse(opts.body); got.push(b);

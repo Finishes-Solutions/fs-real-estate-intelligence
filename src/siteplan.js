@@ -199,7 +199,8 @@ export function initSitePlan(ctx) {
   const RS = ruleSheets({ onChange: () => { if (ed && card.classList.contains('sp-mode') && !card.querySelector('.sp-rules :focus')) rulesRefresh(); } }); // the team's street rule sheets (lib/rulesheet.mjs), one per place
   // ---------- a project's reference files (src/sitefiles.js): the project page's Files tab; confirmed facts go to the AI ----------
   const SF = siteFiles({ ctx, esc, project: id => db.projects.find(x => x.id === id), save: p => save(p), render: () => { if (ctx.view === 'projects') render(true); }, library: TL, when: s => when(s),
-    optionsOf: p => (p?.plans || []).filter(pl => pl.ring.length >= 3).map(pl => ({ id: pl.id, name: pl.name, kos: pl.elements.filter(e => e.kind === 'keepout').map(e => e.name) })), addEasement: (p, plid, x, file) => easementFrom(p, plid, x, file) });
+    optionsOf: p => (p?.plans || []).filter(pl => pl.ring.length >= 3).map(pl => ({ id: pl.id, name: pl.name, kos: pl.elements.filter(e => e.kind === 'keepout').map(e => e.name) })), addEasement: (p, plid, x, file) => easementFrom(p, plid, x, file),
+    traceDrawing: (p, file, acres) => traceDrawing(p, file, acres) });
   // a confirmed easement (its width and the side of the lot it runs along) drawn on an option as a no-build area: a strip
   // inside that lot line (lib/sitefiles.mjs easementStrip). The layouts then keep off it, like one drawn by hand.
   function easementFrom(p, plid, x, file) {
@@ -1305,7 +1306,7 @@ export function initSitePlan(ctx) {
     const G = SP.frame(x.origin), N = SP.frame(b.origin);
     const to = p => N.toFt(G.toLL(p)).map(v => +v.toFixed(2));
     x.elements.forEach(e => { [e.x, e.y] = to([e.x, e.y]); if (e.path) e.path = e.path.map(to); if (e.poly) e.poly = e.poly.map(to); if (e.cl) e.cl = e.cl.map(to); });
-    x.origin = b.origin; x.ring = b.ring; x.src = src; x.front = null; x.frontGuess = true; x.streets = []; x.streetsSet = false; x.zones = []; // the layout's zone lines were drawn on the old outline
+    x.origin = b.origin; x.ring = b.ring; x.src = src; if (src !== 'drawn') delete x.boundarySource; x.front = null; x.frontGuess = true; x.streets = []; x.streetsSet = false; x.zones = []; // the layout's zone lines were drawn on the old outline
   }
   function setParcels(keys) {
     const p = P(), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(r => r?.geometry), b = siteOf(recs);
@@ -1340,9 +1341,22 @@ export function initSitePlan(ctx) {
     if (T.selfIntersects(ed.draft)) { ctx.toast('The outline crosses itself. Click the corners in order round the site (Backspace takes a point back).'); return; } // a bow-tie has no real area: its layouts were nonsense
     const F = SP.frame(pl.origin), ll = ed.draft.map(F.toLL), b = SP.boundaryFrom({ type: 'Polygon', coordinates: [ll.concat([ll[0]])] });
     if (!b || SP.ringArea(b.ring) < 1000) { ctx.toast('That outline has almost no area: click at least three corners that aren’t in a line.'); return; }
+    if (pl.boundarySource?.confirmedAcres) {
+      const tracedAcres = SP.ringArea(b.ring) / 43560, confirmedAcres = pl.boundarySource.confirmedAcres, differencePct = Math.abs(tracedAcres - confirmedAcres) / confirmedAcres * 100;
+      if (differencePct > 10 && !confirm('The map trace is ' + tracedAcres.toFixed(2) + ' acres, ' + differencePct.toFixed(1) + '% different from the ' + confirmedAcres.toFixed(2) + ' acres confirmed from ' + pl.boundarySource.fileName + '. Check the outline and map scale. Continue anyway?')) return;
+      pl.boundarySource = { ...pl.boundarySource, tracedAcres: +tracedAcres.toFixed(3), differencePct: +differencePct.toFixed(1), confidence: differencePct > 10 ? 'low; acreage mismatch accepted by user' : 'low; manually traced on map' };
+    }
     if (ed.draftPlan) { P().plans.push(ed.draftPlan); ed.draftPlan = null; ctx.scheduleHash?.(); } // the option exists from here (and goes in the address)
     change(x => reorigin(x, b, 'drawn'));
     ed.mode = null; ed.draft = []; draw(); panel(); map.once('idle', () => PL() === pl && detectFront(pl));
+  }
+  function traceDrawing(p, file, acres) {
+    if (!db.projects.some(x => x.id === p.id)) throw new Error('That project is no longer available.');
+    if (ed?.run) throw new Error('Wait for the current layout run to finish before starting a boundary trace.');
+    const center = p.parcels.find(x => x.center)?.center || [+map.getCenter().lng.toFixed(6), +map.getCenter().lat.toFixed(6)];
+    const plan = newPlan(p, { origin: center, boundarySource: { fileName: String(file.name || 'reference drawing').slice(0, 120), confirmedAcres: acres, confidence: 'low; manual map trace' } });
+    open(p.id, plan.id, { draw: true, draftPlan: plan });
+    ctx.toast('The reference is open in another tab. Trace its boundary on the map, then compare the mapped area with the confirmed acreage. This conceptual trace is not a survey.');
   }
 
   // ---------- tools: measure, draw an area or a line, fit, the grid, layers ----------
@@ -2103,7 +2117,7 @@ export function initSitePlan(ctx) {
     const back = fromCard && ctx.cardChild?.() === 'open' ? '<button type="button" class="cback sp-cback" title="Back to ' + esc(fromCard) + '">' + ICO.back + '<span>' + esc(fromCard) + '</span></button>' : '';
     // one list (lib/planview.mjs): the section chips and the sections come from it, in its order, so they can't drift apart
     const HTML = {
-      spDrawSite: () => '<div class="bsec sp-draw" id="spDrawSite"><div class="lt">Draw the site</div><p>Click each corner of the site on the map; click the first corner again, double-click or press Enter to finish.' + (ed.draft.length ? ' <b>' + plural(ed.draft.length, 'corner') + ' so far.</b>' : '') + '</p><div class="sp-row"><button type="button" class="btn sm primary" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button type="button" class="btn sm" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button type="button" class="btn sm ghost" id="spCancelDraw">Keep the Old Site</button>') + (ed.draftPlan ? '<button type="button" class="btn sm ghost" id="spCancelDraft" title="Throw the drawing away; no option is added">Cancel</button>' : '') + '</div></div>',
+      spDrawSite: () => '<div class="bsec sp-draw" id="spDrawSite"><div class="lt">Draw the site</div><p>Click each corner of the site on the map; click the first corner again, double-click or press Enter to finish.' + (pl.boundarySource && Number.isFinite(pl.boundarySource.confirmedAcres) ? ' The source drawing is open in another tab. Trace its parcel outline, not internal lines; the target is ' + pl.boundarySource.confirmedAcres.toFixed(2) + ' acres. Review the frontage before continuing.' : '') + (ed.draft.length ? ' <b>' + plural(ed.draft.length, 'corner') + ' so far.</b>' : '') + '</p><div class="sp-row"><button type="button" class="btn sm primary" id="spFinish"' + (ed.draft.length < 3 ? ' disabled' : '') + '>Finish</button><button type="button" class="btn sm" id="spClearDraw">Start Over</button>' + (noRing ? '' : '<button type="button" class="btn sm ghost" id="spCancelDraw">Keep the Old Site</button>') + (ed.draftPlan ? '<button type="button" class="btn sm ghost" id="spCancelDraft" title="Throw the drawing away; no option is added">Cancel</button>' : '') + '</div></div>',
       spSel: () => '<div class="bsec" id="spSel">' + selHtml(sel, prog) + '</div>',
       spLayouts: () => '<div class="bsec" id="spLayouts">' + layoutsHead() + '<div id="spVariants">' + variantsHtml() + '</div></div>',
       spChgSec: () => '<div class="bsec sp-ai" id="spChgSec"><label class="lt" for="spChg">Change with AI</label><textarea id="spChg" rows="2" placeholder="e.g. make Building A two stories · remove Bldg 3 · all the apartments 3 stories · no 3-story homes">' + esc(ed.chg || '') + '</textarea>' +
@@ -2393,6 +2407,7 @@ export function initSitePlan(ctx) {
   // the site: its tools as a grid of equal buttons, the parcels it's made of, and one line when something needs doing
   function siteHtml(p, pl, stage) {
     const sure = STG.status(pl).site.state === 'done'; // confirmed: the site's tools wait for Reopen
+    const source = pl.boundarySource;
     const keys = pl.parcels || (pl.parcel ? [pl.parcel] : []), recs = keys.map(k => p.parcels.find(x => x.key === k)).filter(Boolean), on = ed.mode === 'parcels', F = SP.frame(pl.origin);
     // the parcels that make up the site: the ones whose outline lies in the site's (a parcel across a road, or with no outline, is left out)
     const rings = g => g ? (g.type === 'Polygon' ? [g.coordinates[0]] : (g.coordinates || []).map(q => q[0])) : [], near = q => pl.ring.some((a, k) => SP.segDist(q, a, pl.ring[(k + 1) % pl.ring.length]) < 8);
@@ -2401,6 +2416,7 @@ export function initSitePlan(ctx) {
     const head = pl.src === 'drawn' && !used.length ? ' · drawn on the map' : used.length ? ' · ' + plural(used.length, 'parcel') : '';
     const b = (id, ic, label, tip, pressed) => '<button type="button" class="btn sp-stb" id="' + id + '"' + (pressed == null ? '' : ' aria-pressed="' + pressed + '"') + ' title="' + esc(tip) + '">' + SI[ic] + '<span>' + label + '</span></button>';
     return '<div class="bsec" id="spSiteSec"><div class="lt">Site<span class="src">' + (SP.ringArea(pl.ring) / 43560).toFixed(2) + ' ac' + head + '</span></div>' +
+      (source && Number.isFinite(source.confirmedAcres) ? '<div class="rnote sp-1l">Boundary traced from ' + esc(source.fileName || 'reference drawing') + '. Confirmed ' + source.confirmedAcres.toFixed(2) + ' acres; mapped ' + (Number.isFinite(source.tracedAcres) ? source.tracedAcres.toFixed(2) + ' acres (' + (Number.isFinite(source.differencePct) ? source.differencePct.toFixed(1) : 'unknown') + '% difference)' : 'area not measured yet') + '. Manual map trace, not survey-certified; verify the outline and street side.</div>' : '') +
       (sure ? '<div class="rnote sp-1l">The site is confirmed. Reopen it (above) to change its parcels, street side or outline.</div>' : '<div class="sp-g2">' + b('spParcels', 'parcels', on ? 'Done With Parcels' : 'Change Parcels', 'Click parcels on the map to add them to the site (up to ' + MAXP + ') or take them out', on) +
         b('spFront', 'front', 'Street Side', 'Then click the lot line along the street; front setbacks and drives follow it', ed.mode === 'front') + b('spStreet', 'street', 'Side Street', 'A second street along the lot (a corner lot): click its lot line to add it, or again to remove it', ed.mode === 'street') +
         (stage === 'site' ? '' : b('spEntr', 'entr', 'Add Entrance', 'A driveway in from the street: click the lot line where it should come in; it runs straight in to the nearest drive', ed.mode === 'entrance') + b('spRing', 'ring', 'Add Roundabout', 'A ring with a planted island where streets meet: click a junction (the small circles); the streets are cut back to it and the homes in its way make way', ed.mode === 'roundabout')) + b('spRedraw', 'redraw', 'Redraw Site', 'Draw the site’s outline again, corner by corner') + '</div>') +

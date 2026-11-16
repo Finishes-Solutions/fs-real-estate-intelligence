@@ -1,4 +1,4 @@
-// The project page's Files tab: reference files for the AI (a survey, existing floor plans, an earlier site plan).
+// The project page's Files tab: reference files for the AI and a confirmed-acreage manual trace into a new site option.
 // A file goes straight from the browser to the team's private storage on a one-time link (api/sitefiles.js), then the
 // AI reads it into facts (lib/sitefiles.mjs), each with how sure it is and where it came from. Each fact is confirmed,
 // corrected or dismissed here; only confirmed ones go to the AI with every site-plan call about this project (src/
@@ -19,7 +19,7 @@ const fieldsFor = f => f.category === 'floor_plan' ? ['value', 'widthFt', 'depth
 // object); save(p): keep and share it; render(): draw the tab again; library: the team building library (save);
 // optionsOf(p): the options an easement can be drawn on [{ id, name }]; addEasement(p, plid, points, fact, file) ->
 // a message, or throws with what went wrong; when(iso): "2 days ago"
-export function siteFiles({ ctx, esc, project, save, render, library, optionsOf, addEasement, when }) {
+export function siteFiles({ ctx, esc, project, save, render, library, optionsOf, addEasement, traceDrawing, when }) {
   const st = { setup: null, why: '', listed: new Set(), busy: new Map(), pct: new Map(), err: new Map(), editing: null, place: new Map() };
   const headers = () => ({ 'Content-Type': 'application/json', 'x-field-code': get(CODE_KEY) });
   async function call(pid, body, q) {
@@ -86,6 +86,21 @@ export function siteFiles({ ctx, esc, project, save, render, library, optionsOf,
     try { const d = await call(pid, null, '&open=' + encodeURIComponent(f.path)); if (w) w.location = d.url; else location.href = d.url; }
     catch (e) { w?.close(); ctx.toast('Couldn’t open ' + f.name + ': ' + e.message); }
   }
+  async function trace(pid, id) {
+    const f = F(P(pid), id); if (!f || f.missing) return;
+    const input = document.querySelector('[data-trace-acres="' + CSS.escape(id) + '"]'), acres = Number(input?.value);
+    if (!Number.isFinite(acres) || acres <= 0) { ctx.toast('Enter the confirmed site acreage from the drawing before tracing it.'); input?.focus(); return; }
+    if (!traceDrawing) { ctx.toast('Drawing-based site intake is not available on this copy of the site.'); return; }
+    const w = window.open('', '_blank');
+    if (!w) { ctx.toast('Allow pop-ups to open the reference drawing in a second tab before tracing.'); return; }
+    try {
+      const d = await call(pid, null, '&open=' + encodeURIComponent(f.path));
+      if (!d.url) throw new Error('The reference link was not returned.');
+      w.location = d.url;
+      const p = P(pid); if (p) traceDrawing(p, f, acres);
+      else w.close();
+    } catch (e) { w.close(); ctx.toast('Couldn’t start a trace from ' + f.name + ': ' + e.message); }
+  }
   function setFact(pid, id, fid, fn) { const p = P(pid), f = F(p, id), x = f?.facts?.find(q => q.id === fid); if (!x) return; fn(x, f, p); save(p); render(); }
 
   // ---------- the tab ----------
@@ -118,6 +133,7 @@ export function siteFiles({ ctx, esc, project, save, render, library, optionsOf,
   function fileHtml(pid, fl) {
     const b = st.busy.get(fl.id), facts = fl.facts || [], shown = facts.filter(x => x.status !== 'no'), gone = facts.filter(x => x.status === 'no'), sure = facts.filter(x => x.status === 'new' && x.confidence === 'sure').length;
     const ext = RF.extOf(fl.name).toUpperCase() || 'FILE', r = fl.read;
+    const traceable = ['pdf', 'png', 'jpg', 'jpeg', 'dxf'].includes(RF.extOf(fl.name));
     const status = b === 'upload' ? '<p class="rnote loading" data-fpct="' + esc(fl.id) + '">Uploading ' + (st.pct.get(fl.id) || 0) + '%…</p>' : b === 'read' ? '<p class="rnote loading" role="status">The AI is reading it (up to a couple of minutes for a long PDF)…</p>' : b === 'delete' ? '<p class="rnote loading">Deleting…</p>'
       : fl.missing ? '<p class="rnote err">This file is no longer in the team’s storage; its facts stay here.</p>' : fl.readErr ? '<p class="rnote err">' + esc(fl.readErr) + ' <button type="button" class="lnk" data-fread="' + esc(fl.id) + '">Try again</button></p>' : !r ? '<p class="rnote">Not read yet. <button type="button" class="lnk" data-fread="' + esc(fl.id) + '">Read it</button></p>' : '';
     return '<article class="pj-file" data-fid="' + esc(fl.id) + '"><div class="pj-fh"><span class="pj-fic" aria-hidden="true">' + esc(ext) + '</span><div class="pj-fm"><b title="' + esc(fl.name) + '">' + esc(fl.name) + '</b><span>' +
@@ -126,7 +142,8 @@ export function siteFiles({ ctx, esc, project, save, render, library, optionsOf,
       (r ? '<p class="pj-fsum">' + esc(r.title ? r.title + ': ' : '') + esc(r.summary || '') + '</p>' + (r.readable === false || r.unreadable ? '<p class="rnote err">' + esc(r.readable === false ? 'The AI couldn’t read this file' + (r.unreadable ? ': ' + r.unreadable : '.') : 'Not all of it could be read: ' + r.unreadable) + '</p>' : '') : '') +
       (shown.length ? '<ul class="pj-facts">' + shown.map(x => factHtml(pid, fl, x)).join('') + '</ul>' : r && r.readable !== false && !facts.length ? '<p class="rnote">No facts found in it.</p>' : '') +
       (gone.length ? '<details class="pj-fgone"><summary>' + gone.length + ' dismissed</summary><ul class="pj-facts">' + gone.map(x => factHtml(pid, fl, x)).join('') + '</ul></details>' : '') +
-      (sure > 1 ? '<div class="btnrow"><button type="button" class="btn sm" data-fsure="' + esc(fl.id) + '" title="Confirm every fact the AI read clearly; check the unsure ones one by one">Confirm the ' + sure + ' Sure Facts</button></div>' : '') + '</article>';
+      (sure > 1 ? '<div class="btnrow"><button type="button" class="btn sm" data-fsure="' + esc(fl.id) + '" title="Confirm every fact the AI read clearly; check the unsure ones one by one">Confirm the ' + sure + ' Sure Facts</button></div>' : '') +
+      (traceable && !fl.missing ? '<div class="pj-trace"><label for="pjTraceAcres-' + esc(fl.id) + '">Confirmed site area <span>(acres)</span></label><div class="btnrow"><input id="pjTraceAcres-' + esc(fl.id) + '" data-trace-acres="' + esc(fl.id) + '" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="e.g. 7.71" aria-label="Confirmed site area in acres for ' + esc(fl.name) + '"' + (b ? ' disabled' : '') + '><button type="button" class="btn sm" data-ftrace="' + esc(fl.id) + '"' + (b ? ' disabled' : '') + '>Trace boundary on map</button></div><small>Opens this reference in another tab. Trace its boundary on the map, then compare the mapped area to the confirmed acreage. This is a conceptual trace, not a survey.</small></div>' : '') + '</article>';
   }
   function html(p) {
     if (!st.listed.has(p.id)) setTimeout(() => list(p.id));
@@ -144,6 +161,7 @@ export function siteFiles({ ctx, esc, project, save, render, library, optionsOf,
     if (drop) { drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); }; drop.ondragleave = () => drop.classList.remove('over');
       drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); const fs = [...(e.dataTransfer?.files || [])]; if (fs.length) upload(pid, fs); }; }
     sec.querySelectorAll('[data-fopen]').forEach(b => b.onclick = () => open(pid, b.dataset.fopen));
+    sec.querySelectorAll('[data-ftrace]').forEach(b => b.onclick = () => trace(pid, b.dataset.ftrace));
     sec.querySelectorAll('[data-fread]').forEach(b => b.onclick = () => { const f = F(P(pid), b.dataset.fread), n = (f?.facts || []).filter(x => x.status === 'ok').length; if (n && !confirm('Read ' + f.name + ' again? Its facts are replaced, the ' + n + ' confirmed one' + (n === 1 ? '' : 's') + ' too.')) return; read(pid, b.dataset.fread); });
     sec.querySelectorAll('[data-fdel]').forEach(b => b.onclick = () => remove(pid, b.dataset.fdel));
     sec.querySelectorAll('[data-fsure]').forEach(b => b.onclick = () => { const p1 = P(pid), f = F(p1, b.dataset.fsure); if (!f) return; for (const x of f.facts || []) if (x.status === 'new' && x.confidence === 'sure') x.status = 'ok'; save(p1); render(); });
