@@ -1,4 +1,4 @@
-// Site reports for the parcel on the building card, one click each: Parcel Map, Topography, Site Environmental and the Area
+// Site reports for the parcel on the building card (or every parcel picked, on the All tab), one click each: Parcel Map, Topography, Site Environmental and the Area
 // Report in 1, 3, 5 and 10-mile rings. Made on the server (api/sitereport.js) as an unbranded PDF and saved like every other
 // export (recorded in the Reports tab). Shown on the card (a "Reports" block at the end of the Site section) and on the
 // Reports tab ("For the open parcel").
@@ -28,12 +28,12 @@ export function fromRegrid(rg) {
 
 export function initSiteReports(ctx) {
   const running = new Set();
-  // the parcel the reports are about: the open card's
   // the parcel the reports are about: the open card's appraisal record, else its Regrid record (outside Texas, or where the
   // county has none) once "Get Regrid Details" has run for it
   // A parcel drawn from the map's lines alone (fromLines: no acres or values) gives way to its Regrid record once that has
   // been fetched for it (2026-10-30, Sevier County TN: the Parcel Map showed 0.00 acres and $0 beside a fetched record).
-  const target = () => { const b = ctx.currentBuilding?.(); if (!b) return null;
+  // With several picked and the All tab open, it's all of them together (src/building.js selectionReportTarget).
+  const target = () => { const b = ctx.currentBuilding?.(); if (!b) return ctx.selectionReportTarget?.() || null;
     const rg = ctx.lastRegrid, rgHere = !!rg?.geom && Math.hypot(rg.center[0] - b.center[0], rg.center[1] - b.center[1]) <= 1e-4;
     if (b.parcel?.geometry && !(b.parcel.fromLines && rgHere)) return { parcels: [b.parcel], center: b.center, label: b.parcel.situs || b.title || '' };
     if (!rgHere) return null;
@@ -44,7 +44,7 @@ export function initSiteReports(ctx) {
     if (!t) { ctx.toast?.(ctx.currentBuilding?.() ? 'This parcel has no free appraisal record: press Get Regrid Details on the card first (the report is drawn from its outline).' : 'Click a parcel on the map first: the report is drawn from its outline.'); return; }
     const id = key + '|' + t.center.join(','); if (running.has(id)) return; running.add(id);
     const old = btn?.innerHTML; if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.innerHTML = '<b>' + esc(r.label) + '</b><span>Making it… ' + esc(r.time) + '</span>'; }
-    ctx.toast?.('Making the ' + r.label + '…');
+    ctx.toast?.('Making the ' + r.label + (t.parcels.length > 1 ? ' for ' + t.parcels.length + ' parcels' : '') + '…');
     try {
       const res = await fetch('api/sitereport', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: key, parcels: t.parcels, center: t.center, label: t.label }) });
       if (!res.ok || !/pdf/.test(res.headers.get('content-type') || '')) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'The ' + r.label + ' couldn’t be made right now.'); }
@@ -60,7 +60,7 @@ export function initSiteReports(ctx) {
     const fc = parcelGeoJSON(t.parcels, { regrid: t.regrid || null, label: t.label });
     if (!fc.features.length) { ctx.toast?.('This parcel has no outline to export.'); return; }
     ctx.exportMeta = { report: 'site-outline', format: 'geojson', scope: t.label };
-    try { await ctx.saveFile('parcel-outline-' + slug(t.label) + '-' + new Date().toISOString().slice(0, 10) + '.geojson', new Blob([JSON.stringify(fc, null, 1)], { type: 'application/geo+json' }), 'application/geo+json'); }
+    try { await ctx.saveFile('parcel-outline' + (t.parcels.length > 1 ? 's' : '') + '-' + slug(t.label) + '-' + new Date().toISOString().slice(0, 10) + '.geojson', new Blob([JSON.stringify(fc, null, 1)], { type: 'application/geo+json' }), 'application/geo+json'); }
     catch (e) { ctx.toast?.(e.message); } finally { ctx.exportMeta = null; }
   }
   // the buttons: a grid of one-click reports for el (the card's Site section, or the Reports tab)

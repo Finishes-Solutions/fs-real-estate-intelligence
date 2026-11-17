@@ -169,4 +169,36 @@ const T = { ...spec, z, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 };
   assert.ok(!all.includes('0.2% annual chance'), 'zone X (minimal) is not drawn as a hazard');
   const gone = M.envMapPages({ head, foot: '', ring, origin, F, layers: { ...layers, wetlands: [], terrain: null, errors: { wetlands: 'Failed to execute query.', terrain: 'timed out' } }, png: pngDataUrl }).join('');
   assert.match(gone, /The wetlands map didn't load/); assert.match(gone, /a blank is not "none"/); assert.match(gone, /Detailed ground elevations didn't load/); }
+// ---------- several parcels as one site (lib/reports/sitering.mjs): three real Waller County parcels that adjoin (OP-0046, 41119 Old
+// Houston Hwy: 9.36 + 0.93 + 5.88 ac, outlines as the appraisal district draws them, with the slivers and overlaps between) ----------
+{ const SR = await import('../lib/reports/sitering.mjs'), API = await import('../api/sitereport.js');
+  const cards = JSON.parse(readFileSync(new URL('../build/projects/op-0046.parcels.json', import.meta.url), 'utf8')), recs = cards.map(API.toRecord);
+  const S = SR.siteOutline(recs), ac = S.areaSf / 43560, sum = recs.reduce((t, r) => t + r.acres, 0);
+  assert.equal(S.inSite.length, 3, 'every parcel picked is in the site'); assert.equal(S.left.length, 0); assert.equal(S.lots.length, 3, 'the three parcel lines, to draw inside the outline');
+  assert.ok(Math.abs(ac / sum - 1) < 0.02, 'the merged outline measures the three parcels together (' + ac.toFixed(2) + ' ac against ' + sum.toFixed(2) + ' on the roll), not the first one alone');
+  const F1 = frame(S.center), site = S.ring.map(F1.toFt), inR = (p, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) c = !c; } return c; };
+  for (const r of recs) { const ft = r.geom.slice(0, -1).map(F1.toFt), c = [ft.reduce((t, p) => t + p[0], 0) / ft.length, ft.reduce((t, p) => t + p[1], 0) / ft.length]; assert.ok(inR(c, site), 'parcel ' + r.id + ' lies inside the site outline'); }
+  assert.match(SR.siteNote(S), /^The site is 3 parcels together, measured as one outline of 16\.\d\d acres\.$/);
+  assert.equal(SR.siteNote(SR.siteOutline([recs[0]])), '', 'one parcel: nothing to say'); assert.equal(SR.siteOutline([recs[0]]).ring.length, recs[0].geom.length - 1, 'one parcel keeps its own outline, every point');
+  // a parcel across a road (60 ft away) is joined, the road's strip counted in and said so; one a mile off is left out and named
+  const mx = 1 / (364000 * Math.cos(30.057 * Math.PI / 180)), xs = recs.flatMap(r => r.geom.map(p => p[0])), ys = recs.flatMap(r => r.geom.map(p => p[1])), e = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const lot = (id, dx) => ({ ...recs[1], id, geom: [[e + dx * mx, y0], [e + (dx + 300) * mx, y0], [e + (dx + 300) * mx, y1], [e + dx * mx, y1], [e + dx * mx, y0]] });
+  const S2 = SR.siteOutline([...recs, lot('ACROSS', 60), lot('FAR', 5400)]);
+  assert.deepEqual(S2.left.map(r => r.id), ['FAR'], 'only the parcel a mile away is left out'); assert.equal(S2.inSite.length, 4); assert.ok(S2.gaps >= 1 && S2.areaSf > S.areaSf + 300 * 1000, 'the lot across the road is part of the site');
+  assert.match(SR.siteNote(S2), /4 parcels together.*ground between them.*One parcel \(FAR\) of the 5 picked lies more than 200 ft from the rest and is not in this report/);
+  // the reports: topography measured on the whole site (not parcel 1), the parcel lines drawn, the note on the page
+  const ring3 = site, box = API.topoBox(ring3), sp = TR.gridSpec(box, { maxPts: TR.MAX_POINTS, minCell: 3, margin: 0 }), zz = [];
+  for (let j = 0; j < sp.ny; j++) for (let i = 0; i < sp.nx; i++) zz.push(250 + 0.006 * (sp.x0 + i * sp.cell));
+  const T3 = { ...sp, z: zz, source: 'USGS 3DEP', detail: '1 m lidar', resM: 1 }, inside = k => { let n = 0; for (let j = 0; j < sp.ny; j++) for (let i = 0; i < sp.nx; i++) if (inR([sp.x0 + i * sp.cell, sp.y0 + j * sp.cell], k)) n++; return n; };
+  const th = TP.topoReport({ title: '3 parcels', terrain: T3, ring: ring3, origin: S.center, png: pngDataUrl, lots: S.lots.map(l => l.map(F1.toFt)), note: SR.siteNote(S) });
+  assert.ok(th.includes(inside(ring3).toLocaleString('en-US') + '</') && inside(ring3) > 1.6 * inside(recs[0].geom.slice(0, -1).map(F1.toFt)), 'points counted over all three parcels');
+  assert.equal((th.match(/stroke-dasharray="4 3"/g) || []).length, 3, 'three parcel lines inside the site'); assert.ok(th.includes('The site is 3 parcels together') && th.includes('dashed: the parcel lines inside it'));
+  assert.ok(!TP.topoReport({ title: 'One', terrain: T3, ring: ring3, origin: S.center, png: pngDataUrl }).includes('dashed'), 'one parcel: as before');
+  // the endpoint: all three in the Parcel Map; the Area Report measured from the middle of the site with its merged outline
+  const pm = await API.buildHtml('parcel', { parcels: cards, center: cards[0].center || S.center, label: '3 parcels at 41119 Old Houston Hwy' });
+  assert.ok(pm.includes('Parcel 3 of 3') && pm.includes('3 parcels at 41119 Old Houston Hwy') && pm.includes('10680'), 'the parcel map lists all three');
+  const far = [-95.90, 30.09], ar = await API.buildHtml('area', { parcels: cards, center: far, label: '3 parcels' });
+  assert.ok(ar.includes('Rings measured from ' + S.center[1].toFixed(5) + ', ' + S.center[0].toFixed(5)), 'rings from the middle of the site, not from the first pick'); assert.ok(ar.includes('The site is 3 parcels together') && ar.includes('measured from the middle of the site'));
+  const one = await API.buildHtml('area', { parcels: [cards[0]], center: far, label: 'One' }); assert.ok(one.includes('Rings measured from ' + far[1].toFixed(5)) && !one.includes('parcels together'), 'one parcel: measured from where it was asked, no note'); }
+
 console.log('sitereports ok');

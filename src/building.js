@@ -300,7 +300,7 @@ export function initBuildings(ctx) {
     card.querySelector('#bSizeBody').innerHTML = sizeRows(b);
     // the parcel list (a building on several parcels) comes with the second lookup, so the parcel section is redrawn with it
     if (!early || d.parcels?.length > 1) renderParcel(d.parcel, d.parcelError, d.parcels);
-    if (!early) { renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, d.parcel); }
+    if (!early) { renderFilings(d.parcel?.geometry || null); renderTenants(d.parcel); ctx.renderSite?.(card.querySelector('#bSite'), b.center, d.parcel, d.parcels); ctx.renderRegrid?.(card.querySelector('#bRegrid'), b.center, d.parcel); ctx.renderDev?.(card.querySelector('#bDev'), b.center, d.parcel); }
     renderOverview(b, d); renderPlaces(d.places || [], d.placesError); renderPhoto(d.photo); planBtn(b);
   }
   // a parcel that's already in a project: the button opens its plan (Site plan's start card offers Open Plan first)
@@ -335,6 +335,9 @@ export function initBuildings(ctx) {
       for (const t of ctx.tabs.list('building')) { const x = t.ref; if (x && !x.d && !x.loading) x.loading = details(x).catch(e => { x.err = e.message; }).finally(() => { x.loading = null; highlight(); if (ctx.tabs.active()?.id === 'b:all') renderAll(); else ctx.tabs.label(t.id, x.parcel?.situs || x.parcel?.owner || t.label); }); } }
     else ctx.tabs?.pin({ id: 'b:all', drop: true });
   }
+  // the reports' target while the All tab is the open one (the Reports page reads it: "For the selected parcels")
+  let allTarget = null;
+  ctx.selectionReportTarget = () => ctx.tabs?.active()?.id === 'b:all' ? allTarget : null;
   function renderAll() {
     const list = (ctx.tabs?.list('building') || []).map(t => t.ref).filter(Boolean); if (!list.length) return; cur = null; stopOrbit();
     const rows = list.map(b => ({ b, s: stats(b) })), uniqP = new Map();
@@ -347,6 +350,9 @@ export function initBuildings(ctx) {
     const acres = [...uniqP.values()].reduce((t, p) => t + (/acre/i.test(p.area || '') ? parseFloat(p.area) : 0), 0);
     const geoms = [...uniqP.values()].map(p => p.geometry).concat(list.filter(b => !b.parcel).map(b => b.footprint)).filter(Boolean);
     const fl = F.filter(f => geoms.some(g => inGeom([f.lon, f.lat], g))), loading = list.some(b => b.loading);
+    // what the reports are made for: every parcel picked that has an outline, together
+    const withOutline = [...uniqP.values()].filter(p => p.geometry?.coordinates?.length), noOutline = list.filter(b => !(b.d?.parcels?.length ? b.d.parcels : [b.parcel || b.rg]).some(p => p?.geometry)).length;
+    const rep = allTarget = !loading && withOutline.length ? { parcels: withOutline, center: list[0].center, label: withOutline.length === 1 ? withOutline[0].situs || '1 parcel' : withOutline.length + ' parcels' + (withOutline.find(p => p.situs) ? ' at ' + withOutline.find(p => p.situs).situs.split(',')[0] : '') } : null;
     card.innerHTML = '<div class="top"><div><div class="kicker">Selection</div><h2>' + list.length + ' buildings &amp; parcels</h2><div class="bsub">' + ((matchMedia('(pointer: coarse)').matches ? 'Tap Add to pick more' : 'Shift-click to add more') + ' · up to 20') + '</div></div>' +
       '<button class="x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
       '<div class="kgrid msum"><div><b>' + (tot('fp') ? fmtN(tot('fp')) : '—') + '</b><span>Footprint sq ft</span></div><div><b>' + (tot('gfa') ? '~' + fmtN(tot('gfa')) : '—') + '</b><span>Est. floor area sq ft</span></div>' +
@@ -355,12 +361,17 @@ export function initBuildings(ctx) {
       '<div class="bsec"><div class="lt">Selected</div>' + rows.map(({ b, s }, i) => '<div class="mrow"><button class="lnk" data-go="' + i + '"><b><i class="mnum">' + (i + 1) + '</i>' + esc(b.parcel?.situs || (b.footprint ? 'Building ' : 'Parcel ') + (i + 1)) + '</b><span>' +
         [s.fp ? fmtN(s.fp) + ' sq ft footprint' : (b.footprint ? '' : 'parcel only'), s.fl ? (s.fSrc === 'estimated from height' ? '~' : '') + s.fl + ' fl' : '', s.h ? ft(s.h) : '', b.d?.parcels?.length > 1 ? b.d.parcels.length + ' parcels' : '', b.parcel?.owner || ''].filter(Boolean).map(esc).join(' · ') + (b.err ? ' · lookup failed' : '') + '</span></button><button class="x" data-rm="' + i + '" aria-label="Remove">×</button></div>').join('') + '</div>' +
       (fl.length ? '<div class="bsec"><div class="lt">Construction filings on these parcels</div><div class="rnote">' + fl.length + ' filing' + (fl.length > 1 ? 's' : '') + ' · est. ' + fmtM(fl.reduce((t, f) => t + f.cost, 0)) + '</div></div>' : '') +
+      // the one-click site reports for every parcel picked, as one site (src/sitereports.js)
+      (ctx.siteReportButtons ? '<div class="bsec site-rep" id="mReports"><div class="lt">Reports for ' + (rep ? rep.parcels.length === 1 ? 'this parcel' : 'these ' + rep.parcels.length + ' parcels' : 'these parcels') + '</div>' + ctx.siteReportButtons(rep, { always: !!rep }) +
+        '<div class="rnote">' + (loading ? 'Ready once the parcels have loaded.' : !rep ? 'None of these has a parcel outline yet: open one and press Get Regrid Details, and the reports are drawn from it.' :
+          (rep.parcels.length > 1 ? 'One report for all of them as one site: the Parcel Map lists each parcel, and the others measure the parcels together.' : '') + (noOutline ? ' ' + noOutline + ' of the picks ' + (noOutline === 1 ? 'has' : 'have') + ' no parcel outline and ' + (noOutline === 1 ? 'is' : 'are') + ' left out.' : '')) + '</div></div>' : '') +
       '<div class="bacts"><button class="btn askai" id="mPlan" title="One site plan on all these parcels together (up to 20)">Site Plan for All</button><button class="btn" id="mCsv">Export CSV</button><button class="btn" id="mFit">Zoom to All</button><button class="btn" id="mClear">Clear</button></div>';
     card.classList.add('open');
     ctx.tabs?.track({ id: 'b:all', kind: 'summary', label: 'All ' + list.length, reopen: renderAll, pinned: true });
     highlight();
     card.querySelector('.x').onclick = () => ctx.closeCard();
     card.querySelector('#mClear').onclick = () => ctx.closeCard();
+    if (rep) ctx.wireSiteReports?.(card.querySelector('#mReports'), rep);
     card.querySelector('#mPlan').onclick = () => {
       if (list.some(b => b.loading)) { ctx.toast('Still loading the parcels. Try again in a moment.'); return; }
       const none = list.filter(b => !(b.d?.parcels?.length || b.parcel || b.rg)).length;
