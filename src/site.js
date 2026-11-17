@@ -30,17 +30,19 @@ export function initSite(ctx) {
     return out.join('');
   }
 
-  ctx.renderSite = async (el, center, parcel) => {
+  ctx.renderSite = async (el, center, parcel, parcels = null) => {
+    // a building on several parcels: its reports are for all of them together (parcels: every parcel under it)
+    const lots = (parcels || []).filter(p => p?.geometry), many = lots.length > 1 && lots.some(p => p.propId === parcel?.propId), repT = !parcel?.geometry ? null : many ? { parcels: lots, center, label: lots.length + ' parcels' + (parcel.situs ? ' at ' + parcel.situs.split(',')[0] : '') } : { parcels: [parcel], center, label: parcel.situs || '' };
     if (!el) return;
     el.innerHTML = '<div class="lt">Site</div><div class="rnote loading">Checking flood zone, traffic and districts…</div>';
     const addr = /^\d/.test(parcel?.situsStreet || '') ? parcel.situsStreet : '', zip = parcel?.situsZip || '';
     const [d, area] = await Promise.all([ctx.siteAt(center, addr, zip).catch(e => ({ error: e })), ctx.areaData ? ctx.areaData().catch(() => null) : null]);
     if (!el.isConnected) return;
-    if (d.error) { el.innerHTML = '<div class="lt">Site</div>'; el.append(errorBox(d.error, () => ctx.renderSite(el, center, parcel), 'Site data')); if (econRows(area, parcel)) el.insertAdjacentHTML('beforeend', '<dl>' + econRows(area, parcel) + '</dl>'); return; }
+    if (d.error) { el.innerHTML = '<div class="lt">Site</div>'; el.append(errorBox(d.error, () => ctx.renderSite(el, center, parcel, parcels), 'Site data')); if (econRows(area, parcel)) el.insertAdjacentHTML('beforeend', '<dl>' + econRows(area, parcel) + '</dl>'); return; }
     const f = d.flood, t = d.traffic, ds = d.districts || {}, env = d.environment, cr = d.crime, tr = d.transit;
     const flood = f && !f.error && f.zone ? '<b class="' + (f.risk === 'high' ? 'risk-hi' : f.risk === 'moderate' ? 'risk-md' : '') + '">Zone ' + esc(f.zone) + '</b> <span class="sc">' + esc(f.note) + '</span>' : f?.note ? esc(f.note) : '';
     const traffic = t?.roads?.length ? t.roads.map(r => esc(r.road) + ' <b>' + fmtN(r.aadt) + '</b>').join(' · ') + ' <span class="sc">vehicles/day</span>' : t && !t.error ? '<span class="sc">No counted roads within 300 m</span>' : '';
-    const water = (ds.water || []).filter(x => !x.error).map(x => esc(x.name) + ' <span class="sc">' + esc(x.type) + '</span>').join('<br>');
+    const water = (Array.isArray(ds.water) ? ds.water : []).filter(x => !x.error).map(x => esc(x.name) + ' <span class="sc">' + esc(x.type) + '</span>').join('<br>');
     const tirz = Array.isArray(ds.tirz) && ds.tirz.length ? ds.tirz.map(esc).join(', ') : '';
     const schools = Array.isArray(ds.schools) && ds.schools.length ? ds.schools.map(esc).join(', ') : '';
     const env1 = env && !env.error ? (env.count ? fmtN(env.total || env.count) + ' regulated facilit' + ((env.total || env.count) === 1 ? 'y' : 'ies') + ' within 0.25 mile' + (env.flaggedCount ? '; <b class="risk-md">' + env.flaggedCount + ' flagged</b>' : '; none flagged') : 'No EPA-regulated facilities within 0.25 mile') : '';
@@ -57,7 +59,7 @@ export function initSite(ctx) {
       row('Environmental', env1 && env1 + envList, 'EPA ECHO') + row('Alcohol sales here', bars && bars + '<br><span class="sc">Mixed beverage gross receipts, last 12 months</span>', 'Texas Comptroller') +
       econRows(area, parcel) + '</dl>' +
       // one-click site reports for this parcel (src/sitereports.js): drawn from its outline, so only with one
-      (ctx.siteReportButtons ? '<div class="site-rep" id="siteReports"><div class="fl">Reports for this parcel</div>' + (parcel?.geometry ? ctx.siteReportButtons({ parcels: [parcel], center, label: parcel.situs || '' }) :
+      (ctx.siteReportButtons ? '<div class="site-rep" id="siteReports"><div class="fl">Reports for ' + (many ? 'these ' + lots.length + ' parcels' : 'this parcel') + '</div>' + (repT ? ctx.siteReportButtons(repT) + (many ? '<div class="rnote">The building sits on ' + lots.length + ' parcels: one report for all of them as one site.</div>' : '') :
         ctx.siteReportButtons(null, { always: true }) + '<div class="rnote">No free appraisal record here: press Get Regrid Details first, and the reports are drawn from the Regrid parcel.</div>') + '</div>' : '') +
       // area reports for a circle around the site: pick a radius, then Crime Report or FEMA Report
       (ctx.crimeReport || ctx.femaReport || ctx.areaReports?.length ? '<div class="site-rep"><div class="fl">Area reports</div><div class="mi-chips" role="radiogroup" aria-label="Report radius">' +
@@ -65,7 +67,7 @@ export function initSite(ctx) {
         (ctx.crimeReport ? '<button class="btn" type="button" id="siteCrimeRep" data-push>Crime Report</button>' : '') + (ctx.femaReport ? '<button class="btn" type="button" id="siteFemaRep" data-push>FEMA Report</button>' : '') + (ctx.envReport ? '<button class="btn" type="button" id="siteEnvRep" data-push>Environmental Report</button>' : '') + (ctx.areaReports || []).filter(r => !r.noSite).map(r => { const ok = !r.cover || r.cover.test(center); return '<button class="btn" type="button" data-push data-ar="' + r.key + '"' + (ok ? '' : ' disabled title="' + esc(r.cover.why) + '"') + '>' + esc(r.label) + (ok ? '' : ' · ' + esc(r.cover.short)) + '</button>'; }).join('') + '</div>' +
         '<div class="rnote">Crime: City of Houston only (Houston Police). FEMA: flood zones, flood insurance claims, disasters and hazard risk. Environmental: cleanup sites, tanks, wells, pipelines, wetlands and soils around the parcel.</div></div>' : '');
     ctx.renderUtilities?.(el.querySelector('.util-slot'), center, parcel);
-    ctx.wireSiteReports?.(el, parcel?.geometry ? { parcels: [parcel], center, label: parcel.situs || '' } : null); // (none: the Regrid record, once fetched)
+    ctx.wireSiteReports?.(el, repT); // (none: the Regrid record, once fetched)
     const where = () => parcel?.situs || center[1].toFixed(4) + ', ' + center[0].toFixed(4), lab = () => repMi + ' mi around ' + where();
     el.querySelectorAll('.mi-chips [data-mi]').forEach(b => b.onclick = () => { repMi = +b.dataset.mi; el.querySelectorAll('.mi-chips [data-mi]').forEach(x => x.setAttribute('aria-checked', x === b)); });
     el.querySelector('#siteCrimeRep')?.addEventListener('click', () => ctx.crimeReport({ geometry: circle(center, repMi), label: lab(), center }));

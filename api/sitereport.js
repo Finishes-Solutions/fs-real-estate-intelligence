@@ -21,6 +21,7 @@ import { spendFor } from '../lib/spending.mjs';
 const withSpending = (tracts, ce) => !ce ? tracts : tracts.map(t => { const x = spendFor(t.ib, ce); return x ? { ...t, spend: x.spend, sph: x.sph, dine: x.sp.fa ?? null, furn: x.sp.hf ?? null, appa: x.sp.ap ?? null, sp: x.sp } : t; });
 import { pngDataUrl } from '../lib/reports/png.mjs';
 import { frame } from '../lib/siteplan.mjs';
+import { siteOutline, siteNote } from '../lib/reports/sitering.mjs';
 import { NWI, SDA, soilWkt, soilMapQuery, parseSoils, fieldVal, inTexas } from '../lib/env.mjs';
 
 export const KINDS = { parcel: 'Parcel Map', topo: 'Topography', environmental: 'Site Environmental', area: 'Area Report' };
@@ -103,12 +104,21 @@ export async function envLayers(center, recs, { terrain = true } = {}) {
 }
 
 export async function buildHtml(kind, { parcels, center, label }) {
-  const recs = parcels.map(toRecord), title = titleOf(label, recs), area = areaOf(recs), date = today(), geometry = { type: 'MultiPolygon', coordinates: recs.filter(r => r.geom.length > 2).map(r => [r.geom]) };
-  if (kind === 'parcel') return parcelReport({ title, area, date, parcels: recs, site: await siteFacts(center), source: parcels[0]?.source || 'County appraisal district' });
+  const all = parcels.map(toRecord), title = titleOf(label, all), date = today();
+  // several parcels: one site (lib/reports/sitering.mjs). Its middle is where the site facts and the rings are measured
+  // from, its merged outline is what the ground, the soils and the maps are measured on, and a parcel too far from the
+  // rest to be part of it is named on the page. The Parcel Map draws every parcel picked, each on its own.
+  const S = all.length > 1 ? siteOutline(all) : null, note = siteNote(S);
+  if (S) center = S.center;
+  if (kind === 'parcel') return parcelReport({ title, area: areaOf(all), date, parcels: all, site: await siteFacts(center), source: parcels[0]?.source || 'County appraisal district' });
+  const recs = S ? S.inSite : all, area = areaOf(recs), geometry = { type: 'MultiPolygon', coordinates: recs.filter(r => r.geom.length > 2).map(r => [r.geom]) };
+  // the outline measured, in feet round F's origin: the one parcel's own, or the merged site's (and the parcel lines inside it)
+  const siteLL = S ? S.ring : recs[0].geom.slice(0, recs[0].geom.length > 3 && recs[0].geom[0][0] === recs[0].geom.at(-1)[0] ? -1 : undefined);
+  const ringIn = F => siteLL.map(p => F.toFt(p)), lotsIn = F => (S?.lots || []).map(l => l.map(p => F.toFt(p)));
   if (kind === 'topo') {
-    const { terrainFor } = await import('./terrain.js'), F = frame(center), ring = recs[0].geom.slice(0, recs[0].geom.length > 3 && recs[0].geom[0][0] === recs[0].geom.at(-1)[0] ? -1 : undefined).map(p => F.toFt(p));
+    const { terrainFor } = await import('./terrain.js'), F = frame(center), ring = ringIn(F);
     const box = topoBox(recs.flatMap(r => r.geom).map(p => F.toFt(p))), T = await terrainFor(center, box, Date.now(), { meteo: false });
-    return topoReport({ title, area, date, terrain: T, ring, origin: center, png: pngDataUrl });
+    return topoReport({ title, area, date, terrain: T, ring, origin: center, png: pngDataUrl, lots: lotsIn(F), note });
   }
   if (kind === 'environmental') {
     const [{ envReport }, { femaReport }, facts] = await Promise.all([import('./env.js'), import('./fema.js'), siteFacts(center)]);
@@ -116,10 +126,10 @@ export async function buildHtml(kind, { parcels, center, label }) {
     // the wetlands search in the records came back empty-handed but the map has them: the map's answer stands for both
     if (env.kinds?.wetlands?.error && layers.wetlands && !layers.errors?.wetlands) { const F = layers.F, on = layers.wetlands.filter(w => recs.some(r => r.geom.some(p => w.rings.some(rg => inRingFt(F.toFt(p), rg)))));
       env.kinds.wetlands = { ...env.kinds.wetlands, error: undefined, count: layers.wetlands.length, onsite: on.length, nearest: on.slice(0, 5).map(w => ({ name: w.type || 'Wetland', addr: w.code, mi: 0 })), note: 'from the map area round the parcel' }; }
-    const F = layers.F || frame(center), ring = recs[0].geom.slice(0, recs[0].geom.length > 3 && recs[0].geom[0][0] === recs[0].geom.at(-1)[0] ? -1 : undefined).map(p => F.toFt(p));
+    const F = layers.F || frame(center), ring = ringIn(F);
     const soilInfo = (env.soils?.list || []).concat((layers.soils || []).map(s => s.info).filter(Boolean)).filter((x, i, a) => a.findIndex(y => y.name === x.name) === i);
-    return siteEnvReport({ title, area, date, env: { ...env, soils: { ...(env.soils || {}), list: soilInfo } }, fema, flood: facts.flood, parcelLabel: recs.length > 1 ? recs.length + ' parcels · searched from their outlines' : 'Parcel ' + recs[0].id + ' · searched from its outline',
-      maps: layers.box ? { ring, origin: center, F, layers, png: pngDataUrl } : null });
+    return siteEnvReport({ title, area, date, env: { ...env, soils: { ...(env.soils || {}), list: soilInfo } }, fema, flood: facts.flood, parcelLabel: recs.length > 1 ? recs.length + ' parcels · searched from their outlines' : 'Parcel ' + recs[0].id + ' · searched from its outline', note,
+      maps: layers.box ? { ring, origin: center, F, layers, png: pngDataUrl, lots: lotsIn(F) } : null });
   }
   if (kind === 'area') {
     const [m, f, a] = await Promise.all([load('market.json'), load('filings.json'), load('area.json').catch(() => null)]), zip = recs[0].zip, tx = inTexas(center);
@@ -127,7 +137,7 @@ export async function buildHtml(kind, { parcels, center, label }) {
     // Census Bureau (people, income and housing; no jobs or spending model there)
     const local = tx && coverage(m.tracts, center, 1) > 0.5, tracts = local ? m.tracts : withSpending(await liveTracts(center, Math.max(...RINGS) + 1, { year: m.year || 2024 }), await load('cache/ce.json').catch(() => null));
     const un = tx && a?.unemployment?.counties ? Object.values(a.unemployment.counties).find(c => recs[0].county && String(c.name).toLowerCase() === String(recs[0].county).replace(/ county/i, '').toLowerCase()) : null;
-    return ringsReport({ title, area, date, center, site: recs[0].geom, tracts, filings: tx ? f.filings : [], period: f.period, zip, zipRent: zip ? a?.rents?.zips?.[zip] : null, unemployment: un, acsYear: m.year ? (m.year - 4) + '–' + m.year : '',
+    return ringsReport({ title, area, date, center, site: siteLL, note, tracts, filings: tx ? f.filings : [], period: f.period, zip, zipRent: zip ? a?.rents?.zips?.[zip] : null, unemployment: un, acsYear: m.year ? (m.year - 4) + '–' + m.year : '',
       filingsNote: tx ? '' : 'Construction filings come from the Texas Department of Licensing and Regulation (TDLR), which covers Texas only. Outside Texas, check the county\'s building permits and the state\'s project registers.' });
   }
   throw Object.assign(new Error('Unknown report: ' + kind), { status: 400 });

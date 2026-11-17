@@ -431,6 +431,13 @@ Outside Texas the four work from the Regrid record (press **Get Regrid Details**
 - **Parcel Outline** (instant, a GeoJSON file): the full outline, every point exactly as the county draws it, with everything on record (and every Regrid field once you've fetched the Regrid record), its area, perimeter and courses. It opens in QGIS, ArcGIS, Google Earth, CAD tools that read GeoJSON and geojson.io.
 These four are unbranded (no company name), black and white with blue accents, so they can go to anyone.
 
+**Several parcels, one report.** Pick the parcels (Shift-click, or **⋯ → Select more** on touch screens), open the **All** tab and use **Reports for these parcels**: the same buttons, each making one report for all of them as one site. On the **Reports** page the group reads **For the selected parcels** while the All tab is open. A building that sits on several parcels gets the same on its own card (**Reports for these 3 parcels**).
+- **Parcel Map** draws every parcel to scale on one map, numbered, with a table of each parcel's owner, acres and values and the site totals, then each parcel's boundary and record on its own pages.
+- **Topography**, **Site Environmental** and the **Area Report** measure the parcels together as one outline: the lowest and highest ground, slope, sections, earthwork and soil shares are for the whole site, and the rings are measured from its middle. The parcel lines are drawn dashed inside the site, and the first page says how many parcels are in it and its acreage.
+- The parcels are joined the way **Site Plan for All** joins them: overlaps are taken out and gaps of up to 200 ft between them (a road, a ditch, a sliver between county lines) count as part of the site, and the page says so. A parcel more than 200 ft from the rest isn't part of the site: those three reports leave it out and name it on the first page, so run it on its own (the Parcel Map still shows every parcel picked).
+- **Parcel Outline** saves one file with every parcel as its own shape.
+- A pick with no parcel outline (no appraisal record there and no Regrid record fetched yet) is left out, and the card says how many.
+
 - The green **Export** button on the map opens **New report**, which makes:
   - a **Summary report** (PDF, Excel or web page);
   - a **Filing list** (PDF, Excel, CSV or map file);
@@ -1185,6 +1192,7 @@ The **?** button at the top right (Data & help; on phones, More → Data sources
 
 ## Recently added
 
+- **Reports for several parcels (Nov 17):** pick several parcels, open the **All** tab and make the Parcel Map, Topography, Site Environmental, Area Report and Parcel Outline for all of them as one site.
 - **Real building shapes and unit mix in a traced plan (Nov 14):** an agent tracing a drawing can now give each building its real footprint, its stated floor area and the apartments' unit mix from the drawing's table.
 - **Islands in a traced plan (Nov 13):** when an agent traces a drawing, the landscape islands in the parking and drives are now drawn as islands (curbed and planted), not left as blank ground.
 - **Agents can trace an existing drawing (Nov 13):** a connected agent can now put a site plan you already have onto the parcel exactly as drawn: ponds, lawns and paving by their outlines, drives by their centre lines, parking rows by their stall counts, and buildings left where the drawing has them.

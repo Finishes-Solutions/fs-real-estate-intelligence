@@ -159,8 +159,8 @@ export function initReports(ctx) {
   function parcelGroup() {
     if (!ctx.siteReportButtons) return '';
     const t = ctx.siteReportTarget?.();
-    return '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">For the open parcel <span class="rp-n">' + esc(t ? t.label || 'Parcel' : 'none open') + '</span></div>' +
-      (t ? '<span class="rp-hint">One click makes the PDF.</span>' : '<span class="rp-hint">Click a parcel on the Map, then come back here, or use the Reports block on its card.</span>') + '</div>' + ctx.siteReportButtons(t) + '</div>';
+    return '<div class="rp-sec rp-group"><div class="rp-gh"><div class="lt">' + (t?.parcels?.length > 1 ? 'For the selected parcels' : 'For the open parcel') + ' <span class="rp-n">' + esc(t ? t.label || 'Parcel' : 'none open') + '</span></div>' +
+      (t ? '<span class="rp-hint">One click makes the PDF.</span>' : '<span class="rp-hint">Click a parcel on the Map (or pick several and open the All tab), then come back here, or use the Reports block on its card.</span>') + '</div>' + ctx.siteReportButtons(t) + '</div>';
   }
   function rows() {
     const t = q.toLowerCase(), all = list.filter(r => (!kind || r.report === kind) && (!t || [r.file, kindOf(r.report), r.scope, tidyFilterText(r.filters)].join(' ').toLowerCase().includes(t)));

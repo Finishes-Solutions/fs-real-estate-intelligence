@@ -3,6 +3,16 @@
 Every push to the repository adds an entry at the top: date and time (US Central), what changed, and the commit(s).
 Nightly "Refresh data" commits from the data workflow are left out (they only update `data/`).
 
+## 2026-11-17
+
+### 1:25 PM CT: Site reports for several parcels at once (`matthew/vigilant-gates-jr09wi`, 4f38237, d43325d)
+- **Reports on the All tab:** with several parcels picked, the **All** tab now has **Reports for these parcels**: Parcel Map, Topography, Site Environmental, Area Report and Parcel Outline, one click each, for all of them as one site. Before, the reports were only on a single parcel's card.
+- **Measured on the whole site:** Topography, Site Environmental and the Area Report used to measure only the first parcel when given several. They now merge the parcels into one outline (the way Site Plan for All does, closing gaps of up to 200 ft such as a road or a ditch), measure the ground, soils and rings on it, draw the parcel lines dashed inside it and say on the first page how many parcels and acres it is.
+- **Nothing dropped quietly:** a parcel more than 200 ft from the rest is left out of those three reports and named on the first page; a pick with no parcel outline is counted on the card. The Parcel Map shows every parcel picked.
+- **Also:** a building that sits on several parcels gets reports for all of them from its own card, and the Reports page shows **For the selected parcels** while the All tab is open.
+- **Fix:** a parcel card's Site section (with its report buttons) no longer goes blank when the water-district lookup fails.
+- Checked on three adjoining Waller parcels (41119 Old Houston Hwy, 16.17 acres on the roll, 16.14 as one outline), picked in the app with Shift-click and run from the All tab. The live lidar, flood and soil sources can't be reached from where this was built, so the Topography and Environmental maps were checked with stand-in ground and layers on the real outlines; worth one real run after it's live.
+
 ## 2026-11-13
 
 ### 11:40 PM CT: Buildings in a traced site plan take their real footprint, floor area and unit mix (`matthew/wonderful-allen-iy00ka`)
