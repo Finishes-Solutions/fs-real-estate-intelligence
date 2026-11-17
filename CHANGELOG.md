@@ -5,7 +5,7 @@ Nightly "Refresh data" commits from the data workflow are left out (they only up
 
 ## 2026-11-17
 
-### 12:40 PM CT: Site reports for several parcels at once (`matthew/vigilant-gates-jr09wi`)
+### 1:25 PM CT: Site reports for several parcels at once (`matthew/vigilant-gates-jr09wi`, 4f38237, d43325d)
 - **Reports on the All tab:** with several parcels picked, the **All** tab now has **Reports for these parcels**: Parcel Map, Topography, Site Environmental, Area Report and Parcel Outline, one click each, for all of them as one site. Before, the reports were only on a single parcel's card.
 - **Measured on the whole site:** Topography, Site Environmental and the Area Report used to measure only the first parcel when given several. They now merge the parcels into one outline (the way Site Plan for All does, closing gaps of up to 200 ft such as a road or a ditch), measure the ground, soils and rings on it, draw the parcel lines dashed inside it and say on the first page how many parcels and acres it is.
 - **Nothing dropped quietly:** a parcel more than 200 ft from the rest is left out of those three reports and named on the first page; a pick with no parcel outline is counted on the card. The Parcel Map shows every parcel picked.
